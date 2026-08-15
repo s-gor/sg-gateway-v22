@@ -1,0 +1,218 @@
+name: dev-v22 Full Backup final validation R4
+
+on:
+  push:
+    branches: [dev-v22]
+    paths:
+      - .github/workflows/dev-v22-backup-fix-r4.yml
+
+permissions:
+  contents: write
+
+jobs:
+  validate-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout dev-v22
+        uses: actions/checkout@v4
+        with:
+          ref: dev-v22
+          fetch-depth: 0
+
+      - name: Guard expected state
+        run: |
+          test "$(cat VERSION)" = "0.1.0-021.12"
+          test "$(git branch --show-current)" = "dev-v22"
+          for f in \
+            .github/workflows/dev-v22-backup-fix.yml \
+            .github/workflows/dev-v22-backup-fix-r2.yml \
+            .github/workflows/dev-v22-backup-fix-r3.yml \
+            .github/workflows/dev-v22-backup-fix-r4.yml; do
+            test -f "$f"
+          done
+          git diff --exit-code
+
+      - name: Apply exact Fix 01 patch body
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          lines = Path('.github/workflows/dev-v22-backup-fix.yml').read_text(encoding='utf-8').splitlines()
+          target = '      - name: Apply Full Backup verifier and unlimited upload fix'
+          start = lines.index(target)
+          run_line = next(i for i in range(start + 1, len(lines)) if lines[i] == '        run: |')
+          body = []
+          for line in lines[run_line + 1:]:
+              if line.startswith('      - name:'):
+                  break
+              if line.startswith('          '):
+                  body.append(line[10:])
+              elif not line.strip():
+                  body.append('')
+              else:
+                  raise SystemExit(f'unexpected indentation: {line!r}')
+          script = '\n'.join(body) + '\n'
+          if 'stage_uploaded_full_backup_for_verification' not in script:
+              raise SystemExit('Fix 01 body extraction failed')
+          Path('/tmp/apply-fix01.sh').write_text(script, encoding='utf-8', newline='\n')
+          PY
+          bash /tmp/apply-fix01.sh
+
+      - name: Update inherited upload acceptance contracts
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path('tests/test_sg_gateway_02111_backup_domain_release.py')
+          text = p.read_text(encoding='utf-8')
+          old = '    assert "client_max_body_size 1024m;" in access\n'
+          new = '    assert "client_max_body_size 0;" in access\n'
+          if text.count(old) != 1:
+              raise SystemExit(f'legacy test 1024m assertion count={text.count(old)}')
+          p.write_text(text.replace(old, new, 1), encoding='utf-8', newline='\n')
+
+          p = Path('build-run.sh')
+          text = p.read_text(encoding='utf-8')
+          old = '''  grep -Fq 'client_max_body_size 1024m;' "\\$root/install.sh" || fail "В install.sh нет client_max_body_size для Full Restore"\n'''
+          new = '''  grep -Fq 'client_max_body_size 0;' "\\$root/install.sh" || fail "В install.sh Full Restore не переведён на unlimited upload"\n'''
+          if text.count(old) != 1:
+              raise SystemExit(f'build-run 1024m contract count={text.count(old)}')
+          p.write_text(text.replace(old, new, 1), encoding='utf-8', newline='\n')
+          PY
+
+      - name: Remove temporary workflows from candidate tree
+        run: |
+          git rm \
+            .github/workflows/dev-v22-backup-fix.yml \
+            .github/workflows/dev-v22-backup-fix-r2.yml \
+            .github/workflows/dev-v22-backup-fix-r3.yml \
+            .github/workflows/dev-v22-backup-fix-r4.yml
+
+      - name: Reject old upload caps
+        run: |
+          if grep -RsnE 'MAX_UPLOAD_BYTES|максимум 512 MiB|client_max_body_size 1024m;' app hostd deploy install.sh build-run.sh; then
+            echo 'Old Full Backup upload cap remains' >&2
+            exit 1
+          fi
+          grep -n 'client_max_body_size 0;' install.sh deploy/configure-panel-access.sh hostd/sg_hostd/full_backup_runtime.py build-run.sh
+
+      - name: Install test dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install -r requirements-dev.txt
+
+      - name: Syntax and targeted tests
+        env:
+          PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/hostd
+        run: |
+          python3 -B -c "from pathlib import Path; files=list(Path('app').rglob('*.py'))+list(Path('hostd').rglob('*.py'))+list(Path('tests').rglob('*.py')); [compile(p.read_text(encoding='utf-8'), str(p), 'exec') for p in files]; print(f'syntax ok: {len(files)} files')"
+          python3 -m pytest -q \
+            tests/test_sg_gateway_v22_full_backup_verify.py \
+            tests/test_sg_gateway_v22_full_backup_upload_unlimited.py \
+            tests/test_sg_gateway_02111_backup_domain_release.py
+
+      - name: Full repository tests
+        env:
+          PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/hostd
+        run: python3 -m pytest -q tests
+
+      - name: Remove test-generated runtime artifacts
+        run: |
+          rm -f data/system-activity.json
+          find . -type d -name __pycache__ -prune -exec rm -rf {} + || true
+          find . -type f \( -name '*.pyc' -o -name '*.pyo' \) -delete || true
+          rm -rf .pytest_cache .ruff_cache
+
+      - name: Stage permanent candidate before manifest generation
+        run: |
+          git add -A
+          echo '===== STAGED CANDIDATE ====='
+          git status --short
+          if git diff --cached --name-only | grep -Fx 'data/system-activity.json'; then
+            echo 'Transient data/system-activity.json must not be committed' >&2
+            exit 1
+          fi
+          for required in \
+            hostd/sg_hostd/full_backup_verify_runtime.py \
+            tests/test_sg_gateway_v22_full_backup_verify.py \
+            tests/test_sg_gateway_v22_full_backup_upload_unlimited.py; do
+            git ls-files --error-unmatch "$required" >/dev/null
+          done
+          if git ls-files | grep -E '^\.github/workflows/dev-v22-backup-fix(-r[234])?\.yml$'; then
+            echo 'Temporary workflow still present in staged candidate' >&2
+            exit 1
+          fi
+
+      - name: Rebuild source integrity manifest from staged Git inventory
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import subprocess
+          from pathlib import Path
+
+          tracked = subprocess.check_output(['git','ls-files'], text=True, encoding='utf-8').splitlines()
+          tracked = [p for p in tracked if p != 'SOURCE-SHA256SUMS']
+          rows = []
+          for path in sorted(tracked):
+              data = subprocess.check_output(['git','show',f':{path}'])
+              rows.append(f"{hashlib.sha256(data).hexdigest()}  {path}")
+          Path('SOURCE-SHA256SUMS').write_text('\n'.join(rows) + '\n', encoding='utf-8', newline='\n')
+          subprocess.check_call(['git','add','SOURCE-SHA256SUMS'])
+          print(f'SOURCE-SHA256SUMS rebuilt from staged index for {len(rows)} files')
+          PY
+
+      - name: Verify staged source integrity exactly
+        run: |
+          python3 - <<'PY'
+          import hashlib, re, subprocess
+          from pathlib import Path
+
+          expected = {}
+          for line_no, raw in enumerate(Path('SOURCE-SHA256SUMS').read_text(encoding='utf-8').splitlines(), 1):
+              if not raw.strip():
+                  continue
+              m = re.fullmatch(r'([0-9a-f]{64})  (.+)', raw)
+              if m is None:
+                  raise SystemExit(f'invalid checksum line {line_no}: {raw!r}')
+              digest, path = m.groups()
+              if path in expected:
+                  raise SystemExit(f'duplicate checksum path: {path}')
+              expected[path] = digest
+          tracked = set(subprocess.check_output(['git','ls-files'], text=True, encoding='utf-8').splitlines())
+          tracked.discard('SOURCE-SHA256SUMS')
+          if set(expected) != tracked:
+              raise SystemExit(f'inventory mismatch missing={sorted(tracked-set(expected))} extra={sorted(set(expected)-tracked)}')
+          for path in sorted(tracked):
+              data = subprocess.check_output(['git','show',f':{path}'])
+              actual = hashlib.sha256(data).hexdigest()
+              if actual != expected[path]:
+                  raise SystemExit(f'hash mismatch: {path}')
+          print(f'staged source integrity ok: {len(tracked)} files')
+          PY
+
+      - name: Create local validation commit
+        run: |
+          git config user.name "SG-Gateway Fix Runner"
+          git config user.email "actions@users.noreply.github.com"
+          git commit -m "VALIDATE Fix 01 Full Backup unlimited upload"
+          echo "VALIDATED_COMMIT=$(git rev-parse HEAD)"
+          echo "VALIDATED_TREE=$(git rev-parse 'HEAD^{tree}')"
+
+      - name: Build and verify committed FULL CLEAN artifact
+        run: |
+          bash build-run.sh /tmp/SG-Gateway-v22-Fix01-FULL-CLEAN.run
+          bash /tmp/SG-Gateway-v22-Fix01-FULL-CLEAN.run --verify-only
+
+      - name: Publish permanent Fix 01 without workflow deletion in Actions push
+        run: |
+          VALIDATED_TREE="$(git rev-parse 'HEAD^{tree}')"
+          git reset --soft HEAD^
+          git restore --source=HEAD --staged --worktree \
+            .github/workflows/dev-v22-backup-fix.yml \
+            .github/workflows/dev-v22-backup-fix-r2.yml \
+            .github/workflows/dev-v22-backup-fix-r3.yml \
+            .github/workflows/dev-v22-backup-fix-r4.yml
+          git commit -m "Fix 01: verify Full Backup and remove upload size limit"
+          echo "PUBLISHED_COMMIT=$(git rev-parse HEAD)"
+          echo "PUBLISHED_INTERMEDIATE_TREE=$(git rev-parse 'HEAD^{tree}')"
+          echo "EXPECTED_FINAL_TREE_AFTER_WORKFLOW_CLEANUP=$VALIDATED_TREE"
+          git push origin HEAD:dev-v22
