@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+import base64
+import json
+from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
 
 from app.clients.exports import build_protocol_export, protocol_ready
 from app.clients.repository import Client, device_access_tokens, list_devices
@@ -108,3 +110,70 @@ def build_sg_subscription_document(client: Client) -> dict:
         },
         "devices": devices,
     }
+
+
+def _subscription_label(client_name: str, device: dict, profile_name: str) -> str:
+    device_name = "Основное устройство" if device.get("primary") else str(device.get("name") or "Устройство")
+    return f"{client_name} · {device_name} · {profile_name}"
+
+
+def _with_fragment(uri: str, label: str) -> str:
+    parts = urlsplit(str(uri or "").strip())
+    if not parts.scheme:
+        return str(uri or "").strip()
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, parts.query, quote(label, safe="")))
+
+
+def _config_marker(profile: dict, device: dict) -> str:
+    raw = str(profile.get("config") or "").encode("utf-8")
+    encoded = base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
+    metadata = {
+        "profile": profile.get("id"),
+        "name": profile.get("name"),
+        "device_id": device.get("id"),
+        "device": device.get("name"),
+        "primary": bool(device.get("primary")),
+        "encoding": "base64url",
+        "data": encoded,
+    }
+    return "# SG-CONFIG " + json.dumps(metadata, ensure_ascii=False, separators=(",", ":"))
+
+
+def build_sg_subscription_text(client: Client) -> str:
+    """Build the SG v1 human-readable backward-compatible envelope with URI and SG-CONFIG records."""
+    document = build_sg_subscription_document(client)
+    summary = document["summary"]
+    lines = [
+        "# SG-SUBSCRIPTION/1",
+        "# scope=client",
+        f"# client={client.name}",
+        f"# devices={summary['devices']}",
+        f"# profiles-assigned={summary['profiles_assigned']}",
+        f"# profiles-ready={summary['profiles_ready']}",
+    ]
+
+    for device in document["devices"]:
+        device_name = "Основное устройство" if device.get("primary") else str(device.get("name") or "Устройство")
+        lines.append(
+            "# SG-DEVICE "
+            + json.dumps(
+                {
+                    "id": device.get("id"),
+                    "name": device_name,
+                    "primary": bool(device.get("primary")),
+                    "enabled": bool(device.get("enabled")),
+                },
+                ensure_ascii=False,
+                separators=(",", ":"),
+            )
+        )
+        for profile in device.get("profiles", []):
+            if not profile.get("ready"):
+                continue
+            if profile.get("format") == "uri" and profile.get("uri"):
+                label = _subscription_label(client.name, device, str(profile.get("name") or profile.get("id") or "Профиль"))
+                lines.append(_with_fragment(str(profile["uri"]), label))
+            elif profile.get("format") == "config" and profile.get("config"):
+                lines.append(_config_marker(profile, device))
+
+    return "\n".join(lines) + "\n"
