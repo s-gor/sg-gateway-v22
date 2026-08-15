@@ -688,27 +688,49 @@ def _restore_payload(payload_root: Path, preserve_machine_env: bool = True) -> N
 
 
 def _ensure_full_restore_upload_nginx() -> None:
-    # SG_GATEWAY_FULL_BACKUP_UPLOAD_FIX1
+    # Full Backup uploads are intentionally unlimited at nginx level.
+    # The natural limit is available disk space; the Python stager streams to disk.
     path = Path("/etc/nginx/sites-available/sg-gateway")
     if not path.is_file():
         return
     body = path.read_text(encoding="utf-8")
-    if "SG_GATEWAY_FULL_BACKUP_UPLOAD_FIX1" in body:
+    endpoint = "/maintenance/full-backups/restore"
+    pattern = re.compile(
+        rf"(?ms)^    location = {re.escape(endpoint)} \{{\n.*?^    \}}\n"
+    )
+    matches = list(pattern.finditer(body))
+    if len(matches) > 1:
+        raise RuntimeError(f"Nginx Full Restore proxy location is ambiguous: {len(matches)}")
+
+    if matches:
+        match = matches[0]
+        block = match.group(0)
+        directive = re.compile(r"(?m)^        client_max_body_size\s+[^;]+;$")
+        if directive.search(block):
+            normalized = directive.sub("        client_max_body_size 0;", block, count=1)
+        else:
+            normalized = block.replace(
+                f"    location = {endpoint} {{\n",
+                f"    location = {endpoint} {{\n        client_max_body_size 0;\n",
+                1,
+            )
+        if normalized != block:
+            body = body[:match.start()] + normalized + body[match.end():]
+            path.write_text(body, encoding="utf-8", newline="\n")
         return
+
     matches = list(re.finditer(
         r"(?m)^    location / \{\n        proxy_pass http://127\.0\.0\.1:(\d+);\n",
         body,
     ))
     if len(matches) != 1:
-        raise RuntimeError(
-            f"Nginx Full Restore proxy location is ambiguous: {len(matches)}"
-        )
+        raise RuntimeError(f"Nginx Full Restore proxy location is ambiguous: {len(matches)}")
     match = matches[0]
     port = match.group(1)
     block = (
-        "    # SG_GATEWAY_FULL_BACKUP_UPLOAD_FIX1\n"
         "    location = /maintenance/full-backups/restore {\n"
-        "        client_max_body_size 1024m;\n"
+        "        client_max_body_size 0;\n"
+        "        client_body_timeout 300s;\n"
         f"        proxy_pass http://127.0.0.1:{port};\n"
         "        proxy_http_version 1.1;\n"
         "        proxy_set_header Host $host;\n"
@@ -719,12 +741,7 @@ def _ensure_full_restore_upload_nginx() -> None:
         "        proxy_send_timeout 300s;\n"
         "    }\n"
     )
-    path.write_text(
-        body[:match.start()] + block + body[match.start():],
-        encoding="utf-8",
-        newline="\n",
-    )
-
+    path.write_text(body[:match.start()] + block + body[match.start():], encoding="utf-8", newline="\n")
 
 def _probe(
     command: list[str],

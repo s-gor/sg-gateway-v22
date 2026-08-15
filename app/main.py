@@ -59,10 +59,11 @@ from app.maintenance.full_backups import (
     get_full_backup,
     list_full_backups,
     stage_uploaded_full_backup,
+    stage_uploaded_full_backup_for_verification,
 )
 from app.maintenance.diagnostics import build_diagnostic_report, build_diagnostic_report_json
 from app.maintenance.health import collect_health_checks, health_summary
-from app.maintenance.operations import list_operations
+from app.maintenance.operations import list_operations, log_operation
 from app.maintenance.service import collect_diagnostics
 from app.maintenance.xray_updates import overview as xray_update_overview
 from app.maintenance.panel_updates import overview as panel_update_overview
@@ -1661,13 +1662,58 @@ def create_app() -> Flask:
     @app.post("/maintenance/full-backups/restore")
     def restore_full_backup_route():
         upload = request.files.get("backup")
-        if upload is None or not str(upload.filename or "").strip():
+        original_name = str(getattr(upload, "filename", "") or "").strip() if upload is not None else ""
+        if upload is None or not original_name:
             flash("Выберите файл .sgbackup", "error")
             return redirect(url_for("maintenance", tab="backups"))
+
+        verify_only = request.form.get("backup_action", "").strip().lower() == "verify"
+        staged = None
         try:
-            stage_uploaded_full_backup(upload)
+            if verify_only:
+                staged = stage_uploaded_full_backup_for_verification(upload)
+            else:
+                stage_uploaded_full_backup(upload)
         except ValueError as exc:
+            if verify_only:
+                log_operation("backup.full.verify", f"backup:{original_name}", str(exc), status="error")
             flash(str(exc), "error")
+            return redirect(url_for("maintenance", tab="backups"))
+
+        if verify_only:
+            try:
+                result = run_hostd_command("backup.full.verify", timeout=180)
+            except Exception as exc:
+                message = f"Проверка backup не выполнена: {exc}"
+                log_operation("backup.full.verify", f"backup:{original_name}", message, status="error")
+                flash(message, "error")
+                return redirect(url_for("maintenance", tab="backups"))
+            finally:
+                if staged is not None:
+                    staged.unlink(missing_ok=True)
+
+            if result.status != "ok":
+                message = result.message or "Backup не прошёл проверку"
+                log_operation("backup.full.verify", f"backup:{original_name}", message, status="error")
+                flash(f"Backup НЕ прошёл проверку: {message}", "error")
+                return redirect(url_for("maintenance", tab="backups"))
+
+            payload = result.payload or {}
+            sha256 = str(payload.get("sha256") or "")
+            source_version = str(payload.get("source_version") or "unknown")
+            created_at = str(payload.get("created_at") or "не указано")
+            tables = int(payload.get("database_tables") or 0)
+            database_size = _format_bytes(payload.get("database_size_bytes") or 0)
+            certificates = "есть" if payload.get("contains_letsencrypt_certificates") else "нет"
+            message = (
+                f"Backup исправен: {original_name}. "
+                f"SG-Gateway {source_version}; создан {created_at}; "
+                f"SQLite: OK, таблиц {tables}, {database_size}; "
+                f"сертификаты: {certificates}; SHA-256: {sha256}. "
+                "Восстановление не выполнялось."
+            )
+            log_operation("backup.full.verify", f"backup:{original_name}", message)
+            flash(message, "success")
             return redirect(url_for("maintenance", tab="backups"))
 
         result = run_hostd_command("backup.full.restore.start", timeout=20)
