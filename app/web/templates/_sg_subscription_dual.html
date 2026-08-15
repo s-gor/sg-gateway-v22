@@ -1,0 +1,47 @@
+{% set client_subscription_universal = sg_subscription_universal_url(client) %}
+{% set client_subscription_native = sg_subscription_native_url(client) %}
+{% if client_subscription_universal and client_subscription_native %}
+<section class="dv16-subscription sg-subscription-dual state-applied" data-sg-subscription-v1 data-sg-subscription-dual-v1>
+  <div class="dv16-subscription-summary sg-subscription-dual-summary">
+    <strong>Подписки клиента</strong>
+    <span>Два формата одной подписки.</span>
+    <small>Универсальная — стандартные URI для совместимых клиентов. SG — расширенный формат для SG Client и SG Mobile, включая конфигурации AmneziaWG 2.0.</small>
+  </div>
+
+  <div class="sg-subscription-format-grid" aria-label="Форматы подписки клиента">
+    <article class="sg-subscription-format" data-sg-subscription-format="universal">
+      <div class="sg-subscription-format-copy">
+        <strong>Универсальная подписка</strong>
+        <small>Основной совместимый Base64 feed со стандартными URI.</small>
+      </div>
+      <div class="dv16-subscription-actions sg-subscription-format-actions">
+        <button class="button primary dv16-copy sg-subscription-copy-universal" type="button" data-copy-value="{{ client_subscription_universal|e }}">Скопировать</button>
+        <details class="dv16-qr">
+          <summary class="button">QR</summary>
+          <div class="dv16-qr-popover">
+            <button type="button" aria-label="Закрыть QR" onclick="this.closest('details').removeAttribute('open')">×</button>
+            <img src="/clients/{{ client.id }}/sg-subscription-v1/qr/universal" alt="QR универсальной подписки {{ client.name }}">
+          </div>
+        </details>
+      </div>
+    </article>
+
+    <article class="sg-subscription-format" data-sg-subscription-format="native">
+      <div class="sg-subscription-format-copy">
+        <strong>SG Client / SG Mobile</strong>
+        <small>SG Subscription v1: стандартные URI плюс SG-CONFIG для AWG2.</small>
+      </div>
+      <div class="dv16-subscription-actions sg-subscription-format-actions">
+        <button class="button dv16-copy sg-subscription-copy-native" type="button" data-copy-value="{{ client_subscription_native|e }}">Скопировать</button>
+        <details class="dv16-qr">
+          <summary class="button">QR</summary>
+          <div class="dv16-qr-popover">
+            <button type="button" aria-label="Закрыть QR" onclick="this.closest('details').removeAttribute('open')">×</button>
+            <img src="/clients/{{ client.id }}/sg-subscription-v1/qr" alt="QR SG Subscription {{ client.name }}">
+          </div>
+        </details>
+      </div>
+    </article>
+  </div>
+</section>
+{% endif %}

@@ -58,6 +58,9 @@
     </div>
   </header>
 
+  <!-- SG_SUBSCRIPTION_DUAL_UI_V1 -->
+  {% include "_sg_subscription_dual.html" %}
+
   <section class="dv16-devices" aria-label="Устройства клиента">
     {% for view in device_views %}
     {% set device = view.device %}
@@ -109,7 +112,7 @@
 
       <section class="dv16-subscription state-{{ subscription.status if subscription else 'missing' }}">
         <div class="dv16-subscription-summary">
-          <strong>Подписка устройства</strong>
+          <strong>Legacy SUB устройства</strong>
           {% if subscription and subscription.status == 'applied' and subscription.payload %}
           <span>Ссылка для NekoBox и совместимых клиентов.</span>
           <small>SUB: VLESS Reality TCP · Hysteria2 · AnyTLS · TUIC v5 — только выбранные и готовые.</small>
