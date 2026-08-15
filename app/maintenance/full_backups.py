@@ -10,7 +10,8 @@ from app.config import load_config
 
 FULL_BACKUP_SUFFIX = ".sgbackup"
 RESTORE_UPLOAD_NAME = "restore-upload.sgbackup"
-MAX_UPLOAD_BYTES = 512 * 1024 * 1024
+VERIFY_UPLOAD_NAME = "verify-upload.sgbackup"
+_TRANSIENT_UPLOAD_NAMES = {RESTORE_UPLOAD_NAME, VERIFY_UPLOAD_NAME}
 
 
 @dataclass(frozen=True)
@@ -46,7 +47,7 @@ def list_full_backups() -> list[FullBackupInfo]:
     paths = [
         path
         for path in directory.glob("SG-Gateway-FULL-*.sgbackup")
-        if path.is_file() and path.name != RESTORE_UPLOAD_NAME
+        if path.is_file() and path.name not in _TRANSIENT_UPLOAD_NAMES
     ]
     return sorted((_info(path) for path in paths), key=lambda item: item.name, reverse=True)
 
@@ -55,19 +56,22 @@ def get_full_backup(name: str) -> FullBackupInfo | None:
     if not _valid_name(name):
         return None
     path = get_full_backup_dir() / name
-    if not path.is_file() or path.name == RESTORE_UPLOAD_NAME:
+    if not path.is_file() or path.name in _TRANSIENT_UPLOAD_NAMES:
         return None
     return _info(path)
 
 
-def stage_uploaded_full_backup(file_storage) -> Path:
+def _stage_uploaded_full_backup(file_storage, destination_name: str) -> Path:
+    if destination_name not in _TRANSIENT_UPLOAD_NAMES:
+        raise ValueError("Недопустимое имя временного backup")
+
     original = str(getattr(file_storage, "filename", "") or "").strip()
     if not original.lower().endswith(FULL_BACKUP_SUFFIX):
         raise ValueError("Нужен файл SG-Gateway с расширением .sgbackup")
 
     directory = get_full_backup_dir()
-    destination = directory / RESTORE_UPLOAD_NAME
-    temporary = directory / f".{RESTORE_UPLOAD_NAME}.tmp"
+    destination = directory / destination_name
+    temporary = directory / f".{destination_name}.tmp"
     temporary.unlink(missing_ok=True)
 
     total = 0
@@ -77,10 +81,6 @@ def stage_uploaded_full_backup(file_storage) -> Path:
             if not chunk:
                 break
             total += len(chunk)
-            if total > MAX_UPLOAD_BYTES:
-                handle.close()
-                temporary.unlink(missing_ok=True)
-                raise ValueError("Полный backup больше допустимых 512 MiB")
             handle.write(chunk)
         handle.flush()
         os.fsync(handle.fileno())
@@ -92,3 +92,11 @@ def stage_uploaded_full_backup(file_storage) -> Path:
     os.chmod(temporary, 0o600)
     os.replace(temporary, destination)
     return destination
+
+
+def stage_uploaded_full_backup(file_storage) -> Path:
+    return _stage_uploaded_full_backup(file_storage, RESTORE_UPLOAD_NAME)
+
+
+def stage_uploaded_full_backup_for_verification(file_storage) -> Path:
+    return _stage_uploaded_full_backup(file_storage, VERIFY_UPLOAD_NAME)

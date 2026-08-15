@@ -112,7 +112,7 @@ verify_source() {
   [[ -f "\$root/assets/placeholder/restarting.html" ]] || fail "Нет статической restart page"
   grep -Fq 'SG_GATEWAY_FULL_BACKUP_UPLOAD_FIX1' "\$root/deploy/configure-panel-access.sh" || fail "Нет upload limit для Full Restore"
   grep -Fq 'SG_GATEWAY_02111_CUMULATIVE_FULL_RESTORE_UPLOAD_FIX' "\$root/install.sh" || fail "Clean/update installer не гарантирует upload limit Full Restore"
-  grep -Fq 'client_max_body_size 1024m;' "\$root/install.sh" || fail "В install.sh нет client_max_body_size для Full Restore"
+  grep -Fq 'client_max_body_size 0;' "\$root/install.sh" || fail "В install.sh Full Restore не переведён на unlimited upload"
   grep -Fq 'data-sg-full-file' "\$root/app/web/templates/maintenance.html" || fail "Нет Full Backup UI V2"
   grep -Fq 'SG_GATEWAY_02110_DOMAIN_EXPORT_FIX1' "\$root/app/clients/exports.py" || fail "Нет domain endpoint policy"
   ! grep -RIl --exclude='*.pyc' --exclude-dir='__pycache__' -E 'CLIENT_TRAFFIC|TRAFFIC3|TRAFFIC2|client_traffic' "\$root/app" "\$root/hostd" >/dev/null || fail "В 021.12 обнаружен код Traffic"

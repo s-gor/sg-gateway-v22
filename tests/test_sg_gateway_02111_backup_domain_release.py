@@ -66,7 +66,7 @@ def test_nginx_upload_contract_is_durable() -> None:
     access = text("deploy/configure-panel-access.sh")
     runtime = text("hostd/sg_hostd/full_backup_runtime.py")
     assert "SG_GATEWAY_FULL_BACKUP_UPLOAD_FIX1" in access
-    assert "client_max_body_size 1024m;" in access
+    assert "client_max_body_size 0;" in access
     assert "proxy_read_timeout 300s;" in access
     assert "def _ensure_full_restore_upload_nginx()" in runtime
 

@@ -24,6 +24,7 @@
   'connection.update': 'Обновлены настройки подключения',
   'backup.create': 'Создана резервная копия',
   'backup.restore': 'Восстановлена резервная копия',
+  'backup.full.verify': 'Проверен полный backup',
   'diagnostics.download': 'Скачана диагностика',
   'client.create': 'Создан клиент',
   'client.enable': 'Клиент включён',
@@ -340,12 +341,17 @@
             <span class="sg-full-file-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 16V4m0 0 4 4m-4-4-4 4M5 15v4h14v-4"/></svg></span>
             <span class="sg-full-file-copy">
               <strong data-sg-full-file-name>Выберите .sgbackup</strong>
-              <small data-sg-full-file-meta>Нажмите, чтобы выбрать файл · максимум 512 MiB</small>
+              <small data-sg-full-file-meta>Нажмите, чтобы выбрать файл · размер не ограничен</small>
             </span>
             <span class="sg-full-file-action">Выбрать файл</span>
           </label>
           <div class="sg-full-restore-actions">
-            <span class="sg-full-restore-note">Перед восстановлением автоматически создаётся страховочный Full Backup.</span>
+            <span class="sg-full-restore-note">Проверка ничего не меняет. Перед восстановлением автоматически создаётся страховочный Full Backup.</span>
+            <button class="button sg-full-restore-button sg-full-verify-button" type="submit"
+                    name="backup_action" value="verify" disabled data-sg-full-verify-button>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>
+              <span>Проверить backup</span>
+            </button>
             <button class="button mtv2-restore sg-full-restore-button" type="submit" disabled data-sg-full-restore-button>
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.3-5.7M4 4v6h6"/></svg>
               <span>Восстановить сервер</span>
@@ -663,12 +669,21 @@
       const fileName = form.querySelector("[data-sg-full-file-name]");
       const fileMeta = form.querySelector("[data-sg-full-file-meta]");
       const restoreButton = form.querySelector("[data-sg-full-restore-button]");
-      if (!input || !fileName || !fileMeta || !restoreButton) return;
+      const verifyButton = form.querySelector("[data-sg-full-verify-button]");
+      if (!input || !fileName || !fileMeta || !restoreButton || !verifyButton) return;
+
+      verifyButton.addEventListener("click", () => {
+        form.dataset.sgConfirmBypass = "1";
+        window.setTimeout(() => {
+          if (form.dataset.sgConfirmBypass === "1") delete form.dataset.sgConfirmBypass;
+        }, 0);
+      });
 
       const reset = () => {
         fileName.textContent = "Выберите .sgbackup";
-        fileMeta.textContent = "Нажмите, чтобы выбрать файл · максимум 512 MiB";
+        fileMeta.textContent = "Нажмите, чтобы выбрать файл · размер не ограничен";
         restoreButton.disabled = true;
+        verifyButton.disabled = true;
         form.classList.remove("has-file");
       };
 
@@ -679,8 +694,9 @@
           return;
         }
         fileName.textContent = file.name;
-        fileMeta.textContent = `${formatBytes(file.size)} · готов к восстановлению`;
+        fileMeta.textContent = `${formatBytes(file.size)} · готов к проверке / восстановлению`;
         restoreButton.disabled = false;
+        verifyButton.disabled = false;
         form.classList.add("has-file");
       });
 
