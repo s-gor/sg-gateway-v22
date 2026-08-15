@@ -1982,8 +1982,7 @@ stage_local_application_smoke_test() {
     SG_GATEWAY_SECRET_KEY="smoke-test-secret" \
     SG_GATEWAY_ADMIN_PASSWORD="smoke-test-password" \
     "$PREFIX/.venv/bin/python" - <<'PY'
-from app.main import create_app
-app = create_app()
+from app.production import app
 app.testing = True
 client = app.test_client()
 health = client.get('/health')
@@ -2193,7 +2192,7 @@ User=${PANEL_USER}
 Group=${PANEL_GROUP}
 WorkingDirectory=${PREFIX}
 EnvironmentFile=${CONFIG_DIR}/sg-gateway.env
-ExecStart=${PREFIX}/.venv/bin/waitress-serve --host=\${SG_GATEWAY_HOST} --port=\${SG_GATEWAY_PORT} app.main:app
+ExecStart=${PREFIX}/.venv/bin/waitress-serve --host=\${SG_GATEWAY_HOST} --port=\${SG_GATEWAY_PORT} app.production:app
 Restart=on-failure
 RestartSec=3
 TimeoutStopSec=30
