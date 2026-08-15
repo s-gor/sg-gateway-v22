@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-REPOSITORY="s-gor/sg-gateway"
-BRANCH="${SG_GATEWAY_GITHUB_BRANCH:-main}"
+REPOSITORY="s-gor/sg-gateway-v22"
+BRANCH="${SG_GATEWAY_GITHUB_BRANCH:-${SG_GATEWAY_UPDATE_BRANCH:-dev-v22}}"
 ARCHIVE_URL="https://github.com/${REPOSITORY}/archive/refs/heads/${BRANCH}.tar.gz"
 GIT_URL="https://github.com/${REPOSITORY}.git"
 
@@ -388,6 +388,101 @@ run_stage() {
   printf '%s[SG-Gateway Update] [OK]%s %s\n' "$GREEN" "$RESET" "$label"
 }
 
+# SG_GATEWAY_02205_WSGI_ISOLATED_VALIDATION_V1
+panel_wsgi_target() {
+  local raw
+  raw="$(systemctl show -p ExecStart --value "$PANEL_SERVICE" 2>/dev/null || true)"
+  python3 - "$raw" <<'PYWSGITARGET'
+import re
+import sys
+
+raw = sys.argv[1]
+items = re.findall(
+    r"(?<![A-Za-z0-9_.])([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*:[A-Za-z_]\w*)(?![A-Za-z0-9_])",
+    raw,
+)
+print(items[-1] if items else "app.production:app")
+PYWSGITARGET
+}
+
+validate_candidate_wsgi_target() {
+  local source="$1" target module
+  target="$(panel_wsgi_target)"
+  module="${target%%:*}"
+  "$PREFIX/.venv/bin/python" -B - "$source" "$module" "$target" <<'PYCANDIDATEWSGI'
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+module = sys.argv[2]
+target = sys.argv[3]
+module_path = root.joinpath(*module.split("."))
+present = module_path.with_suffix(".py").is_file() or (module_path / "__init__.py").is_file()
+if not present:
+    raise SystemExit(
+        f"candidate source does not provide installed panel WSGI target {target}"
+    )
+print(f"Candidate WSGI target: {target} -> module present")
+PYCANDIDATEWSGI
+}
+
+validate_deployed_panel() {
+  runuser -u sg-gateway -- "$PREFIX/.venv/bin/python" -B -c \
+    'from pathlib import Path; from jinja2 import Environment; env=Environment(); [env.parse(p.read_text(encoding="utf-8")) for p in Path("/opt/sg-gateway/app/web/templates").rglob("*.html")]; print("Templates: OK")'
+
+  local target validation_root
+  target="$(panel_wsgi_target)"
+  validation_root="$TEMP_DIR/wsgi-validation"
+  rm -rf "$validation_root"
+  # TEMP_DIR is created root:root 0700 by mktemp. The deployed WSGI import
+  # runs as sg-gateway, so allow traversal only for the duration of this
+  # isolated validation. Directory listing remains denied.
+  chmod 0711 "$TEMP_DIR"
+  install -d -m 0750 -o sg-gateway -g sg-gateway \
+    "$validation_root" "$validation_root/data" "$validation_root/log"
+
+  runuser -u sg-gateway -- "$PREFIX/.venv/bin/python" -B - \
+    "$PREFIX" "$CONFIG_DIR/sg-gateway.env" "$target" "$validation_root" <<'PYDEPLOYEDWSGI'
+import importlib
+import os
+import shlex
+import sys
+from pathlib import Path
+
+prefix = Path(sys.argv[1])
+env_file = Path(sys.argv[2])
+target = sys.argv[3]
+validation_root = Path(sys.argv[4])
+
+for raw in env_file.read_text(encoding="utf-8").splitlines():
+    line = raw.strip()
+    if not line or line.startswith("#") or "=" not in line:
+        continue
+    name, value = line.split("=", 1)
+    name = name.strip()
+    value = value.strip()
+    if value[:1] in {'"', "'"}:
+        try:
+            parsed = shlex.split(value, posix=True)
+            value = parsed[0] if parsed else ""
+        except ValueError:
+            value = value[1:-1] if len(value) >= 2 else ""
+    os.environ[name] = value
+
+# The import can execute app.main -> init_db(). Keep it away from production.
+os.environ["SG_GATEWAY_DATA_DIR"] = str(validation_root / "data")
+os.environ["SG_GATEWAY_LOG_DIR"] = str(validation_root / "log")
+
+os.chdir(prefix)
+sys.path.insert(0, str(prefix))
+module_name, object_name = target.split(":", 1)
+module = importlib.import_module(module_name)
+getattr(module, object_name)
+print(f"Panel WSGI import: OK ({target}) with isolated data/log")
+PYDEPLOYEDWSGI
+  chmod 0700 "$TEMP_DIR"
+}
+
 preflight() {
   [[ "$(id -u)" -eq 0 ]] || fail "run this updater through sudo"
   [[ -f "$PREFIX/VERSION" && -f "$CONFIG_DIR/runtime.env" && -f "$CONFIG_DIR/sg-gateway.env" ]] || {
@@ -490,6 +585,7 @@ prepare_source() {
   [[ -f "$SOURCE_DIR/requirements.txt" ]] || fail "requirements.txt is missing from GitHub source"
   [[ -f "$SOURCE_DIR/hostd/requirements.txt" ]] || fail "hostd/requirements.txt is missing from GitHub source"
   [[ -f "$SOURCE_DIR/app/main.py" ]] || fail "app/main.py is missing from GitHub source"
+  [[ -f "$SOURCE_DIR/app/production.py" ]] || fail "app/production.py is missing from GitHub source"
   [[ -f "$SOURCE_DIR/hostd/sg_hostd/app.py" ]] || fail "hostd source is missing from GitHub source"
 
   if ! cmp -s "$PREFIX/requirements.txt" "$SOURCE_DIR/requirements.txt"; then
@@ -512,6 +608,7 @@ if not ok:
 print("Python syntax: OK")
 PYCHECK
 
+  validate_candidate_wsgi_target "$SOURCE_DIR"
 }
 
 # SG_GATEWAY_02112_LIGHT_UPDATE_ASSET_PRESERVE_FIX10
@@ -671,9 +768,7 @@ main() {
 
   run_stage 2 "Safety Backup: SG state + full /etc/letsencrypt" create_safety_backup
   run_stage 3 "Обновление только исходников SG-Gateway" deploy_source "$SOURCE_DIR"
-  run_stage 4 "Python/UI проверка без изменения runtime" \
-    runuser -u sg-gateway -- "$PREFIX/.venv/bin/python" -B -c \
-      'from pathlib import Path; from jinja2 import Environment; env=Environment(); [env.parse(p.read_text(encoding="utf-8")) for p in Path("/opt/sg-gateway/app/web/templates").rglob("*.html")]; print("Templates: OK")'
+  run_stage 4 "Python/UI проверка без изменения runtime" validate_deployed_panel
   run_stage 5 "Перезапуск только panel + hostd" restart_panel
   run_stage 6 "Проверка HTTPS, Clients, Nginx и runtime" verify_final
 

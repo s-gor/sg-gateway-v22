@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 REPOSITORY="s-gor/sg-gateway-v22"
-BRANCH="${SG_GATEWAY_GITHUB_BRANCH:-dev-v22}"
+BRANCH="${SG_GATEWAY_GITHUB_BRANCH:-${SG_GATEWAY_UPDATE_BRANCH:-dev-v22}}"
 ARCHIVE_URL="https://github.com/${REPOSITORY}/archive/refs/heads/${BRANCH}.tar.gz"
 TEMP_DIR=""
 
@@ -27,7 +27,7 @@ if [[ -f /opt/sg-gateway/VERSION && -f /etc/sg-gateway/runtime.env && -f /etc/sg
   printf '[SG-Gateway] SG-Gateway %s is already installed.\n' "${installed_version:-unknown}"
   printf '[SG-Gateway] Clean Install is blocked on an existing server.\n'
   printf '[SG-Gateway] Use the dedicated Update command:\n'
-  printf 'curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway/main/deploy/update-from-github.sh | sudo bash\n'
+  printf 'curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/dev-v22/deploy/update-from-github.sh | sudo bash\n'
   exit 2
 fi
 
