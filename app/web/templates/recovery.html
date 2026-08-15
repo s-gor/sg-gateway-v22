@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="ru" data-theme="dark">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script>
+      try {
+        const savedTheme = localStorage.getItem("sg-gateway-theme");
+        document.documentElement.dataset.theme = savedTheme === "light" ? "light" : "dark";
+      } catch (_) {}
+    </script>
+    <title>SG-Gateway · Recovery</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='sg-luxury-jade-depth-v2.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='sg-readable-typography-v3.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='sg-recovery-restore-v1.css') }}?v={{ app_version }}-recovery-restore-v1">
+  </head>
+  <body class="sg-body">
+    <main class="recovery-shell">
+      <header class="recovery-header">
+        <div class="brand">
+          <div class="brand-mark">SG</div>
+          <div>
+            <div class="brand-name">SG-Gateway Recovery</div>
+            <div class="brand-note">Минимальная аварийная страница</div>
+          </div>
+        </div>
+        <div class="topbar-actions">
+          <a class="button primary" href="/maintenance">Maintenance</a>
+          <a class="button" href="/maintenance/diagnostics.json">Скачать диагностику</a>
+          <a class="button" href="/">Открыть панель</a>
+        </div>
+      </header>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <section class="flash-stack recovery-flash-stack" aria-live="polite">
+          {% for category, message in messages %}
+            <div class="flash-message {{ category }}">{{ message }}</div>
+          {% endfor %}
+        </section>
+        {% endif %}
+      {% endwith %}
+
+      <section class="tool-panel sg-ljd-card-large">
+        <div class="section-heading">
+          <h1>Состояние: {{ health.upper() }}</h1>
+          <p>Эта страница намеренно упрощена: состояние, проверки, последние резервные копии и быстрые ссылки панели.</p>
+        </div>
+      </section>
+
+      <section class="table-panel section-block sg-ljd-card-large">
+        <table class="data-table sg-ljd-table">
+          <thead>
+            <tr>
+              <th>Проверка</th>
+              <th>Статус</th>
+              <th>Сообщение</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for check in health_checks %}
+              <tr>
+                <td><strong>{{ check.name }}</strong></td>
+                <td><span class="badge {{ 'success' if check.status == 'ok' else ('idle' if check.status == 'idle' else '') }}">{{ {'ok': 'Норма', 'idle': 'Не используется', 'warning': 'Предупреждение', 'error': 'Ошибка'}.get(check.status, check.status) }}</span></td>
+                <td>{{ check.message }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </section>
+
+      <section class="table-panel sg-ljd-card-large">
+        {% if backups %}
+          <table class="data-table sg-ljd-table">
+            <thead>
+              <tr>
+                <th>Последние резервные копии</th>
+                <th>Тип</th>
+                <th>Создана</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for backup in backups %}
+                <tr>
+                  <td><strong>{{ backup.name }}</strong></td>
+                  <td>{{ backup.kind }}</td>
+                  <td>{{ backup.created_at }}</td>
+                  <td class="actions-cell">
+                    <div class="recovery-backup-actions">
+                      <a class="button small" href="{{ url_for('download_backup_route', name=backup.name) }}">Скачать</a>
+                      <button class="button small recovery-restore-button"
+                              type="button"
+                              data-recovery-restore
+                              data-backup-name="{{ backup.name }}"
+                              data-restore-url="{{ url_for('recovery_restore_backup_route', name=backup.name) }}">Восстановить</button>
+                    </div>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        {% else %}
+          <div class="empty-state sg-ljd-nested">
+            <h2>Резервных копий пока нет</h2>
+            <p>Последние резервные копии появятся здесь после создания первой копии.</p>
+          </div>
+        {% endif %}
+      </section>
+
+      <dialog class="recovery-confirm" id="recovery-confirm" aria-labelledby="recovery-confirm-title">
+        <form method="post" id="recovery-restore-form">
+          <div class="recovery-confirm-kicker">ВОССТАНОВЛЕНИЕ</div>
+          <h2 id="recovery-confirm-title">Восстановить резервную копию?</h2>
+          <p>Перед заменой текущей базы будет автоматически создана страховочная копия.</p>
+          <code id="recovery-confirm-backup"></code>
+          <div class="recovery-confirm-actions">
+            <button class="button" type="button" id="recovery-confirm-cancel">Отмена</button>
+            <button class="button recovery-restore-button" type="submit">Восстановить</button>
+          </div>
+        </form>
+      </dialog>
+    </main>
+
+    <script>
+      (() => {
+        const dialog = document.getElementById("recovery-confirm");
+        const form = document.getElementById("recovery-restore-form");
+        const backupName = document.getElementById("recovery-confirm-backup");
+        const cancel = document.getElementById("recovery-confirm-cancel");
+        const requestedRestore = {{ requested_restore|tojson }};
+        if (!dialog || !form || !backupName) return;
+        const openRestore = (button) => {
+          form.action = button.dataset.restoreUrl || "";
+          backupName.textContent = button.dataset.backupName || "";
+          if (typeof dialog.showModal === "function") dialog.showModal();
+          else dialog.setAttribute("open", "");
+        };
+        document.querySelectorAll("[data-recovery-restore]").forEach((button) => button.addEventListener("click", () => openRestore(button)));
+        cancel?.addEventListener("click", () => dialog.close());
+        dialog.addEventListener("click", (event) => { if (event.target === dialog) dialog.close(); });
+        if (requestedRestore) {
+          const requested = Array.from(document.querySelectorAll("[data-recovery-restore]")).find((button) => button.dataset.backupName === requestedRestore);
+          if (requested) openRestore(requested);
+        }
+      })();
+    </script>
+  </body>
+</html>

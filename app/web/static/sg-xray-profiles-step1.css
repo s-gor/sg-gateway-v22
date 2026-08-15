@@ -1,0 +1,15 @@
+/* SG-Gateway Xray independent profiles · Step 1 */
+.xps1-panel{margin-top:20px;padding:24px;border:1px solid var(--border,#c4d0d8);border-radius:18px;background:var(--panel,#edf2f5)}
+.xps1-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin-bottom:18px}
+.xps1-head h2{margin:3px 0 5px;font-size:24px}.xps1-head p{margin:0;color:var(--muted,#587083);font-size:15px}
+.xps1-summary{display:flex;gap:8px;flex-wrap:wrap}.xps1-chip{padding:6px 10px;border-radius:999px;border:1px solid var(--border,#b8c8d2);font-size:12px;font-weight:800}.xps1-chip.good{color:#0b7858;border-color:#7ebba8;background:#e5f4ee}.xps1-chip.locked{color:#936200;background:#f7efdc;border-color:#cdb98a}
+.xps1-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.xps1-card{display:grid;grid-template-columns:auto 1fr;gap:14px;padding:18px;border:1px solid var(--border,#b9c8d1);border-radius:15px;background:var(--surface,#f5f8fa)}
+.xps1-card.is-locked{opacity:.76}.xps1-toggle{padding-top:2px}.xps1-toggle input{width:20px;height:20px;accent-color:#2675ad}.xps1-copy{min-width:0}.xps1-title{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.xps1-title strong{font-size:17px}.xps1-status{flex:0 0 auto;font-size:11px;font-weight:850;padding:4px 8px;border-radius:999px;background:#dfe8ed;color:#496276}.xps1-status.ready{background:#e1f3ec;color:#087454}.xps1-status.locked{background:#f3ead7;color:#8a5e04}.xps1-meta{margin:5px 0 12px;color:var(--muted,#5a7182);font-size:13px}.xps1-fields{display:grid;grid-template-columns:140px minmax(0,1fr);gap:10px}.xps1-fields label{display:grid;gap:5px;font-size:12px;font-weight:750;color:var(--muted,#52697b)}.xps1-fields input{width:100%;box-sizing:border-box}.xps1-note{margin:11px 0 0;color:var(--muted,#5a7182);font-size:13px;line-height:1.45}.xps1-actions{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-top:16px}.xps1-actions small{color:var(--muted,#607687);font-size:13px}
+@media(max-width:900px){.xps1-grid{grid-template-columns:1fr}.xps1-head,.xps1-actions{display:block}.xps1-summary,.xps1-actions button{margin-top:12px}.xps1-fields{grid-template-columns:1fr}}
+
+.secv2-live-note{display:flex;gap:12px;align-items:center;margin:16px 0;padding:13px 15px;border:1px solid rgba(90,157,241,.3);border-radius:12px;background:rgba(90,157,241,.08)}
+.secv2-live-note strong{font-size:14px}.secv2-live-note span{color:var(--muted,#8795a6);font-size:13px}
+.xray-studio-actions{display:flex;align-items:center;gap:10px;margin-top:16px;padding:15px;border:1px solid var(--border,#2a394a);border-radius:14px;background:rgba(12,19,27,.38)}
+.xray-studio-actions>div{min-width:250px;margin-right:auto}.xray-studio-actions strong,.xray-studio-actions span{display:block}.xray-studio-actions span{margin-top:4px;color:var(--muted,#8795a6);font-size:12px}
+@media(max-width:980px){.xray-studio-actions{align-items:stretch;flex-direction:column}.xray-studio-actions>div{margin:0}.xray-studio-actions form,.xray-studio-actions button{width:100%}}

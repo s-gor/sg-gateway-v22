@@ -1,0 +1,100 @@
+/* SG-Gateway 0.1.0-021.7 — CPU Summary to System Header Fix 1 */
+
+/* The System header gets a compact runtime-status group in the free middle area. */
+body.page-system .sv1-heading {
+  display: grid !important;
+  grid-template-columns: minmax(300px, 1fr) auto auto;
+  align-items: center !important;
+  column-gap: 22px !important;
+}
+
+body.page-system .sv1-heading .sv1-cpu-summary.sg-cpu-summary-heading {
+  display: flex !important;
+  align-items: center !important;
+  flex-wrap: nowrap !important;
+  gap: 8px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  justify-self: center !important;
+}
+
+body.page-system .sv1-heading .sv1-cpu-summary.sg-cpu-summary-heading > span {
+  display: inline-flex !important;
+  align-items: baseline !important;
+  gap: 5px !important;
+  min-height: 34px !important;
+  padding: 8px 12px !important;
+  margin: 0 !important;
+  border-radius: 10px !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+}
+
+body.page-system .sv1-heading .sv1-cpu-summary.sg-cpu-summary-heading > span strong {
+  font-size: 12px !important;
+  font-weight: 850 !important;
+}
+
+/* Light theme */
+html[data-theme="light"] body.page-system .sv1-heading .sv1-cpu-summary.sg-cpu-summary-heading > span {
+  border: 1px solid rgba(63, 128, 94, .25) !important;
+  background: rgba(74, 168, 114, .10) !important;
+  color: #66756d !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.65) !important;
+}
+
+html[data-theme="light"] body.page-system .sv1-heading .sv1-cpu-summary.sg-cpu-summary-heading > span strong {
+  color: #2f8d64 !important;
+}
+
+/* Graphite / dark */
+html[data-theme="dark"] body.page-system .sv1-heading .sv1-cpu-summary.sg-cpu-summary-heading > span,
+html[data-theme="graphite"] body.page-system .sv1-heading .sv1-cpu-summary.sg-cpu-summary-heading > span {
+  border: 1px solid rgba(75, 185, 132, .22) !important;
+  background: rgba(52, 160, 111, .10) !important;
+  color: #91a8a0 !important;
+}
+
+html[data-theme="dark"] body.page-system .sv1-heading .sv1-cpu-summary.sg-cpu-summary-heading > span strong,
+html[data-theme="graphite"] body.page-system .sv1-heading .sv1-cpu-summary.sg-cpu-summary-heading > span strong {
+  color: #66d79d !important;
+}
+
+/* Undo the previous CPU-card-specific top-summary spacing once the block lives in the page header. */
+body.page-system [data-sg-cpu-card="1"] > .sv1-cpu-summary.sg-cpu-summary-heading {
+  display: none !important;
+}
+
+@media (max-width: 1180px) {
+  body.page-system .sv1-heading {
+    grid-template-columns: 1fr auto !important;
+    row-gap: 12px !important;
+  }
+
+  body.page-system .sv1-heading .sv1-cpu-summary.sg-cpu-summary-heading {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-self: start !important;
+  }
+
+  body.page-system .sv1-heading .sv1-heading-actions {
+    grid-column: 2;
+    grid-row: 1;
+  }
+}
+
+@media (max-width: 760px) {
+  body.page-system .sv1-heading {
+    grid-template-columns: 1fr !important;
+  }
+
+  body.page-system .sv1-heading .sv1-heading-actions,
+  body.page-system .sv1-heading .sv1-cpu-summary.sg-cpu-summary-heading {
+    grid-column: 1 !important;
+    justify-self: start !important;
+  }
+
+  body.page-system .sv1-heading .sv1-cpu-summary.sg-cpu-summary-heading {
+    flex-wrap: wrap !important;
+  }
+}

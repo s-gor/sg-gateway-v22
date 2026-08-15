@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block title %}SG-Gateway · Outbounds{% endblock %}
+
+{% block content %}
+<section class="ob49-page">
+  <header class="ob49-heading">
+    <div>
+      <div class="ob49-kicker"><span></span> SG-GATEWAY / OUTBOUNDS</div>
+      <h1>Outbounds</h1>
+      <p>Выходы Xray создаются здесь. Правила использования настраиваются отдельно в Routing.</p>
+    </div>
+    <a class="ob49-help" href="{{ url_for('help_topic', slug='routing') }}">Справка</a>
+  </header>
+
+  <section class="ob49-system-card">
+    <header>
+      <h2>System outbounds</h2>
+      <p>Встроенные маршруты Xray: прямой доступ и блокировка трафика.</p>
+    </header>
+
+    <div class="ob49-system-row">
+      <span class="ob49-route-icon" aria-hidden="true">↦</span>
+      <div class="ob49-route-copy">
+        <div><strong>direct</strong><span>Системный выход</span></div>
+        <p>Прямой выход в интернет.</p>
+      </div>
+      <div class="ob49-route-meta"><code>freedom</code><span class="is-default">● По умолчанию</span><span>Системный</span></div>
+    </div>
+
+    <div class="ob49-system-row">
+      <span class="ob49-route-icon" aria-hidden="true">↦</span>
+      <div class="ob49-route-copy">
+        <div><strong>blocked</strong><span>Системный выход</span></div>
+        <p>Отбрасывает трафик, совпавший с блокирующим правилом.</p>
+      </div>
+      <div class="ob49-route-meta"><code>blackhole</code><span>Системный</span></div>
+    </div>
+  </section>
+
+  <section class="ob49-warp-card" id="warp">
+    <header class="ob49-warp-head">
+      <div>
+        <div class="ob49-kicker"><span></span> CLOUDFLARE</div>
+        <h2>WARP Outbound</h2>
+        <p>Встроенный WireGuard-outbound Xray. Системный WARP-клиент и отдельный сетевой интерфейс не требуются.</p>
+      </div>
+      <div class="ob49-status {{ 'ok' if warp.enabled else ('ready' if warp.installed else '') }}">
+        <span></span>{{ warp.status_label }}
+      </div>
+    </header>
+
+    {% if not warp.installed %}
+    <div class="ob49-warp-action-row">
+      <div class="ob49-warp-copy">
+        <h3>Создать выход <code>warp</code></h3>
+        <p>Одна операция создаст WARP, проверит полный Xray candidate и сразу активирует native WireGuard outbound.</p>
+      </div>
+      <div class="ob49-warp-buttons">
+        <form method="post" action="{{ url_for('outbounds_warp_create') }}">
+          <button class="ob49-primary" type="submit">Создать WARP</button>
+        </form>
+      </div>
+    </div>
+    {% else %}
+    <div class="ob49-warp-action-row ob49-warp-active-row">
+      <div class="ob49-warp-copy">
+        <h3>Outbound tag <code>{{ warp.tag }}</code></h3>
+        <p>protocol: {{ warp.protocol_label }}</p>
+        <div class="ob49-warp-facts">
+          {% if warp.profile and warp.profile.endpoint %}<span>Endpoint: {{ warp.profile.endpoint }}</span>{% endif %}
+          {% if warp.last_test and warp.last_test.ip %}<span>Последний IP: {{ warp.last_test.ip }}</span>{% endif %}
+          {% if warp.last_test and warp.last_test.checked_at %}<span>Проверено: {{ warp.last_test.checked_at }}</span>{% else %}<span>Последняя проверка ещё не выполнялась</span>{% endif %}
+        </div>
+      </div>
+      <div class="ob49-warp-buttons ob49-warp-buttons-full">
+        <a class="ob49-secondary" href="{{ url_for('outbounds_warp_json') }}">{ } WARP JSON</a>
+        <form method="post" action="{{ url_for('outbounds_warp_test') }}">
+          <button class="ob49-secondary" type="submit">Проверить WARP</button>
+        </form>
+        {% if warp.enabled %}
+        <form method="post" action="{{ url_for('outbounds_warp_disable') }}"
+              data-sg-confirm="Выключить WARP? Сначала замените все активные правила, которые используют этот выход."
+              data-sg-confirm-title="Выключить WARP"
+              data-sg-confirm-button="Выключить">
+          <button class="ob49-secondary" type="submit">Отключить</button>
+        </form>
+        {% else %}
+        <form method="post" action="{{ url_for('outbounds_warp_enable') }}">
+          <button class="ob49-primary" type="submit">Включить</button>
+        </form>
+        {% endif %}
+        <form method="post" action="{{ url_for('outbounds_warp_recreate') }}"
+              data-sg-confirm="Пересоздать WARP-реквизиты? Новый outbound будет проверен до замены текущего."
+              data-sg-confirm-title="Пересоздать WARP"
+              data-sg-confirm-button="Пересоздать">
+          <button class="ob49-secondary" type="submit">Пересоздать</button>
+        </form>
+        <form method="post" action="{{ url_for('outbounds_warp_remove') }}"
+              data-sg-confirm="Удалить WARP outbound и локальные реквизиты? Удаление невозможно, пока Routing использует WARP."
+              data-sg-confirm-title="Удалить WARP"
+              data-sg-confirm-button="Удалить">
+          <button class="ob49-danger" type="submit">Удалить</button>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="ob49-routing-row">
+      <div>
+        <h3>Маршрутизация настраивается отдельно</h3>
+        <p>Режим «выбранные сайты» или «весь трафик» находится на странице <strong>Routing</strong>.</p>
+      </div>
+      <div>
+        <a class="ob49-secondary" href="{{ url_for('help_topic', slug='routing') }}">Полная инструкция</a>
+        <a class="ob49-primary" href="{{ url_for('routing') }}">Открыть Routing</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="ob49-custom-card">
+    <header>
+      <div>
+        <div class="ob49-kicker"><span></span> ВЫХОДЫ</div>
+        <h2>Custom outbounds</h2>
+        <p>Пользовательские выходы в этой версии не создаются. Панель показывает только реально поддерживаемые маршруты.</p>
+      </div>
+    </header>
+    <div class="ob49-empty-row">
+      <span aria-hidden="true">↳</span>
+      <div><strong>Пользовательские выходы ещё не созданы</strong><p>Сейчас доступны системные direct, blocked и необязательный WARP.</p></div>
+    </div>
+  </section>
+</section>
+{% endblock %}

@@ -1,0 +1,23 @@
+[Unit]
+Description=SG-Gateway AnyTLS and TUIC runtime
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/sing-box run -c /etc/sing-box/config.json
+Restart=on-failure
+RestartSec=2s
+User=root
+Group=root
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+ReadOnlyPaths=/etc/letsencrypt
+ReadWritePaths=/var/lib/sing-box /var/log/sing-box /run
+RuntimeDirectory=sing-box
+RuntimeDirectoryMode=0755
+
+[Install]
+WantedBy=multi-user.target

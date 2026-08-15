@@ -1,0 +1,12 @@
+[project]
+name = "sg-hostd"
+version = "0.1.0"
+description = "Limited host helper for SG-Gateway."
+requires-python = ">=3.11"
+dependencies = [
+    "flask>=3.0,<4",
+    "waitress>=3.0,<4",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

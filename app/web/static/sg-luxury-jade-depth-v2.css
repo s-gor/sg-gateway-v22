@@ -1,0 +1,449 @@
+/*
+ * SG Luxury Jade Depth — strict web transfer of the approved light-theme standard.
+ * Only approved colours, gradients, radii, light rim and the two approved shadows
+ * are used here. Dark theme is not addressed by any rule in this file.
+ */
+
+html[data-theme="light"] {
+  color-scheme: light;
+  --sg-ljd-background: #E5ECE7;
+  --sg-ljd-background-alt: #DCE5E0;
+  --sg-ljd-ivory: #F8F5EE;
+  --sg-ljd-ivory-high: #FBFAF6;
+  --sg-ljd-warm-stone: #DDDAD2;
+  --sg-ljd-warm-raised: #EFE5D5;
+  --sg-ljd-jade: #456F5C;
+  --sg-ljd-jade-deep: #356B56;
+  --sg-ljd-champagne: #B88A45;
+  --sg-ljd-text: #29312C;
+  --sg-ljd-muted: #66716A;
+  --sg-ljd-border: #89968A;
+  --sg-ljd-border-strong: #68786C;
+
+  --sg-ljd-header: linear-gradient(180deg, #F1F3EF 0%, #DCE4DD 100%);
+  --sg-ljd-sidebar: linear-gradient(180deg, #E8EFF2 0%, #D8E1E4 100%);
+  --sg-ljd-surface: linear-gradient(180deg, #FEFCF7 0%, #F2ECE1 100%);
+  --sg-ljd-surface-soft: linear-gradient(180deg, #F1EADE 0%, #E1D8CA 100%);
+  --sg-ljd-surface-raised: linear-gradient(180deg, #F8F0E4 0%, #E8D9C3 100%);
+  --sg-ljd-input: linear-gradient(180deg, #FFFDFC 0%, #F6F1E7 100%);
+  --sg-ljd-disabled: linear-gradient(180deg, #F6F0E6 0%, #E7DCCB 100%);
+  --sg-ljd-tile-active: linear-gradient(180deg, #739E88 0%, #4E7965 100%);
+  --sg-ljd-action: linear-gradient(180deg, #709A84 0%, #4D7864 100%);
+  --sg-ljd-action-hover: linear-gradient(180deg, #7EAA93 0%, #5B866F 100%);
+  --sg-ljd-action-pressed: linear-gradient(180deg, #4F7764 0%, #3E6050 100%);
+
+  --sg-ljd-button-depth:
+    inset 0 1px 0 rgba(255, 255, 255, .333),
+    inset 1px 0 0 rgba(255, 255, 255, .333),
+    inset -1px 0 0 rgba(255, 255, 255, .333),
+    0 2px 12px rgba(43, 52, 46, .20);
+  --sg-ljd-card-depth:
+    0 4px 18px rgba(43, 52, 46, .17);
+
+  /* Existing semantic variables are mapped only to approved standard roles. */
+  --sg-bg: #E5ECE7;
+  --sg-sidebar: #DCE5E0;
+  --sg-topbar: #DCE5E0;
+  --sg-panel: #F8F5EE;
+  --sg-panel-soft: #DDDAD2;
+  --sg-panel-deep: #EFE5D5;
+  --sg-line: #89968A;
+  --sg-line-soft: #89968A;
+  --sg-text: #29312C;
+  --sg-muted: #66716A;
+  --sg-dim: #66716A;
+  --sg-blue: #456F5C;
+  --sg-blue-strong: #356B56;
+  --sg-blue-active: #739E88;
+  --sg-green: #356B56;
+  --sg-green-bg: #DCE5E0;
+  --sg-green-line: #89968A;
+  --sg-yellow: #B88A45;
+  --sg-shadow: var(--sg-ljd-card-depth);
+  --bg: #E5ECE7;
+  --panel: #F8F5EE;
+  --panel-soft: #DDDAD2;
+  --panel-2: #DDDAD2;
+  --panel-3: #EFE5D5;
+  --line: #89968A;
+  --text: #29312C;
+  --muted: #66716A;
+  --green: #356B56;
+  --yellow: #B88A45;
+  --blue: #456F5C;
+  --success: #356B56;
+  --warning: #B88A45;
+  --button: #EFE5D5;
+  --sgui-card-shadow: var(--sg-ljd-card-depth);
+}
+
+/* Level 0: exact radial pearl/jade ambient light. */
+html[data-theme="light"],
+html[data-theme="light"] body.sg-body,
+html[data-theme="light"] .sg-workspace,
+html[data-theme="light"] .login-shell,
+html[data-theme="light"] .recovery-shell {
+  background: radial-gradient(ellipse 68% 68% at 78% -8%, #FBF4E8 0%, #F1EEE6 22%, #E5ECE7 58%, #E5ECE7 100%) fixed !important;
+  color: #29312C;
+}
+
+html[data-theme="light"] body.sg-body,
+html[data-theme="light"] .sg-content,
+html[data-theme="light"] .content { color: #29312C; }
+html[data-theme="light"] h1,
+html[data-theme="light"] h2,
+html[data-theme="light"] h3,
+html[data-theme="light"] h4,
+html[data-theme="light"] label,
+html[data-theme="light"] dt { color: #29312C; }
+html[data-theme="light"] p,
+html[data-theme="light"] small,
+html[data-theme="light"] .subtle,
+html[data-theme="light"] .sg-muted { color: #66716A; }
+
+/* Level 1: exact header and sidebar materials. */
+html[data-theme="light"] .sg-sidebar {
+  border-right-color: #89968A !important;
+  background: var(--sg-ljd-sidebar) !important;
+  box-shadow: var(--sg-ljd-card-depth) !important;
+}
+html[data-theme="light"] .sg-global-topbar,
+html[data-theme="light"] .recovery-header {
+  border-color: #89968A !important;
+  background: var(--sg-ljd-header) !important;
+  box-shadow: var(--sg-ljd-card-depth) !important;
+}
+html[data-theme="light"] .sg-brand { border-bottom-color: #89968A !important; background: transparent !important; }
+html[data-theme="light"] .sg-brand-mark,
+html[data-theme="light"] .brand-mark { color: #456F5C !important; background: #DCE5E0 !important; }
+html[data-theme="light"] .sg-brand-name,
+html[data-theme="light"] .brand-name { color: #29312C !important; }
+html[data-theme="light"] .sg-brand-note,
+html[data-theme="light"] .brand-note { color: #66716A !important; }
+
+/* Material roles are assigned explicitly in templates. */
+html[data-theme="light"] .sg-ljd-card-large {
+  border-color: #89968A !important;
+  background: var(--sg-ljd-surface) !important;
+  color: #29312C !important;
+  border-radius: 18px !important;
+  box-shadow: var(--sg-ljd-card-depth) !important;
+}
+html[data-theme="light"] .sg-ljd-card {
+  border-color: #89968A !important;
+  background: var(--sg-ljd-surface) !important;
+  color: #29312C !important;
+  border-radius: 14px !important;
+  box-shadow: var(--sg-ljd-card-depth) !important;
+}
+html[data-theme="light"] .sg-ljd-nested,
+html[data-theme="light"] .sg-ljd-nested-group {
+  border-color: #89968A !important;
+  background: var(--sg-ljd-surface-soft) !important;
+  color: #29312C !important;
+  border-radius: 12px !important;
+  box-shadow: none !important;
+}
+html[data-theme="light"] .sg-ljd-raised {
+  border-color: #68786C !important;
+  background: var(--sg-ljd-surface-raised) !important;
+  color: #29312C !important;
+  border-radius: 14px !important;
+  box-shadow: var(--sg-ljd-card-depth) !important;
+}
+html[data-theme="light"] .sg-ljd-warning {
+  border-color: #B88A45 !important;
+  background: var(--sg-ljd-surface-raised) !important;
+  color: #29312C !important;
+  border-radius: 12px !important;
+  box-shadow: none !important;
+}
+
+/* Strips: one warm-stone bed, separate ivory cards above it. */
+html[data-theme="light"] .sg-ljd-strip {
+  border-color: #89968A !important;
+  background: #DDDAD2 !important;
+  border-radius: 14px !important;
+  box-shadow: none !important;
+}
+html[data-theme="light"] .sg-ljd-strip > article,
+html[data-theme="light"] .sg-ljd-strip > div {
+  border-color: #89968A !important;
+  background: var(--sg-ljd-surface) !important;
+  color: #29312C !important;
+}
+
+/* Nested groups keep their separator bed and ivory rows. */
+html[data-theme="light"] .sg-ljd-nested-group > article,
+html[data-theme="light"] .sg-ljd-nested-group > div,
+html[data-theme="light"] .sg-ljd-nested-group > dl {
+  border-color: #89968A !important;
+  background: var(--sg-ljd-surface) !important;
+  color: #29312C !important;
+  box-shadow: none !important;
+}
+
+/* Exact button material: gradient, approved shadow, top/side rim, 10 px radius. */
+html[data-theme="light"] .button:not(.danger),
+html[data-theme="light"] .sg-icon-button,
+html[data-theme="light"] .sg-sidebar-action,
+html[data-theme="light"] .sg-user-menu > summary,
+html[data-theme="light"] .cv2-copy-button,
+html[data-theme="light"] .cv2-dots-button,
+html[data-theme="light"] .cv2-dialog-close,
+html[data-theme="light"] .cd12-copy,
+html[data-theme="light"] .gfv1-hash-copy,
+html[data-theme="light"] .rtux1-copy,
+html[data-theme="light"] .xps1-copy,
+html[data-theme="light"] .hlpv1-clear-search {
+  border-color: #89968A !important;
+  background: var(--sg-ljd-disabled) !important;
+  color: #29312C !important;
+  border-radius: 10px !important;
+  box-shadow: var(--sg-ljd-button-depth) !important;
+}
+html[data-theme="light"] .button.primary:not(.danger),
+html[data-theme="light"] .sg-ljd-tile.is-active,
+html[data-theme="light"] .sg-ljd-tile.active {
+  border-color: #68786C !important;
+  background: var(--sg-ljd-action) !important;
+  color: #FBFAF6 !important;
+}
+html[data-theme="light"] .button.primary:not(.danger):hover,
+html[data-theme="light"] .sg-ljd-tile:hover {
+  background: var(--sg-ljd-action-hover) !important;
+  color: #FBFAF6 !important;
+}
+html[data-theme="light"] .button.primary:not(.danger):active,
+html[data-theme="light"] .sg-ljd-tile:active {
+  background: var(--sg-ljd-action-pressed) !important;
+  color: #FBFAF6 !important;
+}
+html[data-theme="light"] .button:disabled,
+html[data-theme="light"] button:disabled {
+  border-color: #89968A !important;
+  background: var(--sg-ljd-disabled) !important;
+  color: #66716A !important;
+  box-shadow: var(--sg-ljd-button-depth) !important;
+  opacity: 1 !important;
+}
+html[data-theme="light"] .button.danger {
+  border-radius: 10px !important;
+  box-shadow: var(--sg-ljd-button-depth) !important;
+}
+html[data-theme="light"] .sg-ljd-key-action { border-color: #B88A45 !important; }
+
+/* Navigation is a dedicated button class, not a generic recolour. */
+html[data-theme="light"] .sg-nav-item {
+  border-color: transparent !important;
+  background: transparent !important;
+  color: #66716A !important;
+  border-radius: 10px !important;
+  box-shadow: none !important;
+}
+html[data-theme="light"] .sg-nav-item:hover {
+  border-color: #89968A !important;
+  background: var(--sg-ljd-disabled) !important;
+  color: #29312C !important;
+  box-shadow: var(--sg-ljd-button-depth) !important;
+}
+html[data-theme="light"] .sg-nav-item.active {
+  border-color: #68786C !important;
+  background: var(--sg-ljd-tile-active) !important;
+  color: #FBFAF6 !important;
+  box-shadow: var(--sg-ljd-button-depth) !important;
+}
+html[data-theme="light"] .sg-nav-item.active strong,
+html[data-theme="light"] .sg-nav-item.active small,
+html[data-theme="light"] .sg-nav-item.active .sg-nav-icon { color: #FBFAF6 !important; }
+
+/* Tiles use 12 px radius and the same approved button depth. */
+html[data-theme="light"] .sg-ljd-tile,
+html[data-theme="light"] .sg-ljd-tile-grid > a,
+html[data-theme="light"] .sg-ljd-tile-grid > button,
+html[data-theme="light"] .sg-ljd-tile-grid > article {
+  border-color: #89968A !important;
+  background: var(--sg-ljd-disabled) !important;
+  color: #29312C !important;
+  border-radius: 12px !important;
+  box-shadow: var(--sg-ljd-button-depth) !important;
+}
+html[data-theme="light"] .sg-ljd-tile-grid > a:hover,
+html[data-theme="light"] .sg-ljd-tile-grid > button:hover {
+  border-color: #68786C !important;
+  background: var(--sg-ljd-action-hover) !important;
+  color: #FBFAF6 !important;
+}
+
+/* Active controls get the exact jade volume. */
+html[data-theme="light"] .sg-health-pill.ok,
+html[data-theme="light"] .cv2-row.is-selected,
+html[data-theme="light"] .cv10-protocol input:checked + span,
+html[data-theme="light"] .xps1-toggle input:checked + span,
+html[data-theme="light"] .mhv2-switch input:checked + span {
+  border-color: #68786C !important;
+  background: var(--sg-ljd-tile-active) !important;
+  color: #FBFAF6 !important;
+  box-shadow: var(--sg-ljd-button-depth) !important;
+}
+html[data-theme="light"] .sg-health-pill.warning,
+html[data-theme="light"] .flash-message.warning,
+html[data-theme="light"] .secv2-result.warning {
+  border-color: #B88A45 !important;
+  background: var(--sg-ljd-surface-raised) !important;
+  color: #29312C !important;
+}
+
+/* Inputs: exact near-white vertical material. */
+html[data-theme="light"] input,
+html[data-theme="light"] select,
+html[data-theme="light"] textarea {
+  border-color: #89968A !important;
+  background: var(--sg-ljd-input) !important;
+  color: #29312C !important;
+  border-radius: 10px !important;
+  box-shadow: none !important;
+}
+html[data-theme="light"] input::placeholder,
+html[data-theme="light"] textarea::placeholder { color: #66716A !important; }
+html[data-theme="light"] input:focus,
+html[data-theme="light"] select:focus,
+html[data-theme="light"] textarea:focus {
+  border-color: #456F5C !important;
+  outline-color: #456F5C !important;
+}
+
+/* Explicit tables: raised head, ivory rows, warm-stone alternation. */
+html[data-theme="light"] .sg-ljd-table {
+  border-color: #89968A !important;
+  background: var(--sg-ljd-surface) !important;
+  color: #29312C !important;
+}
+html[data-theme="light"] .sg-ljd-table thead { background: var(--sg-ljd-surface-raised) !important; color: #29312C !important; }
+html[data-theme="light"] .sg-ljd-table tbody tr { background: var(--sg-ljd-surface) !important; }
+html[data-theme="light"] .sg-ljd-table tbody tr:nth-child(even) { background: var(--sg-ljd-surface-soft) !important; }
+html[data-theme="light"] .sg-ljd-table th,
+html[data-theme="light"] .sg-ljd-table td { border-color: #89968A !important; color: #29312C !important; }
+
+/* Popup and dialog backdrop uses the approved dark jade-graphite shadow colour. */
+html[data-theme="light"] dialog::backdrop,
+html[data-theme="light"] .cv2-dialog::backdrop { background: rgba(43, 52, 46, .20) !important; }
+
+/* Champagne is limited to decoration, upload/traffic accents and warnings. */
+html[data-theme="light"] .sv1-summary-icon,
+html[data-theme="light"] .cnv1-summary-icon,
+html[data-theme="light"] .hlpv1-summary-icon,
+html[data-theme="light"] .mtv2-summary-icon {
+  background: var(--sg-ljd-surface-soft) !important;
+  color: #356B56 !important;
+  border-color: #89968A !important;
+}
+html[data-theme="light"] .sv1-summary-icon.violet,
+html[data-theme="light"] .cnv1-summary-icon.violet,
+html[data-theme="light"] .hlpv1-summary-icon.violet,
+html[data-theme="light"] .mtv2-summary-icon.violet { color: #B88A45 !important; border-color: #B88A45 !important; }
+html[data-theme="light"] .sv1-summary-icon.blue,
+html[data-theme="light"] .cnv1-summary-icon.blue,
+html[data-theme="light"] .hlpv1-summary-icon.blue,
+html[data-theme="light"] .mtv2-summary-icon.blue,
+html[data-theme="light"] .sv1-summary-icon.green,
+html[data-theme="light"] .cnv1-summary-icon.green,
+html[data-theme="light"] .hlpv1-summary-icon.green,
+html[data-theme="light"] .mtv2-summary-icon.green { color: #356B56 !important; border-color: #89968A !important; }
+
+html[data-theme="light"] .opjob-steps .is-active { color: #356B56 !important; }
+
+/* Terminal remains a terminal; only its outer material follows the light hierarchy. */
+html[data-theme="light"] .opjob-terminal { border-color: #68786C !important; border-radius: 14px !important; box-shadow: var(--sg-ljd-card-depth) !important; }
+
+/* V23 · approved corrections: no green/cyan button outlines. */
+html[data-theme="light"] .button:not(.danger),
+html[data-theme="light"] .sg-icon-button,
+html[data-theme="light"] .sg-sidebar-action,
+html[data-theme="light"] .sg-user-menu > summary,
+html[data-theme="light"] .sv1-action-button,
+html[data-theme="light"] .sg-ljd-tile-grid > a,
+html[data-theme="light"] .sg-ljd-tile-grid > button {
+  border-color: #89968A !important;
+  outline: 0 !important;
+}
+html[data-theme="light"] .button.primary:not(.danger) {
+  border-color: #68786C !important;
+}
+html[data-theme="light"] .sg-ljd-key-action {
+  border-color: #B88A45 !important;
+}
+html[data-theme="light"] .button:focus-visible,
+html[data-theme="light"] .sg-icon-button:focus-visible,
+html[data-theme="light"] .sg-sidebar-action:focus-visible,
+html[data-theme="light"] .sg-user-menu > summary:focus-visible,
+html[data-theme="light"] .sv1-action-button:focus-visible,
+html[data-theme="light"] .sg-ljd-tile-grid > a:focus-visible,
+html[data-theme="light"] .sg-ljd-tile-grid > button:focus-visible {
+  outline: 2px solid #B88A45 !important;
+  outline-offset: 2px !important;
+}
+
+/* Only the four System summary cards sit directly on the page background. */
+html[data-theme="light"] .sv1-summary.sg-ljd-system-summary {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
+/* V23 Xray selector follows SG-Panel's choose → check → apply flow. */
+html[data-theme="light"] .xps2-selection,
+html[data-theme="light"] .xps2-parameters {
+  border-color: #89968A !important;
+  background: var(--sg-ljd-surface-soft) !important;
+  color: #29312C !important;
+  border-radius: 12px !important;
+  box-shadow: none !important;
+}
+html[data-theme="light"] .xps2-choice {
+  border-color: #89968A !important;
+  background: var(--sg-ljd-surface) !important;
+  color: #29312C !important;
+  border-radius: 13px !important;
+  box-shadow: var(--sg-ljd-button-depth) !important;
+  outline: 0 !important;
+}
+html[data-theme="light"] .xps2-choice:hover {
+  border-color: #68786C !important;
+  background: var(--sg-ljd-surface-raised) !important;
+}
+html[data-theme="light"] .xps2-choice.is-selected,
+html[data-theme="light"] .xps2-selector:checked + .xps2-choice {
+  border-color: #68786C !important;
+  background: var(--sg-ljd-surface) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .333),
+    inset 1px 0 0 rgba(255, 255, 255, .333),
+    inset -1px 0 0 rgba(255, 255, 255, .333),
+    inset 0 0 0 2px #68786C,
+    0 2px 12px rgba(43, 52, 46, .20) !important;
+}
+html[data-theme="light"] .xps2-choice-topline {
+  color: #356B56 !important;
+}
+html[data-theme="light"] .xps2-choice-status {
+  border-color: #89968A !important;
+  background: var(--sg-ljd-disabled) !important;
+  color: #66716A !important;
+}
+html[data-theme="light"] .xps2-choice-status.active {
+  color: #356B56 !important;
+}
+html[data-theme="light"] .xps2-choice-status.pending,
+html[data-theme="light"] .xps2-choice-status.locked,
+html[data-theme="light"] .xps2-https-state {
+  border-color: #B88A45 !important;
+  background: var(--sg-ljd-surface-raised) !important;
+  color: #B88A45 !important;
+}
+html[data-theme="light"] .xps2-parameter-row {
+  border-color: #89968A !important;
+  background: var(--sg-ljd-surface) !important;
+  color: #29312C !important;
+}

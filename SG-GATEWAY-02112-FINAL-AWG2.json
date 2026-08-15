@@ -1,0 +1,61 @@
+{
+  "product": "SG-Gateway",
+  "version": "0.1.0-021.12",
+  "baseline": "FINAL-AWG2",
+  "frozen_on": "2026-08-09",
+  "feature_frozen": true,
+  "awg_generation": "AWG2",
+  "next_development_line": "0.1.0-022.01",
+  "policy": {
+    "new_features_in_02112": false,
+    "awg3_in_02112": false,
+    "critical_bug_or_security_fixes_only": true,
+    "traffic_features": false,
+    "publish_branch": "main",
+    "tags_or_releases": false
+  },
+  "validated_real_server": {
+    "clean_install": true,
+    "full_restore": true,
+    "https_domain": true,
+    "all_connections_by_domain": true,
+    "safe_update_6_of_6": true,
+    "light_update": true,
+    "light_update_git_objects_observed": "676K",
+    "light_update_checked_out_source_observed": "2.9M"
+  },
+  "safe_update": {
+    "source_mode": "Git partial clone + runtime whitelist",
+    "runtime_whitelist": [
+      "app/",
+      "hostd/",
+      "deploy/",
+      "small root files"
+    ],
+    "excluded_trees": [
+      "assets/",
+      "data/",
+      "docs/",
+      "tests/",
+      "vendor/",
+      ".github/"
+    ],
+    "preserves": [
+      "Clients/credentials",
+      "/etc/letsencrypt",
+      "Nginx",
+      "VPN runtime"
+    ],
+    "updates_cores": false,
+    "local_assets_policy": "preserve-local-no-download-with-safety-backup-recovery"
+  },
+  "clean_install_core_baseline": {
+    "xray": "v26.6.27",
+    "mihomo": "v1.19.29",
+    "sing-box": "1.13.14",
+    "wgcf-cli": "v0.3.6",
+    "amneziawg-tools": "1.0.20260618-2",
+    "amneziawg-kernel-module": "1.0.20260329-2",
+    "amneziawg-dkms": "1.0.0"
+  }
+}

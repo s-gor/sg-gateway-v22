@@ -1,0 +1,188 @@
+/* SG-Gateway 0.1.0-021.7 — Accepted System resource cards.
+   Confirmed visually on 2026-08-01.
+   This file is the single cumulative override for the three resource cards. */
+
+/* Equal card widths. */
+.sv1-resource-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  align-items: stretch !important;
+}
+
+.sv1-resource-card {
+  position: relative !important;
+  min-width: 0 !important;
+}
+
+/* One visual geometry for all three refresh buttons. */
+.sg-resource-refresh-slot {
+  position: absolute !important;
+  top: 82px !important;
+  right: 22px !important;
+  z-index: 20 !important;
+  width: auto !important;
+  height: 38px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.sg-resource-refresh-slot > button {
+  position: static !important;
+  inset: auto !important;
+  transform: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 7px !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  height: 38px !important;
+  min-height: 38px !important;
+  max-height: 38px !important;
+  margin: 0 !important;
+  padding: 0 12px !important;
+  border-radius: 10px !important;
+  white-space: nowrap !important;
+}
+
+/* Memory has the icon as a text node and the label in span. */
+[data-sg-memory-card="1"] .sg-resource-refresh-slot > button {
+  font: 400 16px/1 Inter, "Segoe UI", system-ui, sans-serif !important;
+}
+[data-sg-memory-card="1"] .sg-resource-refresh-slot > button > span {
+  font: 750 11px/1 Inter, "Segoe UI", system-ui, sans-serif !important;
+}
+
+/* Disk and CPU have the icon in span and the label as a text node. */
+[data-sg-disk-card="1"] .sg-resource-refresh-slot > button,
+[data-sg-cpu-card="1"] .sg-resource-refresh-slot > button {
+  font: 750 11px/1 Inter, "Segoe UI", system-ui, sans-serif !important;
+}
+[data-sg-disk-card="1"] .sg-resource-refresh-slot > button > span,
+[data-sg-cpu-card="1"] .sg-resource-refresh-slot > button > span {
+  font: 400 16px/1 Inter, "Segoe UI", system-ui, sans-serif !important;
+}
+
+/* Remove explanatory and automatic-refresh lines in the compact view. */
+[data-sg-memory-card="1"] .sv1-legend-row small,
+[data-sg-memory-card="1"] .sv1-memory-breakdown-title > span,
+[data-sg-disk-card="1"] [data-sg-disk-refresh-status],
+[data-sg-cpu-card="1"] [data-sg-cpu-refresh-status],
+[data-sg-cpu-card="1"] .sv1-cpu-summary {
+  display: none !important;
+}
+
+/* Top values. */
+[data-sg-memory-card="1"] .sv1-resource-number,
+[data-sg-disk-card="1"] .sv1-resource-number {
+  font-size: 24px !important;
+}
+[data-sg-cpu-card="1"] .sv1-cpu-hero-stat strong {
+  font-size: 28px !important;
+}
+
+/* Dial sizes. */
+[data-sg-memory-card="1"] .sv1-resource-main,
+[data-sg-disk-card="1"] .sv1-resource-main {
+  grid-template-columns: 138px minmax(0, 1fr) !important;
+}
+[data-sg-memory-card="1"] .sv1-donut,
+[data-sg-disk-card="1"] .sv1-donut {
+  width: 134px !important;
+  height: 134px !important;
+}
+
+[data-sg-cpu-card="1"] .sv1-cpu-hero {
+  --sg-cpu-dial-size: 120px;
+  grid-template-columns: var(--sg-cpu-dial-size) minmax(0, 1fr) !important;
+}
+[data-sg-cpu-card="1"] .sv1-cpu-dial {
+  width: var(--sg-cpu-dial-size) !important;
+  height: var(--sg-cpu-dial-size) !important;
+}
+[data-sg-cpu-card="1"] .sv1-cpu-dial::before {
+  inset: 18px !important;
+}
+
+/* Accepted level and thickness of the three wide bars under the dials. */
+[data-sg-memory-card="1"] .sv1-peer-progress-memory {
+  transform: translateY(2px) !important;
+}
+[data-sg-disk-card="1"] .sv1-disk-bar {
+  height: 10px !important;
+  margin-top: 18px !important;
+  transform: none !important;
+}
+[data-sg-disk-card="1"] .sv1-disk-labels {
+  transform: none !important;
+}
+[data-sg-cpu-card="1"] .sv1-peer-progress-cpu {
+  transform: none !important;
+}
+
+/* Keep the Disk breakdown compact after lowering its wide bar. */
+[data-sg-disk-card="1"] .sv1-disk-breakdown {
+  transform: translateY(-23px) !important;
+}
+
+/* Common headings and row typography. */
+.sv1-memory-breakdown-title > strong,
+.sv1-disk-breakdown-caption > strong,
+.sv1-cpu-breakdown-caption > strong {
+  font: 700 14px/1.4 Inter, "Segoe UI", system-ui, sans-serif !important;
+  letter-spacing: 0 !important;
+}
+
+[data-sg-memory-card="1"] .sv1-legend-row strong,
+[data-sg-disk-card="1"] .sv1-disk-part-name,
+[data-sg-cpu-card="1"] .sv1-cpu-part-name {
+  font: 700 12px/1.4 Inter, "Segoe UI", system-ui, sans-serif !important;
+  letter-spacing: 0 !important;
+}
+
+[data-sg-memory-card="1"] .sv1-legend-row > span,
+[data-sg-memory-card="1"] .sv1-legend-row > em,
+[data-sg-disk-card="1"] .sv1-disk-part-value,
+[data-sg-disk-card="1"] .sv1-disk-part-head > em,
+[data-sg-cpu-card="1"] .sv1-cpu-part-head > em {
+  font: 400 11px/1.4 Inter, "Segoe UI", system-ui, sans-serif !important;
+  font-style: normal !important;
+  letter-spacing: 0 !important;
+}
+
+/* Lower list bars: Disk and CPU match Memory (8px). */
+[data-sg-disk-card="1"] .sv1-disk-part-track,
+[data-sg-cpu-card="1"] .sv1-cpu-part-track {
+  height: 8px !important;
+}
+
+@media (max-width: 1179px) {
+  .sv1-resource-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .sg-resource-refresh-slot {
+    position: static !important;
+    width: auto !important;
+    height: auto !important;
+    margin: 8px 0 4px !important;
+  }
+
+  .sg-resource-refresh-slot > button {
+    height: 34px !important;
+    min-height: 34px !important;
+    max-height: 34px !important;
+  }
+
+  [data-sg-memory-card="1"] .sv1-peer-progress-memory,
+  [data-sg-disk-card="1"] .sv1-disk-bar,
+  [data-sg-disk-card="1"] .sv1-disk-labels,
+  [data-sg-disk-card="1"] .sv1-disk-breakdown,
+  [data-sg-cpu-card="1"] .sv1-peer-progress-cpu {
+    transform: none !important;
+  }
+
+  [data-sg-disk-card="1"] .sv1-disk-bar {
+    margin-top: 25px !important;
+  }
+}

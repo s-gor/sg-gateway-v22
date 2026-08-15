@@ -1,0 +1,327 @@
+{% extends "base.html" %}
+{% block title %}SG-Gateway · Security{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='sg-security-v2.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='sg-security-password-fix1.css') }}">
+{% endblock %}
+
+{% block content %}
+<section class="secv2-page">
+  <header class="ts2-page-heading">
+    <div>
+      <div class="ts2-kicker">SG-GATEWAY / SECURITY</div>
+      <h1>Security</h1>
+      <p>Домен панели, сертификат Let’s Encrypt, Nginx и защищённый вход по HTTPS.</p>
+    </div>
+    <div class="ts2-heading-actions">
+      <a class="button" href="{{ url_for('maintenance') }}">Backup и диагностика</a>
+      <a class="button" href="{{ url_for('recovery') }}">Recovery</a>
+    </div>
+  </header>
+
+  <section class="secv2-summary sg-ljd-strip">
+    <article>
+      <span>HTTPS</span>
+      <strong class="{{ 'ok' if tls.https_ready else 'warning' }}">
+        {{ 'Активен' if tls.https_ready else 'Не настроен' }}
+      </strong>
+      <small>{{ tls.public_url if tls.https_ready else 'Защищённый вход ещё не включён' }}</small>
+    </article>
+
+    <article>
+      <span>DNS</span>
+      <strong class="{{ 'ok' if tls.dns and tls.dns.status == 'ok' else 'warning' }}">
+        {% if tls.dns and tls.dns.status == 'ok' %}Проверен
+        {% elif tls.dns and tls.dns.status == 'error' %}Ошибка
+        {% else %}Не проверен
+        {% endif %}
+      </strong>
+      <small>{{ tls.dns.message if tls.dns else 'Введите домен и запустите проверку' }}</small>
+    </article>
+
+    <article>
+      <span>СЕРТИФИКАТ</span>
+      <strong class="{{ 'ok' if tls.certificate else 'warning' }}">
+        {% if tls.certificate and tls.certificate.days_left is not none %}
+          {{ tls.certificate.days_left }} дней
+        {% elif tls.certificate %}
+          Установлен
+        {% else %}
+          Не установлен
+        {% endif %}
+      </strong>
+      <small>{{ tls.certificate.not_after if tls.certificate else 'Let’s Encrypt ещё не получен' }}</small>
+    </article>
+
+    <article>
+      <span>АВТОПРОДЛЕНИЕ</span>
+      <strong class="{{ 'ok' if tls.certbot_timer_enabled else 'warning' }}">
+        {{ 'Таймер включён' if tls.certbot_timer_enabled else 'Таймер не включён' }}
+      </strong>
+      <small>
+        {% if tls.certificate %}
+          Certbot проверяет срок и перезагружает Nginx
+        {% else %}
+          Будет использоваться после получения сертификата
+        {% endif %}
+      </small>
+    </article>
+  </section>
+
+  <article class="secv2-workflow sg-ljd-card-large">
+    <header class="secv2-card-head">
+      <div>
+        <div class="secv2-kicker">ДОМЕН И HTTPS</div>
+        <h2>Защищённый доступ к панели</h2>
+        <p>Укажите домен, проверьте DNS и затем получите сертификат Let’s Encrypt.</p>
+      </div>
+      <span class="secv2-pill {{ 'ok' if tls.https_ready else 'warning' }}">
+        {{ 'HTTPS включён' if tls.https_ready else 'Требует настройки' }}
+      </span>
+    </header>
+
+    <div class="secv2-progress sg-ljd-nested">
+      <div class="done">
+        <i>1</i>
+        <span>Домен</span>
+      </div>
+      <b></b>
+      <div class="{{ 'done' if tls.dns and tls.dns.status == 'ok' else 'current' }}">
+        <i>2</i>
+        <span>DNS</span>
+      </div>
+      <b></b>
+      <div class="{{ 'done' if tls.certificate else ('current' if tls.dns and tls.dns.status == 'ok' else '') }}">
+        <i>3</i>
+        <span>Сертификат</span>
+      </div>
+      <b></b>
+      <div class="{{ 'done' if tls.https_ready else '' }}">
+        <i>4</i>
+        <span>HTTPS</span>
+      </div>
+    </div>
+
+    <form class="secv2-domain-form secv2-domain-form-fix1"
+          method="post"
+          action="{{ url_for('security_tls_check') }}">
+      <label class="secv2-domain-label" for="secv2-domain-input">Домен панели</label>
+      <div class="secv2-domain-line">
+        <input id="secv2-domain-input"
+               type="text"
+               name="domain"
+               value="{{ tls.domain }}"
+               placeholder="panel.example.com"
+               autocomplete="off"
+               required>
+        <button class="button primary" type="submit">Проверить домен</button>
+      </div>
+      <small class="secv2-domain-help">Только доменное имя — без <code>https://</code> и без пути.</small>
+    </form>
+
+    <div class="secv2-checks sg-ljd-nested-group">
+      <div>
+        <span>Публичный IPv4 сервера</span>
+        <strong>{{ tls.dns.public_ip if tls.dns and tls.dns.public_ip else 'Определится при проверке' }}</strong>
+      </div>
+      <div>
+        <span>DNS домена</span>
+        <strong>
+          {% if tls.dns and tls.dns.addresses %}
+            {{ tls.dns.addresses | join(', ') }}
+          {% elif tls.dns %}
+            Не найден
+          {% else %}
+            Не проверен
+          {% endif %}
+        </strong>
+      </div>
+      <div>
+        <span>Nginx</span>
+        <strong class="{{ 'ok' if tls.nginx_active else 'warning' }}">
+          {{ 'Работает' if tls.nginx_active else 'Не запущен' }}
+        </strong>
+      </div>
+      <div>
+        <span>Необходимые порты</span>
+        <strong>TCP 80 · TCP {{ tls.public_port }}</strong>
+      </div>
+    </div>
+
+    {% if tls.dns %}
+    <div class="secv2-result {{ tls.dns.status }} sg-ljd-nested">
+      <strong>
+        {% if tls.dns.status == 'ok' %}DNS проверен
+        {% elif tls.dns.status == 'error' %}DNS требует исправления
+        {% else %}Проверьте соответствие адресов
+        {% endif %}
+      </strong>
+      <span>{{ tls.dns.message }}</span>
+    </div>
+    {% endif %}
+
+    <div class="secv2-live-note sg-ljd-nested"><strong>Процесс выполняется в живом терминале</strong><span>Вы увидите DNS, Certbot, nginx -t, проверку backend и HTTPS, а при ошибке — автоматический откат.</span></div>
+    <div class="secv2-actions">
+      <form method="post"
+            action="{{ url_for('security_tls_issue') }}">
+        <button class="button primary sg-ljd-key-action"
+                type="submit"
+                {% if not tls.domain or not tls.dns or tls.dns.status == 'error' %}disabled{% endif %}>
+          {{ 'Переустановить HTTPS' if tls.https_ready else 'Открыть терминал и включить HTTPS' }}
+        </button>
+      </form>
+
+      {% if tls.certificate %}
+      <form method="post" action="{{ url_for('security_tls_renew') }}">
+        <button class="button" type="submit">Проверить обновление</button>
+      </form>
+      {% endif %}
+
+      {% if tls.backups %}
+      <form method="post"
+            action="{{ url_for('security_tls_rollback') }}">
+        <button class="button danger" type="submit">Откатить последнее изменение</button>
+      </form>
+      {% endif %}
+    </div>
+  </article>
+
+
+  <article class="secv2-password-card sg-ljd-card-large" id="password-change">
+    <header class="secv2-card-head">
+      <div>
+        <div class="secv2-kicker">ПАРОЛЬ АДМИНИСТРАТОРА</div>
+        <h2>Сменить пароль</h2>
+        <p>Укажите текущий пароль, затем новый пароль дважды.</p>
+      </div>
+      <span class="secv2-pill {{ 'warning' if security.default_password else 'ok' }}">
+        {{ 'Стандартный' if security.default_password else 'Пользовательский' }}
+      </span>
+    </header>
+    <form class="secv2-password-form" method="post" action="{{ url_for('security_password_change') }}">
+      <label>
+        <span>Текущий пароль</span>
+        <input type="password" name="current_password" autocomplete="current-password" required>
+      </label>
+      <label>
+        <span>Новый пароль</span>
+        <input type="password" name="new_password" autocomplete="new-password" minlength="8" required>
+      </label>
+      <label>
+        <span>Повторите новый пароль</span>
+        <input type="password" name="confirm_password" autocomplete="new-password" minlength="8" required>
+      </label>
+      <div class="secv2-password-actions">
+        <button class="button primary" type="submit">Сменить пароль</button>
+      </div>
+    </form>
+  </article>
+  <section class="secv2-lower-grid">
+    <article class="secv2-card sg-ljd-card">
+      <header class="secv2-card-head">
+        <div>
+          <div class="secv2-kicker">СЕРТИФИКАТ</div>
+          <h2>Состояние сертификата</h2>
+          <p>Фактические данные установленного сертификата.</p>
+        </div>
+        <span class="secv2-pill {{ 'ok' if tls.certificate else 'muted' }}">
+          {{ 'Установлен' if tls.certificate else 'Нет сертификата' }}
+        </span>
+      </header>
+
+      {% if tls.certificate %}
+      <dl class="secv2-list sg-ljd-nested-group">
+        <div><dt>Домен</dt><dd>{{ tls.domain }}</dd></div>
+        <div><dt>Издатель</dt><dd>{{ tls.certificate.issuer }}</dd></div>
+        <div><dt>Выдан</dt><dd>{{ tls.certificate.not_before }}</dd></div>
+        <div><dt>Истекает</dt><dd>{{ tls.certificate.not_after }}</dd></div>
+        <div><dt>Осталось</dt><dd>{{ tls.certificate.days_left }} дней</dd></div>
+        <div>
+          <dt>Автопродление</dt>
+          <dd class="{{ 'ok' if tls.certbot_timer_enabled else 'warning' }}">
+            {{ 'Таймер включён' if tls.certbot_timer_enabled else 'Таймер выключен' }}
+          </dd>
+        </div>
+      </dl>
+      {% else %}
+      <div class="secv2-compact-empty sg-ljd-nested">
+        <strong>Сертификат ещё не установлен</strong>
+        <span>Сначала проверьте домен, затем включите HTTPS.</span>
+      </div>
+      {% endif %}
+    </article>
+
+    <article class="secv2-card sg-ljd-card">
+      <header class="secv2-card-head">
+        <div>
+          <div class="secv2-kicker">ДОСТУП К ПАНЕЛИ</div>
+          <h2>Текущий режим доступа</h2>
+          <p>Публичный адрес, внутренний listener и состояние Nginx.</p>
+        </div>
+      </header>
+
+      <dl class="secv2-list sg-ljd-nested-group">
+        <div>
+          <dt>Публичный адрес</dt>
+          <dd>{{ tls.public_url if tls.https_ready else 'Не настроен' }}</dd>
+        </div>
+        <div>
+          <dt>Внутренний listener</dt>
+          <dd>
+            {% if tls.https_ready %}
+              127.0.0.1:{{ tls.backend_port }}
+            {% else %}
+              {{ security.host }}:{{ security.port }}
+            {% endif %}
+          </dd>
+        </div>
+        <div>
+          <dt>Nginx</dt>
+          <dd class="{{ 'ok' if tls.nginx_active else 'warning' }}">
+            {{ 'Работает' if tls.nginx_active else 'Не запущен' }}
+          </dd>
+        </div>
+        <div>
+          <dt>HTTP → HTTPS</dt>
+          <dd class="{{ 'ok' if tls.https_ready else 'warning' }}">
+            {{ 'Включено' if tls.https_ready else 'Не включено' }}
+          </dd>
+        </div>
+        <div>
+          <dt>Пароль администратора</dt>
+          <dd class="{{ 'warning' if security.default_password else 'ok' }}">
+            {{ 'Стандартный' if security.default_password else 'Пользовательский' }}
+          </dd>
+        </div>
+      </dl>
+    </article>
+  </section>
+
+  <details class="secv2-tech sg-ljd-card">
+    <summary>Технические детали</summary>
+    <div>
+      <section>
+        <span>Конфигурация Nginx</span>
+        <code>{{ tls.nginx_config }}</code>
+      </section>
+      <section>
+        <span>Сертификат</span>
+        <code>{{ tls.certificate_path or 'Не создан' }}</code>
+      </section>
+      <section>
+        <span>Внутренний proxy_pass</span>
+        <code>http://127.0.0.1:{{ tls.backend_port }}</code>
+      </section>
+      <section>
+        <span>Последнее действие</span>
+        <code>{{ tls.last_message or 'Действий ещё не было' }}</code>
+      </section>
+    </div>
+  </details>
+
+  <footer class="secv2-footer">
+    <strong>Безопасное применение</strong>
+    <span>Перед изменением создаётся backup. При ошибке Certbot, проверки Nginx или перезапуска панели прежняя рабочая конфигурация возвращается автоматически.</span>
+  </footer>
+</section>
+{% endblock %}

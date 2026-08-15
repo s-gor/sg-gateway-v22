@@ -1,0 +1,16 @@
+/* SG-Gateway 0.1.0-021.7 — Top Dividers Remove Fix 2, accepted final scope. */
+body.page-system .sv1-disk-breakdown,
+body.page-system .sv1-cpu-breakdown {
+  border-top:0!important;
+  box-shadow:none!important;
+}
+body.page-system .sv1-disk-breakdown::before,
+body.page-system .sv1-disk-breakdown::after,
+body.page-system .sv1-cpu-breakdown::before,
+body.page-system .sv1-cpu-breakdown::after {
+  display:none!important; content:none!important; border:0!important; background:none!important; box-shadow:none!important;
+}
+body.page-system .sv1-disk-breakdown > hr,
+body.page-system .sv1-cpu-breakdown > hr,
+body.page-system .sv1-disk-breakdown .sv1-section-divider,
+body.page-system .sv1-cpu-breakdown .sv1-section-divider { display:none!important; border:0!important; }

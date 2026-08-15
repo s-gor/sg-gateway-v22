@@ -1,0 +1,970 @@
+/* SG-Gateway Global UI Unification Fix 1
+   Geometry and hierarchy are shared by dark and light themes.
+   Existing color palettes remain active through --sg-* variables. */
+
+:root {
+  --sgui-shell-sidebar: 258px;
+  --sgui-topbar-height: 72px;
+
+  --sgui-page-pad-x: 30px;
+  --sgui-page-pad-top: 28px;
+  --sgui-page-pad-bottom: 46px;
+  --sgui-page-gap: 18px;
+  --sgui-section-gap: 16px;
+  --sgui-grid-gap: 12px;
+
+  --sgui-radius-card: 14px;
+  --sgui-radius-nested: 10px;
+  --sgui-radius-control: 9px;
+  --sgui-radius-badge: 999px;
+
+  --sgui-card-padding: 18px;
+  --sgui-summary-padding: 15px 17px;
+  --sgui-nested-padding: 11px 12px;
+
+  --sgui-button-height: 42px;
+  --sgui-button-height-small: 32px;
+  --sgui-badge-height: 28px;
+  --sgui-icon-button: 42px;
+
+  --sgui-page-title: clamp(34px, 2.25vw, 40px);
+  --sgui-page-subtitle: 14px;
+  --sgui-breadcrumb: 10.5px;
+  --sgui-section-title: 22px;
+  --sgui-card-title: 15px;
+  --sgui-body: 12px;
+  --sgui-secondary: 11px;
+  --sgui-micro: 9.5px;
+
+  --sgui-card-shadow:
+    inset 0 1px color-mix(in srgb, #ffffff 5%, transparent),
+    0 8px 22px color-mix(in srgb, #000000 12%, transparent);
+}
+
+html[data-theme="light"] {
+  --sgui-card-shadow:
+    inset 0 1px rgba(255, 255, 255, .58),
+    0 8px 20px rgba(49, 65, 75, .08);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Shared shell                                                               */
+/* -------------------------------------------------------------------------- */
+
+.sg-shell {
+  grid-template-columns: var(--sgui-shell-sidebar) minmax(0, 1fr);
+}
+
+.sg-sidebar {
+  width: var(--sgui-shell-sidebar);
+}
+
+.sg-brand,
+.sg-global-topbar {
+  min-height: var(--sgui-topbar-height);
+}
+
+.sg-brand {
+  gap: 13px;
+  padding: 12px 18px;
+}
+
+.sg-global-topbar {
+  gap: 10px;
+  padding: 9px 28px;
+}
+
+.sg-current-server {
+  min-width: 230px;
+  width: min(250px, 25vw);
+  min-height: 52px;
+  border-radius: 16px;
+  padding: 8px 13px 9px;
+}
+
+.sg-health-pill {
+  min-height: var(--sgui-button-height);
+  padding: 0 15px;
+  font-size: 10px;
+}
+
+.sg-icon-button {
+  width: var(--sgui-icon-button);
+  height: var(--sgui-icon-button);
+  flex-basis: var(--sgui-icon-button);
+  border-radius: var(--sgui-radius-control);
+}
+
+.sg-user-menu summary {
+  min-height: var(--sgui-button-height);
+  border-radius: var(--sgui-radius-control);
+  padding: 0 13px;
+}
+
+.sg-content,
+body.sg-body .content {
+  padding:
+    var(--sgui-page-pad-top)
+    var(--sgui-page-pad-x)
+    var(--sgui-page-pad-bottom);
+}
+
+.sg-nav {
+  gap: 4px;
+  padding: 22px 10px 15px;
+}
+
+.sg-nav-item {
+  min-height: 59px;
+  border-radius: 10px;
+  padding: 8px 12px;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Unified page rhythm and headings                                           */
+/* -------------------------------------------------------------------------- */
+
+:is(
+  .sv1-page,
+  .cv2-page,
+  .cnv1-page,
+  .rtux1-page,
+  .rtux2-page,
+  .mtv2-page,
+  .secv2-page,
+  .hlpv1-page
+) {
+  display: grid;
+  gap: var(--sgui-page-gap);
+  min-width: 0;
+}
+
+:is(
+  .sv1-heading,
+  .cv2-heading,
+  .cnv1-heading,
+  .rtux2-heading,
+  .mtv2-heading,
+  .hlpv1-heading,
+  .secv2-page > .ts2-page-heading
+) {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 22px;
+  min-height: 88px;
+  padding: 0 4px 2px;
+}
+
+:is(
+  .sv1-heading,
+  .cv2-heading,
+  .cnv1-heading,
+  .rtux2-heading,
+  .mtv2-heading,
+  .hlpv1-heading,
+  .secv2-page > .ts2-page-heading
+) h1 {
+  margin: 8px 0 5px;
+  color: var(--sg-text);
+  font-size: var(--sgui-page-title);
+  font-weight: 780;
+  letter-spacing: -.035em;
+  line-height: 1.06;
+}
+
+:is(
+  .sv1-heading,
+  .cv2-heading,
+  .cnv1-heading,
+  .rtux2-heading,
+  .mtv2-heading,
+  .hlpv1-heading,
+  .secv2-page > .ts2-page-heading
+) p {
+  max-width: 920px;
+  margin: 0;
+  color: var(--sg-muted);
+  font-size: var(--sgui-page-subtitle);
+  line-height: 1.5;
+}
+
+:is(
+  .sv1-kicker,
+  .cv2-kicker,
+  .cnv1-kicker,
+  .rtux2-kicker,
+  .mtv2-kicker,
+  .hlpv1-kicker,
+  .secv2-page > .ts2-page-heading .ts2-kicker
+) {
+  color: var(--sg-blue);
+  font-size: var(--sgui-breadcrumb);
+  font-weight: 850;
+  letter-spacing: .14em;
+  line-height: 1.2;
+}
+
+:is(
+  .sv1-heading-actions,
+  .cv2-heading-actions,
+  .cnv1-heading-actions,
+  .mtv2-heading-actions,
+  .hlpv1-heading-actions,
+  .secv2-page > .ts2-page-heading .ts2-heading-actions
+) {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Unified typography scale                                                   */
+/* -------------------------------------------------------------------------- */
+
+:is(
+  .sv1-card-kicker,
+  .cv2-card-kicker,
+  .cnv1-card-kicker,
+  .rtux2-section-kicker,
+  .rtux1-card-kicker,
+  .mtv2-card-kicker,
+  .secv2-kicker,
+  .hlpv1-card-kicker,
+  .gfv1-kicker,
+  .ts2-kicker
+) {
+  color: var(--sg-blue);
+  font-size: var(--sgui-micro);
+  font-weight: 850;
+  letter-spacing: .13em;
+  line-height: 1.25;
+  text-transform: uppercase;
+}
+
+:is(
+  .sv1-card-head,
+  .cnv1-panel-head,
+  .rtux2-section-head,
+  .rtux1-panel-head,
+  .mtv2-panel-head,
+  .secv2-card-head,
+  .hlpv1-panel-head,
+  .gfv1-head,
+  .ts2-panel-head
+) h2 {
+  margin-top: 6px;
+  color: var(--sg-text);
+  font-size: var(--sgui-section-title);
+  font-weight: 760;
+  letter-spacing: -.02em;
+  line-height: 1.22;
+}
+
+:is(
+  .sv1-card-head,
+  .cnv1-panel-head,
+  .rtux2-section-head,
+  .rtux1-panel-head,
+  .mtv2-panel-head,
+  .secv2-card-head,
+  .hlpv1-panel-head,
+  .gfv1-head,
+  .ts2-panel-head
+) p {
+  margin-top: 7px;
+  color: var(--sg-muted);
+  font-size: var(--sgui-body);
+  line-height: 1.5;
+}
+
+:is(
+  .sv1-page,
+  .cv2-page,
+  .cnv1-page,
+  .rtux1-page,
+  .rtux2-page,
+  .mtv2-page,
+  .secv2-page,
+  .hlpv1-page
+) p {
+  line-height: 1.5;
+}
+
+:is(
+  .sv1-page,
+  .cv2-page,
+  .cnv1-page,
+  .rtux1-page,
+  .rtux2-page,
+  .mtv2-page,
+  .secv2-page,
+  .hlpv1-page
+) small {
+  line-height: 1.45;
+}
+
+/* Summary labels, card labels and technical microcopy */
+:is(
+  .sv1-summary-label,
+  .cv2-summary-label,
+  .cnv1-summary-label,
+  .hlpv1-summary-label,
+  .rtux2-summary-strip span,
+  .rtux1-summary span,
+  .mtv2-summary span,
+  .secv2-summary span,
+  .gfv1-summary span,
+  .ts2-routing-summary span,
+  .sv1-runtime-table dt,
+  .rtux1-values dt
+) {
+  font-size: 10px;
+  font-weight: 820;
+  letter-spacing: .075em;
+}
+
+:is(
+  .sv1-summary-note,
+  .cv2-summary-note,
+  .cnv1-summary-note,
+  .hlpv1-summary-note,
+  .rtux2-summary-strip small,
+  .rtux1-summary small,
+  .mtv2-summary small,
+  .secv2-summary small,
+  .gfv1-summary small,
+  .ts2-routing-summary small
+) {
+  font-size: 10.8px;
+  line-height: 1.42;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Unified button system                                                      */
+/* -------------------------------------------------------------------------- */
+
+.sg-body .button,
+.sg-body .sg-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: var(--sgui-button-height);
+  border-radius: var(--sgui-radius-control);
+  padding: 0 16px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 760;
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.sg-body .button svg,
+.sg-body .sg-button svg {
+  width: 16px;
+  height: 16px;
+}
+
+.sg-body .button.primary,
+.sg-body .sg-button.primary,
+.sg-body .sg-button:not(.sg-button-secondary) {
+  border-color: color-mix(in srgb, var(--sg-blue-strong) 84%, var(--sg-line));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--sg-blue-strong) 88%, #ffffff 8%),
+    var(--sg-blue-strong)
+  );
+  color: #ffffff;
+}
+
+.sg-body .button:not(.primary),
+.sg-body .sg-button-secondary {
+  border-color: var(--sg-line);
+  background: var(--sg-panel-soft);
+  color: var(--sg-text);
+}
+
+.sg-body .button:hover:not(:disabled),
+.sg-body .sg-button:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--sg-blue) 48%, var(--sg-line));
+  filter: brightness(1.04);
+}
+
+.sg-body .button:active:not(:disabled),
+.sg-body .sg-button:active:not(:disabled) {
+  transform: translateY(1px);
+  filter: brightness(.96);
+}
+
+.sg-body .button:disabled,
+.sg-body .sg-button:disabled {
+  cursor: not-allowed;
+  opacity: .62;
+  box-shadow: none;
+}
+
+:is(
+  .rtux1-copy,
+  .rtux1-details button,
+  .gfv1-hash-copy,
+  .cv2-copy-button,
+  .cv2-dialog-close,
+  .hlpv1-clear-search
+) {
+  min-height: var(--sgui-button-height-small);
+  border-radius: 8px;
+  padding: 0 10px;
+  font-size: 9.5px;
+  font-weight: 740;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Unified status badge system                                                */
+/* -------------------------------------------------------------------------- */
+
+:is(
+  .sv1-state-pill,
+  .sv1-engine-pill,
+  .sv1-check-status,
+  .cv2-pill,
+  .cv2-profile-status,
+  .cnv1-map-status,
+  .cnv1-engine-status,
+  .rtux1-status,
+  .rtux2-route,
+  .rtux2-rule-state,
+  .rtux2-chip,
+  .mtv2-health-status,
+  .mtv2-operation-status,
+  .secv2-pill,
+  .hlpv1-step-pill,
+  .gfv1-state,
+  .ts2-status
+) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--sgui-badge-height);
+  width: fit-content;
+  border: 1px solid var(--sg-line);
+  border-radius: var(--sgui-radius-badge);
+  padding: 0 10px;
+  font-size: 9.5px;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+:is(
+  .sv1-state-pill.normal,
+  .sv1-engine-pill.success,
+  .sv1-check-status.ok,
+  .cv2-pill.success,
+  .cnv1-engine-status.success,
+  .rtux1-status.success,
+  .rtux2-rule-state.ok,
+  .rtux2-chip.ok,
+  .mtv2-operation-status.ok,
+  .secv2-pill.ok,
+  .gfv1-state.ok,
+  .ts2-status.ok
+) {
+  border-color: var(--sg-green-line);
+  background: var(--sg-green-bg);
+  color: var(--sg-green);
+}
+
+:is(
+  .sv1-state-pill.warning,
+  .sv1-state-pill.high,
+  .sv1-engine-pill.warning,
+  .sv1-check-status.warning,
+  .cnv1-engine-status.warning,
+  .rtux1-status.warning,
+  .rtux2-rule-state.warning,
+  .mtv2-health-status.warning,
+  .secv2-pill.warning,
+  .gfv1-state.warning,
+  .ts2-status.warning
+) {
+  border-color: color-mix(in srgb, var(--sg-yellow) 42%, var(--sg-line));
+  background: color-mix(in srgb, var(--sg-yellow) 10%, var(--sg-panel));
+  color: var(--sg-yellow);
+}
+
+:is(
+  .sv1-state-pill.critical,
+  .sv1-check-status.error,
+  .cv2-pill.danger,
+  .mtv2-health-status.error,
+  .mtv2-operation-status.error
+) {
+  border-color: color-mix(in srgb, var(--sg-red) 44%, var(--sg-line));
+  background: color-mix(in srgb, var(--sg-red) 10%, var(--sg-panel));
+  color: var(--sg-red);
+}
+
+:is(
+  .cnv1-map-status > span,
+  .cnv1-engine-status > span,
+  .sg-health-dot,
+  .cv2-state-dot
+) {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 7px;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Unified main card system                                                   */
+/* -------------------------------------------------------------------------- */
+
+:is(
+  .sv1-summary-card,
+  .sv1-resource-card,
+  .sv1-panel,
+  .cv2-summary-card,
+  .cv2-filter-panel,
+  .cv2-list-panel,
+  .cv2-detail,
+  .cnv1-summary-card,
+  .cnv1-map-panel,
+  .cnv1-engine-card,
+  .cnv1-note-panel,
+  .rtux2-rules-card,
+  .rtux2-scenarios-card,
+  .rtux2-compact-section,
+  .rtux1-outbound-card,
+  .rtux1-dns-panel,
+  .gfv1-card,
+  .ts2-panel,
+  .mtv2-summary > article,
+  .mtv2-panel,
+  .secv2-workflow,
+  .secv2-card,
+  .hlpv1-summary-card,
+  .hlpv1-search-panel,
+  .hlpv1-topic-sidebar,
+  .hlpv1-article-panel
+) {
+  border: 1px solid var(--sg-line);
+  border-radius: var(--sgui-radius-card);
+  background: var(--sg-panel);
+  box-shadow: var(--sgui-card-shadow);
+}
+
+/* Summary cards share one height and padding */
+:is(
+  .sv1-summary-card,
+  .cv2-summary-card,
+  .cnv1-summary-card,
+  .hlpv1-summary-card,
+  .mtv2-summary > article
+) {
+  min-height: 108px;
+  padding: var(--sgui-summary-padding);
+}
+
+/* Full section cards share one section padding */
+:is(
+  .sv1-resource-card,
+  .sv1-panel,
+  .cv2-filter-panel,
+  .cv2-list-panel,
+  .cv2-detail,
+  .cnv1-map-panel,
+  .cnv1-engine-card,
+  .cnv1-note-panel,
+  .rtux2-rules-card,
+  .rtux2-scenarios-card,
+  .rtux1-outbound-card,
+  .rtux1-dns-panel,
+  .gfv1-card,
+  .ts2-panel,
+  .mtv2-panel,
+  .secv2-workflow,
+  .secv2-card,
+  .hlpv1-search-panel,
+  .hlpv1-topic-sidebar,
+  .hlpv1-article-panel
+) {
+  padding: var(--sgui-card-padding);
+}
+
+/* Grid and section gaps */
+:is(
+  .sv1-summary,
+  .cv2-summary,
+  .cnv1-summary,
+  .hlpv1-summary,
+  .mtv2-summary
+) {
+  gap: var(--sgui-grid-gap);
+}
+
+:is(
+  .sv1-resource-grid,
+  .cv2-workspace,
+  .cnv1-engine-grid,
+  .rtux1-outbound-grid,
+  .rtux1-dns-grid,
+  .mtv2-main-grid,
+  .secv2-grid,
+  .hlpv1-workspace
+) {
+  gap: var(--sgui-section-gap);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Unified nested card and row system                                         */
+/* -------------------------------------------------------------------------- */
+
+:is(
+  .sv1-runtime-list > div,
+  .sv1-runtime-table > div,
+  .sv1-check-row,
+  .sv1-connection-card,
+  .sv1-action-grid > a,
+  .cv2-row,
+  .cv2-detail-server,
+  .cv2-detail-grid,
+  .cv2-detail-field,
+  .cv2-profile-box,
+  .cnv1-map-node,
+  .cnv1-endpoint-card,
+  .cnv1-engine-metrics > div,
+  .cnv1-advanced,
+  .rtux2-rules-table > article,
+  .rtux2-rules-empty,
+  .rtux2-scenario-grid button,
+  .rtux2-scenario-form,
+  .rtux2-form-readonly,
+  .rtux1-endpoint,
+  .rtux1-values > div,
+  .rtux1-details,
+  .rtux1-listeners article,
+  .rtux1-dns-grid article,
+  .gfv1-summary article,
+  .gfv1-pair,
+  .gfv1-active-grid,
+  .gfv1-empty,
+  .ts2-routing-summary article,
+  .ts2-rule-row,
+  .ts2-honesty,
+  .mtv2-latest-backup,
+  .mtv2-older-backups article,
+  .mtv2-health-issues article,
+  .mtv2-ok-checks article,
+  .mtv2-recovery-steps article,
+  .mtv2-diagnostics-grid > div,
+  .mtv2-operation-list article,
+  .mtv2-all-ok,
+  .mtv2-empty,
+  .secv2-checks > div,
+  .secv2-list > div,
+  .secv2-tech,
+  .secv2-tech section,
+  .secv2-compact-empty,
+  .hlpv1-topic-link,
+  .hlpv1-step-card,
+  .hlpv1-related-grid a,
+  .hlpv1-journey a
+) {
+  border-color: var(--sg-line-soft);
+  border-radius: var(--sgui-radius-nested);
+  background: var(--sg-panel-deep);
+}
+
+:is(
+  .sv1-check-row,
+  .cv2-row,
+  .cnv1-engine-metrics > div,
+  .rtux2-rules-table > article,
+  .mtv2-health-issues article,
+  .mtv2-ok-checks article,
+  .mtv2-recovery-steps article,
+  .mtv2-operation-list article,
+  .secv2-list > div,
+  .hlpv1-topic-link
+) {
+  min-height: 58px;
+}
+
+:is(
+  .sv1-connection-card,
+  .cv2-detail-field,
+  .cnv1-endpoint-card,
+  .rtux1-endpoint,
+  .mtv2-health-issues article,
+  .mtv2-ok-checks article,
+  .secv2-checks > div,
+  .hlpv1-step-card
+) {
+  padding: var(--sgui-nested-padding);
+}
+
+/* Section head rhythm inside all cards */
+:is(
+  .sv1-card-head,
+  .cnv1-panel-head,
+  .rtux2-section-head,
+  .rtux1-panel-head,
+  .mtv2-panel-head,
+  .secv2-card-head,
+  .hlpv1-panel-head,
+  .gfv1-head,
+  .ts2-panel-head
+) {
+  margin-bottom: 15px;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Page-specific normalization                                                */
+/* -------------------------------------------------------------------------- */
+
+/* System */
+.sv1-summary,
+.sv1-resource-grid {
+  align-items: stretch;
+}
+
+.sv1-resource-card,
+.sv1-panel {
+  min-width: 0;
+}
+
+.sv1-card-head {
+  min-height: 48px;
+}
+
+/* Clients */
+.cv2-filter-panel {
+  min-height: 86px;
+}
+
+.cv2-row {
+  border-radius: 0;
+}
+
+.cv2-row:first-child {
+  border-radius: var(--sgui-radius-nested) var(--sgui-radius-nested) 0 0;
+}
+
+.cv2-row:last-child {
+  border-radius: 0 0 var(--sgui-radius-nested) var(--sgui-radius-nested);
+}
+
+/* Connections */
+.cnv1-map-panel,
+.cnv1-engine-card {
+  min-width: 0;
+}
+
+/* Routing */
+.rtux2-tabs {
+  min-height: 53px;
+}
+
+.rtux2-tabs button {
+  min-height: 52px;
+  padding-inline: 14px;
+  font-size: 12px;
+  font-weight: 760;
+}
+
+.rtux2-summary-strip,
+.secv2-summary {
+  overflow: hidden;
+  border: 1px solid var(--sg-line);
+  border-radius: var(--sgui-radius-card);
+  background: var(--sg-line-soft);
+  box-shadow: var(--sgui-card-shadow);
+}
+
+.rtux2-summary-strip article,
+.secv2-summary article {
+  min-height: 96px;
+  background: var(--sg-panel);
+  padding: 14px 16px;
+}
+
+.rtux2-rules-head {
+  min-height: 42px;
+}
+
+.rtux2-rules-table > article {
+  min-height: 66px;
+}
+
+/* Maintenance */
+.mtv2-main-grid {
+  align-items: start;
+}
+
+.mtv2-latest-backup,
+.mtv2-recovery-steps article,
+.mtv2-health-issues article {
+  min-height: 58px;
+}
+
+/* Security */
+.secv2-workflow,
+.secv2-card {
+  min-width: 0;
+}
+
+.secv2-progress {
+  min-height: 52px;
+  border: 1px solid var(--sg-line-soft);
+  border-radius: var(--sgui-radius-nested);
+  background: var(--sg-panel-deep);
+  padding: 8px 14px;
+}
+
+.secv2-list {
+  overflow: hidden;
+  border: 1px solid var(--sg-line-soft);
+  border-radius: var(--sgui-radius-nested);
+  background: var(--sg-line-soft);
+}
+
+.secv2-list > div {
+  min-height: 57px;
+  border-radius: 0;
+  padding: 11px 12px;
+}
+
+.secv2-list > div:first-child {
+  border-radius: var(--sgui-radius-nested) var(--sgui-radius-nested) 0 0;
+}
+
+.secv2-list > div:last-child {
+  border-radius: 0 0 var(--sgui-radius-nested) var(--sgui-radius-nested);
+}
+
+/* Help */
+.hlpv1-search-panel {
+  min-height: 76px;
+}
+
+.hlpv1-topic-link {
+  min-height: 60px;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Shared semantic color discipline                                           */
+/* -------------------------------------------------------------------------- */
+
+/* Blue is the interface action/selection color */
+:is(
+  .sv1-kicker,
+  .cv2-kicker,
+  .cnv1-kicker,
+  .rtux2-kicker,
+  .mtv2-kicker,
+  .hlpv1-kicker,
+  .secv2-page > .ts2-page-heading .ts2-kicker,
+  .sv1-card-kicker,
+  .cv2-card-kicker,
+  .cnv1-card-kicker,
+  .rtux2-section-kicker,
+  .rtux1-card-kicker,
+  .mtv2-card-kicker,
+  .secv2-kicker,
+  .hlpv1-card-kicker
+) {
+  color: var(--sg-blue);
+}
+
+/* Green is reserved for ok/online/success */
+:is(
+  .good,
+  .ok,
+  .success,
+  .ready
+) {
+  color: var(--sg-green);
+}
+
+/* Amber is reserved for warning/pending */
+.warning {
+  color: var(--sg-yellow);
+}
+
+/* Red is reserved for danger/error/offline */
+:is(
+  .danger,
+  .error
+) {
+  color: var(--sg-red);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Responsive consistency                                                     */
+/* -------------------------------------------------------------------------- */
+
+@media (max-width: 1180px) {
+  :root {
+    --sgui-page-pad-x: 22px;
+  }
+
+  :is(
+    .sv1-heading,
+    .cv2-heading,
+    .cnv1-heading,
+    .rtux2-heading,
+    .mtv2-heading,
+    .hlpv1-heading,
+    .secv2-page > .ts2-page-heading
+  ) {
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 760px) {
+  :root {
+    --sgui-page-pad-x: 14px;
+    --sgui-page-pad-top: 18px;
+    --sgui-page-gap: 14px;
+    --sgui-section-gap: 12px;
+  }
+
+  :is(
+    .sv1-heading,
+    .cv2-heading,
+    .cnv1-heading,
+    .rtux2-heading,
+    .mtv2-heading,
+    .hlpv1-heading,
+    .secv2-page > .ts2-page-heading
+  ) {
+    flex-direction: column;
+    align-items: stretch;
+    min-height: auto;
+  }
+
+  :is(
+    .sv1-heading-actions,
+    .cv2-heading-actions,
+    .cnv1-heading-actions,
+    .mtv2-heading-actions,
+    .hlpv1-heading-actions,
+    .secv2-page > .ts2-page-heading .ts2-heading-actions
+  ) {
+    width: 100%;
+  }
+
+  :is(
+    .sv1-heading-actions,
+    .cv2-heading-actions,
+    .cnv1-heading-actions,
+    .mtv2-heading-actions,
+    .hlpv1-heading-actions,
+    .secv2-page > .ts2-page-heading .ts2-heading-actions
+  ) .button {
+    flex: 1 1 auto;
+  }
+}

@@ -1,0 +1,129 @@
+/* Preview 49 · SG-Panel-style Outbounds and WARP management */
+.ob49-page {
+  --ob-bg: var(--sg-panel, #192738);
+  --ob-bg-soft: var(--sg-panel-soft, #132031);
+  --ob-raised: var(--sg-panel-deep, #203147);
+  --ob-line: var(--sg-line, #2a3d52);
+  --ob-line-strong: var(--sg-line-soft, #38516a);
+  --ob-text: var(--sg-text, #f1f5f9);
+  --ob-muted: var(--sg-muted, #93a4b8);
+  --ob-jade: var(--sg-green, #55d592);
+  --ob-blue: var(--sg-blue, #5aa4ef);
+  --ob-yellow: var(--sg-yellow, #e7c45b);
+  display: grid;
+  gap: 24px;
+  width: min(100%, 1500px);
+  margin: 0 auto;
+}
+.ob49-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:24px; }
+.ob49-heading h1 { margin:6px 0 4px; color:var(--ob-text); font-size:clamp(32px,3vw,44px); line-height:1; letter-spacing:-.04em; }
+.ob49-heading p { margin:0; color:var(--ob-muted); font-size:15px; }
+.ob49-kicker { display:flex; align-items:center; gap:9px; color:var(--ob-jade); font-size:10px; font-weight:900; letter-spacing:.16em; }
+.ob49-kicker span { width:7px; height:7px; border-radius:50%; background:currentColor; }
+.ob49-help,
+.ob49-primary,
+.ob49-secondary,
+.ob49-danger {
+  min-height:44px; display:inline-flex; align-items:center; justify-content:center; gap:8px;
+  padding:10px 18px; border:1px solid var(--ob-line-strong); border-radius:11px;
+  color:var(--ob-text); font:inherit; font-size:13px; font-weight:850; text-decoration:none; cursor:pointer;
+  box-shadow:0 7px 18px rgba(0,0,0,.14);
+}
+.ob49-primary { border-color:color-mix(in srgb, var(--ob-jade) 66%, var(--ob-line)); background:linear-gradient(180deg, color-mix(in srgb, var(--ob-jade) 72%, #fff 5%), color-mix(in srgb, var(--ob-jade) 68%, #000 22%)); color:#fff; }
+.ob49-secondary,.ob49-help { background:var(--ob-raised); }
+.ob49-danger { border-color:rgba(239,123,137,.52); background:rgba(110,35,49,.45); color:#ffd9df; }
+.ob49-system-card,
+.ob49-warp-card,
+.ob49-custom-card {
+  overflow:hidden; border:1px solid var(--ob-line); border-radius:17px; background:var(--ob-bg);
+  box-shadow:0 16px 38px rgba(0,0,0,.14);
+}
+.ob49-system-card > header,
+.ob49-custom-card > header { padding:20px 22px 15px; border-bottom:1px solid var(--ob-line); background:var(--ob-raised); }
+.ob49-system-card h2,
+.ob49-custom-card h2 { margin:0 0 6px; color:var(--ob-text); font-size:18px; }
+.ob49-system-card header p,
+.ob49-custom-card header p { margin:0; color:var(--ob-muted); font-size:13px; }
+.ob49-system-row { min-height:76px; display:grid; grid-template-columns:40px minmax(0,1fr) auto; align-items:center; gap:14px; padding:13px 18px; border-bottom:1px solid var(--ob-line); }
+.ob49-system-row:last-child { border-bottom:0; }
+.ob49-route-icon { width:36px; height:36px; display:grid; place-items:center; border:1px solid var(--ob-line-strong); border-radius:10px; background:var(--ob-raised); color:var(--ob-jade); font-size:22px; }
+.ob49-route-copy { min-width:0; }
+.ob49-route-copy > div { display:flex; align-items:center; gap:9px; }
+.ob49-route-copy strong { color:var(--ob-text); font-size:16px; }
+.ob49-route-copy span { color:var(--ob-muted); font-size:12px; }
+.ob49-route-copy p { margin:4px 0 0; color:var(--ob-muted); font-size:13px; }
+.ob49-route-meta { display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:9px; color:var(--ob-muted); font-size:11px; font-weight:750; }
+.ob49-route-meta code { color:var(--ob-text); font-size:12px; }
+.ob49-route-meta .is-default { color:var(--ob-jade); }
+.ob49-warp-card { padding:26px; }
+.ob49-warp-head { display:flex; align-items:flex-start; justify-content:space-between; gap:24px; }
+.ob49-warp-head h2 { margin:7px 0 8px; color:var(--ob-text); font-size:30px; letter-spacing:-.03em; }
+.ob49-warp-head p { max-width:900px; margin:0; color:var(--ob-muted); font-size:15px; line-height:1.55; }
+.ob49-status { display:inline-flex; align-items:center; gap:9px; flex:0 0 auto; color:var(--ob-text); font-size:14px; font-weight:850; }
+.ob49-status span { width:10px; height:10px; border-radius:50%; background:#8796aa; }
+.ob49-status.ready span { background:var(--ob-yellow); }
+.ob49-status.ok span { background:var(--ob-jade); box-shadow:0 0 0 5px color-mix(in srgb, var(--ob-jade) 16%, transparent); }
+.ob49-warp-action-row { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:28px; margin-top:24px; padding:24px; border:1px dashed var(--ob-line-strong); border-radius:15px; background:color-mix(in srgb, var(--ob-bg-soft) 88%, transparent); }
+.ob49-warp-copy h3,
+.ob49-routing-row h3 { margin:0 0 8px; color:var(--ob-text); font-size:17px; }
+.ob49-warp-copy h3 code { padding:2px 7px; border:1px solid var(--ob-line-strong); border-radius:6px; color:var(--ob-blue); background:var(--ob-raised); }
+.ob49-warp-copy p,
+.ob49-routing-row p { margin:0; color:var(--ob-muted); font-size:14px; line-height:1.55; }
+.ob49-warp-facts { display:flex; flex-wrap:wrap; gap:8px 14px; margin-top:13px; color:var(--ob-muted); font-size:11px; }
+.ob49-warp-buttons { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:9px; }
+.ob49-warp-buttons form,
+.ob49-warp-more form { margin:0; }
+.ob49-warp-more { margin-top:12px; border:1px solid var(--ob-line); border-radius:12px; background:var(--ob-bg-soft); }
+.ob49-warp-more summary { padding:12px 15px; color:var(--ob-muted); font-size:12px; font-weight:800; cursor:pointer; }
+.ob49-warp-more > div { display:flex; flex-wrap:wrap; gap:9px; padding:0 15px 15px; }
+.ob49-routing-row { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:24px; margin-top:0; padding:24px; border:1px solid var(--ob-line); border-radius:15px; background:var(--ob-bg-soft); }
+.ob49-routing-row > div:last-child { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:10px; }
+.ob49-custom-card header { display:flex; justify-content:space-between; gap:20px; }
+.ob49-custom-card .ob49-kicker { margin-bottom:7px; }
+.ob49-empty-row { min-height:88px; display:flex; align-items:center; gap:14px; padding:18px 22px; }
+.ob49-empty-row > span { width:42px; height:42px; display:grid; place-items:center; border:1px dashed var(--ob-line-strong); border-radius:10px; color:var(--ob-blue); font-size:23px; }
+.ob49-empty-row strong { color:var(--ob-text); font-size:15px; }
+.ob49-empty-row p { margin:5px 0 0; color:var(--ob-muted); font-size:13px; }
+
+html[data-theme="light"] .ob49-page {
+  --ob-bg: var(--sg-ljd-surface);
+  --ob-bg-soft: var(--sg-ljd-surface-soft);
+  --ob-raised: var(--sg-ljd-surface-raised);
+  --ob-line: var(--sg-ljd-border);
+  --ob-line-strong: var(--sg-ljd-border-strong);
+  --ob-text: var(--sg-ljd-text);
+  --ob-muted: var(--sg-ljd-muted);
+  --ob-jade: var(--sg-ljd-jade-deep);
+  --ob-blue: var(--sg-ljd-jade);
+  --ob-yellow: var(--sg-ljd-champagne);
+}
+html[data-theme="light"] .ob49-system-card,
+html[data-theme="light"] .ob49-warp-card,
+html[data-theme="light"] .ob49-custom-card { box-shadow:var(--sg-ljd-card-depth); }
+html[data-theme="light"] .ob49-primary { background:var(--sg-ljd-action); box-shadow:var(--sg-ljd-button-depth); }
+html[data-theme="light"] .ob49-primary:hover { background:var(--sg-ljd-action-hover); }
+html[data-theme="light"] .ob49-secondary,
+html[data-theme="light"] .ob49-help { background:var(--sg-ljd-disabled); box-shadow:var(--sg-ljd-button-depth); }
+html[data-theme="light"] .ob49-danger { background:linear-gradient(180deg,#F3D7D7,#D8A9A9); color:#5B2525; box-shadow:var(--sg-ljd-button-depth); }
+
+@media (max-width: 900px) {
+  .ob49-heading,
+  .ob49-warp-head { align-items:stretch; flex-direction:column; }
+  .ob49-system-row,
+  .ob49-warp-action-row,
+  .ob49-routing-row { grid-template-columns:1fr; }
+  .ob49-route-meta,
+  .ob49-warp-buttons,
+  .ob49-routing-row > div:last-child { justify-content:flex-start; }
+  .ob49-route-icon { display:none; }
+}
+
+/* SG-Gateway 017: SG-Panel WARP one-click/visible action contract. */
+.ob49-warp-active-row { grid-template-columns:minmax(280px,.85fr) minmax(520px,1.4fr); }
+.ob49-warp-buttons-full { align-items:center; }
+.ob49-warp-buttons-full > a,
+.ob49-warp-buttons-full > form { flex:0 0 auto; }
+@media (max-width:1180px) {
+  .ob49-warp-active-row { grid-template-columns:1fr; }
+  .ob49-warp-buttons-full { justify-content:flex-start; }
+}

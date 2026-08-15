@@ -1,0 +1,1 @@
+"""Limited host helper for SG-Gateway."""

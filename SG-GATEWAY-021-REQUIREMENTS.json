@@ -1,0 +1,38 @@
+{
+  "version": "0.1.0-021.12",
+  "status": "FINAL-AWG2",
+  "artifact_type": "full-clean-ec2-installer",
+  "feature_frozen": true,
+  "next_development_line": "0.1.0-022.01",
+  "invariants": {
+    "amneziawg_generation": "AWG2",
+    "amneziawg_udp_port": 585,
+    "traffic_features": false,
+    "safe_update_mode": "light-runtime-whitelist",
+    "safe_update_touches_cores": false,
+    "light_update_preserves_local_assets": true,
+    "full_backup_restore_supported": true,
+    "sg_admin_enter_means_yes": true,
+    "installer_prints_client_links": false,
+    "installer_prints_subscription_base64": false,
+    "installer_prints_pem_or_private_keys": false,
+    "warp_created_automatically": true,
+    "hysteria2_salamander_preserved": true,
+    "clients_row_typography": "approved-v018-scale",
+    "client_detail_bottom_add_device_button": false,
+    "technical_links": "always-open",
+    "hysteria2_salamander_udp_exclusive": true,
+    "clients_protocol_grid": "4x2-desktop-8-real-vpn-protocols",
+    "sgclient_selectable_access": false,
+    "sg_admin_explainer_location": "clients"
+  },
+  "clean_install_core_baseline": {
+    "xray": "v26.6.27",
+    "mihomo": "v1.19.29",
+    "sing-box": "1.13.14",
+    "wgcf-cli": "v0.3.6",
+    "amneziawg-tools": "1.0.20260618-2",
+    "amneziawg-kernel-module": "1.0.20260329-2",
+    "amneziawg-dkms": "1.0.0"
+  }
+}

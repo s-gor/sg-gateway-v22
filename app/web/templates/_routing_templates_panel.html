@@ -1,0 +1,269 @@
+
+{% set active_state = routing_templates.active or {} %}
+{% set candidate_state = routing_templates.candidate or {} %}
+{% set active_rules = active_state.get('rules', []) %}
+{% set candidate_rules = candidate_state.get('rules', []) %}
+{% set shown_rules = active_rules if active_rules else candidate_rules %}
+{% set enabled_rules = shown_rules | selectattr('enabled') | list %}
+{% set geofiles_ready = routing_templates.geoip_count > 0 and routing_templates.geosite_count > 0 %}
+
+<section class="rtux2-traffic" id="routing-templates">
+  <div class="rtux2-toolbar">
+    <div class="rtux2-toolbar-status">
+      <span class="rtux2-chip ok">Default: direct</span>
+      <span>{{ enabled_rules | length }} активных правил</span>
+      <span>GeoFiles: {{ 'готовы' if geofiles_ready else 'не готовы' }}</span>
+    </div>
+    <a class="button primary" href="#rtux2-scenarios">Подготовить сценарий</a>
+  </div>
+
+  <section class="rtux2-summary-strip sg-ljd-strip">
+    <article>
+      <span>ВЫХОД ПО УМОЛЧАНИЮ</span>
+      <strong>DIRECT</strong>
+      <small>Трафик без совпадения идёт напрямую</small>
+    </article>
+    <article>
+      <span>ПРАВИЛА</span>
+      <strong>{{ enabled_rules | length }}</strong>
+      <small>{{ 'Сохранены в managed fragment' if active_rules else ('Подготовлены в candidate' if candidate_rules else 'Ещё не созданы') }}</small>
+    </article>
+    <article>
+      <span>GEOFILES</span>
+      <strong class="{{ 'ok' if geofiles_ready else 'warning' }}">
+        {{ 'Готовы' if geofiles_ready else 'Не готовы' }}
+      </strong>
+      <small>GeoIP {{ routing_templates.geoip_count }} · GeoSite {{ routing_templates.geosite_count }}</small>
+    </article>
+    <article>
+      <span>LIVE XRAY</span>
+      <strong class="{{ 'ok' if routing_templates.engine_connected else 'warning' }}">
+        {{ 'Подключён' if routing_templates.engine_connected else 'Не подключён' }}
+      </strong>
+      <small>{{ routing_templates.engine_message }}</small>
+    </article>
+  </section>
+
+  <article class="rtux2-rules-card sg-ljd-card-large">
+    <header class="rtux2-section-head">
+      <div>
+        <div class="rtux2-section-kicker">ПОРЯДОК ПРИМЕНЕНИЯ</div>
+        <h2>Правила маршрутизации</h2>
+        <p>Срабатывает первое подходящее правило; трафик без совпадения идёт через direct.</p>
+      </div>
+      <details class="rtux2-json">
+        <summary class="button">Экспертный JSON</summary>
+        <pre>{{ (active_state.get('managed_fragment') or candidate_state.get('managed_fragment') or {'routing': {'domainStrategy': 'IPIfNonMatch', 'rules': []}}) | tojson(indent=2) }}</pre>
+      </details>
+    </header>
+
+    {% if shown_rules %}
+    <div class="rtux2-rules-table sg-ljd-nested-group">
+      <div class="rtux2-rules-head">
+        <span>Порядок</span>
+        <span>Правило</span>
+        <span>Условие</span>
+        <span>Маршрут</span>
+        <span>Состояние</span>
+      </div>
+
+      {% for rule in shown_rules %}
+      <article class="{{ '' if rule.enabled else 'disabled' }}">
+        <span class="rtux2-order">{{ '%02d' | format(loop.index * 10) }}</span>
+        <div>
+          <strong>{{ rule.title }}</strong>
+          <small>{{ 'Активный managed fragment' if active_rules else 'Проверенный candidate' }}</small>
+        </div>
+        <div class="rtux2-condition">
+          {% if rule.selected_geosite %}
+            <code>geosite:{{ rule.selected_geosite }}</code>
+          {% endif %}
+          {% if rule.selected_geoip %}
+            <code>geoip:{{ rule.selected_geoip }}</code>
+          {% endif %}
+          {% if rule.xray_rule and rule.xray_rule.get('network') %}
+            <code>network: {{ rule.xray_rule.get('network') }}</code>
+          {% endif %}
+          {% if rule.missing %}
+            <code class="warning">Не найдено: {{ rule.missing | join(', ') }}</code>
+          {% endif %}
+          {% if not rule.selected_geosite and not rule.selected_geoip and not rule.missing and not (rule.xray_rule and rule.xray_rule.get('network')) %}
+            <code>Все остальные совпадения</code>
+          {% endif %}
+        </div>
+        <span class="rtux2-route {{ rule.action }}">
+          {% if rule.action == 'direct' %}Direct
+          {% elif rule.action == 'block' %}Block
+          {% elif rule.action == 'xray' %}Xray
+          {% else %}{{ rule.action }}
+          {% endif %}
+        </span>
+        <span class="rtux2-rule-state {{ 'ok' if rule.enabled else 'warning' }}">
+          {{ 'Включено' if rule.enabled else 'Недоступно' }}
+        </span>
+      </article>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="rtux2-rules-empty sg-ljd-nested">
+      <strong>Управляемые правила ещё не созданы</strong>
+      <span>Выберите быстрый сценарий ниже, проверьте его и сохраните managed fragment.</span>
+    </div>
+    {% endif %}
+  </article>
+
+  <article class="rtux2-scenarios-card sg-ljd-card-large" id="rtux2-scenarios">
+    <header class="rtux2-section-head">
+      <div>
+        <div class="rtux2-section-kicker">БЫСТРЫЕ СЦЕНАРИИ</div>
+        <h2>Что нужно сделать?</h2>
+        <p>SG-Gateway сформирует только правила, совместимые с активными GeoIP и GeoSite.</p>
+      </div>
+      <div class="rtux2-geo-badges">
+        <span class="{{ 'ok' if routing_templates.geoip_count else 'warning' }}">geoip.dat</span>
+        <span class="{{ 'ok' if routing_templates.geosite_count else 'warning' }}">geosite.dat</span>
+      </div>
+    </header>
+
+    <div class="rtux2-scenario-grid sg-ljd-tile-grid">
+      {% for item in routing_templates.templates %}
+        {% if item.template_id in ['ads-block', 'private-direct', 'ru-sites-ip-direct', 'ai-developer-xray'] %}
+        <form method="post" action="{{ url_for('routing_template_preview') }}">
+          <input type="hidden" name="template_id" value="{{ item.template_id }}">
+          <input type="hidden" name="mode" value="replace_managed">
+          <button type="submit" {% if not item.ready %}disabled{% endif %}>
+            <span class="rtux2-scenario-icon">
+              {% if item.template_id == 'ads-block' %}⊘
+              {% elif item.template_id == 'private-direct' %}⌂
+              {% elif item.template_id == 'ru-sites-ip-direct' %}RU
+              {% else %}AI
+              {% endif %}
+            </span>
+            <span>
+              <strong>
+                {% if item.template_id == 'ads-block' %}Блокировать рекламу
+                {% elif item.template_id == 'private-direct' %}Локальные сети напрямую
+                {% elif item.template_id == 'ru-sites-ip-direct' %}Россия: сайты и IP
+                {% else %}AI & Developer
+                {% endif %}
+              </strong>
+              <small>{{ item.summary }}</small>
+            </span>
+            <em class="{{ 'ok' if item.ready else 'warning' }}">
+              {{ 'Доступен' if item.ready else 'Нет категорий' }}
+            </em>
+          </button>
+        </form>
+        {% endif %}
+      {% endfor %}
+    </div>
+
+    <form class="rtux2-scenario-form sg-ljd-nested"
+          method="post"
+          action="{{ url_for('routing_template_preview') }}">
+      <input type="hidden" name="mode" value="replace_managed">
+      <div class="rtux2-form-row">
+        <label>
+          <span>Сценарий</span>
+          <select name="template_id" required>
+            {% for item in routing_templates.templates %}
+            <option value="{{ item.template_id }}" {% if not item.ready %}disabled{% endif %}>
+              {{ item.title }}{% if not item.ready %} — нет категорий{% endif %}
+            </option>
+            {% endfor %}
+          </select>
+        </label>
+
+        <div class="rtux2-form-readonly sg-ljd-nested">
+          <span>Режим</span>
+          <strong>Заменить управляемые правила</strong>
+          <small>Текущий managed fragment сначала сохраняется в резервную копию.</small>
+        </div>
+      </div>
+
+      {% if candidate_state %}
+      <div class="rtux2-validation {{ 'ok' if candidate_state.get('ready') else 'warning' }}">
+        <strong>
+          {{ 'Проверка пройдена' if candidate_state.get('ready') else 'Требуется исправление' }}
+        </strong>
+        <span>{{ candidate_state.get('message', '') }}</span>
+      </div>
+      {% else %}
+      <div class="rtux2-validation warning">
+        <strong>Требуется проверка</strong>
+        <span>Сохранение станет доступно после проверки JSON, категорий GeoFiles и итогового managed fragment.</span>
+      </div>
+      {% endif %}
+
+      <button class="button" type="submit">Проверить конфигурацию</button>
+    </form>
+
+    {% if candidate_state %}
+    <section class="rtux2-candidate sg-ljd-nested">
+      <header>
+        <div>
+          <span>ПРОВЕРЕННЫЙ CANDIDATE</span>
+          <strong>{{ candidate_state.get('title', 'Routing candidate') }}</strong>
+          <small>{{ candidate_state.get('message', '') }}</small>
+        </div>
+        <span class="rtux2-rule-state {{ 'ok' if candidate_state.get('ready') else 'warning' }}">
+          {{ 'Готов к сохранению' if candidate_state.get('ready') else 'Не готов' }}
+        </span>
+      </header>
+
+      <div class="rtux2-candidate-actions">
+        <form method="post"
+              action="{{ url_for('routing_template_apply') }}"
+              data-sg-confirm="Сохранить и применить проверенный managed fragment к рабочему Xray?" data-sg-confirm-title="Применить правила маршрутизации" data-sg-confirm-button="Создать и применить">
+          <button class="button primary"
+                  type="submit"
+                  {% if not candidate_state.get('ready') %}disabled{% endif %}>
+            Создать и применить
+          </button>
+        </form>
+
+        {% if routing_templates.backups %}
+        <form method="post"
+              action="{{ url_for('routing_template_rollback') }}"
+              data-sg-confirm="Восстановить предыдущий managed fragment маршрутизации?" data-sg-confirm-title="Откатить правила" data-sg-confirm-button="Восстановить">
+          <button class="button" type="submit">Откатить правила</button>
+        </form>
+        {% endif %}
+      </div>
+    </section>
+    {% endif %}
+  </article>
+
+  <details class="rtux2-compact-section sg-ljd-nested">
+    <summary>
+      <span>
+        <strong>Дополнительные Outbounds</strong>
+        <small>AmneziaWG, Xray Reality и Mihomo находятся на соседней вкладке.</small>
+      </span>
+      <em>Открыть Outbounds</em>
+    </summary>
+    <div>
+      <a class="button" href="#outbounds" data-open-routing-tab="outbounds">Перейти к Outbounds</a>
+    </div>
+  </details>
+
+  <details class="rtux2-compact-section sg-ljd-nested">
+    <summary>
+      <span>
+        <strong>Экспертные настройки маршрутизации</strong>
+        <small>Путь managed fragment, результат проверки и состояние подключения к live Xray.</small>
+      </span>
+      <em>Открыть</em>
+    </summary>
+    <dl>
+      <div><dt>Managed fragment</dt><dd>{{ routing_templates.managed_path }}</dd></div>
+      <div><dt>Резервные копии</dt><dd>{{ routing_templates.backups | length }}</dd></div>
+      <div><dt>Live Xray</dt><dd>{{ routing_templates.engine_message }}</dd></div>
+    </dl>
+  </details>
+
+  <footer class="rtux2-honesty">
+    <strong>Важно</strong>
+    <span>Панель проверяет категории, создаёт Xray JSON-фрагмент и сохраняет резервные копии. Подключение managed fragment к live Xray runtime пока остаётся отдельным техническим этапом.</span>
+  </footer>
+</section>

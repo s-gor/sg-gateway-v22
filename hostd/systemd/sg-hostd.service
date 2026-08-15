@@ -1,0 +1,22 @@
+[Unit]
+Description=SG-Gateway host helper
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/sg-gateway/hostd
+ExecStart=/opt/sg-gateway/.venv/bin/waitress-serve --host=127.0.0.1 --port=8090 sg_hostd.app:app
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+RuntimeDirectory=sg-gateway
+RuntimeDirectoryMode=0755
+ReadWritePaths=-/run/sg-gateway -/usr/local/share/xray
+
+[Install]
+WantedBy=multi-user.target

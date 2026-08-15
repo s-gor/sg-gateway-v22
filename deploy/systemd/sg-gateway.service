@@ -1,0 +1,24 @@
+[Unit]
+Description=SG-Gateway panel
+After=network-online.target sg-hostd.service
+Wants=network-online.target sg-hostd.service
+
+[Service]
+Type=simple
+User=sg-gateway
+Group=sg-gateway
+WorkingDirectory=/opt/sg-gateway
+EnvironmentFile=/etc/sg-gateway/sg-gateway.env
+ExecStart=/opt/sg-gateway/.venv/bin/waitress-serve --host=0.0.0.0 --port=63443 app.main:app
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=30
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/sg-gateway /var/log/sg-gateway
+
+[Install]
+WantedBy=multi-user.target

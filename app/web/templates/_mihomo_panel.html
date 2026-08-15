@@ -1,0 +1,253 @@
+<section class="mhv2-panel cnv1-engine-card cnv1-engine-mihomo sg-ljd-card" id="mihomo">
+  {% set mieru_state = mihomo.protocols|selectattr('id', 'equalto', 'mieru')|first %}
+  {% set anytls_state = mihomo.protocols|selectattr('id', 'equalto', 'anytls')|first %}
+  {% set tuic_state = mihomo.protocols|selectattr('id', 'equalto', 'tuic')|first %}
+  <header class="mhv2-head">
+    <div>
+      <div class="mhv2-kicker">MIHOMO + SING-BOX</div>
+      <h2>Mieru · AnyTLS · TUIC v5</h2>
+      <p>Три независимых listener двух движков.</p>
+    </div>
+    <span class="mhv2-state {{ 'ok' if mihomo.service_active else 'warning' }}">
+      {{ 'Работает' if mihomo.service_active else 'Не запущен' }}
+    </span>
+  </header>
+
+  <div class="mhv2-compact-meta">
+    <section class="mhv2-compact-endpoint sg-ljd-nested">
+      <div>
+        <span>ПУБЛИЧНЫЙ ENDPOINT</span>
+        <strong>{{ mihomo_public_host or 'Не определён' }}</strong>
+        <small>{{ country_name(mihomo.settings.country_code) }} · {{ mihomo.settings.endpoint_source }}</small>
+      </div>
+      <span class="mhv2-listener-count">{{ mihomo.listener_active }} / {{ mihomo.listener_total }} работают</span>
+    </section>
+
+    {% if mihomo.has_pending_changes %}
+    <section class="mhv2-pending sg-ljd-warning">
+      <strong>Есть неприменённые изменения</strong>
+      <span>Рабочие listener и клиентские ссылки изменятся только после кнопки «Применить».</span>
+    </section>
+    {% endif %}
+
+    {% if not mihomo.settings.tls_ready %}
+    <section class="mhv2-tls-warning mhv2-tls-warning-compact sg-ljd-warning">
+      <div>
+        <strong>HTTPS не настроен</strong>
+        <span>AnyTLS и TUIC v5 пока недоступны.</span>
+      </div>
+      <a class="button" href="{{ url_for('security') }}">Security</a>
+    </section>
+    {% endif %}
+  </div>
+
+  <form class="mhv2-form mhv2-form-compact" method="post" action="{{ url_for('update_mihomo') }}">
+    <section class="mhv2-listeners mhv2-listeners-compact">
+      <article class="mhv2-listener sg-ljd-nested">
+        <header>
+          <div class="mhv2-listener-title">
+            <span class="mhv2-listener-icon">MI</span>
+            <div>
+              <h3>Mieru</h3>
+              <p>TCP или UDP</p>
+            </div>
+          </div>
+          <label class="sg-runtime-switch state-{{ mieru_state.state }}" data-runtime-switch>
+            <input type="checkbox" name="mieru_enabled"
+                   {% if mihomo.settings.mieru_enabled %}checked{% endif %}>
+            <span class="sg-runtime-track" aria-hidden="true"><i></i></span>
+            <span class="sg-runtime-copy">
+              <strong data-runtime-label>{{ mieru_state.state_label }}</strong>
+              <small data-runtime-note>{{ mieru_state.state_note }}</small>
+            </span>
+          </label>
+        </header>
+        <div class="mhv2-basic-fields">
+          <label>
+            <span>Порт</span>
+            <input type="number" min="1" max="65535"
+                   name="mieru_port" value="{{ mihomo.settings.mieru_port }}">
+          </label>
+          <label>
+            <span>Transport</span>
+            <select name="mieru_transport">
+              <option value="TCP" {% if mihomo.settings.mieru_transport == 'TCP' %}selected{% endif %}>TCP</option>
+              <option value="UDP" {% if mihomo.settings.mieru_transport == 'UDP' %}selected{% endif %}>UDP</option>
+            </select>
+          </label>
+        </div>
+        <details class="mhv2-advanced">
+          <summary>Дополнительно</summary>
+          <div class="mhv2-advanced-body">
+            <label>
+              <span>Multiplexing</span>
+              <select name="mieru_multiplexing">
+                {% for value in ['MULTIPLEXING_OFF', 'MULTIPLEXING_LOW', 'MULTIPLEXING_MIDDLE', 'MULTIPLEXING_HIGH'] %}
+                <option value="{{ value }}" {% if value == mihomo.settings.mieru_multiplexing %}selected{% endif %}>{{ value }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label>
+              <span>Handshake</span>
+              <select name="mieru_handshake">
+                {% for value in ['HANDSHAKE_STANDARD', 'HANDSHAKE_NO_WAIT'] %}
+                <option value="{{ value }}" {% if value == mihomo.settings.mieru_handshake %}selected{% endif %}>{{ value }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label class="mhv2-check">
+              <input type="checkbox" name="mieru_user_hint_mandatory"
+                     {% if mihomo.settings.mieru_user_hint_mandatory %}checked{% endif %}>
+              <span>Требовать user hint</span>
+            </label>
+          </div>
+        </details>
+      </article>
+
+      <article class="mhv2-listener {{ '' if mihomo.settings.tls_ready else 'disabled' }} sg-ljd-nested">
+        <header>
+          <div class="mhv2-listener-title">
+            <span class="mhv2-listener-icon">AT</span>
+            <div>
+              <h3>AnyTLS</h3>
+              <p>TCP · TLS</p>
+            </div>
+          </div>
+          <label class="sg-runtime-switch state-{{ anytls_state.state }}" data-runtime-switch
+                 data-runtime-on-note="Будет включён после создания клиента с этим профилем">
+            <input type="checkbox" name="anytls_enabled"
+                   {% if mihomo.settings.anytls_enabled %}checked{% endif %}
+                   {% if not mihomo.settings.tls_ready %}disabled{% endif %}>
+            <span class="sg-runtime-track" aria-hidden="true"><i></i></span>
+            <span class="sg-runtime-copy">
+              <strong data-runtime-label>{{ anytls_state.state_label }}</strong>
+              <small data-runtime-note>{{ anytls_state.state_note }}</small>
+            </span>
+          </label>
+        </header>
+        <div class="mhv2-basic-fields one">
+          <label>
+            <span>TCP-порт</span>
+            <input type="number" min="1" max="65535"
+                   name="anytls_port" value="{{ mihomo.settings.anytls_port }}">
+          </label>
+        </div>
+        <details class="mhv2-advanced">
+          <summary>Дополнительно</summary>
+          <div class="mhv2-advanced-body">
+            <label>
+              <span>Padding scheme</span>
+              <input type="text" name="anytls_padding_scheme"
+                     value="{{ mihomo.settings.anytls_padding_scheme }}"
+                     placeholder="Стандартная схема">
+            </label>
+          </div>
+        </details>
+      </article>
+
+      <article class="mhv2-listener {{ '' if mihomo.settings.tls_ready else 'disabled' }} sg-ljd-nested">
+        <header>
+          <div class="mhv2-listener-title">
+            <span class="mhv2-listener-icon">T5</span>
+            <div>
+              <h3>TUIC v5</h3>
+              <p>UDP/QUIC · TLS</p>
+            </div>
+          </div>
+          <label class="sg-runtime-switch state-{{ tuic_state.state }}" data-runtime-switch
+                 data-runtime-on-note="Будет включён после создания клиента с этим профилем">
+            <input type="checkbox" name="tuic_enabled"
+                   {% if mihomo.settings.tuic_enabled %}checked{% endif %}
+                   {% if not mihomo.settings.tls_ready %}disabled{% endif %}>
+            <span class="sg-runtime-track" aria-hidden="true"><i></i></span>
+            <span class="sg-runtime-copy">
+              <strong data-runtime-label>{{ tuic_state.state_label }}</strong>
+              <small data-runtime-note>{{ tuic_state.state_note }}</small>
+            </span>
+          </label>
+        </header>
+        <div class="mhv2-basic-fields one">
+          <label>
+            <span>UDP-порт</span>
+            <input type="number" min="1" max="65535"
+                   name="tuic_port" value="{{ mihomo.settings.tuic_port }}">
+          </label>
+        </div>
+        <details class="mhv2-advanced">
+          <summary>Дополнительно</summary>
+          <div class="mhv2-advanced-body two">
+            <label>
+              <span>ALPN</span>
+              <input type="text" name="tuic_alpn" value="{{ mihomo.settings.tuic_alpn }}">
+            </label>
+            <label>
+              <span>Congestion controller</span>
+              <select name="tuic_congestion_controller">
+                {% for value in ['bbr', 'cubic', 'new_reno'] %}
+                <option value="{{ value }}" {% if value == mihomo.settings.tuic_congestion_controller %}selected{% endif %}>{{ value }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label>
+              <span>UDP relay mode</span>
+              <select name="tuic_udp_relay_mode">
+                {% for value in ['native', 'quic'] %}
+                <option value="{{ value }}" {% if value == mihomo.settings.tuic_udp_relay_mode %}selected{% endif %}>{{ value }}</option>
+                {% endfor %}
+              </select>
+            </label>
+          </div>
+        </details>
+      </article>
+    </section>
+
+    <div class="mhv2-actions">
+      <button class="button" type="submit" name="action" value="save">Сохранить</button>
+      <button class="button" type="submit" name="action" value="test">Проверить</button>
+      <button class="button primary sg-ljd-key-action" type="submit" name="action" value="apply">Применить</button>
+      {% if mihomo.backups %}
+      <button class="button danger" type="submit" name="action" value="rollback"
+              data-sg-confirm="Откатить последнее изменение Mihomo и восстановить предыдущую конфигурацию?" data-sg-confirm-title="Откатить Mihomo" data-sg-confirm-button="Откатить" data-sg-confirm-tone="danger">
+        Откатить
+      </button>
+      {% endif %}
+    </div>
+
+    <details class="mhv2-service-tools">
+      <summary>Сервисные действия</summary>
+      <div>
+        <button class="button" type="submit" name="action" value="restart">Перезапустить Mihomo</button>
+        <span>Только для уже применённой конфигурации.</span>
+      </div>
+    </details>
+  </form>
+
+  <p class="mhv2-runtime-note">
+    Mieru обслуживается Mihomo. AnyTLS и TUIC v5 обслуживаются отдельным
+    sing-box. Ошибка дополнительного движка не блокирует клиентов, Xray или
+    установку панели.
+  </p>
+</section>
+
+<script id="sg-mihomo-runtime-switches-v1">
+(() => {
+  document.querySelectorAll('[data-runtime-switch]').forEach(control => {
+    const input = control.querySelector('input[type="checkbox"]');
+    const label = control.querySelector('[data-runtime-label]');
+    const note = control.querySelector('[data-runtime-note]');
+    if (!input || !label || !note) return;
+    const onNote = control.dataset.runtimeOnNote || '';
+    if (onNote && input.checked && control.classList.contains('state-pending')) {
+      note.textContent = onNote;
+    }
+    input.addEventListener('change', () => {
+      control.classList.remove('state-active', 'state-off', 'state-error');
+      control.classList.add('state-pending');
+      label.textContent = 'Не применено';
+      note.textContent = input.checked
+        ? (onNote || 'после применения будет включён')
+        : 'после применения будет выключен';
+    });
+  });
+})();
+</script>

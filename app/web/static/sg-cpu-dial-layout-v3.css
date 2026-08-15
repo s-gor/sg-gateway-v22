@@ -1,0 +1,127 @@
+/* SG-Gateway 0.1.0-021.7 — CPU Dial Layout Fix 3 */
+.sv1-cpu-hero {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr);
+  align-items: center;
+  gap: 18px;
+  margin: 2px 0 16px;
+}
+
+.sv1-cpu-dial {
+  position: relative;
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  background:
+    conic-gradient(
+      from -90deg,
+      #4f9bff 0 calc(var(--sg-cpu-percent) * 1%),
+      #233d57 calc(var(--sg-cpu-percent) * 1%) 100%
+    );
+  box-shadow:
+    inset 0 0 0 1px rgba(107, 151, 190, .12),
+    0 0 0 1px rgba(56, 91, 122, .08);
+}
+
+.sv1-cpu-dial::before {
+  content: "";
+  position: absolute;
+  inset: 23px;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #152f49 0%, #112a42 100%);
+  box-shadow: inset 0 0 0 1px rgba(95, 137, 175, .10);
+}
+
+.sv1-cpu-dial-center {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.sv1-cpu-dial-center strong {
+  color: var(--text, #f4f7fb);
+  font-size: 31px;
+  font-weight: 850;
+  line-height: 1;
+}
+
+.sv1-cpu-dial-center span {
+  margin-top: 7px;
+  color: var(--muted, #8ba5be);
+  font-size: 11px;
+}
+
+.sv1-cpu-hero-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+
+.sv1-cpu-hero-stat strong {
+  display: block;
+  color: var(--text, #f4f7fb);
+  font-size: 35px;
+  font-weight: 850;
+  line-height: 1;
+}
+
+.sv1-cpu-hero-stat span {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted, #8ba5be);
+  font-size: 12px;
+}
+
+.sv1-cpu-hero-load {
+  padding-top: 11px;
+  border-top: 1px solid rgba(120, 155, 185, .14);
+}
+
+.sv1-cpu-hero-load span {
+  display: block;
+  color: var(--muted, #8ba5be);
+  font-size: 11px;
+}
+
+.sv1-cpu-hero-load strong {
+  display: block;
+  margin-top: 4px;
+  color: var(--text, #edf4fa);
+  font-size: 14px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.sv1-cpu-runtime-footer {
+  margin-top: 18px;
+  padding-top: 15px;
+  border-top: 1px solid rgba(126, 157, 187, .16);
+}
+
+.sv1-cpu-runtime-title {
+  margin-bottom: 10px;
+  color: var(--text, #f4f7fb);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.sv1-cpu-runtime-footer .sv1-runtime-list {
+  margin-top: 0;
+}
+
+@media (max-width: 760px) {
+  .sv1-cpu-hero {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    text-align: center;
+  }
+
+  .sv1-cpu-hero-load {
+    width: 100%;
+  }
+}

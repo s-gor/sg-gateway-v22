@@ -1,0 +1,813 @@
+/* SG-Gateway Maintenance UX Fix 1 */
+
+.mtv2-page {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.mtv2-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 22px;
+  padding: 0 4px 2px;
+}
+
+.mtv2-kicker {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--sg-blue);
+  font-size: 9px;
+  font-weight: 850;
+  letter-spacing: .16em;
+}
+
+.mtv2-kicker > span {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--sg-blue);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--sg-blue) 55%, transparent);
+}
+
+.mtv2-heading h1 {
+  margin: 7px 0 4px;
+  font-size: clamp(31px, 2.25vw, 38px);
+}
+
+.mtv2-heading p {
+  margin: 0;
+  color: var(--sg-muted);
+  font-size: 13px;
+}
+
+.mtv2-heading-actions,
+.mtv2-backup-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
+.mtv2-heading-actions form,
+.mtv2-backup-actions form {
+  margin: 0;
+}
+
+.mtv2-heading-actions .button {
+  min-height: 42px;
+  gap: 7px;
+}
+
+.mtv2-heading-actions svg {
+  width: 15px;
+  height: 15px;
+}
+
+.mtv2-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.mtv2-summary > article {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  min-height: 96px;
+  border: 1px solid var(--sg-line);
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at 90% -20%, rgba(96, 169, 243, .07), transparent 46%),
+    var(--sg-panel);
+  padding: 14px 16px;
+}
+
+.mtv2-summary-icon,
+.mtv2-backup-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--sg-green-line);
+  border-radius: 11px;
+  background: var(--sg-green-bg);
+  color: var(--sg-green);
+}
+
+.mtv2-summary-icon.blue {
+  border-color: rgba(96, 169, 243, .25);
+  background: rgba(60, 126, 193, .13);
+  color: var(--sg-blue);
+}
+
+.mtv2-summary-icon.violet {
+  border-color: rgba(157, 122, 255, .24);
+  background: rgba(126, 93, 226, .12);
+  color: #aa91ff;
+}
+
+.mtv2-summary-icon.green {
+  border-color: rgba(49, 207, 145, .24);
+  background: rgba(49, 207, 145, .11);
+  color: var(--sg-green);
+}
+
+.mtv2-summary-icon.warning {
+  border-color: color-mix(in srgb, var(--sg-yellow) 42%, transparent);
+  background: color-mix(in srgb, var(--sg-yellow) 11%, transparent);
+  color: var(--sg-yellow);
+}
+
+.mtv2-summary-icon.error {
+  border-color: color-mix(in srgb, var(--sg-red) 44%, transparent);
+  background: color-mix(in srgb, var(--sg-red) 11%, transparent);
+  color: var(--sg-red);
+}
+
+.mtv2-summary-icon svg,
+.mtv2-backup-icon svg {
+  width: 21px;
+  height: 21px;
+}
+
+.mtv2-summary span,
+.mtv2-backup-primary > span {
+  color: var(--sg-muted);
+  font-size: 9px;
+  font-weight: 830;
+  letter-spacing: .08em;
+}
+
+.mtv2-summary strong {
+  display: block;
+  overflow: hidden;
+  margin-top: 5px;
+  color: var(--sg-text);
+  font-size: 19px;
+  font-weight: 780;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mtv2-summary strong.ok,
+.mtv2-summary strong.green {
+  color: var(--sg-green);
+}
+
+.mtv2-summary strong.warning {
+  color: var(--sg-yellow);
+}
+
+.mtv2-summary strong.error {
+  color: var(--sg-red);
+}
+
+.mtv2-summary small {
+  display: block;
+  overflow: hidden;
+  margin-top: 5px;
+  color: var(--sg-muted);
+  font-size: 9.5px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mtv2-panel {
+  min-width: 0;
+  border: 1px solid var(--sg-line);
+  border-radius: 15px;
+  background: var(--sg-panel);
+  padding: 17px;
+  box-shadow: inset 0 1px rgba(255,255,255,.018);
+}
+
+.mtv2-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.mtv2-card-kicker {
+  color: var(--sg-blue);
+  font-size: 8px;
+  font-weight: 850;
+  letter-spacing: .13em;
+}
+
+.mtv2-panel-head h2 {
+  margin: 5px 0 0;
+  font-size: 19px;
+}
+
+.mtv2-panel-head p {
+  margin: 6px 0 0;
+  color: var(--sg-muted);
+  font-size: 9.8px;
+  line-height: 1.45;
+}
+
+.mtv2-panel-head form {
+  margin: 0;
+}
+
+.mtv2-panel-head .button {
+  min-height: 36px;
+  justify-content: center;
+  padding-inline: 12px;
+  font-size: 8.5px;
+}
+
+.mtv2-latest-backup {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+  border: 1px solid color-mix(in srgb, var(--sg-blue) 35%, var(--sg-line));
+  border-radius: 11px;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--sg-blue) 8%, transparent), transparent 58%),
+    var(--sg-panel-deep);
+  padding: 12px;
+}
+
+.mtv2-backup-primary {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.mtv2-backup-primary strong {
+  color: var(--sg-text);
+  font-size: 12px;
+}
+
+.mtv2-backup-primary small {
+  color: var(--sg-muted);
+  font-size: 9.5px;
+}
+
+.mtv2-backup-details {
+  grid-column: 2 / -1;
+  border-top: 1px solid var(--sg-line-soft);
+  padding-top: 8px;
+}
+
+.mtv2-backup-details summary,
+.mtv2-older-backups summary,
+.mtv2-ok-checks summary,
+.mtv2-more-operations summary {
+  cursor: pointer;
+  color: var(--sg-muted);
+  font-size: 9.5px;
+  font-weight: 750;
+}
+
+.mtv2-backup-details code {
+  display: block;
+  overflow-wrap: anywhere;
+  margin-top: 8px;
+  color: var(--sg-text);
+  font-size: 9px;
+}
+
+.mtv2-restore {
+  border-color: color-mix(in srgb, var(--sg-yellow) 35%, var(--sg-line));
+  color: var(--sg-yellow);
+}
+
+.mtv2-older-backups {
+  margin-top: 10px;
+  border-top: 1px solid var(--sg-line-soft);
+  padding-top: 10px;
+}
+
+.mtv2-older-backups > div {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.mtv2-older-backups article {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--sg-line-soft);
+  border-radius: 9px;
+  background: var(--sg-panel-deep);
+  padding: 10px;
+}
+
+.mtv2-older-backups article > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.mtv2-older-backups strong {
+  color: var(--sg-text);
+  font-size: 10.5px;
+}
+
+.mtv2-older-backups small {
+  color: var(--sg-muted);
+  font-size: 9px;
+}
+
+.mtv2-main-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.28fr) minmax(300px, .72fr);
+  align-items: start;
+  gap: 14px;
+}
+
+.mtv2-health-issues,
+.mtv2-ok-checks > div {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.mtv2-health-issues article,
+.mtv2-ok-checks article {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 58px;
+  border: 1px solid var(--sg-line-soft);
+  border-radius: 9px;
+  background: var(--sg-panel-deep);
+  padding: 10px 11px;
+}
+
+.mtv2-health-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--sg-green);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--sg-green) 45%, transparent);
+}
+
+.mtv2-health-dot.warning {
+  background: var(--sg-yellow);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--sg-yellow) 45%, transparent);
+}
+
+.mtv2-health-dot.error {
+  background: var(--sg-red);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--sg-red) 45%, transparent);
+}
+
+.mtv2-health-issues article > div,
+.mtv2-ok-checks article > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.mtv2-health-issues strong,
+.mtv2-ok-checks strong {
+  color: var(--sg-text);
+  font-size: 10.5px;
+}
+
+.mtv2-health-issues small,
+.mtv2-ok-checks small {
+  overflow-wrap: anywhere;
+  color: var(--sg-muted);
+  font-size: 9.2px;
+  line-height: 1.4;
+}
+
+.mtv2-health-status,
+.mtv2-operation-status,
+.mtv2-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 26px;
+  border: 1px solid var(--sg-green-line);
+  border-radius: 999px;
+  background: var(--sg-green-bg);
+  color: var(--sg-green);
+  padding: 0 8px;
+  font-size: 8px;
+  font-weight: 780;
+  white-space: nowrap;
+}
+
+.mtv2-health-status.warning {
+  border-color: color-mix(in srgb, var(--sg-yellow) 35%, var(--sg-line));
+  background: color-mix(in srgb, var(--sg-yellow) 8%, var(--sg-panel));
+  color: var(--sg-yellow);
+}
+
+.mtv2-health-status.error {
+  border-color: color-mix(in srgb, var(--sg-red) 38%, var(--sg-line));
+  background: color-mix(in srgb, var(--sg-red) 8%, var(--sg-panel));
+  color: var(--sg-red);
+}
+
+.mtv2-ok-checks {
+  margin-top: 10px;
+  border-top: 1px solid var(--sg-line-soft);
+  padding-top: 10px;
+}
+
+.mtv2-all-ok,
+.mtv2-empty {
+  display: grid;
+  gap: 5px;
+  margin-top: 14px;
+  border: 1px dashed var(--sg-line);
+  border-radius: 10px;
+  background: var(--sg-panel-deep);
+  padding: 14px;
+  text-align: center;
+}
+
+.mtv2-all-ok strong,
+.mtv2-empty strong {
+  color: var(--sg-text);
+  font-size: 11px;
+}
+
+.mtv2-all-ok span,
+.mtv2-empty span {
+  color: var(--sg-muted);
+  font-size: 9.5px;
+}
+
+.mtv2-recovery-steps {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.mtv2-recovery-steps article {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 10px;
+  min-height: 62px;
+  border: 1px solid var(--sg-line-soft);
+  border-radius: 9px;
+  background: var(--sg-panel-deep);
+  padding: 10px;
+}
+
+.mtv2-recovery-steps article > span {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--sg-blue) 12%, var(--sg-panel));
+  color: var(--sg-blue);
+  font-size: 8px;
+  font-weight: 850;
+}
+
+.mtv2-recovery-steps article > div {
+  display: grid;
+  gap: 4px;
+}
+
+.mtv2-recovery-steps strong {
+  color: var(--sg-text);
+  font-size: 10.5px;
+}
+
+.mtv2-recovery-steps small {
+  color: var(--sg-muted);
+  font-size: 9px;
+  line-height: 1.4;
+}
+
+.mtv2-recovery-note {
+  display: grid;
+  gap: 5px;
+  margin-top: 10px;
+  border: 1px solid color-mix(in srgb, var(--sg-yellow) 30%, var(--sg-line));
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--sg-yellow) 6%, var(--sg-panel-deep));
+  padding: 10px;
+}
+
+.mtv2-recovery-note strong {
+  color: var(--sg-text);
+  font-size: 9.8px;
+}
+
+.mtv2-recovery-note span {
+  color: var(--sg-muted);
+  font-size: 9px;
+  line-height: 1.4;
+}
+
+.mtv2-diagnostics-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  overflow: hidden;
+  margin-top: 14px;
+  border: 1px solid var(--sg-line-soft);
+  border-radius: 10px;
+  background: var(--sg-line-soft);
+  gap: 1px;
+}
+
+.mtv2-diagnostics-grid > div {
+  display: grid;
+  gap: 6px;
+  min-height: 68px;
+  background: var(--sg-panel-deep);
+  padding: 11px;
+}
+
+.mtv2-diagnostics-grid span {
+  color: var(--sg-muted);
+  font-size: 8.7px;
+  font-weight: 720;
+}
+
+.mtv2-diagnostics-grid strong {
+  overflow-wrap: anywhere;
+  color: var(--sg-text);
+  font-size: 10.5px;
+}
+
+.mtv2-diagnostics-grid strong.ok {
+  color: var(--sg-green);
+}
+
+.mtv2-diagnostics-grid strong.warning {
+  color: var(--sg-yellow);
+}
+
+.mtv2-diagnostics-grid strong.error {
+  color: var(--sg-red);
+}
+
+.mtv2-operation-list {
+  display: grid;
+  margin-top: 14px;
+  overflow: hidden;
+  border: 1px solid var(--sg-line-soft);
+  border-radius: 10px;
+}
+
+.mtv2-operation-list article {
+  display: grid;
+  grid-template-columns: 145px minmax(190px, .8fr) auto minmax(0, 1.4fr);
+  align-items: center;
+  gap: 12px;
+  min-height: 58px;
+  background: var(--sg-panel-deep);
+  padding: 10px 12px;
+}
+
+.mtv2-operation-list article + article {
+  border-top: 1px solid var(--sg-line-soft);
+}
+
+.mtv2-operation-list time {
+  color: var(--sg-muted);
+  font-size: 9px;
+  white-space: nowrap;
+}
+
+.mtv2-operation-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.mtv2-operation-copy strong {
+  overflow: hidden;
+  color: var(--sg-blue);
+  font-size: 9.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mtv2-operation-copy small {
+  overflow: hidden;
+  color: var(--sg-muted);
+  font-size: 8.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mtv2-operation-status.ok {
+  border-color: var(--sg-green-line);
+  color: var(--sg-green);
+}
+
+.mtv2-operation-status.error {
+  border-color: color-mix(in srgb, var(--sg-red) 38%, var(--sg-line));
+  background: color-mix(in srgb, var(--sg-red) 8%, var(--sg-panel));
+  color: var(--sg-red);
+}
+
+.mtv2-operation-list p {
+  overflow-wrap: anywhere;
+  margin: 0;
+  color: var(--sg-muted);
+  font-size: 9px;
+  line-height: 1.4;
+}
+
+.mtv2-count {
+  border-color: color-mix(in srgb, var(--sg-blue) 35%, var(--sg-line));
+  background: color-mix(in srgb, var(--sg-blue) 8%, var(--sg-panel));
+  color: var(--sg-blue);
+}
+
+.mtv2-more-operations {
+  margin-top: 10px;
+  border-top: 1px solid var(--sg-line-soft);
+  padding-top: 10px;
+}
+
+.mtv2-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  border-top: 1px solid var(--sg-line);
+  padding: 2px 4px 0;
+  color: var(--sg-muted);
+  font-size: 8.5px;
+}
+
+@media (max-width: 1480px) {
+  .mtv2-diagnostics-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .mtv2-operation-list article {
+    grid-template-columns: 125px minmax(170px, .75fr) auto minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 1180px) {
+  .mtv2-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .mtv2-main-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .mtv2-operation-list article {
+    grid-template-columns: 1fr auto;
+  }
+
+  .mtv2-operation-list p,
+  .mtv2-operation-copy {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 760px) {
+  .mtv2-heading,
+  .mtv2-panel-head,
+  .mtv2-older-backups article,
+  .mtv2-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .mtv2-summary,
+  .mtv2-diagnostics-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .mtv2-latest-backup {
+    grid-template-columns: 42px minmax(0, 1fr);
+  }
+
+  .mtv2-backup-actions {
+    grid-column: 1 / -1;
+  }
+
+  .mtv2-backup-details {
+    grid-column: 1 / -1;
+  }
+}
+
+/* SG-Gateway 021 · compact support tools instead of duplicated diagnostics summary */
+.mtv2-support-tools {
+  grid-column: 1 / -1;
+  margin: 0;
+  border: 1px solid var(--line, rgba(75, 97, 87, .34));
+  border-radius: 14px;
+  background: var(--panel-soft, rgba(249, 246, 238, .72));
+  overflow: hidden;
+}
+
+.mtv2-support-tools > summary {
+  display: flex;
+  align-items: center;
+  min-height: 48px;
+  padding: 11px 15px;
+  cursor: pointer;
+  list-style: none;
+  color: var(--text);
+}
+
+.mtv2-support-tools > summary::-webkit-details-marker {
+  display: none;
+}
+
+.mtv2-support-tools > summary::after {
+  content: "›";
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 21px;
+  line-height: 1;
+  transform: rotate(90deg);
+  transition: transform .16s ease;
+}
+
+.mtv2-support-tools[open] > summary::after {
+  transform: rotate(-90deg);
+}
+
+.mtv2-support-tools > summary > span {
+  display: grid;
+  gap: 2px;
+}
+
+.mtv2-support-tools > summary strong {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.mtv2-support-tools > summary small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.mtv2-support-tools-body {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 13px 15px 15px;
+  border-top: 1px solid var(--line, rgba(75, 97, 87, .24));
+}
+
+.mtv2-support-tools-body > div:first-child {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.mtv2-support-tools-body > div:first-child strong {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.mtv2-support-tools-body > div:first-child span {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.mtv2-support-tools-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.mtv2-support-tools-actions .button {
+  min-height: 36px;
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  .mtv2-support-tools-body {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .mtv2-support-tools-actions {
+    justify-content: flex-start;
+  }
+}
+
+/* SG-Gateway 021 · health checks always open */
+.mtv2-ok-checks > div {
+  margin-top: 0;
+}

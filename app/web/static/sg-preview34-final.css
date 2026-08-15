@@ -1,0 +1,14 @@
+/* SG-Gateway Preview 34: keep selected protocol cards readable in every theme. */
+.cv10-protocol input:checked + span,
+.cv10-protocol input:checked + span strong,
+.cv10-protocol input:checked + span small {
+  color: #FBFAF6 !important;
+}
+
+.cv10-protocol input:checked + span strong {
+  font-weight: 800;
+}
+
+.cv10-protocol input:checked + span small {
+  opacity: .94;
+}

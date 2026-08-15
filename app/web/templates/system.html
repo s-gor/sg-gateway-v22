@@ -1,0 +1,382 @@
+{% extends "base.html" %}
+{% block title %}SG-Gateway · System{% endblock %}
+
+{% block head %}
+  {{ super() }}
+  <link rel="stylesheet" href="{{ url_for('static', filename='sg-system-visual-v1.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='sg-system-top-bars-v2.css') }}?v={{ app_version }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='sg-cpu-breakdown-v1.css') }}?v={{ app_version }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='sg-cpu-dial-layout-v3.css') }}?v={{ app_version }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='sg-refresh-buttons-unify-v2.css') }}?v={{ app_version }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='sg-refresh-buttons-unify-v5.css') }}?v={{ app_version }}">
+<script src="{{ url_for('static', filename='sg-cpu-breakdown-v1.js') }}?v={{ app_version }}" defer></script>
+<link rel="stylesheet" href="{{ url_for('static', filename='sg-disk-breakdown-v1.css') }}?v={{ app_version }}">
+<script src="{{ url_for('static', filename='sg-disk-breakdown-v2.js') }}?v={{ app_version }}" defer></script>
+{% endblock %}
+
+{% block content %}
+{% set health_label = {'ok':'В норме', 'warning':'Требует внимания', 'error':'Ошибка'}.get(report.health, report.health) %}
+{% set health_class = {'ok':'success', 'warning':'warning', 'error':'danger'}.get(report.health, 'warning') %}
+{% set hostd_label = {'ok':'Работает', 'warning':'Предупреждение', 'error':'Ошибка'}.get(report.hostd.status, report.hostd.status) %}
+{% set configured_connections = connections | selectattr('status', 'equalto', 'Configured') | list %}
+
+<section class="sv1-page">
+  <header class="sv1-heading">
+    <div>
+      <div class="sv1-kicker"><span></span> SG-GATEWAY / SYSTEM</div>
+      <h1>System</h1>
+      <p>Ресурсы, службы и состояние собственного сервера SG-Gateway.</p>
+    </div>
+
+    <div class="sv1-heading-actions">
+      <a class="button primary sg-ljd-key-action" href="{{ url_for('download_diagnostics') }}">
+        Скачать диагностику
+      </a>
+      <a class="button" href="{{ url_for('maintenance') }}">Maintenance</a>
+    </div>
+  </header>
+
+  <section class="sv1-summary sg-ljd-system-summary">
+    <article class="sv1-summary-card sv1-summary-health sg-ljd-card">
+      <div class="sv1-summary-icon">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 3 5 6v5c0 4.8 2.9 8.1 7 10 4.1-1.9 7-5.2 7-10V6l-7-3Z"/>
+          <path d="m9 12 2 2 4-4"/>
+        </svg>
+      </div>
+      <div>
+        <div class="sv1-summary-label">Состояние системы</div>
+        <div class="sv1-summary-value {{ health_class }}">{{ health_label }}</div>
+        <div class="sv1-summary-note">Проверки панели, данных, hostd и подключений</div>
+      </div>
+    </article>
+
+    <article class="sv1-summary-card sg-ljd-card">
+      <div class="sv1-summary-icon blue">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="8" r="4"/>
+          <path d="M5 21v-2a7 7 0 0 1 14 0v2"/>
+        </svg>
+      </div>
+      <div>
+        <div class="sv1-summary-label">Клиенты</div>
+        <div class="sv1-summary-value">{{ client_total }}</div>
+        <div class="sv1-summary-note">Записей в клиентской базе</div>
+      </div>
+    </article>
+
+    <article class="sv1-summary-card sg-ljd-card">
+      <div class="sv1-summary-icon violet">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M5 6c0-1.1 3.1-2 7-2s7 .9 7 2-3.1 2-7 2-7-.9-7-2Z"/>
+          <path d="M5 6v6c0 1.1 3.1 2 7 2s7-.9 7-2V6M5 12v6c0 1.1 3.1 2 7 2s7-.9 7-2v-6"/>
+        </svg>
+      </div>
+      <div>
+        <div class="sv1-summary-label">Резервные копии</div>
+        <div class="sv1-summary-value">{{ backup_total }}</div>
+        <div class="sv1-summary-note">Доступно для восстановления</div>
+      </div>
+    </article>
+
+    <article class="sv1-summary-card sg-ljd-card">
+      <div class="sv1-summary-icon green">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M3 12h4l2-7 4 14 2-7h6"/>
+        </svg>
+      </div>
+      <div>
+        <div class="sv1-summary-label">Подключения</div>
+        <div class="sv1-summary-value">{{ configured_connections | length }} / {{ connections | length }}</div>
+        <div class="sv1-summary-note">Настроено в базе SG-Gateway</div>
+      </div>
+    </article>
+  </section>
+
+  <section class="sv1-resource-grid">
+    <article class="sv1-resource-card sg-ljd-card" data-sg-memory-card="1">
+      <header class="sv1-card-head">
+        <div>
+          <div class="sv1-card-kicker">ПАМЯТЬ</div>
+          <h2>Оперативная память</h2>
+        </div>
+        <span class="sv1-state-pill {{ resources.memory.state }}">{{ resources.memory.state_label }}</span>
+      </header>
+
+      <div class="sg-resource-refresh-slot">
+        <button class="button" type="button" data-sg-memory-refresh aria-label="Обновить память">↻ <span>Обновить</span></button>
+      </div>
+
+      <div class="sv1-resource-main">
+        <div class="sv1-donut"
+             style="--sv1-gradient: {{ resources.memory.gradient }};">
+          <div class="sv1-donut-center">
+            <strong>{{ resources.memory.percent_text }}</strong>
+            <span>использовано</span>
+          </div>
+        </div>
+
+        <div class="sv1-resource-copy">
+          <div class="sv1-resource-number">{{ resources.memory.used }}</div>
+          <div class="sv1-resource-total">из {{ resources.memory.total }}</div>
+          <div class="sv1-resource-available">
+            Доступно: <strong>{{ resources.memory.available }}</strong>
+          </div>
+          <div class="sv1-resource-available">
+            Swap используется: <strong>{{ resources.memory.swap_used }}</strong>
+          </div>
+        </div>
+      </div>
+
+      <div class="sv1-peer-progress sv1-peer-progress-memory">
+        <div class="sv1-peer-progress-track">
+          <span style="width: {{ resources.memory.percent_text }}"></span>
+        </div>
+        <div class="sv1-peer-progress-labels">
+          <span>Использовано {{ resources.memory.percent_text }}</span>
+          <span>Доступно {{ resources.memory.available }}</span>
+        </div>
+      </div>
+
+      <div class="sv1-memory-breakdown" data-sg-memory-breakdown>
+  <div class="sv1-memory-breakdown-title"><strong>Использование памяти</strong><span>Автообновление: 15 сек</span></div>
+
+</div>
+<div class="sv1-memory-legend">
+        {% for item in resources.memory.rows %}
+        <div class="sv1-legend-row">
+          <span class="sv1-legend-dot" style="--legend-color: {{ item.color }}"></span>
+          <div>
+            <strong>{{ item.label }}</strong>
+            <small>{{ item.note }}</small>
+          </div>
+          <span>{{ item.value }}</span>
+          <em>{{ item.percent }}</em>
+        </div>
+        {% endfor %}
+      </div>
+    </article>
+
+    <article class="sv1-resource-card sg-ljd-card" data-sg-disk-card="1">
+      <header class="sv1-card-head">
+        <div>
+          <div class="sv1-card-kicker">ХРАНИЛИЩЕ</div>
+          <h2>Диск данных</h2>
+        </div>
+        <span class="sv1-state-pill {{ resources.disk.state }}">{{ resources.disk.state_label }}</span>
+      </header>
+
+      <div class="sg-resource-refresh-slot">
+        <button type="button" class="sv1-disk-refresh" data-sg-disk-refresh>
+      <span aria-hidden="true">↻</span>
+      Обновить
+    </button>
+      </div>
+
+      <div class="sv1-resource-main">
+        <div class="sv1-donut"
+             style="--sv1-gradient: {{ resources.disk.gradient }};">
+          <div class="sv1-donut-center">
+            <strong>{{ resources.disk.percent_text }}</strong>
+            <span>занято</span>
+          </div>
+        </div>
+
+        <div class="sv1-resource-copy">
+          <div class="sv1-resource-number">{{ resources.disk.used }}</div>
+          <div class="sv1-resource-total">из {{ resources.disk.total }}</div>
+          <div class="sv1-resource-available">
+            Свободно: <strong>{{ resources.disk.free }}</strong>
+          </div>
+          <div class="sv1-resource-available">
+            Файловая система: <strong>{{ resources.disk.filesystem }} · {{ resources.disk.mount_point }}</strong>
+          </div>
+        </div>
+      </div>
+
+      <div class="sv1-disk-bar">
+        <span style="width: {{ resources.disk.percent }}%"></span>
+      </div>
+      <div class="sv1-disk-labels">
+        <span>Использовано {{ resources.disk.percent_text }}</span>
+        <span>Свободно {{ resources.disk.free_percent }}%</span>
+      </div>
+
+<div class="sv1-disk-breakdown" data-sg-disk-breakdown>
+  <div class="sv1-disk-breakdown-title">
+    <div class="sv1-disk-breakdown-caption">
+      <strong>Использование диска</strong>
+      <span data-sg-disk-refresh-status>Автообновление: 60 сек</span>
+    </div>
+
+  </div>
+  {% for item in resources.disk.rows %}
+  <div class="sv1-disk-part" title="{{ item.note }}">
+    <div class="sv1-disk-part-head">
+      <span class="sv1-disk-part-name">{{ item.label }}</span>
+      <span class="sv1-disk-part-value">{{ item.value }}</span>
+      <em>{{ item.percent }}</em>
+    </div>
+    <div class="sv1-disk-part-track">
+      <span style="--disk-part-color: {{ item.color }}; width: {{ item.bar_width }}%"></span>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+    </article>
+
+    <article class="sv1-resource-card sv1-cpu-card sg-ljd-card" data-sg-cpu-card="1">
+      <header class="sv1-card-head">
+        <div>
+          <div class="sv1-card-kicker">ПРОЦЕССОР</div>
+          <h2>CPU и среда</h2>
+        </div>
+        <span class="sv1-state-pill {{ resources.cpu.state }}">{{ resources.cpu.state_label }}</span>
+      </header>
+
+      <div class="sg-resource-refresh-slot">
+        <button type="button" class="sv1-cpu-refresh" data-sg-cpu-refresh>
+      <span aria-hidden="true">↻</span>
+      Обновить
+    </button>
+      </div>
+
+      <div class="sv1-cpu-hero" style="--sg-cpu-percent: {{ resources.cpu.percent }};">
+        <div class="sv1-cpu-dial" aria-label="Загрузка CPU {{ resources.cpu.percent }}%">
+          <div class="sv1-cpu-dial-center">
+            <strong>{{ resources.cpu.percent }}%</strong>
+            <span>загрузка</span>
+          </div>
+        </div>
+
+        <div class="sv1-cpu-hero-copy">
+          <div class="sv1-cpu-hero-stat">
+            <strong>{{ resources.cpu.count }}</strong>
+            <span>CPU</span>
+          </div>
+          <div class="sv1-cpu-hero-load">
+            <span>Load average</span>
+            <strong>{{ resources.cpu.load }}</strong>
+          </div>
+        </div>
+      </div>
+
+
+      <div class="sv1-peer-progress sv1-peer-progress-cpu">
+        <div class="sv1-peer-progress-track">
+          <span style="width: {{ resources.cpu.percent }}%"></span>
+        </div>
+        <div class="sv1-peer-progress-labels">
+          <span>Загрузка {{ resources.cpu.percent }}%</span>
+          <span>Свободно {{ 100 - resources.cpu.percent }}%</span>
+        </div>
+      </div>
+
+<div class="sv1-cpu-breakdown" data-sg-cpu-breakdown>
+  <div class="sv1-cpu-breakdown-title">
+    <div class="sv1-cpu-breakdown-caption">
+      <strong>Использование CPU</strong>
+      <span data-sg-cpu-refresh-status>Автообновление: 10 сек</span>
+    </div>
+
+  </div>
+
+  <div class="sv1-cpu-summary">
+    <span>Uptime <strong>{{ resources.cpu.uptime }}</strong></span>
+    <span>Процессов <strong>{{ resources.cpu.processes }}</strong></span>
+    <span>Активно <strong>{{ resources.cpu.running }}</strong></span>
+  </div>
+
+  {% for item in resources.cpu.rows %}
+  <div class="sv1-cpu-part">
+    <div class="sv1-cpu-part-head">
+      <span class="sv1-cpu-part-name">{{ item.label }}</span>
+      <em>{{ item.percent }}</em>
+    </div>
+    <div class="sv1-cpu-part-track">
+      <span style="--cpu-part-color: {{ item.color }}; width: {{ item.bar_width }}%"></span>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+
+
+</article>
+  </section>
+
+  <section class="sv1-two-column sv1-primary-lower-grid">
+    <link rel="stylesheet" href="{{ url_for('static', filename='sg-system-activity-v3.css') }}?v={{ app_version }}">
+    <article class="sv1-panel sv1-actions-panel sg-ljd-card-large sa2-panel"
+             data-system-activity
+             data-activity-url="{{ url_for('system_activity_api') }}">
+      <header class="sv1-panel-head">
+        <div>
+          <div class="sv1-card-kicker">TRAFFIC &amp; ACTIVITY</div>
+          <h2>Трафик и активность</h2>
+          <p>Статистика сервера за сегодня, месяц и последние 24 часа.</p>
+        </div>
+        <span class="sa2-live"><i></i><span data-activity="updated">LIVE</span></span>
+      </header>
+
+      <div class="sa2-grid">
+        <div class="sa2-stat blue"><span>Сегодня</span><strong data-activity="today-total">—</strong><small data-activity="today-pair">↓ — · ↑ —</small></div>
+        <div class="sa2-stat violet"><span>Этот месяц</span><strong data-activity="month-total">—</strong><small data-activity="month-pair">↓ — · ↑ —</small></div>
+        <div class="sa2-stat green"><span>Клиенты</span><strong data-activity="clients-total">—</strong><small data-activity="clients-note">— включено</small></div>
+        <div class="sa2-stat green"><span>Устройства</span><strong data-activity="devices-total">—</strong><small data-activity="devices-note">— активно</small></div>
+        <div class="sa2-stat blue"><span>За 24 часа</span><strong data-activity="last24-total">—</strong><small>суммарно ↓ + ↑</small></div>
+        <div class="sa2-stat gold"><span>Пик 24 часа</span><strong data-activity="peak24">—</strong><small>максимальная общая скорость</small></div>
+      </div>
+
+      <section class="sa2-chart" aria-label="Трафик за последние 24 часа">
+        <div class="sa2-chart-head">
+          <div><span>Последние 24 часа</span><strong>Почасовой трафик</strong></div>
+          <small>время сервера</small>
+        </div>
+        <div class="sa2-bars">
+          {% for _ in range(24) %}<span data-activity-hour="{{ loop.index0 }}" data-title="нет данных" style="--sa2-level:0%"></span>{% endfor %}
+        </div>
+        <div class="sa2-axis"><span>−24 ч</span><span>−12 ч</span><span>сейчас</span></div>
+        <div class="sa2-foot">
+          <span>Счётчик работает постоянно, страницу держать открытой не нужно.</span>
+          <b>↓ + ↑</b>
+        </div>
+      </section>
+    </article>
+    <script src="{{ url_for('static', filename='sg-system-activity-v3.js') }}?v={{ app_version }}" defer></script>
+
+<article class="sv1-panel sv1-health-panel sg-ljd-card-large">
+      <header class="sv1-panel-head">
+        <div>
+          <div class="sv1-card-kicker">HEALTH CHECKS</div>
+          <h2>Проверки состояния</h2>
+          <p>Проверки, используемые API и разделом Maintenance.</p>
+        </div>
+        <a class="button" href="{{ url_for('api_status') }}">Status API</a>
+      </header>
+
+      <div class="sv1-check-list sg-ljd-nested-group">
+        {% for check in health_checks %}
+        <div class="sv1-check-row">
+          <span class="sv1-check-dot {{ check.status }}"></span>
+          <div>
+            <strong>{{ check.name }}</strong>
+            <small>{{ check.message }}</small>
+          </div>
+          <span class="sv1-check-status {{ check.status }}">
+            {{ {'ok':'Норма', 'idle':'Не используется', 'warning':'Внимание', 'error':'Ошибка'}.get(check.status, check.status) }}
+          </span>
+        </div>
+        {% endfor %}
+      </div>
+    </article>
+  </section>
+
+  <footer class="sv1-page-footer">
+    <span>Отчёт сформирован: {{ report.generated_at }}</span>
+    <span>SG-Gateway v{{ report.version }} · native systemd runtime</span>
+  </footer>
+</section>
+<script src="{{ url_for('static', filename='sg-system-resource-labels-v2.js') }}?v={{ app_version }}" defer></script>
+<script src="{{ url_for('static', filename='sg-memory-card-refresh-v1.js') }}?v={{ app_version }}" defer></script>
+{% endblock %}

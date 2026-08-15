@@ -1,0 +1,14 @@
+/* SG-Gateway Preview 32: final client creation readability and selection defaults. */
+html[data-theme="light"] .cv10-protocol input:checked + span,
+html[data-theme="light"] .cv10-protocol input:checked + span strong,
+html[data-theme="light"] .cv10-protocol input:checked + span small {
+  color: #FBFAF6 !important;
+}
+
+html[data-theme="light"] .cv10-protocol input:checked + span strong {
+  font-weight: 800;
+}
+
+html[data-theme="light"] .cv10-protocol input:checked + span small {
+  opacity: .92;
+}

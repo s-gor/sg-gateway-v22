@@ -1,0 +1,137 @@
+{% set selected_source = geofiles.candidate.source_id if geofiles.candidate else (geofiles.active.source_id if geofiles.active else 'loyalsoldier') %}
+{% set bundle = namespace(available=false) %}
+{% for source in geofiles.sources %}{% if source.id == 'sg_client' and source.available %}{% set bundle.available = true %}{% endif %}{% endfor %}
+<section class="r096-geo">
+  <article class="r096-geo-card">
+    <h2>Установленные файлы</h2>
+    {% if geofiles.active %}
+    <p class="r096-geo-source">Источник: {{ geofiles.active.source_label }}</p>
+    <div class="r096-geo-pair">
+      {% for key, label in [('geoip','geoip.dat'),('geosite','geosite.dat')] %}
+      {% set file = geofiles.active[key] %}
+      <section>
+        <strong>{{ label }}</strong>
+        <span>{{ file.size_text }} · {{ file.categories | length }} категорий</span>
+        <code>{{ file.sha256 }}</code>
+        <button class="button small" type="button" data-copy="{{ file.sha256 }}">Копировать SHA-256</button>
+      </section>
+      {% endfor %}
+    </div>
+    <p class="r096-geo-validation">Проверка Xray: <strong>{{ geofiles.active.xray_validation }}</strong> · {{ geofiles.active.xray_message }}</p>
+    <details class="r096-geo-categories">
+      <summary>Показать все категории</summary>
+      <div><strong>GeoIP</strong><p>{{ geofiles.active.geoip.categories | join(', ') }}</p><strong>GeoSite</strong><p>{{ geofiles.active.geosite.categories | join(', ') }}</p></div>
+    </details>
+    {% else %}
+    <div class="r096-empty">Активная пара GeoFiles не найдена.</div>
+    {% endif %}
+  </article>
+
+  <article class="r096-geo-card">
+    <h2>Источник GeoFiles</h2>
+    <p><strong>Обычное обновление — это два действия:</strong> выберите источник, нажмите «Проверить источник», затем «Обновить GeoFiles».</p>
+    <p class="r096-geo-note">Ничего вручную заменять не нужно. Проверка не меняет активные файлы, а после успешной проверки SG-Gateway применит именно проверенную пару.</p>
+    <p class="r096-geo-note">Наличие category-ads-all не обязательно: совместимость определяется по реальным категориям.</p>
+    <form id="r096-geofiles-form" method="post" action="{{ url_for('geofiles_check') }}" enctype="multipart/form-data">
+      <div class="r096-source-grid">
+        {% for source in geofiles.sources %}
+        <label class="r096-source-card {{ 'disabled' if not source.available else '' }}">
+          <input type="radio" name="source_id" value="{{ source.id }}" {% if source.id == selected_source %}checked{% endif %} {% if not source.available %}disabled{% endif %}>
+          <span><i></i><strong>{{ source.label }}</strong><small>{{ source.note }}</small></span>
+        </label>
+        {% endfor %}
+      </div>
+
+      <div class="r096-source-info" data-source-info="roscomvpn" hidden>
+        <strong>RoscomVPN GeoFiles · отдельная совместимость</strong>
+        <span>Пара определяется по реальным категориям. При применении стандартные несовместимые правила заменяются серверной схемой Direct/Block. Финальный маршрут остаётся Direct.</span>
+        <div class="r096-roscom-options">
+          <label><input type="checkbox" name="roscom_block_ads" value="1"><span>Block · category-ads</span></label>
+          <label><input type="checkbox" name="roscom_block_windows" value="1"><span>Block · win-spy</span></label>
+          <label><input type="checkbox" name="roscom_block_torrent" value="1"><span>Block · torrent</span></label>
+        </div>
+      </div>
+
+      <div class="r096-source-fields" data-source-fields="custom_url" hidden>
+        <label><span>URL GEOIP.DAT</span><input type="url" name="geoip_url" placeholder="https://…/geoip.dat"></label>
+        <label><span>URL GEOSITE.DAT</span><input type="url" name="geosite_url" placeholder="https://…/geosite.dat"></label>
+      </div>
+      <div class="r096-source-fields" data-source-fields="upload" hidden>
+        <label><span>Файл geoip.dat</span><input type="file" name="geoip_file" accept=".dat,application/octet-stream"></label>
+        <label><span>Файл geosite.dat</span><input type="file" name="geosite_file" accept=".dat,application/octet-stream"></label>
+      </div>
+      <div class="r096-source-fields" data-source-fields="local" hidden>
+        <label><span>Абсолютный путь geoip.dat</span><input type="text" name="local_geoip" placeholder="/path/to/geoip.dat"></label>
+        <label><span>Абсолютный путь geosite.dat</span><input type="text" name="local_geosite" placeholder="/path/to/geosite.dat"></label>
+      </div>
+    </form>
+  </article>
+
+  <article class="r096-geo-card">
+    <h2>Проверка и применение</h2>
+    {% if geofiles.candidate %}
+    <p class="r096-geo-source">{{ geofiles.candidate.source_label }} · {{ geofiles.candidate.message }}</p>
+    <p class="r096-geo-validation">Семейство: <strong>{{ geofiles.candidate.family }}</strong> · Режим: {{ geofiles.candidate.compatibility_mode }} · Xray: {{ geofiles.candidate.xray_validation }}</p>
+    {% if geofiles.candidate.missing_active_categories %}
+    <div class="r096-geo-missing"><strong>Категории текущих правил, которых нет в candidate:</strong><span>{{ geofiles.candidate.missing_active_categories | join(', ') }}</span></div>
+    {% endif %}
+    <div class="r096-geo-pair">
+      {% for key, label in [('geoip','geoip.dat'),('geosite','geosite.dat')] %}
+      {% set file = geofiles.candidate[key] %}
+      <section>
+        <strong>{{ label }}</strong>
+        <span>{{ file.size_text }} · {{ file.categories | length }} категорий</span>
+        <code>{{ file.sha256 }}</code>
+        <button class="button small" type="button" data-copy="{{ file.sha256 }}">Копировать SHA-256</button>
+      </section>
+      {% endfor %}
+    </div>
+    <details class="r096-geo-categories">
+      <summary>Показать все категории candidate</summary>
+      <div><strong>GeoIP</strong><p>{{ geofiles.candidate.geoip.categories | join(', ') }}</p><strong>GeoSite</strong><p>{{ geofiles.candidate.geosite.categories | join(', ') }}</p></div>
+    </details>
+    {% else %}
+    <p>Источник ещё не проверен.</p>
+    {% endif %}
+
+    <div class="r096-geo-actions">
+      <button class="r096-secondary-button" type="submit" form="r096-geofiles-form">Проверить источник</button>
+      <form method="post" action="{{ url_for('geofiles_apply') }}" data-sg-confirm="Обновить активную пару GeoFiles? Текущие файлы и маршрутизация будут сохранены для полного отката." data-sg-confirm-title="Обновить GeoFiles" data-sg-confirm-button="Обновить GeoFiles"><button class="r096-primary-button" type="submit" {% if not geofiles.candidate or not geofiles.candidate.ready %}disabled{% endif %}>Обновить GeoFiles</button></form>
+      <form method="post" action="{{ url_for('geofiles_check') }}"><input type="hidden" name="source_id" value="sg_client"><button class="r096-secondary-button" type="submit" {% if not bundle.available %}disabled{% endif %}>Вернуть комплектные</button></form>
+      {% if geofiles.backups %}<form method="post" action="{{ url_for('geofiles_rollback') }}" data-sg-confirm="Восстановить последнюю резервную пару GeoFiles и связанную маршрутизацию?" data-sg-confirm-title="Откатить GeoFiles" data-sg-confirm-button="Восстановить"><button class="r096-secondary-button" type="submit">Откатить последнюю</button></form>{% endif %}
+    </div>
+
+    {% if geofiles.backups %}
+    <details class="r096-backups"><summary>Резервные копии ({{ geofiles.backups | length }})</summary><ul>{% for backup in geofiles.backups %}<li><strong>{{ backup.name }}</strong><span>{{ backup.source_label }}</span></li>{% endfor %}</ul></details>
+    {% endif %}
+  </article>
+</section>
+
+<script>
+(() => {
+  const form = document.getElementById('r096-geofiles-form');
+  if (!form) return;
+  const sync = () => {
+    const value = form.querySelector('input[name="source_id"]:checked')?.value || '';
+    document.querySelectorAll('[data-source-fields]').forEach(item => item.hidden = item.dataset.sourceFields !== value);
+    document.querySelectorAll('[data-source-info]').forEach(item => item.hidden = item.dataset.sourceInfo !== value);
+  };
+  form.querySelectorAll('input[name="source_id"]').forEach(input => input.addEventListener('change', sync));
+  sync();
+
+  document.querySelectorAll('[data-copy]').forEach(button => button.addEventListener('click', async () => {
+    const value = button.dataset.copy || '';
+    const old = button.textContent;
+    let copied = false;
+    if (navigator.clipboard && window.isSecureContext) {
+      try { await navigator.clipboard.writeText(value); copied = true; } catch (_) {}
+    }
+    if (!copied) {
+      const area = document.createElement('textarea'); area.value = value; area.style.position='fixed'; area.style.opacity='0'; document.body.appendChild(area); area.select();
+      try { copied = document.execCommand('copy'); } catch (_) {} area.remove();
+    }
+    button.textContent = copied ? 'Скопировано' : 'Не удалось';
+    setTimeout(() => button.textContent = old, 1200);
+  }));
+})();
+</script>

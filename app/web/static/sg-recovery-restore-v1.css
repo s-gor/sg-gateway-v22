@@ -1,0 +1,14 @@
+/* SG-Gateway 0.1.0-021.10 - Recovery restore entry V1 */
+.recovery-flash-stack { margin-top: 18px; }
+.recovery-backup-actions { display: flex; justify-content: flex-end; align-items: center; gap: 8px; flex-wrap: wrap; }
+.recovery-restore-button { border-color: rgba(231,104,104,.55) !important; color: #ffd7d7 !important; background: rgba(231,104,104,.10) !important; }
+.recovery-restore-button:hover { background: rgba(231,104,104,.18) !important; }
+.recovery-confirm { width: min(500px, calc(100vw - 32px)); border: 1px solid var(--line); border-radius: 14px; background: var(--panel); color: var(--text); padding: 0; box-shadow: 0 24px 70px rgba(0,0,0,.45); }
+.recovery-confirm::backdrop { background: rgba(4,8,14,.72); backdrop-filter: blur(3px); }
+.recovery-confirm form { display: grid; gap: 14px; padding: 24px; }
+.recovery-confirm-kicker { color: var(--muted); font-size: 11px; font-weight: 800; letter-spacing: .12em; }
+.recovery-confirm h2 { margin: 0; font-size: 21px; }
+.recovery-confirm p { margin: 0; color: var(--muted); line-height: 1.55; }
+.recovery-confirm code { display: block; overflow-wrap: anywhere; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-soft); padding: 10px 12px; }
+.recovery-confirm-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 4px; }
+@media (max-width: 700px) { .recovery-backup-actions, .recovery-confirm-actions { justify-content: stretch; } .recovery-backup-actions .button, .recovery-confirm-actions .button { flex: 1; } }

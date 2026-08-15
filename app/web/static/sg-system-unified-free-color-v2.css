@@ -1,0 +1,14 @@
+/* SG-Gateway 0.1.0-021.7 — Unified occupied/free color semantics, final.
+   Colored = occupied/used. Neutral track = available/free. */
+body.page-system {
+  --sg-resource-occupied: linear-gradient(90deg,#4d97ef 0%,#8379ef 100%);
+  --sg-resource-free-neutral: rgba(96,129,160,.15);
+}
+body.page-system .sv1-peer-progress-track,
+body.page-system .sv1-disk-bar {
+  background: var(--sg-resource-free-neutral) !important;
+}
+body.page-system .sv1-peer-progress-track > span,
+body.page-system .sv1-disk-bar > span {
+  background: var(--sg-resource-occupied) !important;
+}

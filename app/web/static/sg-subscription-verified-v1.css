@@ -1,0 +1,44 @@
+/* SG-Gateway 021.8: compact subscription row. */
+.dv16-subscription {
+  align-items: center;
+  column-gap: 18px;
+  row-gap: 10px;
+}
+
+.dv16-subscription-summary {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dv16-subscription-summary > strong {
+  font-size: 1.02rem;
+  line-height: 1.25;
+}
+
+.dv16-subscription-summary > span {
+  line-height: 1.4;
+}
+
+.dv16-subscription-summary > small {
+  color: var(--sg-muted);
+  font-size: .82rem;
+  line-height: 1.4;
+}
+
+.dv16-subscription-actions {
+  align-self: center;
+}
+
+@media (max-width: 760px) {
+  .dv16-subscription {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .dv16-subscription-actions {
+    align-self: stretch;
+  }
+}

@@ -1,0 +1,483 @@
+.mtv31-tabs {
+  display: flex;
+  gap: 8px;
+  margin: -8px 0 22px;
+  border-bottom: 1px solid var(--border, rgba(57, 76, 68, .22));
+}
+
+.mtv31-tabs a {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 20px;
+  color: var(--muted, #66736d);
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.mtv31-tabs a.is-active {
+  color: var(--accent, #356f5f);
+}
+
+.mtv31-tabs a.is-active::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 3px;
+  border-radius: 3px 3px 0 0;
+  background: #b58a46;
+}
+
+.mtv31-update-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.mtv31-update-summary article {
+  min-width: 0;
+  padding: 22px;
+  border-right: 1px solid var(--border, rgba(57, 76, 68, .18));
+}
+
+.mtv31-update-summary article:last-child { border-right: 0; }
+.mtv31-update-summary span,
+.mtv31-channel-head span {
+  display: block;
+  margin-bottom: 12px;
+  color: #48677a;
+  font-size: .73rem;
+  font-weight: 900;
+  letter-spacing: .11em;
+}
+
+.mtv31-update-summary strong {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--text, #27312d);
+  font-size: 1.35rem;
+  line-height: 1.15;
+}
+
+.mtv31-update-summary small {
+  color: var(--muted, #748079);
+  line-height: 1.45;
+}
+
+.mtv31-xray-update-panel { overflow: hidden; }
+
+.mtv31-update-badge {
+  align-self: flex-start;
+  padding: 8px 13px;
+  border: 1px solid rgba(56, 82, 72, .48);
+  border-radius: 999px;
+  color: #394c44;
+  font-size: .7rem;
+  font-weight: 900;
+  letter-spacing: .06em;
+  white-space: nowrap;
+}
+
+.mtv31-channel-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  padding: 20px;
+  border-top: 1px solid var(--border, rgba(57, 76, 68, .16));
+}
+
+.mtv31-channel-card {
+  padding: 22px;
+  border: 1px solid rgba(82, 109, 98, .28);
+  border-radius: 15px;
+  background: rgba(244, 248, 249, .72);
+}
+
+.mtv31-channel-card.stable { border-color: rgba(56, 177, 126, .32); }
+.mtv31-channel-card.prerelease { border-color: rgba(177, 135, 67, .34); }
+.mtv31-channel-card.stable .mtv31-channel-head span { color: #38ae7d; }
+.mtv31-channel-card.prerelease .mtv31-channel-head span { color: #a77932; }
+
+.mtv31-channel-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: flex-start;
+}
+
+.mtv31-channel-head h3 {
+  margin: 0;
+  color: var(--text, #27312d);
+  font-size: 1.22rem;
+}
+
+.mtv31-channel-head > strong {
+  color: var(--text, #27312d);
+  font-size: 1.25rem;
+  white-space: nowrap;
+}
+
+.mtv31-channel-card > p {
+  min-height: 48px;
+  margin: 16px 0;
+  color: var(--muted, #748079);
+  line-height: 1.5;
+}
+
+.mtv31-channel-message {
+  min-height: 62px;
+  margin: 14px 0 16px;
+  padding: 13px 14px;
+  border: 1px solid rgba(73, 108, 132, .25);
+  border-radius: 11px;
+  color: #4c6472;
+  background: rgba(255, 255, 255, .42);
+  line-height: 1.45;
+}
+
+.mtv31-channel-message.available { border-color: rgba(181, 138, 70, .35); color: #8d672c; }
+.mtv31-channel-message.current { border-color: rgba(56, 177, 126, .35); color: #2e7e5c; }
+.mtv31-channel-message.blocked { border-color: rgba(73, 108, 132, .3); color: #4e6675; }
+
+.mtv31-channel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.mtv31-channel-actions form { margin: 0; }
+.mtv31-channel-actions .button[disabled] { opacity: .58; cursor: not-allowed; }
+.mtv31-prerelease-action { border-color: rgba(181, 138, 70, .48); color: #8c6427; }
+
+.mtv31-safety-note,
+.mtv31-update-error {
+  display: grid;
+  gap: 7px;
+  margin: 0 20px 20px;
+  padding: 16px 18px;
+}
+
+.mtv31-safety-note span,
+.mtv31-update-error span { color: var(--muted, #748079); line-height: 1.5; }
+.mtv31-update-error { border-color: rgba(180, 89, 70, .35); }
+.mtv31-update-error .button { justify-self: start; margin-top: 4px; }
+
+@media (max-width: 1050px) {
+  .mtv31-update-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mtv31-update-summary article:nth-child(2) { border-right: 0; }
+  .mtv31-channel-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 640px) {
+  .mtv31-update-summary { grid-template-columns: 1fr; }
+  .mtv31-update-summary article { border-right: 0; border-bottom: 1px solid var(--border, rgba(57, 76, 68, .18)); }
+  .mtv31-update-summary article:last-child { border-bottom: 0; }
+  .mtv31-channel-grid { padding: 14px; }
+  .mtv31-channel-head { display: grid; }
+}
+
+/* SG-Gateway 021 · clean Maintenance tabs and update actions
+   Routing is the accepted control reference. */
+
+.mtv31-tabs {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(150px, 220px)) !important;
+  align-items: center !important;
+  justify-content: start !important;
+  gap: 10px !important;
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 14px 20px 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+
+.mtv31-tabs a {
+  appearance: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 40px !important;
+  border: 1px solid var(--sgc-line, #89968A) !important;
+  border-radius: 10px !important;
+  padding: 8px 15px !important;
+  background: var(
+    --sgc-secondary,
+    linear-gradient(180deg, #FAF7F0 0%, #ECE2D3 100%)
+  ) !important;
+  color: var(--sgc-muted, #66716A) !important;
+  box-shadow: 0 2px 5px rgba(43, 52, 46, .10) !important;
+  font-size: 12px !important;
+  font-weight: 750 !important;
+  line-height: 1.15 !important;
+  text-align: center !important;
+  text-decoration: none !important;
+  white-space: nowrap !important;
+  cursor: pointer !important;
+  transition:
+    background .16s ease,
+    border-color .16s ease,
+    box-shadow .16s ease,
+    color .16s ease,
+    transform .12s ease !important;
+}
+
+.mtv31-tabs a::after {
+  display: none !important;
+  content: none !important;
+}
+
+.mtv31-tabs a:hover {
+  border-color: var(--sgc-line, #89968A) !important;
+  background: var(
+    --sgc-secondary-hover,
+    linear-gradient(180deg, #FFFFFF 0%, #F2E9DC 100%)
+  ) !important;
+  color: var(--sgc-text, #29312C) !important;
+}
+
+.mtv31-tabs a:active {
+  transform: translateY(1px) !important;
+}
+
+.mtv31-tabs a:focus-visible {
+  outline: 2px solid var(--sgc-focus, #93672E) !important;
+  outline-offset: 2px !important;
+}
+
+.mtv31-tabs a.is-active {
+  border-color: var(--sgc-primary-line, #5C846F) !important;
+  background: var(
+    --sgc-primary,
+    linear-gradient(180deg, #6F9A84 0%, #527D69 100%)
+  ) !important;
+  color: #FFFFFF !important;
+  box-shadow: var(
+    --sgc-shadow,
+    0 10px 22px rgba(69, 111, 92, .18)
+  ) !important;
+}
+
+.mtv31-tabs a.is-active:hover {
+  background: var(
+    --sgc-primary-hover,
+    linear-gradient(180deg, #7AA78F 0%, #5B8973 100%)
+  ) !important;
+  color: #FFFFFF !important;
+}
+
+/* The removed summary no longer leaves a false gap above the update card. */
+.mtv31-tabs + .mtv31-xray-update-panel {
+  margin-top: 0 !important;
+}
+
+.mtv31-xray-update-panel {
+  min-width: 0 !important;
+}
+
+.mtv31-channel-actions {
+  display: flex !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+  gap: 10px !important;
+}
+
+.mtv31-channel-actions form {
+  display: contents !important;
+  margin: 0 !important;
+}
+
+.mtv31-channel-actions .button,
+.mtv31-update-error .button,
+.mtv2-heading-actions .button {
+  min-height: 40px !important;
+  border-radius: 10px !important;
+  padding: 8px 15px !important;
+  font-size: 12px !important;
+  font-weight: 750 !important;
+  line-height: 1.15 !important;
+}
+
+.mtv31-channel-actions .button.primary {
+  color: #FFFFFF !important;
+}
+
+.mtv31-channel-actions .button:disabled {
+  opacity: .48 !important;
+  box-shadow: none !important;
+}
+
+@media (max-width: 760px) {
+  .mtv31-tabs {
+    grid-template-columns: 1fr 1fr !important;
+    padding: 10px 10px 0 !important;
+  }
+
+  .mtv31-channel-actions {
+    align-items: stretch !important;
+    flex-direction: column !important;
+  }
+
+  .mtv31-channel-actions .button {
+    width: 100% !important;
+  }
+}
+
+/* SG-Gateway 021 · Maintenance Updates dark-theme contrast fix */
+html[data-theme="dark"] .mtv31-xray-update-panel {
+  border-color: var(--sgpf-line-strong, #34506B) !important;
+  background: var(--sgpf-raised, #162438) !important;
+  color: var(--sgpf-text, #F4F7FA) !important;
+}
+
+html[data-theme="dark"] .mtv31-xray-update-panel .mtv2-panel-head {
+  border-bottom-color: var(--sgpf-line, #24364B) !important;
+}
+
+html[data-theme="dark"] .mtv31-xray-update-panel h2,
+html[data-theme="dark"] .mtv31-xray-update-panel h3,
+html[data-theme="dark"] .mtv31-channel-head > strong,
+html[data-theme="dark"] .mtv31-safety-note strong {
+  color: var(--sgpf-text, #F4F7FA) !important;
+}
+
+html[data-theme="dark"] .mtv31-xray-update-panel p,
+html[data-theme="dark"] .mtv31-safety-note span {
+  color: var(--sgpf-muted, #8A9AAF) !important;
+}
+
+html[data-theme="dark"] .mtv31-channel-grid {
+  gap: 14px !important;
+}
+
+html[data-theme="dark"] .mtv31-channel-card {
+  border: 1px solid var(--sgpf-line-strong, #34506B) !important;
+  border-radius: 14px !important;
+  background:
+    linear-gradient(180deg, #17263A 0%, #122033 100%) !important;
+  color: var(--sgpf-text, #F4F7FA) !important;
+  box-shadow: none !important;
+}
+
+html[data-theme="dark"] .mtv31-channel-card.stable {
+  border-color: #356E62 !important;
+  background:
+    linear-gradient(180deg, #172A35 0%, #11232D 100%) !important;
+}
+
+html[data-theme="dark"] .mtv31-channel-card.prerelease {
+  border-color: #615335 !important;
+  background:
+    linear-gradient(180deg, #292538 0%, #1E1D2D 100%) !important;
+}
+
+html[data-theme="dark"] .mtv31-channel-card p {
+  color: #A7B5C7 !important;
+}
+
+html[data-theme="dark"] .mtv31-channel-head span {
+  color: #8BBCE8 !important;
+}
+
+html[data-theme="dark"] .mtv31-channel-card.stable .mtv31-channel-head span {
+  color: #57D49A !important;
+}
+
+html[data-theme="dark"] .mtv31-channel-card.prerelease .mtv31-channel-head span {
+  color: #E0AE55 !important;
+}
+
+html[data-theme="dark"] .mtv31-channel-message {
+  border: 1px solid var(--sgpf-line, #24364B) !important;
+  border-radius: 10px !important;
+  background: #0E1723 !important;
+  color: #B7C5D6 !important;
+}
+
+html[data-theme="dark"] .mtv31-channel-message.current {
+  border-color: #356E62 !important;
+  background: #10261F !important;
+  color: #9ED9BE !important;
+}
+
+html[data-theme="dark"] .mtv31-channel-message.available {
+  border-color: #4B6685 !important;
+  background: #122137 !important;
+  color: #AFC9E4 !important;
+}
+
+html[data-theme="dark"] .mtv31-channel-message.blocked,
+html[data-theme="dark"] .mtv31-channel-message.unavailable {
+  border-color: #665431 !important;
+  background: #2B2418 !important;
+  color: #E0BC76 !important;
+}
+
+html[data-theme="dark"] .mtv31-update-badge {
+  border-color: #477AAA !important;
+  background: #12253A !important;
+  color: #9CC8EE !important;
+  opacity: 1 !important;
+}
+
+html[data-theme="dark"] .mtv31-safety-note {
+  border-color: var(--sgpf-line, #24364B) !important;
+  background: #101B2A !important;
+}
+
+html[data-theme="dark"] .mtv31-tabs a {
+  border-color: var(--sgpf-line, #24364B) !important;
+  background: #162438 !important;
+  color: #A9B8CA !important;
+  box-shadow: none !important;
+}
+
+html[data-theme="dark"] .mtv31-tabs a:hover {
+  border-color: #3C5E7E !important;
+  background: #1B2D43 !important;
+  color: #F4F7FA !important;
+}
+
+html[data-theme="dark"] .mtv31-tabs a.is-active {
+  border-color: #4E82B1 !important;
+  background:
+    linear-gradient(180deg, #477AAA 0%, #315E8C 100%) !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, .22) !important;
+}
+
+html[data-theme="dark"] .mtv31-channel-actions .button,
+html[data-theme="dark"] .mtv31-update-error .button {
+  border-color: #34506B !important;
+  background: #102033 !important;
+  color: #F4F7FA !important;
+  box-shadow: none !important;
+}
+
+html[data-theme="dark"] .mtv31-channel-actions .button:hover,
+html[data-theme="dark"] .mtv31-update-error .button:hover {
+  border-color: #4E82B1 !important;
+  background: #182D45 !important;
+}
+
+html[data-theme="dark"] .mtv31-channel-actions .button.primary,
+html[data-theme="dark"] .mtv31-channel-actions .mtv31-prerelease-action {
+  border-color: #4E82B1 !important;
+  background:
+    linear-gradient(180deg, #477AAA 0%, #315E8C 100%) !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, .22) !important;
+}
+
+html[data-theme="dark"] .mtv31-channel-actions .button:disabled {
+  border-color: #2C3B4D !important;
+  background: #172230 !important;
+  color: #68788B !important;
+  opacity: 1 !important;
+  box-shadow: none !important;
+}

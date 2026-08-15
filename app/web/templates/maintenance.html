@@ -1,0 +1,691 @@
+{% extends "base.html" %}
+{% block title %}SG-Gateway · Maintenance{% endblock %}
+
+{% block head %}
+  {{ super() }}
+  <link rel="stylesheet" href="{{ url_for('static', filename='sg-maintenance-v2.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='sg-maintenance-updates-v31.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='sg-maintenance-updates-v32.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='sg-full-backup-v1.css') }}">
+{% endblock %}
+
+{% block content %}
+{% set ns = namespace(ok=0, idle=0, warning=0, error=0) %}
+{% for check in health_checks %}
+  {% if check.status == 'ok' %}{% set ns.ok = ns.ok + 1 %}{% endif %}
+  {% if check.status == 'idle' %}{% set ns.idle = ns.idle + 1 %}{% endif %}
+  {% if check.status == 'warning' %}{% set ns.warning = ns.warning + 1 %}{% endif %}
+  {% if check.status == 'error' %}{% set ns.error = ns.error + 1 %}{% endif %}
+{% endfor %}
+{% set issues = ns.warning + ns.error %}
+{% set overall = 'error' if ns.error else ('warning' if ns.warning else 'ok') %}
+{% set overall_label = {'ok':'В норме', 'warning':'Требует внимания', 'error':'Есть ошибки'}[overall] %}
+{% set operation_titles = {
+  'connection.update': 'Обновлены настройки подключения',
+  'backup.create': 'Создана резервная копия',
+  'backup.restore': 'Восстановлена резервная копия',
+  'diagnostics.download': 'Скачана диагностика',
+  'client.create': 'Создан клиент',
+  'client.enable': 'Клиент включён',
+  'client.disable': 'Клиент отключён',
+  'client.delete': 'Клиент удалён',
+  'mihomo.client.enable': 'Добавлен Mihomo-доступ',
+  'mihomo.client.disable': 'Mihomo-доступ отключён',
+  'mihomo.client.rotate': 'Mihomo-доступ перевыпущен',
+  'mihomo.apply': 'Применена конфигурация Mihomo',
+  'mihomo.restart': 'Mihomo перезапущен',
+  'mihomo.rollback': 'Mihomo восстановлен',
+  'xray.update': 'Обновлён Xray Core'
+} %}
+{% set health_titles = {
+  'Mihomo Multi-Protocol': 'Mihomo',
+  'Domain / HTTPS': 'Домен и HTTPS',
+  'GeoFiles Xray': 'GeoFiles Xray'
+} %}
+
+<section class="mtv2-page">
+  <header class="mtv2-heading">
+    <div>
+      <div class="mtv2-kicker"><span></span> SG-GATEWAY / MAINTENANCE</div>
+      <h1>Maintenance</h1>
+      <p>{{ 'Три независимых контура: код SG-Gateway, серверные ядра и GeoFiles. Каждый обновляется отдельно с проверкой и rollback.' if active_tab == 'updates' else 'Резервные копии, диагностика, проверки состояния и журнал операций.' }}</p>
+    </div>
+
+    {% if active_tab == 'backups' %}
+    <div class="mtv2-heading-actions">
+      <form method="post" action="{{ url_for('create_backup_route') }}">
+        <button class="button primary sg-ljd-key-action" type="submit">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 3v12M7 10l5 5 5-5"/>
+            <path d="M5 19h14"/>
+          </svg>
+          Создать копию
+        </button>
+      </form>
+      <a class="button" href="{{ url_for('download_diagnostics') }}">Скачать диагностику</a>
+    </div>
+    {% else %}
+    <div class="mtv2-heading-actions">
+      <a class="button primary sg-ljd-key-action" href="{{ url_for('maintenance', tab='updates', refresh=1) }}">Проверить обновления</a>
+    </div>
+    {% endif %}
+  </header>
+
+  <nav class="mtv31-tabs" aria-label="Разделы Maintenance">
+    <a class="{{ 'is-active' if active_tab == 'backups' else '' }}" href="{{ url_for('maintenance', tab='backups') }}">Backups</a>
+    <a class="{{ 'is-active' if active_tab == 'updates' else '' }}" href="{{ url_for('maintenance', tab='updates') }}">Updates</a>
+  </nav>
+
+  {% if active_tab == 'updates' %}
+  <article class="mtv2-panel mtv32-update-panel sg-ljd-card-large">
+    <header class="mtv2-panel-head">
+      <div>
+        <div class="mtv2-card-kicker">SG-GATEWAY UPDATE</div>
+        <h2>Обновление самой панели</h2>
+        <p>GitHub main фиксируется по точному commit SHA. Обновляются только файлы приложения; <code>.venv</code>, база, сертификаты, GeoFiles и серверные ядра не заменяются.</p>
+      </div>
+      <span class="mtv31-update-badge">ТРАНЗАКЦИОННО</span>
+    </header>
+    {% if panel_updates and panel_updates.error %}
+    <div class="mtv31-update-error sg-ljd-nested"><strong>GitHub main не проверен</strong><span>{{ panel_updates.error }}</span></div>
+    {% endif %}
+    <div class="mtv32-panel-update-grid sg-ljd-nested">
+      <div><span>Установлена</span><strong>{{ panel_updates.installed_version if panel_updates else release.version }}</strong><small>commit: {{ panel_updates.installed_commit[:12] if panel_updates and panel_updates.installed_commit else 'ещё не зафиксирован updater-ом' }}</small></div>
+      <div><span>GitHub main</span><strong>{{ panel_updates.latest_short if panel_updates and panel_updates.latest_short else '—' }}</strong><small>{{ panel_updates.latest_date if panel_updates and panel_updates.latest_date else 'Нажмите «Проверить обновления»' }}</small></div>
+      <div class="mtv32-update-action">
+        <span class="mtv31-channel-message {{ panel_updates.state if panel_updates else 'unavailable' }}">{{ panel_updates.message if panel_updates else 'Проверка не выполнялась.' }}</span>
+        {% if panel_updates and panel_updates.can_install %}
+        <form method="post" action="{{ url_for('panel_update_start') }}" data-sg-confirm="Обновить только код SG-Gateway из зафиксированного GitHub main? Перед переключением будет создан полный backup кода; при ошибке панель восстановится автоматически." data-sg-confirm-title="Обновить SG-Gateway" data-sg-confirm-button="Обновить">
+          <button class="button primary" type="submit">Обновить SG-Gateway</button>
+        </form>
+        {% else %}
+        <a class="button" href="{{ url_for('maintenance', tab='updates', refresh=1) }}">Проверить</a>
+        {% endif %}
+      </div>
+    </div>
+    <div class="mtv31-safety-note sg-ljd-nested"><strong>Защита</strong><span>Если изменился <code>requirements.txt</code>, panel-only update блокируется: такую версию можно ставить только новым полным installer. Это не даёт обновлению зависимостей сломать рабочую систему.</span></div>
+  </article>
+
+  <article class="mtv2-panel mtv31-xray-update-panel sg-ljd-card-large">
+    <header class="mtv2-panel-head">
+      <div>
+        <div class="mtv2-card-kicker">XRAY CORE</div>
+        <h2>Обновление серверного Xray</h2>
+        <p>Скачивается только официальный бинарник Xray. База SG-Gateway, клиенты, ссылки, конфигурация, HTTPS и сертификаты не изменяются.</p>
+      </div>
+      <span class="mtv31-update-badge">БЕЗОПАСНОЕ ОБНОВЛЕНИЕ</span>
+    </header>
+
+    {% if xray_updates and xray_updates.error %}
+    <div class="mtv31-update-error sg-ljd-nested">
+      <strong>Проверка релизов не выполнена</strong>
+      <span>{{ xray_updates.error }}</span>
+      <a class="button" href="{{ url_for('maintenance', tab='updates', refresh=1) }}">Повторить</a>
+    </div>
+    {% endif %}
+
+    <div class="mtv31-channel-grid">
+      {% set stable = xray_updates.stable if xray_updates else none %}
+      <section class="mtv31-channel-card stable">
+        <div class="mtv31-channel-head">
+          <div>
+            <span>STABLE</span>
+            <h3>Стабильная версия</h3>
+          </div>
+          <strong>{{ 'v' ~ stable.release.version if stable and stable.release else '—' }}</strong>
+        </div>
+        <p>Обычный рекомендуемый канал. Предварительные релизы полностью игнорируются.</p>
+        <div class="mtv31-channel-message {{ stable.state if stable else 'unavailable' }}">
+          {{ stable.message if stable else 'Нажмите «Проверить Xray».' }}
+        </div>
+        <div class="mtv31-channel-actions">
+          <a class="button" href="{{ url_for('maintenance', tab='updates', refresh=1) }}">Проверить</a>
+          {% if stable and stable.can_install %}
+          <form method="post" action="{{ url_for('xray_update_start', channel='stable') }}">
+            <button class="button primary" type="submit">Обновить до v{{ stable.release.version }}</button>
+          </form>
+          {% else %}
+          <button class="button" type="button" disabled>{{ 'Обновлять нечего' if stable and stable.state == 'current' else 'Понижение запрещено' if stable and stable.state == 'blocked' else 'Недоступно' }}</button>
+          {% endif %}
+        </div>
+      </section>
+
+      {% set prerelease = xray_updates.prerelease if xray_updates else none %}
+      <section class="mtv31-channel-card prerelease">
+        <div class="mtv31-channel-head">
+          <div>
+            <span>PRE-RELEASE</span>
+            <h3>Предварительная версия</h3>
+          </div>
+          <strong>{{ 'v' ~ prerelease.release.version if prerelease and prerelease.release else '—' }}</strong>
+        </div>
+        <p>Только для осознанного теста новых функций. Этот канал никогда не выбирается автоматически.</p>
+        <div class="mtv31-channel-message {{ prerelease.state if prerelease else 'unavailable' }}">
+          {{ prerelease.message if prerelease else 'Нажмите «Проверить Xray».' }}
+        </div>
+        <div class="mtv31-channel-actions">
+          <a class="button" href="{{ url_for('maintenance', tab='updates', refresh=1) }}">Проверить</a>
+          {% if prerelease and prerelease.can_install %}
+          <form method="post" action="{{ url_for('xray_update_start', channel='prerelease') }}">
+            <button class="button mtv31-prerelease-action" type="submit">Установить для теста</button>
+          </form>
+          {% else %}
+          <button class="button" type="button" disabled>{{ 'Установлена' if prerelease and prerelease.state == 'current' else 'Понижение запрещено' if prerelease and prerelease.state == 'blocked' else 'Недоступно' }}</button>
+          {% endif %}
+        </div>
+      </section>
+    </div>
+
+    <div class="mtv31-safety-note sg-ljd-nested">
+      <strong>Как выполняется обновление</strong>
+      <span>SG-Gateway проверяет официальный SHA-256, запускает новым бинарником <code>xray run -test</code>, сохраняет прежний Xray, атомарно заменяет файл и проверяет службу. При любой ошибке прежний бинарник возвращается автоматически.</span>
+    </div>
+  </article>
+
+  <article class="mtv2-panel mtv32-update-panel sg-ljd-card-large">
+    <header class="mtv2-panel-head">
+      <div>
+        <div class="mtv2-card-kicker">OTHER CORES</div>
+        <h2>Mihomo, sing-box, WARP и AmneziaWG</h2>
+        <p>Каждое ядро обновляется отдельно. Автоматический общий «Update all» отсутствует намеренно.</p>
+      </div>
+      <span class="mtv31-update-badge">ПО ОДНОМУ</span>
+    </header>
+    <div class="mtv32-core-grid">
+      {% for item in (core_updates["items"] if core_updates and core_updates.get("items") else []) %}
+      <section class="mtv32-core-card {{ item.state }}">
+        <div class="mtv32-core-head"><div><span>{{ item.engine }}</span><h3>{{ item.title }}</h3></div><strong>{{ ('v' ~ item.installed) if item.installed and item.engine != 'amneziawg' else item.installed or '—' }}</strong></div>
+        <p>{{ item.message }}</p>
+        {% if item.release %}<small>Stable: v{{ item.release.version }} · {{ item.release.published_at }}</small>{% endif %}
+        <div class="mtv31-channel-actions">
+          {% if item.can_install %}
+          <form method="post" action="{{ url_for('core_update_start', engine=item.engine) }}" data-sg-confirm="Обновить только {{ item.title }}? Текущая конфигурация будет проверена новым бинарником, старый binary сохранится для автоматического rollback." data-sg-confirm-title="Обновить {{ item.title }}" data-sg-confirm-button="Обновить">
+            <button class="button primary" type="submit">Обновить до v{{ item.release.version }}</button>
+          </form>
+          {% else %}
+          <button class="button" type="button" disabled>{{ 'Актуально' if item.state == 'current' else 'Управляемая пара' if item.state == 'managed' else 'Недоступно' }}</button>
+          {% endif %}
+        </div>
+      </section>
+      {% endfor %}
+    </div>
+    <div class="mtv31-safety-note sg-ljd-nested"><strong>AmneziaWG</strong><span>Tools и kernel module нельзя обновлять независимо. «latest» для AWG специально не применяется автоматически: только заранее совместимая пара с DKMS-проверкой.</span></div>
+  </article>
+
+  <article class="mtv2-panel mtv32-update-panel sg-ljd-card-large">
+    <header class="mtv2-panel-head">
+      <div>
+        <div class="mtv2-card-kicker">GEOFILES UPDATE</div>
+        <h2>GeoIP / GeoSite</h2>
+        <p>Для обычного обновления откройте GeoFiles, выберите источник, нажмите «Проверить источник», затем «Обновить GeoFiles». Проверку, резервную копию и безопасное переключение SG-Gateway выполнит сам.</p>
+      </div>
+      <span class="mtv31-update-badge">STAGING + ROLLBACK</span>
+    </header>
+    <div class="mtv32-geofiles-row sg-ljd-nested">
+      <div><span>Активный источник</span><strong>{{ geofiles_updates.active.source_label if geofiles_updates and geofiles_updates.active else 'Не определён' }}</strong><small>{{ geofiles_updates.active.checked_at if geofiles_updates and geofiles_updates.active else 'Сначала подготовьте совместимую пару' }}</small></div>
+      <div><span>Candidate</span><strong>{{ geofiles_updates.candidate.source_label if geofiles_updates and geofiles_updates.candidate else 'Нет' }}</strong><small>{{ 'Готов к применению' if geofiles_updates and geofiles_updates.candidate and geofiles_updates.candidate.ready else 'Не подготовлен' }}</small></div>
+      <a class="button primary" href="{{ url_for('routing') }}#geofiles">Открыть GeoFiles</a>
+    </div>
+    <div class="mtv31-safety-note sg-ljd-nested"><strong>Усиленная схема 021</strong><span>До изменения live-файлов проверяется свободное место и целостность полного backup. Если Xray активен, он кратко останавливается на момент переключения пары, поэтому процесс никогда не читает смешанный набор старого и нового GeoFiles.</span></div>
+  </article>
+  {% else %}
+
+  <section class="mtv2-summary sg-ljd-strip">
+    <article>
+      <div class="mtv2-summary-icon {{ overall }}">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 3 5 6v5c0 4.8 2.9 8.1 7 10 4.1-1.9 7-5.2 7-10V6l-7-3Z"/>
+          <path d="m9 12 2 2 4-4"/>
+        </svg>
+      </div>
+      <div>
+        <span>СОСТОЯНИЕ</span>
+        <strong class="{{ overall }}">{{ overall_label }}</strong>
+        <small>{{ ns.ok }} в норме · {{ issues }} требуют внимания</small>
+      </div>
+    </article>
+
+    <article>
+      <div class="mtv2-summary-icon blue">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M5 6c0-1.1 3.1-2 7-2s7 .9 7 2-3.1 2-7 2-7-.9-7-2Z"/>
+          <path d="M5 6v12c0 1.1 3.1 2 7 2s7-.9 7-2V6"/>
+        </svg>
+      </div>
+      <div>
+        <span>РЕЗЕРВНЫЕ КОПИИ</span>
+        <strong>{{ backups | length }}</strong>
+        <small>{{ backups[0].created_at if backups else 'Копий пока нет' }}</small>
+      </div>
+    </article>
+
+    <article>
+      <div class="mtv2-summary-icon violet">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M5 4h14v16H5z"/>
+          <path d="M8 8h8M8 12h8M8 16h5"/>
+        </svg>
+      </div>
+      <div>
+        <span>ОПЕРАЦИИ</span>
+        <strong>{{ operations | length }}</strong>
+        <small>Последние записи системного журнала</small>
+      </div>
+    </article>
+
+    <article>
+      <div class="mtv2-summary-icon green">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M4 17h16M7 17V7h10v10M9 10h6M9 13h6"/>
+        </svg>
+      </div>
+      <div>
+        <span>ВЕРСИЯ</span>
+        <strong class="green">{{ release.version }}</strong>
+        <small>{{ release.name }} · {{ release.channel }}</small>
+      </div>
+    </article>
+  </section>
+
+  <article class="mtv2-panel sg-ljd-card-large sg-full-backup-card">
+    <header class="mtv2-panel-head sg-full-backup-head">
+      <div>
+        <div class="mtv2-card-kicker">FULL SERVER BACKUP</div>
+        <h2>Полный backup SG-Gateway</h2>
+        <p>Один переносимый файл для полного переезда сервера — вместе с клиентами, ключами, настройками и HTTPS.</p>
+      </div>
+      <form method="post" action="{{ url_for('create_full_backup_route') }}">
+        <button class="button primary sg-full-create" type="submit">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 19h14"/></svg>
+          <span>Создать полный backup</span>
+        </button>
+      </form>
+    </header>
+
+    <div class="sg-full-backup-grid">
+      <section class="sg-full-backup-note sg-ljd-nested" aria-labelledby="sg-full-backup-contents">
+        <div class="sg-full-section-title">
+          <span class="sg-full-section-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7.5 12 3l8 4.5v9L12 21l-8-4.5zM4 7.5 12 12l8-4.5M12 12v9"/></svg></span>
+          <div>
+            <strong id="sg-full-backup-contents">Что сохраняется</strong>
+            <small>Полное состояние SG-Gateway, которое нужно перенести на новый сервер.</small>
+          </div>
+        </div>
+        <div class="sg-full-backup-components" aria-label="Состав полного backup">
+          <em>Клиенты</em><em>Ключи</em><em>Xray</em><em>AmneziaWG</em><em>Mihomo / sing-box</em><em>Routing</em><em>WARP</em><em>GeoFiles</em><em>Nginx</em><em>HTTPS</em>
+        </div>
+        <div class="sg-full-backup-detail">
+          SQLite, runtime-конфиги и весь Let's Encrypt: сертификаты, private key и renewal-state.
+        </div>
+        <div class="sg-full-backup-warning">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 3.5 19h17zM12 9v4m0 3h.01"/></svg>
+          <span><strong>Секретный файл.</strong> Внутри есть приватные ключи — храните `.sgbackup` как пароль.</span>
+        </div>
+      </section>
+
+      <section class="sg-full-restore-box sg-ljd-nested" aria-labelledby="sg-full-restore-title">
+        <div class="sg-full-section-title">
+          <span class="sg-full-section-icon restore" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 21V9m0 0 4 4m-4-4-4 4M5 5h14"/></svg></span>
+          <div>
+            <strong id="sg-full-restore-title">Восстановить на новом сервере</strong>
+            <small>Новый публичный IP сохраняется — старый адрес из backup не подменит его.</small>
+          </div>
+        </div>
+        <form class="sg-full-upload" method="post" action="{{ url_for('restore_full_backup_route') }}" enctype="multipart/form-data"
+              data-sg-full-upload
+              data-sg-confirm="Восстановить полный сервер из выбранного файла? Перед изменением будет автоматически создан страховочный полный backup текущего состояния."
+              data-sg-confirm-title="Полное восстановление SG-Gateway" data-sg-confirm-button="Восстановить" data-sg-confirm-tone="danger">
+          <input class="sg-full-file-input" id="sg-full-backup-file" type="file" name="backup" accept=".sgbackup" required data-sg-full-file>
+          <label class="sg-full-file-picker" for="sg-full-backup-file">
+            <span class="sg-full-file-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 16V4m0 0 4 4m-4-4-4 4M5 15v4h14v-4"/></svg></span>
+            <span class="sg-full-file-copy">
+              <strong data-sg-full-file-name>Выберите .sgbackup</strong>
+              <small data-sg-full-file-meta>Нажмите, чтобы выбрать файл · максимум 512 MiB</small>
+            </span>
+            <span class="sg-full-file-action">Выбрать файл</span>
+          </label>
+          <div class="sg-full-restore-actions">
+            <span class="sg-full-restore-note">Перед восстановлением автоматически создаётся страховочный Full Backup.</span>
+            <button class="button mtv2-restore sg-full-restore-button" type="submit" disabled data-sg-full-restore-button>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.3-5.7M4 4v6h6"/></svg>
+              <span>Восстановить сервер</span>
+            </button>
+          </div>
+        </form>
+      </section>
+    </div>
+
+    {% if full_backups %}
+      {% set full_backup = full_backups[0] %}
+      <div class="sg-full-backup-latest sg-ljd-nested">
+        <div class="sg-full-latest-main">
+          <span class="sg-full-latest-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 3h10l4 4v14H5zM14 3v5h5M8 13h8M8 17h5"/></svg></span>
+          <div>
+            <span class="sg-full-latest-label">ПОСЛЕДНИЙ ПОЛНЫЙ BACKUP</span>
+            <strong>{{ full_backup.created_at }}</strong>
+            <small>{{ full_backup.name }} · <span data-bytes="{{ full_backup.size_bytes }}">{{ full_backup.size_bytes }} B</span></small>
+          </div>
+        </div>
+        <a class="button sg-full-download" href="{{ url_for('download_full_backup_route', name=full_backup.name) }}">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m0 0 4-4m-4 4-4-4M5 20h14"/></svg>
+          <span>Скачать .sgbackup</span>
+        </a>
+      </div>
+    {% endif %}
+  </article>
+
+  <article class="mtv2-panel mtv2-backup-panel sg-ljd-card-large">
+    <header class="mtv2-panel-head">
+      <div>
+        <div class="mtv2-card-kicker">РЕЗЕРВНЫЕ КОПИИ</div>
+        <h2>Последняя копия базы данных</h2>
+        <p>Ручная SQLite-копия и страховочная копия перед восстановлением.</p>
+      </div>
+      <form method="post" action="{{ url_for('create_backup_route') }}">
+        <button class="button primary" type="submit">Создать сейчас</button>
+      </form>
+    </header>
+
+    {% if backups %}
+      {% set backup = backups[0] %}
+      <div class="mtv2-latest-backup sg-ljd-nested">
+        <div class="mtv2-backup-icon">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M5 6c0-1.1 3.1-2 7-2s7 .9 7 2-3.1 2-7 2-7-.9-7-2Z"/>
+            <path d="M5 6v12c0 1.1 3.1 2 7 2s7-.9 7-2V6"/>
+          </svg>
+        </div>
+
+        <div class="mtv2-backup-primary">
+          <span>ПОСЛЕДНЯЯ КОПИЯ</span>
+          <strong>{{ backup.created_at }}</strong>
+          <small>{{ backup.kind }} · <span data-bytes="{{ backup.size_bytes }}">{{ backup.size_bytes }} B</span></small>
+        </div>
+
+        <div class="mtv2-backup-actions">
+          <a class="button" href="{{ url_for('download_backup_route', name=backup.name) }}">Скачать</a>
+          <form method="post"
+                action="{{ url_for('restore_backup_route', name=backup.name) }}"
+                data-sg-confirm="Восстановить базу из этой копии? Перед заменой текущей базы будет создана страховочная копия." data-sg-confirm-title="Восстановить базу" data-sg-confirm-button="Восстановить" data-sg-confirm-tone="danger">
+            <button class="button mtv2-restore" type="submit">Восстановить</button>
+          </form>
+        </div>
+
+        <details class="mtv2-backup-details">
+          <summary>Подробности</summary>
+          <code>{{ backup.name }}</code>
+        </details>
+      </div>
+
+      {% if backups | length > 1 %}
+      <details class="mtv2-older-backups sg-ljd-nested-group">
+        <summary>Другие резервные копии — {{ backups | length - 1 }}</summary>
+        <div>
+          {% for backup in backups[1:] %}
+          <article>
+            <div>
+              <strong>{{ backup.created_at }}</strong>
+              <small>{{ backup.kind }} · <span data-bytes="{{ backup.size_bytes }}">{{ backup.size_bytes }} B</span></small>
+            </div>
+            <div class="mtv2-backup-actions">
+              <a class="button" href="{{ url_for('download_backup_route', name=backup.name) }}">Скачать</a>
+              <form method="post"
+                    action="{{ url_for('restore_backup_route', name=backup.name) }}"
+                    data-sg-confirm="Восстановить эту резервную копию? Перед заменой будет создана страховочная копия текущего состояния." data-sg-confirm-title="Восстановить резервную копию" data-sg-confirm-button="Восстановить" data-sg-confirm-tone="danger">
+                <button class="button mtv2-restore" type="submit">Восстановить</button>
+              </form>
+            </div>
+          </article>
+          {% endfor %}
+        </div>
+      </details>
+      {% endif %}
+    {% else %}
+      <div class="mtv2-empty sg-ljd-nested">
+        <strong>Резервных копий пока нет</strong>
+        <span>Создайте первую копию перед изменением подключений или клиентов.</span>
+      </div>
+    {% endif %}
+  </article>
+
+  <section class="mtv2-main-grid">
+    <article class="mtv2-panel mtv2-health-panel sg-ljd-card-large">
+      <header class="mtv2-panel-head">
+        <div>
+          <div class="mtv2-card-kicker">ПРОВЕРКИ СОСТОЯНИЯ</div>
+          <h2>{{ issues }} требуют внимания</h2>
+          <p>Сначала показаны проблемы. Нормальные проверки показаны ниже.</p>
+        </div>
+      </header>
+
+      {% if issues %}
+      <div class="mtv2-health-issues sg-ljd-nested-group">
+        {% for check in health_checks %}
+          {% if check.status in ['warning', 'error'] %}
+          <article>
+            <span class="mtv2-health-dot {{ check.status }}"></span>
+            <div>
+              <strong>{{ health_titles.get(check.name, check.name) }}</strong>
+              <small>
+                {% if 'AmneziaWG host integration is not connected yet' in check.message %}
+                  Runtime AmneziaWG ещё не подключён
+                {% elif 'Xray runtime status is currently reported by Docker/Compose later' in check.message %}
+                  Runtime Xray ещё не подключён
+                {% elif 'Mihomo установлен, но конфигурация ещё не применена' in check.message %}
+                  Mihomo установлен, но конфигурация ещё не применена
+                {% else %}
+                  {{ check.message }}
+                {% endif %}
+              </small>
+            </div>
+            <span class="mtv2-health-status {{ check.status }}">
+              {{ 'Ошибка' if check.status == 'error' else 'Внимание' }}
+            </span>
+          </article>
+          {% endif %}
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="mtv2-all-ok sg-ljd-nested">
+        <strong>Все проверки в норме</strong>
+        <span>База, каталоги и подключённые службы доступны.</span>
+      </div>
+      {% endif %}
+
+      {% if ns.ok or ns.idle %}
+      <div class="mtv2-ok-checks sg-ljd-nested-group">
+        <div>
+          {% for check in health_checks %}
+            {% if check.status in ['ok', 'idle'] %}
+            <article>
+              <span class="mtv2-health-dot {{ check.status }}"></span>
+              <div>
+                <strong>{{ health_titles.get(check.name, check.name) }}</strong>
+                <small>{{ check.message }}</small>
+              </div>
+              <span class="mtv2-health-status {{ check.status }}">{{ 'Норма' if check.status == 'ok' else 'Не используется' }}</span>
+            </article>
+            {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    </article>
+
+    <article class="mtv2-panel mtv2-recovery-panel sg-ljd-card-large">
+      <header class="mtv2-panel-head">
+        <div>
+          <div class="mtv2-card-kicker">ВОССТАНОВЛЕНИЕ</div>
+          <h2>Инструменты восстановления</h2>
+          <p>Три шага для безопасного возврата к рабочей базе.</p>
+        </div>
+        <a class="button primary" href="{{ url_for('recovery') }}">Открыть Recovery</a>
+      </header>
+
+      <div class="mtv2-recovery-steps sg-ljd-nested-group">
+        <article>
+          <span>01</span>
+          <div>
+            <strong>Проверить состояние</strong>
+            <small>Убедиться, что проблема связана с базой или настройками.</small>
+          </div>
+        </article>
+        <article>
+          <span>02</span>
+          <div>
+            <strong>Выбрать копию</strong>
+            <small>Использовать нужную ручную или страховочную копию.</small>
+          </div>
+        </article>
+        <article>
+          <span>03</span>
+          <div>
+            <strong>Восстановить</strong>
+            <small>Текущая база сохранится как отдельная pre-restore копия.</small>
+          </div>
+        </article>
+      </div>
+
+      <div class="mtv2-recovery-note sg-ljd-nested">
+        <strong>Страховочная копия создаётся автоматически</strong>
+        <span>Восстановление не уничтожает текущую базу без возможности возврата.</span>
+      </div>
+    </article>
+  </section>
+
+  <details class="mtv2-support-tools sg-ljd-nested">
+  <summary>
+    <span>
+      <strong>Для поддержки</strong>
+      <small>Технические данные для разбора проблемы</small>
+    </span>
+  </summary>
+  <div class="mtv2-support-tools-body">
+    <div>
+      <strong>Диагностический отчёт</strong>
+      <span>Служебная сводка панели, состояния базы и подключённых компонентов.</span>
+    </div>
+    <div class="mtv2-support-tools-actions">
+      <a class="button" href="{{ url_for('download_diagnostics') }}">Скачать диагностический отчёт</a>
+      <a class="button" href="{{ url_for('api_status') }}">Открыть Status API</a>
+    </div>
+  </div>
+</details>
+
+<article class="mtv2-panel mtv2-operations-panel sg-ljd-card-large">
+    <header class="mtv2-panel-head">
+      <div>
+        <div class="mtv2-card-kicker">ИСТОРИЯ ОПЕРАЦИЙ</div>
+        <h2>Последние действия</h2>
+        <p>На основной странице показаны только пять последних записей.</p>
+      </div>
+      <span class="mtv2-count">{{ operations | length }} записей</span>
+    </header>
+
+    {% if operations %}
+    <div class="mtv2-operation-list sg-ljd-nested-group">
+      {% for operation in operations[:5] %}
+      <article>
+        <time>{{ operation.created_at }}</time>
+        <div class="mtv2-operation-copy">
+          <strong>{{ operation_titles.get(operation.action, operation.action) }}</strong>
+          <small>{{ operation.target }}</small>
+        </div>
+        <span class="mtv2-operation-status {{ operation.status }}">
+          {{ 'Успешно' if operation.status == 'ok' else 'Ошибка' }}
+        </span>
+        <p>{{ operation.message }}</p>
+      </article>
+      {% endfor %}
+    </div>
+
+    {% if operations | length > 5 %}
+    <details class="mtv2-more-operations">
+      <summary>Показать всю историю — ещё {{ operations | length - 5 }}</summary>
+      <div class="mtv2-operation-list sg-ljd-nested-group">
+        {% for operation in operations[5:] %}
+        <article>
+          <time>{{ operation.created_at }}</time>
+          <div class="mtv2-operation-copy">
+            <strong>{{ operation_titles.get(operation.action, operation.action) }}</strong>
+            <small>{{ operation.target }}</small>
+          </div>
+          <span class="mtv2-operation-status {{ operation.status }}">
+            {{ 'Успешно' if operation.status == 'ok' else 'Ошибка' }}
+          </span>
+          <p>{{ operation.message }}</p>
+        </article>
+        {% endfor %}
+      </div>
+    </details>
+    {% endif %}
+    {% else %}
+    <div class="mtv2-empty sg-ljd-nested">
+      <strong>История операций пока пуста</strong>
+      <span>Действия с клиентами, копиями и подключениями появятся автоматически.</span>
+    </div>
+    {% endif %}
+  </article>
+
+  {% endif %}
+
+  <footer class="mtv2-footer">
+    <span>{{ release.name }} {{ release.version }} · {{ release.channel }}</span>
+    <span>SQLite backups · health checks · operation log</span>
+  </footer>
+</section>
+{% endblock %}
+
+{% block scripts %}
+  {{ super() }}
+  <script>
+  (() => {
+    function formatBytes(value) {
+      const bytes = Number(value);
+      if (!Number.isFinite(bytes) || bytes < 0) return `${value} B`;
+      const units = ["B", "KiB", "MiB", "GiB", "TiB"];
+      let size = bytes;
+      let index = 0;
+      while (size >= 1024 && index < units.length - 1) {
+        size /= 1024;
+        index += 1;
+      }
+      const digits = index === 0 ? 0 : 1;
+      return `${size.toFixed(digits)} ${units[index]}`;
+    }
+
+    document.querySelectorAll("[data-bytes]").forEach(element => {
+      element.textContent = formatBytes(element.dataset.bytes);
+    });
+
+    document.querySelectorAll("[data-sg-full-upload]").forEach(form => {
+      const input = form.querySelector("[data-sg-full-file]");
+      const fileName = form.querySelector("[data-sg-full-file-name]");
+      const fileMeta = form.querySelector("[data-sg-full-file-meta]");
+      const restoreButton = form.querySelector("[data-sg-full-restore-button]");
+      if (!input || !fileName || !fileMeta || !restoreButton) return;
+
+      const reset = () => {
+        fileName.textContent = "Выберите .sgbackup";
+        fileMeta.textContent = "Нажмите, чтобы выбрать файл · максимум 512 MiB";
+        restoreButton.disabled = true;
+        form.classList.remove("has-file");
+      };
+
+      input.addEventListener("change", () => {
+        const file = input.files && input.files[0];
+        if (!file) {
+          reset();
+          return;
+        }
+        fileName.textContent = file.name;
+        fileMeta.textContent = `${formatBytes(file.size)} · готов к восстановлению`;
+        restoreButton.disabled = false;
+        form.classList.add("has-file");
+      });
+
+      reset();
+    });
+  })();
+  </script>
+{% endblock %}

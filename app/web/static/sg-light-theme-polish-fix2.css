@@ -1,0 +1,139 @@
+/* SG-Gateway Light Theme Polish Fix 2
+   Loaded after Global Light Theme Fix 1.
+   Dark theme colors are not changed. */
+
+/* Theme button shows the theme that will be enabled after the click:
+   dark current theme -> sun (switch to light)
+   light current theme -> moon (switch to dark) */
+
+.sg-theme-moon {
+  display: none;
+}
+
+.sg-theme-sun {
+  display: block;
+}
+
+html[data-theme="light"] .sg-theme-moon {
+  display: block;
+}
+
+html[data-theme="light"] .sg-theme-sun {
+  display: none;
+}
+
+/* Security: align nested light surfaces with Clients.
+   Main cards remain #e9eef1; nested controls and rows become lighter,
+   rather than using the heavy grey separator background. */
+
+html[data-theme="light"] .secv2-progress {
+  border-color: #a7b6bf;
+  background: #dce5e9;
+  box-shadow: inset 0 1px rgba(255, 255, 255, .48);
+}
+
+html[data-theme="light"] .secv2-progress > div {
+  color: #4e6371;
+}
+
+html[data-theme="light"] .secv2-progress i {
+  border-color: #9bacb7;
+  background: #e9eef1;
+  color: #536a78;
+}
+
+html[data-theme="light"] .secv2-progress b {
+  background: #aebcc5;
+}
+
+html[data-theme="light"] .secv2-progress .done {
+  color: #19785b;
+}
+
+html[data-theme="light"] .secv2-progress .done i {
+  border-color: #7eaa96;
+  background: #cfe2d8;
+  color: #19785b;
+}
+
+html[data-theme="light"] .secv2-progress .current {
+  color: #315d82;
+}
+
+html[data-theme="light"] .secv2-progress .current i {
+  border-color: #7896aa;
+  background: #d5e1e8;
+  color: #315d82;
+}
+
+html[data-theme="light"] .secv2-checks {
+  border-color: #a7b6bf;
+  background: #aebcc5;
+}
+
+html[data-theme="light"] .secv2-checks > div {
+  border-color: #bac6cd;
+  background: #e4eaed;
+}
+
+html[data-theme="light"] .secv2-list {
+  border-color: #a7b6bf;
+  background: #aebcc5;
+  box-shadow: inset 0 1px rgba(255, 255, 255, .36);
+}
+
+html[data-theme="light"] .secv2-list > div {
+  background: #e4eaed;
+}
+
+html[data-theme="light"] .secv2-list > div:nth-child(even) {
+  background: #dfe7ea;
+}
+
+html[data-theme="light"] .secv2-list > div + div {
+  border-top-color: #b4c1c8;
+}
+
+html[data-theme="light"] .secv2-list dt {
+  color: #526875;
+}
+
+html[data-theme="light"] .secv2-list dd {
+  color: #172531;
+}
+
+html[data-theme="light"] .secv2-compact-empty {
+  border-color: #aab9c2;
+  background: #e4eaed;
+}
+
+html[data-theme="light"] .secv2-tech {
+  border-color: #9eafb9;
+  background: #e9eef1;
+}
+
+html[data-theme="light"] .secv2-tech section {
+  border-color: #b0bec7;
+  background: #e4eaed;
+}
+
+html[data-theme="light"] .secv2-result {
+  background: #e4eaed;
+}
+
+html[data-theme="light"] .secv2-result.warning {
+  border-color: #b28f50;
+  background: #e8dfca;
+}
+
+html[data-theme="light"] .secv2-domain-form input {
+  border-color: #91a5b1;
+  background: #f7f9fa;
+}
+
+html[data-theme="light"] .secv2-workflow,
+html[data-theme="light"] .secv2-card {
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, .62),
+    0 8px 20px rgba(49, 65, 75, .08);
+}

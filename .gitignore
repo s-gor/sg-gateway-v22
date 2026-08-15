@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+venv/
+
+# Runtime and local state
+logs/
+backups/
+*.db
+*.sqlite
+
+# The clean seed database is part of SG-Gateway source.
+!data/
+!data/sg-gateway.sqlite
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Generated release artifacts
+*.run
+*.zip
+*.patch
+*.tar
+*.tar.gz
+*.sha256
+
+# OS and editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Pinned third-party runtime media intentionally committed for reproducible SG-Gateway installs.
+!vendor/
+!vendor/cores/
+!vendor/cores/*.zip
+!vendor/cores/*.gz
+!vendor/cores/*.tar.gz
+!vendor/cores/*.zstd
+!vendor/cores/SHA256SUMS
+!vendor/cores/VERSIONS.env
+!vendor/cores/THIRD-PARTY-NOTICES.md
+
+# Local Git history backups
+*.bundle

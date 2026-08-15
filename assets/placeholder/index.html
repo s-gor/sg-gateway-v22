@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Калькулятор валют</title>
+  <style>
+    :root{
+      --bg1:#0d1320;
+      --bg2:#151d2f;
+      --panel:rgba(22,28,44,.88);
+      --line:rgba(255,255,255,.10);
+      --text:#eef3f8;
+      --muted:#b7c2d3;
+      --gold:#e8d39a;
+      --gold-soft:rgba(232,211,154,.10);
+      --shadow:0 24px 60px rgba(0,0,0,.35);
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0}
+    body{
+      font-family: Georgia, "Times New Roman", serif;
+      color:var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(100,120,180,.18), transparent 28%),
+        radial-gradient(circle at top right, rgba(255,225,160,.12), transparent 22%),
+        linear-gradient(180deg, var(--bg1), var(--bg2));
+      min-height:100vh;
+      line-height:1.55;
+    }
+    .wrap{max-width:1120px;margin:0 auto;padding:28px 16px 50px}
+    .hero,.card{
+      border:1px solid var(--line);
+      border-radius:30px;
+      background:
+        linear-gradient(145deg, rgba(255,255,255,.04), rgba(255,255,255,.015)),
+        radial-gradient(circle at 80% 20%, rgba(232,211,154,.10), transparent 24%),
+        radial-gradient(circle at 15% 30%, rgba(153,190,130,.08), transparent 26%),
+        var(--panel);
+      box-shadow:var(--shadow);
+      backdrop-filter: blur(10px);
+    }
+    .hero{
+      padding:36px 32px 28px;
+      display:grid;
+      grid-template-columns:1.08fr .92fr;
+      gap:20px;
+      align-items:center;
+      overflow:hidden;
+    }
+    .eyebrow{
+      color:var(--gold);
+      text-transform:uppercase;
+      letter-spacing:.18em;
+      font-size:12px;
+      margin-bottom:10px;
+    }
+    h1{
+      margin:0 0 14px;
+      font-size:clamp(34px,6vw,64px);
+      line-height:1.02;
+      letter-spacing:-.03em;
+      font-weight:700;
+    }
+    .lead{
+      margin:0;
+      font-size:18px;
+      color:var(--muted);
+      max-width:720px;
+    }
+    .coins{
+      justify-self:end;
+      width:min(100%,360px);
+      aspect-ratio:1/1;
+      position:relative;
+    }
+    .coin, .coin2, .coin3{
+      position:absolute;
+      border-radius:50%;
+      box-shadow:0 18px 40px rgba(0,0,0,.35), inset 0 0 0 1px rgba(255,255,255,.08);
+      background:
+        radial-gradient(circle at 35% 35%, #fff4d3 0%, #ebd39a 38%, #bd9552 68%, #86652f 100%);
+    }
+    .coin{
+      width:62%; height:62%; right:8%; top:8%;
+    }
+    .coin2{
+      width:46%; height:46%; left:6%; bottom:14%;
+      background:
+        radial-gradient(circle at 35% 35%, #edf5ff 0%, #c9d8ef 38%, #8ea5c4 68%, #53657f 100%);
+    }
+    .coin3{
+      width:28%; height:28%; left:28%; top:16%;
+      background:
+        radial-gradient(circle at 35% 35%, #fff4d3 0%, #ebd39a 38%, #bd9552 68%, #86652f 100%);
+    }
+    .coin:before,.coin2:before,.coin3:before{
+      content:"$";
+      position:absolute;
+      inset:0;
+      display:grid;
+      place-items:center;
+      font-size:clamp(36px,7vw,64px);
+      color:rgba(50,35,12,.68);
+      font-weight:700;
+    }
+    .coin2:before{content:"€"; color:rgba(24,42,68,.68); font-size:clamp(28px,5vw,46px)}
+    .coin3:before{content:"¥"; font-size:clamp(20px,4vw,34px)}
+
+    .card{margin-top:22px;padding:24px}
+    .grid{
+      display:grid;
+      grid-template-columns:1.05fr .95fr;
+      gap:18px;
+      align-items:start;
+    }
+    .field-grid{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:16px;
+    }
+    .field{display:flex;flex-direction:column;gap:8px}
+    .field.full{grid-column:1 / -1}
+    label{font-size:14px;color:#dfe6f1}
+    input,select{
+      width:100%;
+      height:58px;
+      padding:0 16px;
+      border-radius:16px;
+      border:1px solid rgba(255,255,255,.12);
+      background:rgba(12,18,30,.92);
+      color:var(--text);
+      font-size:17px;
+      font-family:inherit;
+      box-shadow: inset 0 1px 2px rgba(0,0,0,.12);
+      appearance:none;
+      -webkit-appearance:none;
+      -moz-appearance:none;
+    }
+    select{
+      background-image:
+        linear-gradient(45deg, transparent 50%, #d9c38c 50%),
+        linear-gradient(135deg, #d9c38c 50%, transparent 50%);
+      background-position:
+        calc(100% - 22px) calc(50% - 3px),
+        calc(100% - 16px) calc(50% - 3px);
+      background-size:6px 6px, 6px 6px;
+      background-repeat:no-repeat;
+      padding-right:40px;
+    }
+    select option{
+      background:#101827;
+      color:#eef3f8;
+    }
+    input:focus,select:focus{
+      outline:none;
+      border-color:rgba(232,211,154,.45);
+      box-shadow:0 0 0 3px rgba(232,211,154,.10);
+    }
+    .swap{
+      height:58px;
+      min-width:58px;
+      border:none;
+      border-radius:16px;
+      cursor:pointer;
+      font-size:24px;
+      color:#182131;
+      background:linear-gradient(180deg, #f0ddab, #cfb06c);
+      box-shadow:0 10px 24px rgba(0,0,0,.22);
+    }
+    .swap:hover{transform:translateY(-1px)}
+    .row{
+      display:grid;
+      grid-template-columns:1fr auto 1fr;
+      gap:12px;
+      align-items:end;
+    }
+    .result{
+      border-radius:26px;
+      padding:22px;
+      border:1px solid rgba(255,255,255,.08);
+      background:rgba(255,255,255,.03);
+      min-height:100%;
+    }
+    .result h2{
+      margin:0 0 8px;
+      font-size:clamp(28px,5vw,46px);
+      line-height:1.04;
+      letter-spacing:-.03em;
+    }
+    .sub{
+      color:var(--muted);
+      font-size:16px;
+      margin-bottom:18px;
+    }
+    .rate-boxes{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:14px;
+      margin-top:14px;
+    }
+    .mini{
+      border-radius:20px;
+      padding:16px;
+      border:1px solid rgba(255,255,255,.08);
+      background:rgba(255,255,255,.03);
+    }
+    .mini .k{
+      color:var(--muted);
+      font-size:13px;
+      margin-bottom:6px;
+    }
+    .mini .v{
+      font-size:20px;
+      line-height:1.15;
+      font-weight:700;
+    }
+    .status{
+      margin-top:18px;
+      border-radius:18px;
+      padding:12px 14px;
+      background:var(--gold-soft);
+      border:1px solid rgba(232,211,154,.18);
+      color:#f2e3b5;
+      font-size:14px;
+    }
+    .flags{
+      margin-top:18px;
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+    }
+    .flag-chip{
+      padding:9px 12px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.08);
+      background:rgba(255,255,255,.03);
+      color:#dce5f2;
+      font-size:14px;
+    }
+    .note{
+      margin-top:18px;
+      border-radius:18px;
+      padding:14px 16px;
+      background:rgba(255,255,255,.03);
+      border:1px solid rgba(255,255,255,.08);
+      color:var(--muted);
+      font-size:14px;
+    }
+    @media (max-width: 920px){
+      .hero,.grid,.field-grid,.rate-boxes{grid-template-columns:1fr}
+      .coins{justify-self:center;max-width:280px}
+    }
+    @media (max-width: 640px){
+      .wrap{padding:14px 10px 30px}
+      .hero,.card{padding:18px}
+      h1{font-size:40px}
+      .lead{font-size:16px}
+      .row{grid-template-columns:1fr}
+      .swap{width:100%}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <div>
+        <div class="eyebrow">В живом режиме</div>
+        <h1>Калькулятор валют</h1>
+        <p class="lead">
+          Рубли, юани, доллары, евро, белорусские рубли и гривны — с флажками, автоматическим пересчётом и чистым тёмным дизайном.
+        </p>
+      </div>
+      <div class="coins" aria-hidden="true">
+        <div class="coin"></div>
+        <div class="coin2"></div>
+        <div class="coin3"></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="grid">
+        <div>
+          <div class="row">
+            <div class="field">
+              <label for="amount">Сумма</label>
+              <input id="amount" type="number" step="any" min="0" value="100" />
+            </div>
+
+            <button class="swap" id="swapBtn" type="button" title="Поменять местами">⇄</button>
+
+            <div class="field">
+              <label for="toAmount">Результат</label>
+              <input id="toAmount" type="text" readonly />
+            </div>
+          </div>
+
+          <div class="field-grid" style="margin-top:16px;">
+            <div class="field">
+              <label for="fromCurrency">Из валюты</label>
+              <select id="fromCurrency">
+                <option value="RUB">🇷🇺 RUB — российский рубль</option>
+                <option value="CNY">🇨🇳 CNY — китайский юань</option>
+                <option value="USD" selected>🇺🇸 USD — доллар США</option>
+                <option value="EUR">🇪🇺 EUR — евро</option>
+                <option value="BYN">🇧🇾 BYN — белорусский рубль</option>
+                <option value="UAH">🇺🇦 UAH — украинская гривна</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="toCurrency">В валюту</label>
+              <select id="toCurrency">
+                <option value="RUB">🇷🇺 RUB — российский рубль</option>
+                <option value="CNY">🇨🇳 CNY — китайский юань</option>
+                <option value="USD">🇺🇸 USD — доллар США</option>
+                <option value="EUR" selected>🇪🇺 EUR — евро</option>
+                <option value="BYN">🇧🇾 BYN — белорусский рубль</option>
+                <option value="UAH">🇺🇦 UAH — украинская гривна</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="flags">
+            <div class="flag-chip">🇷🇺 RUB</div>
+            <div class="flag-chip">🇨🇳 CNY</div>
+            <div class="flag-chip">🇺🇸 USD</div>
+            <div class="flag-chip">🇪🇺 EUR</div>
+            <div class="flag-chip">🇧🇾 BYN</div>
+            <div class="flag-chip">🇺🇦 UAH</div>
+          </div>
+        </div>
+
+        <div class="result">
+          <h2 id="mainText">100.00 USD = 0.00 EUR</h2>
+          <div class="sub" id="subText">Загружаю курсы…</div>
+
+          <div class="rate-boxes">
+            <div class="mini">
+              <div class="k">Курс 1 → 2</div>
+              <div class="v" id="rateForward">—</div>
+            </div>
+            <div class="mini">
+              <div class="k">Курс 2 → 1</div>
+              <div class="v" id="rateReverse">—</div>
+            </div>
+          </div>
+
+          <div class="status" id="statusBox">Подключение к источнику курсов…</div>
+
+          <div class="note">
+            Если онлайн-курсы недоступны, файл автоматически использует встроенный запасной набор значений, чтобы калькулятор не ломался.
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const amount = document.getElementById('amount');
+    const toAmount = document.getElementById('toAmount');
+    const fromCurrency = document.getElementById('fromCurrency');
+    const toCurrency = document.getElementById('toCurrency');
+    const swapBtn = document.getElementById('swapBtn');
+
+    const mainText = document.getElementById('mainText');
+    const subText = document.getElementById('subText');
+    const rateForward = document.getElementById('rateForward');
+    const rateReverse = document.getElementById('rateReverse');
+    const statusBox = document.getElementById('statusBox');
+
+    const currencyNames = {
+      RUB: 'российский рубль',
+      CNY: 'китайский юань',
+      USD: 'доллар США',
+      EUR: 'евро',
+      BYN: 'белорусский рубль',
+      UAH: 'украинская гривна'
+    };
+
+    const fallbackRatesPerUSD = {
+      USD: 1,
+      EUR: 0.92,
+      RUB: 92.0,
+      CNY: 7.20,
+      BYN: 3.27,
+      UAH: 39.5
+    };
+
+    let ratesPerUSD = { ...fallbackRatesPerUSD };
+    let ratesDate = null;
+    let usingFallback = true;
+
+    function formatNumber(n, digits = 2){
+      return new Intl.NumberFormat('ru-RU', {
+        minimumFractionDigits: digits,
+        maximumFractionDigits: digits
+      }).format(n);
+    }
+
+    function niceRate(n){
+      const digits = n >= 100 ? 2 : n >= 1 ? 4 : 6;
+      return formatNumber(n, digits);
+    }
+
+    function convert(value, from, to){
+      const usd = value / ratesPerUSD[from];
+      return usd * ratesPerUSD[to];
+    }
+
+    function updateCalc(){
+      const value = Number(amount.value || 0);
+      const from = fromCurrency.value;
+      const to = toCurrency.value;
+
+      const result = convert(value, from, to);
+      const forward = convert(1, from, to);
+      const reverse = convert(1, to, from);
+
+      toAmount.value = formatNumber(result, result >= 100 ? 2 : 4);
+      mainText.textContent = `${formatNumber(value, 2)} ${from} = ${formatNumber(result, result >= 100 ? 2 : 4)} ${to}`;
+      subText.textContent = `${currencyNames[from]} → ${currencyNames[to]}`;
+      rateForward.textContent = `1 ${from} = ${niceRate(forward)} ${to}`;
+      rateReverse.textContent = `1 ${to} = ${niceRate(reverse)} ${from}`;
+
+      if (usingFallback) {
+        statusBox.textContent = 'Сейчас используются встроенные запасные курсы.';
+      } else {
+        statusBox.textContent = `Курсы загружены. Дата источника: ${ratesDate || 'последнее обновление API'}.`;
+      }
+    }
+
+    async function loadRates(){
+      try {
+        // Frankfurter v2 returns an array of {date, base, quote, rate}
+        const url = 'https://api.frankfurter.dev/v2/rates?base=USD&quotes=EUR,RUB,CNY,BYN,UAH';
+        const res = await fetch(url, { cache: 'no-store' });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+
+        const nextRates = { USD: 1 };
+        let dateFound = null;
+
+        if (Array.isArray(data)) {
+          for (const row of data) {
+            if (row && row.quote && typeof row.rate === 'number') {
+              nextRates[row.quote] = row.rate;
+              if (row.date) dateFound = row.date;
+            }
+          }
+        } else if (data && data.rates) {
+          // fallback if API shape is v1-like
+          Object.assign(nextRates, data.rates);
+          dateFound = data.date || null;
+        }
+
+        const required = ['USD','EUR','RUB','CNY','BYN','UAH'];
+        const hasAll = required.every(code => typeof nextRates[code] === 'number');
+
+        if (!hasAll) throw new Error('Missing currencies');
+
+        ratesPerUSD = nextRates;
+        ratesDate = dateFound;
+        usingFallback = false;
+      } catch (e) {
+        ratesPerUSD = { ...fallbackRatesPerUSD };
+        ratesDate = null;
+        usingFallback = true;
+      }
+      updateCalc();
+    }
+
+    [amount, fromCurrency, toCurrency].forEach(el => {
+      el.addEventListener('input', updateCalc);
+      el.addEventListener('change', updateCalc);
+    });
+
+    swapBtn.addEventListener('click', () => {
+      const tmp = fromCurrency.value;
+      fromCurrency.value = toCurrency.value;
+      toCurrency.value = tmp;
+      updateCalc();
+    });
+
+    updateCalc();
+    loadRates();
+  </script>
+</body>
+</html>

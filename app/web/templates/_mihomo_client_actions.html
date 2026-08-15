@@ -1,0 +1,51 @@
+<section class="mhv2-client-card sg-ljd-card">
+  <header>
+    <div>
+      <div class="mhv2-kicker">MIHOMO ACCESS</div>
+      <h2>Mieru · AnyTLS · TUIC v5</h2>
+      <p>Единый Mihomo YAML для встроенного Mihomo Core SG Client.</p>
+    </div>
+    <span class="mhv2-state {{ 'ok' if client.mihomo_status == 'generated' else 'muted' }}">
+      {{ {'generated': 'Готово', 'disabled': 'Отключено', 'missing': 'Не создано'}.get(client.mihomo_status, client.mihomo_status) }}
+    </span>
+  </header>
+
+  {% if client.mihomo_status == 'missing' %}
+  <div class="mhv2-client-empty sg-ljd-nested">
+    <span>Доступ ещё не сформирован.</span>
+    <form method="post" action="{{ url_for('enable_client_mihomo', client_id=client.id) }}">
+      <button class="button primary" type="submit">Добавить Mihomo-доступ</button>
+    </form>
+  </div>
+  {% else %}
+  <div class="mhv2-client-protocols sg-ljd-nested">
+    <span>Mieru</span>
+    <span>AnyTLS</span>
+    <span>TUIC v5</span>
+  </div>
+  <div class="mhv2-client-actions">
+    <a class="button primary"
+       href="{{ url_for('export_client_access', client_id=client.id, kind='mihomo') }}">
+      Скачать Mihomo YAML
+    </a>
+    <a class="button"
+       href="{{ url_for('client_access_qr', client_id=client.id, kind='mihomo') }}">
+      QR
+    </a>
+    <form method="post"
+          action="{{ url_for('rotate_client_mihomo', client_id=client.id) }}"
+          data-sg-confirm="Перевыпустить Mieru, AnyTLS и TUIC credentials? Старые реквизиты перестанут работать." data-sg-confirm-title="Перевыпустить доступ" data-sg-confirm-button="Перевыпустить" data-sg-confirm-tone="danger">
+      <button class="button" type="submit">Перевыпустить доступ</button>
+    </form>
+    {% if client.mihomo_status == 'generated' %}
+    <form method="post" action="{{ url_for('disable_client_mihomo', client_id=client.id) }}">
+      <button class="button danger" type="submit">Отключить Mihomo</button>
+    </form>
+    {% else %}
+    <form method="post" action="{{ url_for('enable_client_mihomo', client_id=client.id) }}">
+      <button class="button" type="submit">Включить снова</button>
+    </form>
+    {% endif %}
+  </div>
+  {% endif %}
+</section>

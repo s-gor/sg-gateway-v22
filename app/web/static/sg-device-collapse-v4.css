@@ -1,0 +1,148 @@
+/* SG-Gateway 0.1.0-021.9 — collapsed device cards V4
+   Loaded LAST, after the complete theme cascade. */
+
+html body.page-clients .dv16-device.sg-device-collapsed {
+  gap: 0 !important;
+  padding: 15px 17px !important;
+  border-radius: 14px !important;
+}
+
+html body.page-clients .dv16-device.sg-device-collapsed > :not(.dv16-device-head) {
+  display: none !important;
+}
+
+html body.page-clients .dv16-device.sg-device-collapsed > .dv16-device-head {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 15px !important;
+  min-height: 68px !important;
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  outline: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  filter: none !important;
+  backdrop-filter: none !important;
+}
+
+html body.page-clients .dv16-device.sg-device-collapsed > .dv16-device-head > .dv16-device-title {
+  display: flex !important;
+  flex: 1 1 auto !important;
+  align-items: flex-start !important;
+  gap: 12px !important;
+  min-width: 0 !important;
+  width: auto !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  outline: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  filter: none !important;
+  backdrop-filter: none !important;
+}
+
+html body.page-clients .dv16-device.sg-device-collapsed > .dv16-device-head > .dv16-device-title > div {
+  min-width: 0 !important;
+  width: auto !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  outline: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  filter: none !important;
+  backdrop-filter: none !important;
+}
+
+html body.page-clients .dv16-device.sg-device-collapsed > .dv16-device-head::before,
+html body.page-clients .dv16-device.sg-device-collapsed > .dv16-device-head::after,
+html body.page-clients .dv16-device.sg-device-collapsed .dv16-device-title::before,
+html body.page-clients .dv16-device.sg-device-collapsed .dv16-device-title::after,
+html body.page-clients .dv16-device.sg-device-collapsed .dv16-device-title > div::before,
+html body.page-clients .dv16-device.sg-device-collapsed .dv16-device-title > div::after {
+  content: none !important;
+  display: none !important;
+  border: 0 !important;
+  background: none !important;
+  box-shadow: none !important;
+}
+
+html body.page-clients .dv16-device.sg-device-collapsed .dv16-device-title h2 {
+  margin: 2px 0 6px !important;
+  font-size: 21px !important;
+  line-height: 1.08 !important;
+  letter-spacing: -.015em !important;
+}
+
+html body.page-clients .dv16-device.sg-device-collapsed .dv16-device-kind {
+  font-size: 9px !important;
+  letter-spacing: .11em !important;
+}
+
+html body.page-clients .dv16-device.sg-device-collapsed .dv16-profile-tags {
+  gap: 5px !important;
+}
+
+html body.page-clients .dv16-device.sg-device-collapsed .dv16-profile-tags span {
+  min-height: 23px !important;
+  padding: 3px 8px !important;
+  border-radius: 999px !important;
+  font-size: 10px !important;
+  line-height: 1.15 !important;
+}
+
+html body.page-clients .dv16-device.sg-device-collapsed .dv16-device-controls {
+  flex: 0 0 auto !important;
+  gap: 8px !important;
+}
+
+html body.page-clients .sg-device-collapse-toggle {
+  display: inline-grid !important;
+  place-items: center !important;
+  flex: 0 0 42px !important;
+  width: 42px !important;
+  min-width: 42px !important;
+  height: 42px !important;
+  min-height: 42px !important;
+  padding: 0 !important;
+  border-radius: 11px !important;
+  font-size: 0 !important;
+  line-height: 1 !important;
+  cursor: pointer !important;
+}
+
+html body.page-clients .sg-device-collapse-toggle > span {
+  display: block !important;
+  width: 9px !important;
+  height: 9px !important;
+  border-right: 2px solid currentColor !important;
+  border-bottom: 2px solid currentColor !important;
+  transform: rotate(225deg);
+  transition: transform .18s ease;
+}
+
+html body.page-clients .dv16-device.sg-device-collapsed .sg-device-collapse-toggle > span {
+  transform: rotate(45deg);
+}
+
+@media (max-width: 900px) {
+  html body.page-clients .dv16-device.sg-device-collapsed > .dv16-device-head {
+    align-items: flex-start !important;
+  }
+}

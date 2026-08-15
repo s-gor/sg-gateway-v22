@@ -1,0 +1,14 @@
+/* SG-Gateway 017: improve only the small text on the Clients list page. */
+.cv15-clarity-page .cv2-kicker { font-size:14px; }
+.cv15-clarity-page .cv2-heading-copy > p { font-size:17px; line-height:1.5; }
+.cv15-clarity-page .cv2-filter-field > span { font-size:14px; }
+.cv15-clarity-page .cv2-filter-field input,
+.cv15-clarity-page .cv2-filter-field select { font-size:16px; }
+.cv15-clarity-page .cv2-filter-footer,
+.cv15-clarity-page .cv2-list-footer { font-size:14px; }
+.cv15-clarity-page .cv2-table thead th { font-size:13px; }
+.cv15-clarity-page .cv2-server-cell small { font-size:13px; line-height:1.35; }
+.cv15-clarity-page .cv15-device-count span { font-size:14px; }
+.cv15-clarity-page .cv15-device-count small { font-size:13px; }
+.cv15-clarity-page .cv2-expiry { font-size:15px; }
+.cv15-clarity-page .cv15-no-results span { font-size:14px; }

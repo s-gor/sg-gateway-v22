@@ -1,0 +1,17 @@
+[Unit]
+Description=SG-Gateway AmneziaWG awg0
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=/etc/amnezia/amneziawg/awg0.conf
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStartPre=-/usr/bin/awg-quick down /etc/amnezia/amneziawg/awg0.conf
+ExecStart=/usr/bin/awg-quick up /etc/amnezia/amneziawg/awg0.conf
+ExecStop=/usr/bin/awg-quick down /etc/amnezia/amneziawg/awg0.conf
+TimeoutStartSec=60
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

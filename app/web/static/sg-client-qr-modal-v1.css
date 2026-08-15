@@ -1,0 +1,51 @@
+/* SG-Gateway 0.1.0-021.3 · Client QR modal fix
+   QR popovers used to be absolutely positioned inside .dv16-page, whose
+   accepted Routing-style frame intentionally uses overflow:hidden.  The QR
+   was generated correctly but clipped by the page frame.  Keep the frame
+   untouched and render every client/device QR as a viewport modal instead. */
+.dv16-qr[open]::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  background: rgba(3, 8, 14, .72);
+  backdrop-filter: blur(3px);
+}
+
+.dv16-qr[open] .dv16-qr-popover {
+  position: fixed !important;
+  left: 50% !important;
+  top: 50% !important;
+  right: auto !important;
+  bottom: auto !important;
+  z-index: 9999 !important;
+  width: min(92vw, 430px) !important;
+  max-height: 92vh;
+  overflow: auto;
+  transform: translate(-50%, -50%);
+  padding: 56px 18px 18px !important;
+}
+
+.dv16-qr[open] .dv16-qr-popover > button {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 1;
+}
+
+.dv16-qr[open] .dv16-qr-popover img {
+  display: block;
+  width: min(100%, 380px) !important;
+  height: auto !important;
+  margin: 0 auto;
+  padding: 12px;
+  background: #fff;
+  border-radius: 10px;
+}
+
+@media (max-width: 560px) {
+  .dv16-qr[open] .dv16-qr-popover {
+    width: calc(100vw - 24px) !important;
+    max-height: calc(100vh - 24px);
+  }
+}

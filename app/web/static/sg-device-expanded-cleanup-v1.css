@@ -1,0 +1,35 @@
+/* SG-Gateway 0.1.0-021.10
+   Expanded device cleanup V1.
+   Removes legacy inner header surface and separator line.
+   Loaded LAST after Device Collapse V4 and the full theme cascade. */
+
+html body.page-clients .dv16-device > .dv16-device-head,
+html body.page-clients .dv16-device > .dv16-device-head > .dv16-device-title,
+html body.page-clients .dv16-device > .dv16-device-head > .dv16-device-title > div {
+  border: 0 !important;
+  outline: 0 !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  filter: none !important;
+  backdrop-filter: none !important;
+}
+
+html body.page-clients .dv16-device > .dv16-device-head::before,
+html body.page-clients .dv16-device > .dv16-device-head::after,
+html body.page-clients .dv16-device > .dv16-device-head > .dv16-device-title::before,
+html body.page-clients .dv16-device > .dv16-device-head > .dv16-device-title::after,
+html body.page-clients .dv16-device > .dv16-device-head > .dv16-device-title > div::before,
+html body.page-clients .dv16-device > .dv16-device-head > .dv16-device-title > div::after {
+  content: none !important;
+  display: none !important;
+  border: 0 !important;
+  background: none !important;
+  box-shadow: none !important;
+}
+
+html body.page-clients .dv16-device > .dv16-technical {
+  border-top: 0 !important;
+  padding-top: 0 !important;
+}

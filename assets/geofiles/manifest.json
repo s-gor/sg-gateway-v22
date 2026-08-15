@@ -1,0 +1,49 @@
+{
+  "Source": "https://raw.githubusercontent.com/runetfreedom/russia-v2ray-rules-dat/release",
+  "Version": "2026.07.06 15:15 UTC",
+  "UpdatedUtc": "2026-07-06T15:15:52.780725Z",
+  "Files": [
+    {
+      "RelativePath": "geoip.dat",
+      "Url": "https://raw.githubusercontent.com/runetfreedom/russia-v2ray-rules-dat/release/geoip.dat",
+      "Size": 19435989,
+      "Sha256": "C0F37CACACA04FCF273D6FC740E236748B2A7A082056B162BF7CE95DB8AF6EFA"
+    },
+    {
+      "RelativePath": "geosite.dat",
+      "Url": "https://raw.githubusercontent.com/runetfreedom/russia-v2ray-rules-dat/release/geosite.dat",
+      "Size": 71804643,
+      "Sha256": "8BC708286AC3160003D9EBA7290841F931E3EF41A05D92555A07B513A7A08163"
+    },
+    {
+      "RelativePath": "srss/geoip-ru.srs",
+      "Url": "https://raw.githubusercontent.com/runetfreedom/russia-v2ray-rules-dat/release/sing-box/rule-set-geoip/geoip-ru.srs",
+      "Size": 105632,
+      "Sha256": "11D0A09160166D808ACBB9214C92F681D4A21D110AEFD4483A640F19A62DC6FB"
+    },
+    {
+      "RelativePath": "srss/geoip-ru-blocked.srs",
+      "Url": "https://raw.githubusercontent.com/runetfreedom/russia-v2ray-rules-dat/release/sing-box/rule-set-geoip/geoip-ru-blocked.srs",
+      "Size": 201042,
+      "Sha256": "B4988F9E7D5A667A969AAD54B22E717B8D768CD1F8E2C8CD22C58F89F915B150"
+    },
+    {
+      "RelativePath": "srss/geosite-ru-available-only-inside.srs",
+      "Url": "https://raw.githubusercontent.com/runetfreedom/russia-v2ray-rules-dat/release/sing-box/rule-set-geosite/geosite-ru-available-only-inside.srs",
+      "Size": 1155,
+      "Sha256": "2A92B13767461DB54D182B8C5FA3AEE3AF156AC7FE196654920BC432C0EBB7F3"
+    },
+    {
+      "RelativePath": "srss/geosite-ru-blocked.srs",
+      "Url": "https://raw.githubusercontent.com/runetfreedom/russia-v2ray-rules-dat/release/sing-box/rule-set-geosite/geosite-ru-blocked.srs",
+      "Size": 580382,
+      "Sha256": "31E8B4BB7F360FFC6EC61BDEC55E8BC4899F04E29C33019068CCC4E756982C55"
+    },
+    {
+      "RelativePath": "srss/geosite-category-ads-all.srs",
+      "Url": "https://raw.githubusercontent.com/runetfreedom/russia-v2ray-rules-dat/release/sing-box/rule-set-geosite/geosite-category-ads-all.srs",
+      "Size": 1424099,
+      "Sha256": "E908A1E4E789B47C1756AFC08F700BB2BF5A796FDEB11302E192B3A8D2273986"
+    }
+  ]
+}

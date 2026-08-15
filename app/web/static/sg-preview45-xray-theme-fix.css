@@ -1,0 +1,49 @@
+/*
+ * SG-Gateway Preview 45
+ * Connections / Xray status cards must follow the active Graphite or Luxury Jade theme.
+ * This file is loaded after the legacy Preview 27/28 rules that hard-coded a light card.
+ */
+
+html[data-theme="dark"] .xps2-flow-field {
+  border-color: var(--sg-line);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--sg-panel-soft) 92%, var(--sg-blue) 8%) 0%,
+      var(--sg-panel-deep) 100%
+    );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .025),
+    0 8px 20px rgba(0, 0, 0, .08);
+}
+
+html[data-theme="dark"] .xps2-flow-field > span,
+html[data-theme="dark"] .xps2-flow-field > small {
+  color: var(--sg-muted);
+}
+
+html[data-theme="dark"] .xps2-flow-field > strong {
+  color: var(--sg-green);
+}
+
+html[data-theme="light"] .xps2-flow-field {
+  border-color: var(--sg-ljd-border, var(--sg-line));
+  background: var(--sg-ljd-input, linear-gradient(180deg, #FFFDFC 0%, #F6F1E7 100%));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .333),
+    0 2px 12px rgba(43, 52, 46, .12);
+}
+
+html[data-theme="light"] .xps2-flow-field > span,
+html[data-theme="light"] .xps2-flow-field > small {
+  color: var(--sg-ljd-muted, var(--sg-muted));
+}
+
+html[data-theme="light"] .xps2-flow-field > strong {
+  color: var(--sg-ljd-jade-deep, var(--sg-green));
+}
+
+/* Keep both status cards visually equal and aligned inside the parameter row. */
+.xps2-flow-field {
+  min-height: 78px;
+}

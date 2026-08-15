@@ -1,0 +1,92 @@
+/* SG-Gateway 0.1.0-021.7 — Refresh Buttons Unify Fix 2 */
+
+/* All three cards are one positioning system */
+[data-sg-memory-card="1"],
+[data-sg-disk-card="1"],
+[data-sg-cpu-card="1"] {
+  position: relative !important;
+}
+
+/* A direct child of the card: same geometry for RAM / Disk / CPU */
+.sg-resource-refresh-slot {
+  position: absolute !important;
+  top: 82px !important;
+  right: 22px !important;
+  z-index: 20 !important;
+  width: 118px !important;
+  height: 38px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.sg-resource-refresh-slot > button {
+  position: static !important;
+  inset: auto !important;
+  transform: none !important;
+  margin: 0 !important;
+
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 7px !important;
+
+  width: 118px !important;
+  min-width: 118px !important;
+  max-width: 118px !important;
+  height: 38px !important;
+  min-height: 38px !important;
+  max-height: 38px !important;
+  padding: 0 12px !important;
+
+  border: 1px solid rgba(91, 145, 192, .34) !important;
+  border-radius: 11px !important;
+  background: rgba(23, 55, 83, .82) !important;
+  color: var(--text, #edf4fa) !important;
+  font: inherit !important;
+  font-size: 11px !important;
+  font-weight: 780 !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+  cursor: pointer !important;
+}
+
+.sg-resource-refresh-slot > button:hover {
+  border-color: rgba(93, 164, 225, .62) !important;
+  background: rgba(31, 70, 103, .92) !important;
+}
+
+.sg-resource-refresh-slot > button:disabled {
+  opacity: .56 !important;
+  cursor: default !important;
+}
+
+.sg-resource-refresh-slot > button > span {
+  font-size: 16px !important;
+  line-height: 1 !important;
+}
+
+/* The original section headers now contain text only */
+.sv1-memory-breakdown-title,
+.sv1-disk-breakdown-title,
+.sv1-cpu-breakdown-title {
+  padding-right: 0 !important;
+}
+
+/* Mobile: return buttons to the normal flow */
+@media (max-width: 900px) {
+  .sg-resource-refresh-slot {
+    position: static !important;
+    width: auto !important;
+    height: auto !important;
+    margin: 8px 0 4px !important;
+  }
+
+  .sg-resource-refresh-slot > button {
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    height: 34px !important;
+    min-height: 34px !important;
+    max-height: 34px !important;
+  }
+}

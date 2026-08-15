@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block title %}{{ job.title }} · SG-Gateway{% endblock %}
+{% block head %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='sg-operation-job-v13.css') }}">
+{% endblock %}
+{% block content %}
+<section class="opjob-page"
+         data-kind="{{ job.kind }}"
+         data-restart-expected="{{ '1' if job.restart_expected else '0' }}"
+         data-target-url="{{ job.target_url or '' }}"
+         data-status-url="{{ url_for('operation_job_status', job_id=job.job_id) }}">
+  <header class="opjob-head">
+    <div>
+      <div class="opjob-kicker">ЖИВОЙ ТЕРМИНАЛ</div>
+      <h1>{{ job.title }}</h1>
+      <p>{% if job.restart_expected %}Во время восстановления панель может кратко перезапуститься. Если связь пропадёт, появится кнопка обновления страницы.{% else %}Не закрывайте вкладку. Журнал обновляется автоматически; при ошибке конфигурация откатывается.{% endif %}</p>
+    </div>
+    <span id="opjob-status" class="opjob-status is-{{ job.status }}">{{ job.status }}</span>
+  </header>
+  <div class="opjob-steps sg-ljd-nested"><span class="is-active">Подготовка</span><i></i><span>Проверка</span><i></i><span>Применение</span><i></i><span>Готово</span></div>
+  <article class="opjob-terminal">
+    <div class="opjob-terminal-bar"><span></span><span></span><span></span><strong>SG-Gateway task · {{ job.job_id }}</strong></div>
+    <pre id="opjob-log">{{ job.log }}</pre>
+  </article>
+  <footer class="opjob-actions">
+    <a class="button" href="{{ job.back_url or url_for('security') }}">Вернуться</a>
+    <a id="opjob-target" class="button primary{% if job.status != 'success' %} is-hidden{% endif %}" href="{{ job.target_url or '#' }}">Открыть результат</a>
+    <button id="opjob-refresh" class="button primary is-hidden" type="button">Открыть панель заново</button>
+    <span id="opjob-message">{% if job.status == 'success' %}Готово. Выполняется переход…{% elif job.status == 'failed' %}Задача завершилась ошибкой. Подробности выше.{% else %}Задача выполняется…{% endif %}</span>
+  </footer>
+</section>
+<script>
+(() => {
+  const root = document.querySelector('.opjob-page');
+  const log = document.getElementById('opjob-log');
+  const badge = document.getElementById('opjob-status');
+  const message = document.getElementById('opjob-message');
+  const target = document.getElementById('opjob-target');
+  const refresh = document.getElementById('opjob-refresh');
+  const isTlsSwitch = root.dataset.kind === 'tls_issue';
+  const restartExpected = root.dataset.restartExpected === '1';
+  const targetUrl = root.dataset.targetUrl || target.href;
+  let finished = false;
+  let hadSuccessfulPoll = false;
+  let redirectScheduled = false;
+  let consecutiveFailures = 0;
+
+  function markSuccess(text) {
+    if (finished) return;
+    finished = true;
+    badge.textContent = 'success';
+    badge.className = 'opjob-status is-success';
+    target.classList.remove('is-hidden');
+    refresh.classList.add('is-hidden');
+    target.href = targetUrl;
+    message.textContent = text;
+  }
+
+  function continueTerminalOverHttps() {
+    if (redirectScheduled || !targetUrl) return;
+    redirectScheduled = true;
+    const resultUrl = new URL(targetUrl, window.location.href);
+    const secureJobUrl = new URL(window.location.href);
+    secureJobUrl.protocol = 'https:';
+    secureJobUrl.hostname = resultUrl.hostname;
+    secureJobUrl.port = resultUrl.port;
+    message.textContent = 'Nginx включил HTTPS. Продолжаю этот же терминал по защищённому адресу…';
+    window.setTimeout(() => window.location.replace(secureJobUrl.toString()), 900);
+  }
+
+  async function update() {
+    if (finished) return;
+    try {
+      const response = await fetch(root.dataset.statusUrl, {cache: 'no-store'});
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+      const data = await response.json();
+      hadSuccessfulPoll = true;
+      consecutiveFailures = 0;
+      log.textContent = data.log || '';
+      log.scrollTop = log.scrollHeight;
+      badge.textContent = data.status;
+      badge.className = 'opjob-status is-' + data.status;
+      if (data.status === 'success') {
+        if (data.target_url) target.href = data.target_url;
+        markSuccess('Готово. Терминал завершён; результат откроется только по кнопке.');
+        return;
+      }
+      if (data.status === 'failed') {
+        finished = true;
+        refresh.classList.remove('is-hidden');
+        message.textContent = 'Ошибка. Предыдущая конфигурация восстановлена. Обновите страницу, чтобы вернуться в панель.';
+        return;
+      }
+      refresh.classList.add('is-hidden');
+      message.textContent = 'Задача выполняется…';
+    } catch (error) {
+      consecutiveFailures += 1;
+      if (isTlsSwitch && (hadSuccessfulPoll || consecutiveFailures >= 3)) {
+        continueTerminalOverHttps();
+        return;
+      }
+      if (restartExpected && consecutiveFailures >= 2) {
+        refresh.classList.remove('is-hidden');
+        message.textContent = 'Панель перезапускается. Это нормально во время восстановления. Подождите несколько секунд и нажмите «Открыть панель заново».';
+      } else {
+        message.textContent = 'Связь с задачей временно потеряна; повторяю…';
+      }
+    }
+    window.setTimeout(update, isTlsSwitch ? 1000 : 1800);
+  }
+
+  target.href = targetUrl || '#';
+  refresh.addEventListener('click', () => window.location.reload());
+  log.scrollTop = log.scrollHeight;
+  if (!['success', 'failed'].includes(badge.textContent.trim())) {
+    window.setTimeout(update, 500);
+  }
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,45 @@
+/* SG-Gateway Maintenance Typography Fix 2
+   Typography only. Layout and card dimensions stay unchanged. */
+
+.mtv2-kicker { font-size: 10px; }
+.mtv2-heading p { font-size: 14px; line-height: 1.5; }
+.mtv2-summary span,
+.mtv2-backup-primary > span { font-size: 10px; }
+.mtv2-summary small { font-size: 10.5px; line-height: 1.45; }
+.mtv2-card-kicker { font-size: 9.5px; }
+.mtv2-panel-head p { font-size: 11.8px; line-height: 1.55; }
+.mtv2-panel-head .button,
+.mtv2-heading-actions .button,
+.mtv2-backup-actions .button { font-size: 10.5px; }
+.mtv2-backup-primary strong { font-size: 13px; }
+.mtv2-backup-primary small { font-size: 11px; line-height: 1.45; }
+.mtv2-backup-details summary,
+.mtv2-older-backups summary,
+.mtv2-ok-checks summary,
+.mtv2-more-operations summary { font-size: 11.5px; line-height: 1.45; }
+.mtv2-backup-details code { font-size: 10.5px; line-height: 1.5; }
+.mtv2-older-backups strong { font-size: 11.5px; }
+.mtv2-older-backups small { font-size: 10.5px; line-height: 1.45; }
+.mtv2-health-issues strong,
+.mtv2-ok-checks strong { font-size: 11.8px; }
+.mtv2-health-issues small,
+.mtv2-ok-checks small { font-size: 11.2px; line-height: 1.55; }
+.mtv2-health-status,
+.mtv2-operation-status,
+.mtv2-count { min-height: 28px; font-size: 9.5px; }
+.mtv2-all-ok strong,
+.mtv2-empty strong { font-size: 12px; }
+.mtv2-all-ok span,
+.mtv2-empty span { font-size: 10.8px; line-height: 1.5; }
+.mtv2-recovery-steps article > span { font-size: 9.5px; }
+.mtv2-recovery-steps strong { font-size: 11.8px; }
+.mtv2-recovery-steps small { font-size: 10.8px; line-height: 1.5; }
+.mtv2-recovery-note strong { font-size: 11px; }
+.mtv2-recovery-note span { font-size: 10.5px; line-height: 1.5; }
+.mtv2-diagnostics-grid span { font-size: 10.2px; line-height: 1.4; }
+.mtv2-diagnostics-grid strong { font-size: 11.8px; line-height: 1.45; }
+.mtv2-operation-list time { font-size: 10.5px; }
+.mtv2-operation-copy strong { font-size: 10.8px; }
+.mtv2-operation-copy small { font-size: 10px; }
+.mtv2-operation-list p { font-size: 10.8px; line-height: 1.5; }
+.mtv2-footer { font-size: 10px; line-height: 1.45; }

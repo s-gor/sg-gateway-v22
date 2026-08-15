@@ -1,0 +1,47 @@
+/* SG-Gateway 0.1.0-021.7 — final simple System dials.
+   This file changes colors only. Card geometry, heights, rows and spacing are
+   intentionally untouched.
+
+   Memory / Disk: occupied part = blue; available/free part = neutral.
+   CPU: load = blue; free part = neutral. */
+
+body.page-system {
+  --sg-simple-dial-used: #4F9BFF;
+}
+
+html[data-theme="dark"] body.page-system,
+html[data-theme="graphite"] body.page-system,
+body.page-system:not([data-theme]) {
+  --sg-simple-dial-empty: #233D57;
+}
+
+html[data-theme="light"] body.page-system {
+  --sg-simple-dial-empty: #D7E1DD;
+}
+
+body.page-system [data-sg-memory-card="1"] .sv1-donut,
+body.page-system [data-sg-disk-card="1"] .sv1-donut {
+  background: var(--sv1-gradient) !important;
+}
+
+body.page-system [data-sg-cpu-card="1"] .sv1-cpu-dial {
+  background:
+    conic-gradient(
+      from -90deg,
+      var(--sg-simple-dial-used) 0 calc(var(--sg-cpu-percent, 0) * 1%),
+      var(--sg-simple-dial-empty) calc(var(--sg-cpu-percent, 0) * 1%) 100%
+    ) !important;
+}
+
+/* System alignment final fix 3 — Disk is the reference */
+body.page-system .sv1-memory-legend {
+  margin-top: -5px !important;
+}
+
+body.page-system .sv1-cpu-card .sv1-cpu-breakdown {
+  margin-top: -16px !important;
+}
+
+body.page-system .sv1-cpu-card .sv1-cpu-breakdown-title {
+  margin-bottom: 6px !important;
+}

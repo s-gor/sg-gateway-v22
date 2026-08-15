@@ -1,0 +1,112 @@
+/* SG-Gateway 0.1.0-021.7 — CPU Breakdown Fix 1 */
+.sv1-cpu-breakdown {
+  margin-top: 18px;
+  padding-top: 15px;
+  border-top: 1px solid rgba(126,157,187,.16);
+}
+.sv1-cpu-breakdown-title {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:14px;
+  margin-bottom:11px;
+}
+.sv1-cpu-breakdown-caption { min-width:0; }
+.sv1-cpu-breakdown-caption strong {
+  display:block;
+  color:var(--text,#f4f7fb);
+  font-size:14px;
+  font-weight:800;
+}
+.sv1-cpu-breakdown-caption span {
+  display:block;
+  margin-top:3px;
+  color:var(--muted,#7f9bb6);
+  font-size:10px;
+}
+.sv1-cpu-refresh {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  min-height:32px;
+  padding:6px 11px;
+  border:1px solid rgba(91,145,192,.34);
+  border-radius:9px;
+  background:rgba(23,55,83,.58);
+  color:var(--text,#edf4fa);
+  font:inherit;
+  font-size:11px;
+  font-weight:750;
+  line-height:1;
+  cursor:pointer;
+}
+.sv1-cpu-refresh:hover {
+  border-color:rgba(93,164,225,.62);
+  background:rgba(31,70,103,.78);
+}
+.sv1-cpu-refresh:disabled { cursor:default; opacity:.55; }
+.sv1-cpu-refresh > span { font-size:16px; line-height:1; }
+.sv1-cpu-refresh.is-loading > span { animation:sg-cpu-refresh-spin .7s linear infinite; }
+@keyframes sg-cpu-refresh-spin { to { transform:rotate(360deg); } }
+
+.sv1-cpu-summary {
+  display:flex;
+  flex-wrap:wrap;
+  gap:7px;
+  margin-bottom:11px;
+}
+.sv1-cpu-summary > span {
+  display:inline-flex;
+  align-items:center;
+  gap:5px;
+  min-height:28px;
+  padding:5px 8px;
+  border:1px solid rgba(111,146,178,.16);
+  border-radius:8px;
+  background:rgba(7,27,44,.22);
+  color:var(--muted,#86a0b8);
+  font-size:10px;
+}
+.sv1-cpu-summary strong {
+  color:var(--text,#edf4fa);
+  font-size:10px;
+  font-weight:800;
+}
+.sv1-cpu-part { margin-top:10px; }
+.sv1-cpu-part-head {
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 48px;
+  align-items:center;
+  gap:9px;
+}
+.sv1-cpu-part-name {
+  min-width:0;
+  color:var(--text,#edf4fa);
+  font-size:12px;
+  font-weight:750;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.sv1-cpu-part-head em {
+  color:var(--muted,#8aa4bd);
+  font-size:10px;
+  font-style:normal;
+  text-align:right;
+}
+.sv1-cpu-part-track {
+  height:6px;
+  margin-top:6px;
+  overflow:hidden;
+  border-radius:999px;
+  background:rgba(101,132,162,.13);
+}
+.sv1-cpu-part-track > span {
+  display:block;
+  height:100%;
+  min-width:2px;
+  border-radius:inherit;
+  background:var(--cpu-part-color);
+  transition:width .24s ease;
+}

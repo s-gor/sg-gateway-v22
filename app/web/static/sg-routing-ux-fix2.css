@@ -1,0 +1,1931 @@
+/* SG-Gateway Routing UX Fix 1 */
+
+.rtux1-page {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+}
+
+.rtux1-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 22px;
+  padding: 0 4px 2px;
+}
+
+.rtux1-kicker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--sg-blue);
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: .15em;
+}
+
+.rtux1-kicker > span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--sg-blue);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--sg-blue) 58%, transparent);
+}
+
+.rtux1-heading h1 {
+  margin: 8px 0 5px;
+  color: var(--sg-text);
+  font-size: clamp(34px, 2.4vw, 42px);
+  line-height: 1.05;
+}
+
+.rtux1-heading p {
+  max-width: 860px;
+  margin: 0;
+  color: var(--sg-muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.rtux1-heading-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.rtux1-heading-actions .button {
+  min-height: 43px;
+  padding-inline: 17px;
+  font-size: 12px;
+}
+
+.rtux1-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.rtux1-summary > article {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  align-items: center;
+  gap: 13px;
+  min-height: 108px;
+  border: 1px solid var(--sg-line);
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at 90% -25%, rgba(96, 169, 243, .07), transparent 48%),
+    var(--sg-panel);
+  padding: 15px 17px;
+}
+
+.rtux1-summary-icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid rgba(96, 169, 243, .25);
+  border-radius: 12px;
+  background: rgba(60, 126, 193, .13);
+  color: var(--sg-blue);
+}
+
+.rtux1-summary-icon.green {
+  border-color: var(--sg-green-line);
+  background: var(--sg-green-bg);
+  color: var(--sg-green);
+}
+
+.rtux1-summary-icon.violet {
+  border-color: rgba(157, 122, 255, .25);
+  background: rgba(126, 93, 226, .12);
+  color: #aa91ff;
+}
+
+.rtux1-summary-icon.amber {
+  border-color: color-mix(in srgb, var(--sg-yellow) 34%, var(--sg-line));
+  background: color-mix(in srgb, var(--sg-yellow) 9%, var(--sg-panel));
+  color: var(--sg-yellow);
+}
+
+.rtux1-summary-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.rtux1-summary span {
+  color: var(--sg-muted);
+  font-size: 10.5px;
+  font-weight: 850;
+  letter-spacing: .08em;
+}
+
+.rtux1-summary strong {
+  display: block;
+  margin-top: 5px;
+  color: var(--sg-text);
+  font-size: 24px;
+  font-weight: 780;
+  line-height: 1.1;
+}
+
+.rtux1-summary strong.good {
+  color: var(--sg-green);
+}
+
+.rtux1-summary strong.warning {
+  color: var(--sg-yellow);
+}
+
+.rtux1-summary .rtux1-summary-model {
+  font-size: 15px;
+  line-height: 1.3;
+}
+
+.rtux1-summary small {
+  display: block;
+  margin-top: 7px;
+  color: var(--sg-muted);
+  font-size: 11.5px;
+  line-height: 1.4;
+}
+
+.rtux1-flow-panel,
+.rtux1-model-panel,
+.rtux1-dns-panel {
+  min-width: 0;
+  border: 1px solid var(--sg-line);
+  border-radius: 15px;
+  background: var(--sg-panel);
+  padding: 18px;
+}
+
+.rtux1-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.rtux1-card-kicker {
+  color: var(--sg-blue);
+  font-size: 10.5px;
+  font-weight: 850;
+  letter-spacing: .13em;
+}
+
+.rtux1-panel-head h2 {
+  margin: 6px 0 0;
+  color: var(--sg-text);
+  font-size: 22px;
+  line-height: 1.25;
+}
+
+.rtux1-panel-head p {
+  margin: 7px 0 0;
+  color: var(--sg-muted);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.rtux1-route-count,
+.rtux1-model-badge,
+.rtux1-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 31px;
+  border: 1px solid var(--sg-line);
+  border-radius: 999px;
+  background: var(--sg-panel-soft);
+  color: var(--sg-muted);
+  padding: 0 11px;
+  font-size: 10.5px;
+  font-weight: 780;
+  white-space: nowrap;
+}
+
+.rtux1-route-count.ok,
+.rtux1-status.success {
+  border-color: var(--sg-green-line);
+  background: var(--sg-green-bg);
+  color: var(--sg-green);
+}
+
+.rtux1-route-count.warning,
+.rtux1-status.warning {
+  border-color: color-mix(in srgb, var(--sg-yellow) 36%, var(--sg-line));
+  background: color-mix(in srgb, var(--sg-yellow) 8%, var(--sg-panel));
+  color: var(--sg-yellow);
+}
+
+.rtux1-flow {
+  display: grid;
+  grid-template-columns: 150px 72px minmax(0, 1fr) 72px 150px;
+  align-items: stretch;
+  gap: 10px;
+  margin-top: 17px;
+}
+
+.rtux1-flow-node,
+.rtux1-flow-route {
+  min-width: 0;
+  border: 1px solid var(--sg-line-soft);
+  border-radius: 12px;
+  background: var(--sg-panel-deep);
+}
+
+.rtux1-flow-node {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 10px;
+  min-height: 188px;
+  padding: 14px;
+  text-align: center;
+}
+
+.rtux1-flow-node strong {
+  color: var(--sg-text);
+  font-size: 13px;
+}
+
+.rtux1-flow-node small {
+  color: var(--sg-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.rtux1-flow-icon {
+  display: grid;
+  place-items: center;
+  width: 43px;
+  height: 43px;
+  border-radius: 11px;
+  background: rgba(96, 169, 243, .12);
+  color: var(--sg-blue);
+}
+
+.rtux1-flow-node.internet .rtux1-flow-icon {
+  background: var(--sg-green-bg);
+  color: var(--sg-green);
+}
+
+.rtux1-flow-icon svg {
+  width: 23px;
+  height: 23px;
+}
+
+.rtux1-flow-line {
+  display: grid;
+  align-content: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.rtux1-flow-line span {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--sg-blue), transparent);
+}
+
+.rtux1-flow-line i {
+  color: var(--sg-muted);
+  font-size: 9.5px;
+  font-style: normal;
+  text-align: center;
+}
+
+.rtux1-flow-routes {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.rtux1-flow-route {
+  display: grid;
+  align-content: start;
+  gap: 9px;
+  min-height: 188px;
+  padding: 13px;
+}
+
+.rtux1-flow-route.inactive {
+  opacity: .74;
+}
+
+.rtux1-flow-route > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 9px;
+}
+
+.rtux1-flow-route > strong {
+  color: var(--sg-text);
+  font-size: 13px;
+}
+
+.rtux1-flow-route > small,
+.rtux1-flow-route > em {
+  color: var(--sg-muted);
+  font-size: 10.5px;
+  font-style: normal;
+  line-height: 1.4;
+}
+
+.rtux1-engine-icon {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  border: 1px solid rgba(96, 169, 243, .25);
+  border-radius: 11px;
+  background: rgba(60, 126, 193, .13);
+  color: var(--sg-blue);
+  font-size: 10px;
+  font-weight: 850;
+}
+
+.rtux1-engine-icon.awg {
+  border-color: var(--sg-green-line);
+  background: var(--sg-green-bg);
+  color: var(--sg-green);
+}
+
+.rtux1-engine-icon.xray {
+  border-color: rgba(157, 122, 255, .25);
+  background: rgba(126, 93, 226, .12);
+  color: #aa91ff;
+}
+
+.rtux1-engine-icon.mihomo {
+  border-color: rgba(96, 169, 243, .25);
+  background: rgba(60, 126, 193, .13);
+  color: var(--sg-blue);
+}
+
+.rtux1-mihomo-list {
+  display: grid;
+  gap: 5px;
+  margin-top: 1px;
+}
+
+.rtux1-mihomo-list small {
+  display: grid;
+  grid-template-columns: minmax(55px, .7fr) minmax(82px, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+  color: var(--sg-muted);
+  font-size: 9.5px;
+}
+
+.rtux1-mihomo-list b {
+  color: var(--sg-muted);
+  font-size: 9px;
+  font-weight: 760;
+}
+
+.rtux1-mihomo-list b.ready {
+  color: var(--sg-green);
+}
+
+.rtux1-mihomo-list b.muted {
+  opacity: .72;
+}
+
+.rtux1-tabs {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  overflow-x: auto;
+  border: 1px solid var(--sg-line);
+  border-radius: 13px;
+  background: var(--sg-panel);
+  padding: 7px;
+}
+
+.rtux1-tabs button {
+  min-height: 39px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--sg-muted);
+  padding: 0 18px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 760;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.rtux1-tabs button:hover {
+  background: var(--sg-panel-deep);
+  color: var(--sg-text);
+}
+
+.rtux1-tabs button.active {
+  border-color: color-mix(in srgb, var(--sg-blue) 42%, var(--sg-line));
+  background: color-mix(in srgb, var(--sg-blue) 14%, var(--sg-panel-deep));
+  color: var(--sg-blue);
+}
+
+.rtux1-tab-panel[hidden] {
+  display: none !important;
+}
+
+.rtux1-tab-panel {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.rtux1-model-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.rtux1-model-grid article {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 10px;
+  min-height: 112px;
+  border: 1px solid var(--sg-line-soft);
+  border-radius: 10px;
+  background: var(--sg-panel-deep);
+  padding: 12px;
+}
+
+.rtux1-model-grid article > span {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--sg-blue) 12%, var(--sg-panel));
+  color: var(--sg-blue);
+  font-size: 9px;
+  font-weight: 850;
+}
+
+.rtux1-model-grid strong {
+  color: var(--sg-text);
+  font-size: 12px;
+}
+
+.rtux1-model-grid p {
+  margin: 6px 0 0;
+  color: var(--sg-muted);
+  font-size: 10.8px;
+  line-height: 1.5;
+}
+
+.rtux1-outbound-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: start;
+  gap: 13px;
+}
+
+.rtux1-outbound-card {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  border: 1px solid var(--sg-line);
+  border-radius: 15px;
+  background: var(--sg-panel);
+  padding: 16px;
+}
+
+.rtux1-outbound-card > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.rtux1-outbound-title {
+  display: flex;
+  gap: 11px;
+  min-width: 0;
+}
+
+.rtux1-outbound-title h2 {
+  margin: 5px 0 0;
+  color: var(--sg-text);
+  font-size: 18px;
+  line-height: 1.25;
+}
+
+.rtux1-outbound-title p {
+  margin: 6px 0 0;
+  color: var(--sg-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.rtux1-endpoint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--sg-line-soft);
+  border-radius: 10px;
+  background: var(--sg-panel-deep);
+  padding: 11px;
+}
+
+.rtux1-endpoint > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.rtux1-endpoint img {
+  flex: 0 0 auto;
+  border-radius: 3px;
+  object-fit: cover;
+}
+
+.rtux1-endpoint span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.rtux1-endpoint small {
+  color: var(--sg-muted);
+  font-size: 9px;
+  font-weight: 820;
+  letter-spacing: .08em;
+}
+
+.rtux1-endpoint strong {
+  overflow-wrap: anywhere;
+  color: var(--sg-text);
+  font-size: 11.5px;
+}
+
+.rtux1-endpoint em {
+  color: var(--sg-muted);
+  font-size: 10px;
+  font-style: normal;
+}
+
+.rtux1-copy,
+.rtux1-details button,
+.gfv1-hash-copy {
+  min-height: 31px;
+  border: 1px solid var(--sg-line);
+  border-radius: 8px;
+  background: var(--sg-panel-soft);
+  color: var(--sg-text);
+  padding: 0 9px;
+  font: inherit;
+  font-size: 9.5px;
+  font-weight: 720;
+  cursor: pointer;
+}
+
+.rtux1-values {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  overflow: hidden;
+  margin: 0;
+  border: 1px solid var(--sg-line-soft);
+  border-radius: 10px;
+  background: var(--sg-line-soft);
+  gap: 1px;
+}
+
+.rtux1-values > div {
+  display: grid;
+  gap: 5px;
+  min-height: 88px;
+  background: var(--sg-panel-deep);
+  padding: 11px;
+}
+
+.rtux1-values dt {
+  color: var(--sg-muted);
+  font-size: 9.5px;
+  font-weight: 820;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.rtux1-values dd {
+  overflow-wrap: anywhere;
+  margin: 0;
+  color: var(--sg-text);
+  font-size: 12px;
+  font-weight: 720;
+}
+
+.rtux1-values dd.ready {
+  color: var(--sg-green);
+}
+
+.rtux1-values dd.warning {
+  color: var(--sg-yellow);
+}
+
+.rtux1-values small {
+  color: var(--sg-muted);
+  font-size: 10.5px;
+  line-height: 1.4;
+}
+
+.rtux1-details {
+  border: 1px solid var(--sg-line-soft);
+  border-radius: 9px;
+  background: var(--sg-panel-deep);
+  padding: 11px;
+}
+
+.rtux1-details summary {
+  cursor: pointer;
+  color: var(--sg-text);
+  font-size: 11px;
+  font-weight: 760;
+}
+
+.rtux1-details > div {
+  display: grid;
+  gap: 8px;
+  margin-top: 11px;
+}
+
+.rtux1-details label {
+  display: grid;
+  grid-template-columns: 100px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+}
+
+.rtux1-details label > span {
+  color: var(--sg-muted);
+  font-size: 10px;
+  font-weight: 720;
+}
+
+.rtux1-details code {
+  overflow-wrap: anywhere;
+  color: var(--sg-text);
+  font-size: 10px;
+}
+
+.rtux1-outbound-card > footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 11px;
+  border-top: 1px solid var(--sg-line-soft);
+  padding-top: 12px;
+}
+
+.rtux1-outbound-card > footer > span {
+  color: var(--sg-muted);
+  font-size: 10.5px;
+}
+
+.rtux1-listeners {
+  display: grid;
+  gap: 8px;
+}
+
+.rtux1-listeners article {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 64px 84px;
+  align-items: center;
+  gap: 9px;
+  min-height: 54px;
+  border: 1px solid var(--sg-line-soft);
+  border-radius: 9px;
+  background: var(--sg-panel-deep);
+  padding: 9px 10px;
+}
+
+.rtux1-listeners article.disabled {
+  opacity: .66;
+}
+
+.rtux1-listeners article > div {
+  display: grid;
+  gap: 3px;
+}
+
+.rtux1-listeners strong {
+  color: var(--sg-text);
+  font-size: 11px;
+}
+
+.rtux1-listeners small {
+  color: var(--sg-muted);
+  font-size: 9.5px;
+}
+
+.rtux1-listeners b {
+  color: var(--sg-text);
+  font-size: 15px;
+  text-align: right;
+}
+
+.rtux1-listeners article > span {
+  color: var(--sg-muted);
+  font-size: 9.5px;
+  font-weight: 760;
+  text-align: right;
+}
+
+.rtux1-listeners article > span.ready {
+  color: var(--sg-green);
+}
+
+.rtux1-dns-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 11px;
+  margin-top: 15px;
+}
+
+.rtux1-dns-grid article {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 11px;
+  min-height: 126px;
+  border: 1px solid var(--sg-line-soft);
+  border-radius: 11px;
+  background: var(--sg-panel-deep);
+  padding: 13px;
+}
+
+.rtux1-dns-grid h3 {
+  margin: 0;
+  color: var(--sg-text);
+  font-size: 15px;
+}
+
+.rtux1-dns-grid strong {
+  display: block;
+  overflow-wrap: anywhere;
+  margin-top: 8px;
+  color: var(--sg-blue);
+  font-size: 13px;
+}
+
+.rtux1-dns-grid p {
+  margin: 7px 0 0;
+  color: var(--sg-muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.rtux1-info-note {
+  display: grid;
+  gap: 5px;
+  margin-top: 13px;
+  border: 1px solid color-mix(in srgb, var(--sg-blue) 30%, var(--sg-line));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--sg-blue) 6%, var(--sg-panel-deep));
+  padding: 12px;
+}
+
+.rtux1-info-note strong {
+  color: var(--sg-text);
+  font-size: 11.5px;
+}
+
+.rtux1-info-note span {
+  color: var(--sg-muted);
+  font-size: 10.8px;
+  line-height: 1.5;
+}
+
+.rtux1-page-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  border-top: 1px solid var(--sg-line);
+  padding: 4px 4px 0;
+  color: var(--sg-muted);
+  font-size: 10px;
+}
+
+/* Larger, translated Routing Templates */
+
+.rtux1-templates.ts2-panel,
+.rtux1-geofiles.gfv1-panel {
+  margin: 0;
+}
+
+.rtux1-templates .ts2-kicker,
+.rtux1-geofiles .gfv1-kicker {
+  font-size: 10.5px;
+}
+
+.rtux1-templates .ts2-panel-head h2,
+.rtux1-geofiles .gfv1-head h2 {
+  font-size: 22px;
+}
+
+.rtux1-templates .ts2-panel-head p,
+.rtux1-geofiles .gfv1-head p {
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.rtux1-templates .ts2-status,
+.rtux1-geofiles .gfv1-state {
+  min-height: 31px;
+  font-size: 10.5px;
+}
+
+.rtux1-templates .ts2-routing-summary article,
+.rtux1-geofiles .gfv1-summary article {
+  min-height: 96px;
+  padding: 13px;
+}
+
+.rtux1-templates .ts2-routing-summary span,
+.rtux1-geofiles .gfv1-summary span {
+  font-size: 9.5px;
+}
+
+.rtux1-templates .ts2-routing-summary strong,
+.rtux1-geofiles .gfv1-summary strong {
+  font-size: 12.5px;
+}
+
+.rtux1-templates .ts2-routing-summary small,
+.rtux1-geofiles .gfv1-summary small {
+  font-size: 10.5px;
+  line-height: 1.4;
+}
+
+.rtux1-templates .ts2-template-card {
+  min-height: 220px;
+  padding: 14px;
+}
+
+.rtux1-templates .ts2-template-card h3 {
+  font-size: 15px;
+}
+
+.rtux1-templates .ts2-template-card p {
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.rtux1-templates .ts2-template-meta span,
+.rtux1-templates .ts2-rule-row small,
+.rtux1-templates .ts2-honesty span {
+  font-size: 10.5px;
+}
+
+.rtux1-templates .ts2-template-card .button,
+.rtux1-templates .ts2-actions .button {
+  min-height: 37px;
+  font-size: 10.5px;
+}
+
+.rtux1-templates .ts2-candidate h3 {
+  font-size: 18px;
+}
+
+.rtux1-templates .ts2-rule-row strong {
+  font-size: 11.5px;
+}
+
+.rtux1-templates .ts2-action {
+  font-size: 9.5px;
+}
+
+.rtux1-templates .ts2-honesty strong {
+  font-size: 11px;
+}
+
+/* Larger, cleaner GeoFiles */
+
+.rtux1-geofiles .gfv1-card {
+  padding: 15px;
+}
+
+.rtux1-geofiles .gfv1-card h3 {
+  font-size: 18px;
+}
+
+.rtux1-geofiles .gfv1-card p,
+.rtux1-geofiles .gfv1-card header p {
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+.rtux1-geofiles .gfv1-form label > span {
+  font-size: 11px;
+}
+
+.rtux1-geofiles .gfv1-form input,
+.rtux1-geofiles .gfv1-form select {
+  min-height: 42px;
+  font-size: 11.5px;
+}
+
+.rtux1-geofiles .gfv1-note strong {
+  font-size: 11px;
+}
+
+.rtux1-geofiles .gfv1-note span,
+.rtux1-geofiles .gfv1-empty span,
+.rtux1-geofiles .gfv1-validation small {
+  font-size: 10.8px;
+  line-height: 1.5;
+}
+
+.rtux1-geofiles .gfv1-file > span,
+.rtux1-geofiles .gfv1-validation > span {
+  font-size: 9.5px;
+}
+
+.rtux1-geofiles .gfv1-file > strong,
+.rtux1-geofiles .gfv1-validation > strong {
+  font-size: 13px;
+}
+
+.rtux1-geofiles .gfv1-file > small {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  overflow-wrap: anywhere;
+  font-size: 10px;
+}
+
+.rtux1-geofiles .gfv1-file code {
+  color: var(--sg-text);
+  font-size: 10px;
+}
+
+.rtux1-geofiles .gfv1-file em {
+  font-size: 10.5px;
+}
+
+.rtux1-geofiles .gfv1-hash-copy {
+  min-height: 27px;
+  padding-inline: 7px;
+  font-size: 8.5px;
+}
+
+.rtux1-geofiles .gfv1-categories summary {
+  font-size: 10.5px;
+}
+
+.rtux1-geofiles .gfv1-categories p {
+  font-size: 10.5px;
+}
+
+.rtux1-geofiles .button {
+  min-height: 39px;
+  font-size: 10.5px;
+}
+
+@media (max-width: 1500px) {
+  .rtux1-flow {
+    grid-template-columns: 130px 56px minmax(0, 1fr) 56px 130px;
+  }
+
+  .rtux1-flow-routes {
+    grid-template-columns: 1fr;
+  }
+
+  .rtux1-outbound-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .rtux1-model-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1180px) {
+  .rtux1-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .rtux1-flow {
+    grid-template-columns: 1fr;
+  }
+
+  .rtux1-flow-line {
+    display: none;
+  }
+
+  .rtux1-flow-node {
+    min-height: 120px;
+  }
+
+  .rtux1-dns-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .rtux1-page-footer {
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 760px) {
+  .rtux1-heading,
+  .rtux1-panel-head,
+  .rtux1-outbound-card > header,
+  .rtux1-outbound-card > footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .rtux1-summary,
+  .rtux1-model-grid,
+  .rtux1-values {
+    grid-template-columns: 1fr;
+  }
+
+  .rtux1-details label {
+    grid-template-columns: 1fr;
+  }
+
+  .rtux1-listeners article {
+    grid-template-columns: 1fr auto;
+  }
+
+  .rtux1-listeners article > span {
+    grid-column: 1 / -1;
+    text-align: left;
+  }
+}
+
+
+/* SG-Gateway Routing UX Fix 2 — SG-Panel model */
+
+.rtux2-page {
+  gap: 18px;
+}
+
+.rtux2-heading {
+  padding: 0 4px 0;
+}
+
+.rtux2-kicker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--sg-blue);
+  font-size: 10.5px;
+  font-weight: 850;
+  letter-spacing: .15em;
+}
+
+.rtux2-kicker > span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--sg-blue);
+}
+
+.rtux2-heading h1 {
+  margin: 8px 0 5px;
+  color: var(--sg-text);
+  font-size: clamp(34px, 2.25vw, 40px);
+  line-height: 1.05;
+}
+
+.rtux2-heading p {
+  margin: 0;
+  color: var(--sg-muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.rtux2-tabs {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--sg-line);
+  padding: 0 0 0 2px;
+}
+
+.rtux2-tabs button {
+  position: relative;
+  min-height: 52px;
+  border: 0;
+  background: transparent;
+  color: var(--sg-muted);
+  padding: 0 14px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 760;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.rtux2-tabs button::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 2px;
+  background: transparent;
+}
+
+.rtux2-tabs button:hover {
+  color: var(--sg-text);
+}
+
+.rtux2-tabs button.active {
+  color: var(--sg-text);
+}
+
+.rtux2-tabs button.active::after {
+  background: var(--sg-blue);
+}
+
+.rtux2-tab-panel {
+  gap: 16px;
+}
+
+.rtux2-traffic {
+  display: grid;
+  gap: 16px;
+}
+
+.rtux2-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.rtux2-toolbar-status {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  color: var(--sg-muted);
+  font-size: 10.5px;
+}
+
+.rtux2-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  border: 1px solid var(--sg-line);
+  border-radius: 999px;
+  background: var(--sg-panel);
+  padding: 0 10px;
+  font-size: 9.5px;
+  font-weight: 760;
+}
+
+.rtux2-chip.ok {
+  border-color: var(--sg-green-line);
+  background: var(--sg-green-bg);
+  color: var(--sg-green);
+}
+
+.rtux2-summary-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  overflow: hidden;
+  border: 1px solid var(--sg-line);
+  border-radius: 13px;
+  background: var(--sg-line-soft);
+  gap: 1px;
+}
+
+.rtux2-summary-strip article {
+  display: grid;
+  gap: 7px;
+  min-height: 98px;
+  background: var(--sg-panel);
+  padding: 15px 17px;
+}
+
+.rtux2-summary-strip span {
+  color: var(--sg-muted);
+  font-size: 9.5px;
+  font-weight: 820;
+  letter-spacing: .08em;
+}
+
+.rtux2-summary-strip strong {
+  overflow-wrap: anywhere;
+  color: var(--sg-text);
+  font-size: 16px;
+}
+
+.rtux2-summary-strip strong.ok {
+  color: var(--sg-green);
+}
+
+.rtux2-summary-strip strong.warning {
+  color: var(--sg-yellow);
+}
+
+.rtux2-summary-strip small {
+  color: var(--sg-muted);
+  font-size: 10.5px;
+  line-height: 1.45;
+}
+
+.rtux2-rules-card,
+.rtux2-scenarios-card {
+  border: 1px solid var(--sg-line);
+  border-radius: 15px;
+  background: var(--sg-panel);
+  padding: 18px;
+}
+
+.rtux2-section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.rtux2-section-kicker {
+  color: var(--sg-blue);
+  font-size: 9.5px;
+  font-weight: 850;
+  letter-spacing: .13em;
+}
+
+.rtux2-section-head h2 {
+  margin: 6px 0 0;
+  color: var(--sg-text);
+  font-size: 23px;
+}
+
+.rtux2-section-head p {
+  margin: 7px 0 0;
+  color: var(--sg-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.rtux2-json {
+  position: relative;
+}
+
+.rtux2-json summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.rtux2-json summary::-webkit-details-marker {
+  display: none;
+}
+
+.rtux2-json pre {
+  position: absolute;
+  z-index: 10;
+  top: 44px;
+  right: 0;
+  width: min(760px, 78vw);
+  max-height: 520px;
+  overflow: auto;
+  margin: 0;
+  border: 1px solid var(--sg-line);
+  border-radius: 12px;
+  background: #071522;
+  color: #dcebf6;
+  padding: 14px;
+  box-shadow: 0 20px 70px rgba(0,0,0,.38);
+  font-size: 10px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.rtux2-rules-table {
+  display: grid;
+  margin-top: 15px;
+  overflow: hidden;
+  border: 1px solid var(--sg-line-soft);
+  border-radius: 11px;
+}
+
+.rtux2-rules-head,
+.rtux2-rules-table > article {
+  display: grid;
+  grid-template-columns: 92px minmax(180px, .85fr) minmax(260px, 1.45fr) 110px 120px;
+  align-items: center;
+  gap: 12px;
+}
+
+.rtux2-rules-head {
+  min-height: 42px;
+  background: #0d1c2b;
+  color: var(--sg-muted);
+  padding: 0 14px;
+  font-size: 10px;
+  font-weight: 820;
+}
+
+.rtux2-rules-table > article {
+  min-height: 68px;
+  background: var(--sg-panel-deep);
+  padding: 11px 14px;
+}
+
+.rtux2-rules-table > article + article {
+  border-top: 1px solid var(--sg-line-soft);
+}
+
+.rtux2-rules-table > article.disabled {
+  opacity: .64;
+}
+
+.rtux2-order {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 25px;
+  border: 1px solid var(--sg-line);
+  border-radius: 8px;
+  background: var(--sg-panel-soft);
+  color: var(--sg-blue);
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 9px;
+  font-weight: 780;
+}
+
+.rtux2-rules-table article > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.rtux2-rules-table strong {
+  color: var(--sg-text);
+  font-size: 12px;
+}
+
+.rtux2-rules-table small {
+  color: var(--sg-muted);
+  font-size: 9.5px;
+}
+
+.rtux2-condition {
+  display: flex !important;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px !important;
+}
+
+.rtux2-condition code {
+  overflow-wrap: anywhere;
+  border-radius: 5px;
+  background: rgba(255,255,255,.035);
+  color: var(--sg-muted);
+  padding: 3px 5px;
+  font-size: 9.5px;
+}
+
+.rtux2-condition code.warning {
+  color: var(--sg-yellow);
+}
+
+.rtux2-route,
+.rtux2-rule-state {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  min-height: 28px;
+  border: 1px solid var(--sg-line);
+  border-radius: 999px;
+  background: var(--sg-panel-soft);
+  color: var(--sg-muted);
+  padding: 0 9px;
+  font-size: 9px;
+  font-weight: 780;
+}
+
+.rtux2-route.direct,
+.rtux2-rule-state.ok {
+  border-color: var(--sg-green-line);
+  background: var(--sg-green-bg);
+  color: var(--sg-green);
+}
+
+.rtux2-route.block {
+  border-color: rgba(224, 86, 98, .34);
+  background: rgba(224, 86, 98, .08);
+  color: #ef8a94;
+}
+
+.rtux2-route.xray {
+  border-color: rgba(157, 122, 255, .30);
+  background: rgba(126, 93, 226, .10);
+  color: #b6a1ff;
+}
+
+.rtux2-rule-state.warning {
+  border-color: color-mix(in srgb, var(--sg-yellow) 34%, var(--sg-line));
+  background: color-mix(in srgb, var(--sg-yellow) 8%, var(--sg-panel));
+  color: var(--sg-yellow);
+}
+
+.rtux2-rules-empty {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 7px;
+  min-height: 150px;
+  margin-top: 15px;
+  border: 1px dashed var(--sg-line);
+  border-radius: 11px;
+  background: var(--sg-panel-deep);
+  padding: 18px;
+  text-align: center;
+}
+
+.rtux2-rules-empty strong {
+  color: var(--sg-text);
+  font-size: 13px;
+}
+
+.rtux2-rules-empty span {
+  color: var(--sg-muted);
+  font-size: 11px;
+}
+
+.rtux2-geo-badges {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rtux2-geo-badges span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 29px;
+  border: 1px solid var(--sg-line);
+  border-radius: 9px;
+  background: var(--sg-panel-deep);
+  color: var(--sg-muted);
+  padding: 0 10px;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 9.5px;
+  font-weight: 720;
+}
+
+.rtux2-geo-badges span.ok {
+  border-color: var(--sg-green-line);
+  color: var(--sg-green);
+}
+
+.rtux2-geo-badges span.warning {
+  color: var(--sg-yellow);
+}
+
+.rtux2-scenario-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.rtux2-scenario-grid form {
+  margin: 0;
+}
+
+.rtux2-scenario-grid button {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 92px;
+  border: 1px solid var(--sg-line-soft);
+  border-radius: 11px;
+  background: var(--sg-panel-deep);
+  color: inherit;
+  padding: 11px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.rtux2-scenario-grid button:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--sg-blue) 38%, var(--sg-line));
+  background: color-mix(in srgb, var(--sg-blue) 7%, var(--sg-panel-deep));
+}
+
+.rtux2-scenario-grid button:disabled {
+  cursor: not-allowed;
+  opacity: .56;
+}
+
+.rtux2-scenario-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: #1e5086;
+  color: #cce8ff;
+  font-size: 10px;
+  font-weight: 850;
+}
+
+.rtux2-scenario-grid button > span:nth-child(2) {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.rtux2-scenario-grid strong {
+  color: var(--sg-text);
+  font-size: 11.5px;
+}
+
+.rtux2-scenario-grid small {
+  color: var(--sg-muted);
+  font-size: 9.5px;
+  line-height: 1.4;
+}
+
+.rtux2-scenario-grid em {
+  grid-column: 2;
+  color: var(--sg-muted);
+  font-size: 8.5px;
+  font-style: normal;
+  font-weight: 740;
+}
+
+.rtux2-scenario-grid em.ok {
+  color: var(--sg-green);
+}
+
+.rtux2-scenario-grid em.warning {
+  color: var(--sg-yellow);
+}
+
+.rtux2-scenario-form {
+  display: grid;
+  gap: 13px;
+  margin-top: 14px;
+  border: 1px solid var(--sg-line-soft);
+  border-radius: 11px;
+  background: #0d1d2c;
+  padding: 13px;
+}
+
+.rtux2-form-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(250px, .65fr);
+  gap: 12px;
+}
+
+.rtux2-scenario-form label {
+  display: grid;
+  gap: 7px;
+}
+
+.rtux2-scenario-form label > span {
+  color: var(--sg-text);
+  font-size: 10.5px;
+  font-weight: 720;
+}
+
+.rtux2-scenario-form select {
+  width: 100%;
+  min-height: 43px;
+  font-size: 11.5px;
+}
+
+.rtux2-validation {
+  display: grid;
+  gap: 5px;
+  border: 1px solid var(--sg-line);
+  border-radius: 10px;
+  background: var(--sg-panel-deep);
+  padding: 11px 12px;
+}
+
+.rtux2-validation.ok {
+  border-color: var(--sg-green-line);
+  background: var(--sg-green-bg);
+}
+
+.rtux2-validation.warning {
+  border-color: color-mix(in srgb, var(--sg-yellow) 36%, var(--sg-line));
+  background: color-mix(in srgb, var(--sg-yellow) 8%, var(--sg-panel));
+}
+
+.rtux2-validation strong {
+  color: var(--sg-text);
+  font-size: 11px;
+}
+
+.rtux2-validation span {
+  color: var(--sg-muted);
+  font-size: 10.5px;
+  line-height: 1.45;
+}
+
+.rtux2-scenario-form > .button {
+  min-height: 41px;
+  font-size: 11px;
+}
+
+.rtux2-candidate {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+  border: 1px solid color-mix(in srgb, var(--sg-blue) 32%, var(--sg-line));
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--sg-blue) 5%, var(--sg-panel-deep));
+  padding: 13px;
+}
+
+.rtux2-candidate > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.rtux2-candidate > header > div {
+  display: grid;
+  gap: 5px;
+}
+
+.rtux2-candidate > header > div > span {
+  color: var(--sg-blue);
+  font-size: 8.5px;
+  font-weight: 850;
+  letter-spacing: .10em;
+}
+
+.rtux2-candidate > header strong {
+  color: var(--sg-text);
+  font-size: 12px;
+}
+
+.rtux2-candidate > header small {
+  color: var(--sg-muted);
+  font-size: 10px;
+}
+
+.rtux2-candidate-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
+.rtux2-candidate-actions form {
+  margin: 0;
+}
+
+.rtux2-compact-section {
+  border: 1px solid var(--sg-line);
+  border-radius: 12px;
+  background: var(--sg-panel);
+  padding: 0 14px;
+}
+
+.rtux2-compact-section summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  min-height: 68px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.rtux2-compact-section summary::-webkit-details-marker {
+  display: none;
+}
+
+.rtux2-compact-section summary > span {
+  display: grid;
+  gap: 4px;
+}
+
+.rtux2-compact-section summary strong {
+  color: var(--sg-text);
+  font-size: 12px;
+}
+
+.rtux2-compact-section summary small {
+  color: var(--sg-muted);
+  font-size: 10px;
+}
+
+.rtux2-compact-section summary em {
+  color: var(--sg-blue);
+  font-size: 9.5px;
+  font-style: normal;
+  font-weight: 760;
+}
+
+.rtux2-compact-section > div,
+.rtux2-compact-section > dl {
+  margin: 0 0 13px;
+  border-top: 1px solid var(--sg-line-soft);
+  padding-top: 12px;
+}
+
+.rtux2-compact-section dl {
+  display: grid;
+  gap: 0;
+}
+
+.rtux2-compact-section dl > div {
+  display: grid;
+  grid-template-columns: 170px minmax(0, 1fr);
+  gap: 12px;
+  min-height: 42px;
+  align-items: center;
+}
+
+.rtux2-compact-section dl > div + div {
+  border-top: 1px solid var(--sg-line-soft);
+}
+
+.rtux2-compact-section dt {
+  color: var(--sg-muted);
+  font-size: 10px;
+}
+
+.rtux2-compact-section dd {
+  overflow-wrap: anywhere;
+  margin: 0;
+  color: var(--sg-text);
+  font-size: 10px;
+  text-align: right;
+}
+
+.rtux2-honesty {
+  display: grid;
+  gap: 5px;
+  border: 1px solid color-mix(in srgb, var(--sg-blue) 28%, var(--sg-line));
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--sg-blue) 5%, var(--sg-panel));
+  padding: 11px 13px;
+}
+
+.rtux2-honesty strong {
+  color: var(--sg-text);
+  font-size: 10.5px;
+}
+
+.rtux2-honesty span {
+  color: var(--sg-muted);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.rtux2-page-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  border-top: 1px solid var(--sg-line);
+  padding: 4px 4px 0;
+  color: var(--sg-muted);
+  font-size: 10px;
+}
+
+/* Compact Outbounds in Fix 2 */
+
+.rtux2-page .rtux1-outbound-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.rtux2-page .rtux1-outbound-card {
+  padding: 15px;
+}
+
+.rtux2-page .rtux1-outbound-title h2 {
+  font-size: 17px;
+}
+
+.rtux2-page .rtux1-outbound-title p,
+.rtux2-page .rtux1-values small,
+.rtux2-page .rtux1-outbound-card > footer > span {
+  font-size: 10.5px;
+}
+
+.rtux2-page .rtux1-values > div {
+  min-height: 82px;
+}
+
+@media (max-width: 1500px) {
+  .rtux2-scenario-grid,
+  .rtux2-summary-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .rtux2-rules-head,
+  .rtux2-rules-table > article {
+    grid-template-columns: 72px minmax(170px, .8fr) minmax(220px, 1.3fr) 100px 110px;
+  }
+
+  .rtux2-page .rtux1-outbound-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 1050px) {
+  .rtux2-rules-head {
+    display: none;
+  }
+
+  .rtux2-rules-table > article {
+    grid-template-columns: 54px minmax(0, 1fr) auto;
+  }
+
+  .rtux2-condition {
+    grid-column: 2 / -1;
+  }
+
+  .rtux2-rule-state {
+    grid-column: 3;
+  }
+}
+
+@media (max-width: 760px) {
+  .rtux2-toolbar,
+  .rtux2-section-head,
+  .rtux2-candidate > header,
+  .rtux2-compact-section summary {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .rtux2-summary-strip,
+  .rtux2-scenario-grid,
+  .rtux2-form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .rtux2-tabs {
+    gap: 6px;
+  }
+
+  .rtux2-tabs button {
+    padding: 0 10px;
+  }
+
+  .rtux2-rules-table > article {
+    grid-template-columns: 44px minmax(0, 1fr);
+  }
+
+  .rtux2-route,
+  .rtux2-rule-state {
+    grid-column: 2;
+  }
+
+  .rtux2-compact-section dl > div {
+    grid-template-columns: 1fr;
+    padding: 8px 0;
+  }
+
+  .rtux2-compact-section dd {
+    text-align: left;
+  }
+}
+
+
+.rtux2-form-readonly {
+  display: grid;
+  gap: 6px;
+  min-height: 43px;
+  border: 1px solid var(--sg-line);
+  border-radius: 9px;
+  background: var(--sg-panel-deep);
+  padding: 9px 11px;
+}
+
+.rtux2-form-readonly > span {
+  color: var(--sg-muted);
+  font-size: 9.5px;
+  font-weight: 720;
+}
+
+.rtux2-form-readonly > strong {
+  color: var(--sg-text);
+  font-size: 11px;
+}
+
+.rtux2-form-readonly > small {
+  color: var(--sg-muted);
+  font-size: 9.5px;
+  line-height: 1.4;
+}

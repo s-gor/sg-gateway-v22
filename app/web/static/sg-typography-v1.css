@@ -1,0 +1,710 @@
+/* SG-Gateway UI STEP 10 — Global Typography V1
+   Loaded after every page stylesheet.
+   Raises the visual floor for secondary text and expands rows where needed. */
+
+/* ---------- Global shell ---------- */
+
+body.sg-body {
+  font-size: 15px;
+}
+
+.sg-brand-note {
+  font-size: 12px;
+}
+
+.sg-nav-item {
+  min-height: 63px;
+}
+
+.sg-nav-copy strong {
+  font-size: 15px;
+}
+
+.sg-nav-copy small {
+  font-size: 11.5px;
+  line-height: 1.3;
+}
+
+.sg-server-card {
+  padding: 15px;
+}
+
+.sg-server-eyebrow {
+  font-size: 10.5px;
+}
+
+.sg-server-name {
+  font-size: 14px;
+}
+
+.sg-server-version {
+  font-size: 10.5px;
+}
+
+.sg-server-meta {
+  font-size: 10.5px;
+  line-height: 1.35;
+}
+
+.sg-current-label {
+  font-size: 9.5px;
+}
+
+.sg-current-value strong {
+  font-size: 12px;
+}
+
+.sg-current-value span {
+  font-size: 10.5px;
+}
+
+.sg-version-label,
+.sg-health-pill,
+.sg-user-title {
+  font-size: 11px;
+}
+
+.sg-user-menu summary {
+  font-size: 13px;
+}
+
+.sg-sidebar-action {
+  font-size: 14px;
+}
+
+.sg-body .button {
+  min-height: 40px;
+  font-size: 11px;
+  line-height: 1.25;
+}
+
+.sg-body input,
+.sg-body select,
+.sg-body textarea {
+  font-size: 11.5px;
+  line-height: 1.35;
+}
+
+.sg-body .data-table th {
+  font-size: 11px;
+}
+
+/* ---------- Shared typography across all redesigned pages ---------- */
+
+.cv2-kicker,
+.sv1-kicker,
+.cnv1-kicker,
+.rtv1-kicker,
+.mtv1-kicker,
+.secv1-kicker,
+.hlpv1-kicker {
+  font-size: 10px;
+}
+
+.cv2-card-kicker,
+.sv1-card-kicker,
+.cnv1-card-kicker,
+.rtv1-card-kicker,
+.mtv1-card-kicker,
+.secv1-card-kicker,
+.hlpv1-card-kicker {
+  font-size: 9.5px;
+}
+
+.cv2-summary-label,
+.sv1-summary-label,
+.cnv1-summary-label,
+.rtv1-summary-label,
+.mtv1-summary-label,
+.secv1-summary-label,
+.hlpv1-summary-label {
+  font-size: 13px;
+}
+
+.cv2-summary-note,
+.sv1-summary-note,
+.cnv1-summary-note,
+.rtv1-summary-note,
+.mtv1-summary-note,
+.secv1-summary-note,
+.hlpv1-summary-note {
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.cv2-heading p,
+.sv1-heading p,
+.cnv1-heading p,
+.rtv1-heading p,
+.mtv1-heading p,
+.secv1-heading p,
+.hlpv1-heading p {
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.sv1-panel-head p,
+.cnv1-panel-head p,
+.cnv1-engine-head p,
+.rtv1-panel-head p,
+.rtv1-route-card-head p,
+.mtv1-panel-head p,
+.secv1-panel-head p,
+.hlpv1-article-head p,
+.hlpv1-welcome-head p {
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+.cv2-page-footer,
+.sv1-page-footer,
+.cnv1-page-footer,
+.rtv1-page-footer,
+.mtv1-page-footer,
+.secv1-page-footer,
+.hlpv1-page-footer {
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+/* ---------- Clients ---------- */
+
+.cv2-filter-field > span,
+.cv2-server-primary span,
+.cv2-id-row span,
+.cv2-detail-field span,
+.cv2-section-label {
+  font-size: 9.5px;
+}
+
+.cv2-filter-footer,
+.cv2-list-footer,
+.cv2-create-form > label > small {
+  font-size: 10.5px;
+  line-height: 1.45;
+}
+
+.cv2-table th {
+  height: 47px;
+  font-size: 9.5px;
+}
+
+.cv2-client-cell small,
+.cv2-server-cell small,
+.cv2-server-primary small,
+.cv2-profile-row small {
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.cv2-pill,
+.cv2-server-chip,
+.cv2-profile-status {
+  min-height: 25px;
+  font-size: 9px;
+}
+
+.cv2-expiry,
+.cv2-id-row code,
+.cv2-detail-primary {
+  font-size: 10.5px;
+}
+
+.cv2-detail-field strong,
+.cv2-profile-row strong {
+  font-size: 11.5px;
+}
+
+.cv2-copy-button,
+.cv2-open-button,
+.cv2-detail-secondary .button,
+.cv2-danger-body .button {
+  font-size: 10px;
+}
+
+.cv2-danger summary {
+  font-size: 10.5px;
+}
+
+/* ---------- System ---------- */
+
+.sv1-state-pill,
+.sv1-engine-pill,
+.sv1-check-status {
+  min-height: 27px;
+  font-size: 9.5px;
+}
+
+.sv1-donut-center span,
+.sv1-resource-available,
+.sv1-legend-row,
+.sv1-legend-row strong,
+.sv1-disk-labels,
+.sv1-cpu-value span,
+.sv1-runtime-list span,
+.sv1-runtime-table span,
+.sv1-runtime-list strong,
+.sv1-runtime-table strong,
+.sv1-runtime-table code,
+.sv1-connection-identity small,
+.sv1-connection-meta strong,
+.sv1-check-row strong,
+.sv1-last-error strong,
+.sv1-last-error span,
+.sv1-action-grid strong {
+  font-size: 10.5px;
+}
+
+.sv1-legend-row small,
+.sv1-connection-meta span,
+.sv1-check-row small,
+.sv1-last-error small,
+.sv1-action-grid small {
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.sv1-panel-head .button {
+  font-size: 10px;
+}
+
+/* ---------- Connections ---------- */
+
+.cnv1-summary-ports span,
+.cnv1-map-node small,
+.cnv1-map-status,
+.cnv1-endpoint-main small,
+.cnv1-port-chip,
+.cnv1-form-section-title small,
+.cnv1-advanced summary span:last-child,
+.cnv1-advanced-body small,
+.cnv1-form-actions > span {
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.cnv1-engine-status {
+  min-height: 27px;
+  font-size: 9.5px;
+}
+
+.cnv1-endpoint-main span,
+.cnv1-engine-metrics span,
+.cnv1-form-section-title > span {
+  font-size: 9.5px;
+}
+
+.cnv1-engine-metrics > div {
+  min-height: 69px;
+}
+
+.cnv1-engine-metrics strong,
+.cnv1-engine-form label > span,
+.cnv1-advanced summary,
+.cnv1-note-panel p {
+  font-size: 10.5px;
+  line-height: 1.45;
+}
+
+.cnv1-engine-form input,
+.cnv1-engine-form select,
+.cnv1-engine-form textarea {
+  font-size: 11px;
+}
+
+.cnv1-form-actions .button,
+.cnv1-note-panel .button {
+  font-size: 10px;
+}
+
+/* ---------- Routing ---------- */
+
+.rtv1-summary-access,
+.rtv1-honest-pill,
+.rtv1-model-badge,
+.rtv1-flow-node small,
+.rtv1-flow-route > small,
+.rtv1-route-tail,
+.rtv1-endpoint-main small,
+.rtv1-copy,
+.rtv1-code-row button,
+.rtv1-card-footer > span,
+.rtv1-model-grid p,
+.rtv1-note p {
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.rtv1-flow-line i {
+  font-size: 9px;
+}
+
+.rtv1-status {
+  min-height: 27px;
+  font-size: 9.5px;
+}
+
+.rtv1-endpoint-main span,
+.rtv1-value-card span {
+  font-size: 9.5px;
+}
+
+.rtv1-value-card {
+  min-height: 86px;
+}
+
+.rtv1-value-card strong,
+.rtv1-details summary,
+.rtv1-model-grid strong {
+  font-size: 10.5px;
+}
+
+.rtv1-value-card small,
+.rtv1-code-row > span,
+.rtv1-code-row code {
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.rtv1-code-row {
+  min-height: 58px;
+}
+
+.rtv1-card-footer .button {
+  font-size: 10px;
+}
+
+.rtv1-model-number {
+  font-size: 9.5px;
+}
+
+/* ---------- Maintenance ---------- */
+
+.mtv1-backup-row {
+  grid-template-columns: 44px minmax(230px, 1.2fr) minmax(300px, .85fr) auto;
+  min-height: 94px;
+  gap: 14px;
+  padding: 13px 14px;
+}
+
+.mtv1-backup-icon {
+  width: 44px;
+  height: 44px;
+}
+
+.mtv1-backup-copy strong {
+  overflow: visible;
+  font-size: 10.5px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+  white-space: normal;
+}
+
+.mtv1-backup-copy small {
+  font-size: 10px;
+}
+
+.mtv1-latest-pill {
+  min-height: 25px;
+  font-size: 9px;
+}
+
+.mtv1-backup-meta {
+  grid-template-columns: 1.15fr .7fr;
+}
+
+.mtv1-backup-meta > div {
+  min-height: 58px;
+  padding: 10px;
+}
+
+.mtv1-backup-meta span {
+  font-size: 9px;
+}
+
+.mtv1-backup-meta strong {
+  font-size: 10px;
+  line-height: 1.35;
+  white-space: normal;
+}
+
+.mtv1-backup-actions .button,
+.mtv1-panel-head .button {
+  font-size: 10px;
+}
+
+.mtv1-health-row {
+  min-height: 72px;
+  padding: 11px 13px;
+}
+
+.mtv1-health-row strong {
+  font-size: 11px;
+}
+
+.mtv1-health-row small {
+  overflow: visible;
+  max-width: none;
+  font-size: 10px;
+  line-height: 1.4;
+  text-overflow: clip;
+  white-space: normal;
+}
+
+.mtv1-health-status,
+.mtv1-operation-status {
+  min-height: 27px;
+  font-size: 9px;
+}
+
+.mtv1-health-footer {
+  min-height: 48px;
+  font-size: 10px;
+}
+
+.mtv1-diagnostic-card {
+  min-height: 82px;
+  padding: 13px;
+}
+
+.mtv1-diagnostic-card span,
+.mtv1-release-strip span {
+  font-size: 9px;
+}
+
+.mtv1-diagnostic-card strong,
+.mtv1-release-strip strong,
+.mtv1-recovery-flow strong {
+  font-size: 10.5px;
+}
+
+.mtv1-channel-pill,
+.mtv1-log-count {
+  min-height: 28px;
+  font-size: 9px;
+}
+
+.mtv1-step-number {
+  font-size: 9.5px;
+}
+
+.mtv1-recovery-flow article {
+  min-height: 76px;
+}
+
+.mtv1-recovery-flow small,
+.mtv1-recovery-note p {
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.mtv1-operations-table th {
+  height: 49px;
+  font-size: 9.5px;
+}
+
+.mtv1-operations-table td {
+  height: 66px;
+  padding-block: 11px;
+}
+
+.mtv1-time,
+.mtv1-target,
+.mtv1-message,
+.mtv1-operations-table code {
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.mtv1-target,
+.mtv1-message {
+  max-width: 340px;
+  white-space: normal;
+}
+
+/* ---------- Security ---------- */
+
+.secv1-state-pill,
+.secv1-mini-state {
+  min-height: 27px;
+  font-size: 9.5px;
+}
+
+.secv1-flow-node small,
+.secv1-auth-row small,
+.secv1-warning-box p,
+.secv1-success-box p,
+.secv1-bind-main small,
+.secv1-recommendation p,
+.secv1-endpoint-row code,
+.secv1-endpoint-row small,
+.secv1-public-note p,
+.secv1-action-grid small,
+.secv1-not-implemented p {
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.secv1-flow-line i,
+.secv1-endpoint-row > span {
+  font-size: 9px;
+}
+
+.secv1-auth-row {
+  min-height: 75px;
+}
+
+.secv1-auth-row strong,
+.secv1-warning-box strong,
+.secv1-success-box strong,
+.secv1-exposure-grid strong,
+.secv1-recommendation strong,
+.secv1-endpoint-row strong,
+.secv1-action-grid strong,
+.secv1-not-implemented strong {
+  font-size: 10.5px;
+}
+
+.secv1-bind-main span,
+.secv1-exposure-grid span {
+  font-size: 9.5px;
+}
+
+.secv1-copy-button {
+  font-size: 10px;
+}
+
+.secv1-exposure-grid > div {
+  min-height: 78px;
+}
+
+.secv1-rec-number {
+  font-size: 9.5px;
+}
+
+.secv1-recommendation {
+  min-height: 72px;
+}
+
+.secv1-endpoint-row {
+  min-height: 76px;
+}
+
+/* ---------- Help ---------- */
+
+.hlpv1-search-panel label > span,
+.hlpv1-search-panel input,
+.hlpv1-clear-search {
+  font-size: 10.5px;
+}
+
+.hlpv1-sidebar-head > span,
+.hlpv1-step-pill {
+  min-height: 28px;
+  font-size: 9px;
+}
+
+.hlpv1-topic-link {
+  min-height: 84px;
+}
+
+.hlpv1-topic-copy strong,
+.hlpv1-step-card strong,
+.hlpv1-related-grid strong,
+.hlpv1-journey strong,
+.hlpv1-help-note strong {
+  font-size: 10.5px;
+}
+
+.hlpv1-topic-copy small,
+.hlpv1-no-results small,
+.hlpv1-related-grid small,
+.hlpv1-article-footer,
+.hlpv1-journey p,
+.hlpv1-help-note p {
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.hlpv1-step-number,
+.hlpv1-journey-number {
+  font-size: 9.5px;
+}
+
+.hlpv1-step-card {
+  min-height: 104px;
+}
+
+.hlpv1-step-card p {
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.hlpv1-journey a {
+  min-height: 116px;
+}
+
+/* ---------- Earlier STEP 2 compatibility ---------- */
+
+.clients-v2-page .eyebrow,
+.clients-v2-page .label,
+.clients-v2-page .meta,
+.clients-v2-page small {
+  font-size: max(10px, .72em);
+}
+
+/* ---------- Earlier responsive stacking to protect larger text ---------- */
+
+@media (max-width: 1500px) {
+  .mtv1-backup-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .mtv1-backup-row {
+    grid-template-columns: 44px minmax(0, 1fr) auto;
+  }
+
+  .mtv1-backup-meta {
+    grid-column: 2 / -1;
+    grid-row: 2;
+  }
+}
+
+@media (max-width: 1380px) {
+  .cnv1-engines,
+  .rtv1-routes,
+  .secv1-main-grid,
+  .secv1-two-column,
+  .mtv1-two-column {
+    grid-template-columns: 1fr;
+  }
+
+  .hlpv1-workspace {
+    grid-template-columns: minmax(290px, .42fr) minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 1120px) {
+  .hlpv1-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .hlpv1-topic-list {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .secv1-access-flow {
+    grid-template-columns: 1fr;
+  }
+
+  .secv1-flow-line {
+    display: none;
+  }
+}
+
+@media (max-width: 820px) {
+  .hlpv1-topic-list {
+    grid-template-columns: 1fr;
+  }
+}

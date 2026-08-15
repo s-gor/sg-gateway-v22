@@ -1,0 +1,38 @@
+/* SG-Gateway Preview 46 · simple clients/devices shell */
+.dv46-page{display:grid;gap:20px;max-width:1480px;margin:0 auto;padding:4px 0 28px}
+.dv46-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:24px}
+.dv46-heading h1{margin:8px 0 6px;font-size:34px}.dv46-heading p{margin:0;color:var(--muted);max-width:760px}
+.dv46-heading-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px}.dv46-heading-actions form{margin:0}
+.dv46-summary{grid-template-columns:repeat(3,minmax(0,1fr))}
+.dv46-devices{display:grid;gap:18px}.dv46-device{border:1px solid var(--line);border-radius:16px;background:var(--panel);padding:20px;box-shadow:0 12px 32px rgba(0,0,0,.14)}
+.dv46-device.is-disabled{opacity:.82}.dv46-device-head{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;padding-bottom:16px;border-bottom:1px solid var(--line)}
+.dv46-device-title{display:flex;gap:14px;min-width:0}.dv46-device-title h2{margin:3px 0 4px;font-size:24px}.dv46-device-title p{margin:0;color:var(--muted)}
+.dv46-device-kicker,.dv46-primary-label{font-size:11px;letter-spacing:.12em;font-weight:800;color:var(--muted)}
+.dv46-device-dot{width:12px;height:12px;border-radius:50%;margin-top:9px;box-shadow:0 0 0 5px rgba(98,168,255,.10)}.dv46-device-dot.online{background:var(--green)}.dv46-device-dot.offline{background:var(--danger)}
+.dv46-device-actions{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:8px}.dv46-device-actions form{margin:0}
+.dv46-device-meta{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:14px 0}.dv46-device-meta span{display:grid;gap:3px;padding:11px 13px;border:1px solid var(--line);border-radius:10px;background:var(--panel-soft)}.dv46-device-meta small{color:var(--muted);font-size:10px;letter-spacing:.1em;font-weight:800}.dv46-device-meta strong{font-size:14px}
+.dv46-primary-access{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:17px 18px;border:1px solid var(--line);border-radius:13px;background:var(--panel-3)}.dv46-primary-access h3{margin:4px 0;font-size:19px}.dv46-primary-access p{margin:0;color:var(--muted)}.dv46-primary-actions{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:8px;min-width:310px}
+.dv46-profiles{margin-top:14px;border-top:1px solid var(--line);padding-top:12px}.dv46-profiles>summary{cursor:pointer;font-weight:750;color:var(--text);list-style:none;padding:8px 2px}.dv46-profiles>summary::-webkit-details-marker{display:none}.dv46-profiles>summary:before{content:'+';display:inline-grid;place-items:center;width:22px;height:22px;margin-right:8px;border:1px solid var(--line);border-radius:7px}.dv46-profiles[open]>summary:before{content:'−'}.dv46-profiles>summary span{font-weight:400;color:var(--muted);margin-left:8px}.dv46-access-grid{margin-top:12px}
+.dv46-dialog{width:min(860px,calc(100vw - 28px))}.dv46-recommended{padding:14px 16px;border:1px solid var(--line);border-radius:11px}.dv46-recommended p{margin:4px 0 0;color:var(--muted)}.dv46-channel-picker>summary{cursor:pointer;padding:10px 0;font-weight:750}.dv46-channel-picker fieldset{margin-top:8px}
+.dv46-copy.is-copied{border-color:var(--green);color:var(--green)}
+html[data-theme="light"] .dv46-device{background:var(--sg-ljd-surface)!important;border-color:#89968A!important;box-shadow:var(--sg-ljd-card-depth)!important}
+html[data-theme="light"] .dv46-device-meta span{background:var(--sg-ljd-surface-soft)!important;border-color:#89968A!important}
+html[data-theme="light"] .dv46-primary-access{background:var(--sg-ljd-surface-raised)!important;border-color:#89968A!important;box-shadow:var(--sg-ljd-card-depth)!important}
+html[data-theme="light"] .dv46-recommended{background:var(--sg-ljd-surface-soft)!important;border-color:#89968A!important}
+@media(max-width:1000px){.dv46-heading,.dv46-device-head,.dv46-primary-access{flex-direction:column}.dv46-heading-actions,.dv46-device-actions,.dv46-primary-actions{justify-content:flex-start;min-width:0}.dv46-summary,.dv46-device-meta{grid-template-columns:1fr}}
+
+/* Preview 46: the personal device subscription is the primary import path. */
+.dv46-subscription-qr {
+  position: relative;
+}
+.dv46-subscription-qr > summary {
+  list-style: none;
+}
+.dv46-subscription-qr > summary::-webkit-details-marker {
+  display: none;
+}
+.dv46-subscription-qr .cd10-qr-popover {
+  right: 0;
+  left: auto;
+  z-index: 40;
+}

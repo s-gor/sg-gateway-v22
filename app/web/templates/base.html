@@ -1,0 +1,420 @@
+<!doctype html>
+<html lang="ru" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <title>{% block title %}SG-Gateway{% endblock %}</title>
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}?v={{ app_version }}-gateway-jade-1">
+  <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon-32.png') }}?v={{ app_version }}-gateway-jade-1">
+  <link rel="icon" type="image/png" sizes="64x64" href="{{ url_for('static', filename='favicon-64.png') }}?v={{ app_version }}-gateway-jade-1">
+  <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}?v={{ app_version }}-gateway-jade-1">
+  <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='apple-touch-icon.png') }}?v={{ app_version }}-gateway-jade-1">
+  <script>
+    try {
+      const savedTheme = localStorage.getItem("sg-gateway-theme");
+      document.documentElement.dataset.theme = savedTheme === "light" ? "light" : "dark";
+    } catch (_) {}
+  </script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='sg-panel-shell-v1.css') }}">
+  {% block head %}{% endblock %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='sg-typography-v1.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='sg-typography-v2.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='sg-geofiles-core-v1.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='sg-technical-step2-v1.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='sg-mihomo-v1.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='sg-mihomo-v2.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='sg-global-ui-system-v1.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='sg-luxury-jade-depth-v2.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='sg-preview28-final.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='sg-preview32-final.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='sg-preview34-final.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='sg-confirm-modal-v1.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='sg-preview45-xray-theme-fix.css') }}">
+  {% if active_page|default('') == 'routing' %}<link rel="stylesheet" href="{{ url_for('static', filename='sg-routing-client096.css') }}">{% endif %}
+  {% if active_page|default('') == 'outbounds' %}<link rel="stylesheet" href="{{ url_for('static', filename='sg-outbounds-v49.css') }}">{% endif %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='sg-clients-simple-hotfix1.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='sg-clients-clarity-hotfix2.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='sg-readable-typography-v3.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='sg-page-frame-routing-v1.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='sg-controls-final-v1.css') }}">
+  {% if active_page|default('') == 'system' %}
+<link rel="stylesheet" href="{{ url_for('static', filename='sg-system-unified-free-color-v2.css') }}?v={{ app_version }}">
+<script src="{{ url_for('static', filename='sg-system-unified-free-color-v2.js') }}?v={{ app_version }}" defer></script>
+{% endif %}
+  {% if active_page|default('') == 'system' %}<link rel="stylesheet" href="{{ url_for('static', filename='sg-system-cpu-summary-header-v1.css') }}?v={{ app_version }}"><script src="{{ url_for('static', filename='sg-system-cpu-summary-header-v1.js') }}?v={{ app_version }}" defer></script>{% endif %}
+  {% if active_page|default('') == 'system' %}<link rel="stylesheet" href="{{ url_for('static', filename='sg-system-memory-row-bars-v1.css') }}?v={{ app_version }}"><script src="{{ url_for('static', filename='sg-system-memory-row-bars-v1.js') }}?v={{ app_version }}" defer></script>{% endif %}
+  {% if active_page|default('') == 'system' %}
+<link rel="stylesheet" href="{{ url_for('static', filename='sg-system-top-dividers-remove-v2.css') }}?v={{ app_version }}">
+{% endif %}
+  {% if active_page|default('') == 'system' %}<link rel="stylesheet" href="{{ url_for('static', filename='sg-system-memory-legend-divider-remove-v1.css') }}?v={{ app_version }}">{% endif %}
+  {% if active_page|default('') == 'system' %}<link rel="stylesheet" href="{{ url_for('static', filename='sg-system-light-theme-v3.css') }}?v={{ app_version }}">{% endif %}
+  {% if active_page|default('') == 'system' %}<link rel="stylesheet" href="{{ url_for('static', filename='sg-system-simple-dials-v1.css') }}?v={{ app_version }}">{% endif %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='sg-mobile-sidebar-v1.css') }}?v={{ app_version }}-mobile-v1">
+  {% if active_page|default('') == 'clients' %}
+  <!-- SG_DEVICE_COLLAPSE_V4_LAST_CSS -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='sg-device-collapse-v4.css') }}?v={{ app_version }}-devices-collapse-v4">
+  {% endif %}
+  {% if active_page|default('') == 'clients' %}
+  <!-- SG_DEVICE_EXPANDED_CLEANUP_V1_LAST_CSS -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='sg-device-expanded-cleanup-v1.css') }}?v={{ app_version }}-device-expanded-cleanup-v1">
+  {% endif %}
+</head>
+<body class="sg-body page-{{ active_page|default('system') }}">
+  <div class="sg-shell" id="sg-shell">
+    <aside class="sg-sidebar" aria-label="Главное меню">
+      <header class="sg-brand">
+        <div class="sg-brand-mark" aria-hidden="true"><span>SG</span></div>
+        <div class="sg-brand-copy">
+          <div class="sg-brand-name">SG-Gateway</div>
+          <div class="sg-brand-note">SG-Gateway · {{ server_identity.address }}</div>
+        </div>
+      </header>
+
+      <nav class="sg-nav" aria-label="Основные разделы">
+        <a class="sg-nav-item {{ 'active' if active_page == 'system' else '' }}" href="/">
+          <span class="sg-nav-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></svg>
+          </span>
+          <span class="sg-nav-copy"><strong>System</strong><small>Ресурсы и состояние</small></span>
+        </a>
+
+        <a class="sg-nav-item {{ 'active' if active_page == 'clients' else '' }}" href="/clients">
+          <span class="sg-nav-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M16 20v-1.7c0-2-1.8-3.6-4-3.6s-4 1.6-4 3.6V20M12 11.3a3.7 3.7 0 1 0 0-7.3 3.7 3.7 0 0 0 0 7.3ZM19 8v6M22 11h-6"/></svg>
+          </span>
+          <span class="sg-nav-copy"><strong>Clients</strong><small>Пользователи и доступы</small></span>
+        </a>
+
+        <a class="sg-nav-item {{ 'active' if active_page == 'connections' else '' }}" href="/connections">
+          <span class="sg-nav-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M7 7h10v4H7zM5 17h14v3H5zM9 11v6M15 11v6M12 3v4"/></svg>
+          </span>
+          <span class="sg-nav-copy"><strong>Connections</strong><small>AWG · Xray · Mihomo</small></span>
+        </a>
+
+        <a class="sg-nav-item {{ 'active' if active_page == 'outbounds' else '' }}" href="{{ url_for('outbounds') }}">
+          <span class="sg-nav-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M4 6h10M10 3l4 3-4 3M20 18H10M14 15l-4 3 4 3M7 12h10"/></svg>
+          </span>
+          <span class="sg-nav-copy"><strong>Outbounds</strong><small>Direct · WARP · Block</small></span>
+        </a>
+
+        <a class="sg-nav-item {{ 'active' if active_page == 'routing' else '' }}" href="/routing">
+          <span class="sg-nav-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M6 4a2 2 0 1 0 0 4 2 2 0 0 0 0-4ZM18 16a2 2 0 1 0 0 4 2 2 0 0 0 0-4ZM18 4a2 2 0 1 0 0 4 2 2 0 0 0 0-4ZM8 6h4a6 6 0 0 1 6 6v4M8 6v12h8"/></svg>
+          </span>
+          <span class="sg-nav-copy"><strong>Routing</strong><small>Правила и GeoFiles</small></span>
+        </a>
+
+        <a class="sg-nav-item {{ 'active' if active_page == 'maintenance' else '' }}" href="/maintenance">
+          <span class="sg-nav-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M5 6c0-1.1 3.1-2 7-2s7 .9 7 2-3.1 2-7 2-7-.9-7-2Zm0 0v6c0 1.1 3.1 2 7 2s7-.9 7-2V6M5 12v6c0 1.1 3.1 2 7 2s7-.9 7-2v-6"/></svg>
+          </span>
+          <span class="sg-nav-copy"><strong>Maintenance</strong><small>Копии, журналы, обновления</small></span>
+        </a>
+
+        <a class="sg-nav-item {{ 'active' if active_page == 'security' else '' }}" href="/security">
+          <span class="sg-nav-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M12 3 5 6v5c0 4.8 2.9 8.1 7 10 4.1-1.9 7-5.2 7-10V6l-7-3Zm0 5v5M12 17h.01"/></svg>
+          </span>
+          <span class="sg-nav-copy"><strong>Security</strong><small>Доступ и защита</small></span>
+        </a>
+
+        <a class="sg-nav-item {{ 'active' if active_page == 'help' else '' }}" href="/help">
+          <span class="sg-nav-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Zm-2.3-13a2.5 2.5 0 1 1 3.7 2.2c-.9.5-1.4 1.1-1.4 2.3M12 17h.01"/></svg>
+          </span>
+          <span class="sg-nav-copy"><strong>Help</strong><small>Профили и настройки</small></span>
+        </a>
+      </nav>
+
+      <div class="sg-sidebar-spacer"></div>
+
+      <section class="sg-server-card sg-ljd-card" aria-label="Текущий сервер">
+        <div class="sg-server-eyebrow">
+          <span class="sg-live-dot"></span>
+          <span>СОБСТВЕННЫЙ СЕРВЕР</span>
+        </div>
+        <div class="sg-server-main">
+          <img class="sg-flag" src="{{ country_flag_url(server_identity.country_code) }}"
+               alt="{{ server_identity.country_name }}" width="26" height="18">
+          <div class="sg-server-copy">
+            <div class="sg-server-name">{{ server_identity.name }}</div>
+            <div class="sg-server-version">v{{ app_version }}</div>
+          </div>
+        </div>
+        <div class="sg-server-meta">
+          <span>SG-Gateway Core</span>
+          <span>{{ server_identity.address }}</span>
+        </div>
+      </section>
+
+      <button class="sg-sidebar-action" id="sg-sidebar-toggle" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+        <span>Свернуть меню</span>
+      </button>
+
+      {% if is_authenticated %}
+      <form class="sg-logout-form" method="post" action="/logout">
+        <button class="sg-sidebar-action" type="submit">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 17l5-5-5-5M15 12H3M14 4h5a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-5"/></svg>
+          <span>Выйти</span>
+        </button>
+      </form>
+      {% endif %}
+    </aside>
+
+    <section class="sg-workspace">
+      <header class="sg-global-topbar">
+        <div class="sg-topbar-spacer"></div>
+
+        <div class="sg-current-server sg-ljd-card">
+          <div class="sg-current-label">ТЕКУЩИЙ СЕРВЕР</div>
+          <div class="sg-current-value">
+            <img class="sg-flag" src="{{ country_flag_url(server_identity.country_code) }}"
+                 alt="{{ server_identity.country_name }}" width="24" height="16">
+            <strong>{{ server_identity.name }}</strong>
+            <span>{{ server_identity.address }}</span>
+          </div>
+        </div>
+
+        <div class="sg-version-label">v{{ app_version }}</div>
+
+        <div class="sg-health-pill {{ 'ok' if panel_health == 'ok' else 'warning' }}">
+          <span class="sg-health-dot"></span>
+          <span>{{ 'СИСТЕМА В НОРМЕ' if panel_health == 'ok' else 'ТРЕБУЕТ ВНИМАНИЯ' }}</span>
+        </div>
+
+        <button class="sg-icon-button" id="sg-theme-toggle" type="button"
+                aria-label="Переключить тему" title="Переключить тему">
+          <svg class="sg-theme-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 15.3A8.5 8.5 0 0 1 8.7 4a8.5 8.5 0 1 0 11.3 11.3Z"/></svg>
+          <svg class="sg-theme-sun" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3V1M12 23v-2M4.2 4.2 2.8 2.8M21.2 21.2l-1.4-1.4M3 12H1M23 12h-2M4.2 19.8l-1.4 1.4M21.2 2.8l-1.4 1.4M12 17a5 5 0 1 0 0-10 5 5 0 0 0 0 10Z"/></svg>
+        </button>
+
+        <a class="sg-icon-button" href="/help" aria-label="Справка" title="Справка">
+          <span class="sg-question">?</span>
+        </a>
+
+        <details class="sg-user-menu">
+          <summary>admin
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg>
+          </summary>
+          <div class="sg-user-popover sg-ljd-raised">
+            <div class="sg-user-title">Администратор</div>
+            <a href="/security">Security</a>
+            {% if is_authenticated %}
+            <form method="post" action="/logout">
+              <button class="button" type="submit">Выйти</button>
+            </form>
+            {% endif %}
+          </div>
+        </details>
+      </header>
+
+      <main class="content sg-content">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+          <section class="flash-stack" aria-live="polite">
+            {% for category, message in messages %}
+              <div class="flash-message {{ category }}">{{ message }}</div>
+            {% endfor %}
+          </section>
+          {% endif %}
+        {% endwith %}
+        {% block content %}{% endblock %}
+      </main>
+    </section>
+  </div>
+
+
+  <div class="sg-confirm-layer" id="sg-confirm-layer" hidden aria-hidden="true">
+    <section class="sg-confirm-card" id="sg-confirm-card" role="alertdialog" aria-modal="true" aria-labelledby="sg-confirm-title" aria-describedby="sg-confirm-message" data-tone="warning">
+      <header class="sg-confirm-head">
+        <div>
+          <div class="sg-confirm-kicker" id="sg-confirm-kicker">Подтверждение действия</div>
+          <h2 class="sg-confirm-title" id="sg-confirm-title">Подтвердите действие</h2>
+        </div>
+        <button class="sg-confirm-close" id="sg-confirm-close" type="button" aria-label="Закрыть">×</button>
+      </header>
+      <p class="sg-confirm-message" id="sg-confirm-message"></p>
+      <footer class="sg-confirm-actions">
+        <button class="button" id="sg-confirm-cancel" type="button">Отмена</button>
+        <button class="button primary sg-confirm-accept" id="sg-confirm-accept" type="button">Продолжить</button>
+      </footer>
+    </section>
+  </div>
+
+  <script>
+  (() => {
+    const html = document.documentElement;
+    const shell = document.getElementById("sg-shell");
+    const themeButton = document.getElementById("sg-theme-toggle");
+    const sidebarButton = document.getElementById("sg-sidebar-toggle");
+
+    const savedTheme = localStorage.getItem("sg-gateway-theme");
+    if (savedTheme === "light" || savedTheme === "dark") {
+      html.dataset.theme = savedTheme;
+    }
+
+    if (localStorage.getItem("sg-gateway-sidebar") === "collapsed") {
+      shell.classList.add("sidebar-collapsed");
+    }
+
+    themeButton?.addEventListener("click", () => {
+      const next = html.dataset.theme === "light" ? "dark" : "light";
+      html.dataset.theme = next;
+      localStorage.setItem("sg-gateway-theme", next);
+    });
+
+    sidebarButton?.addEventListener("click", () => {
+      shell.classList.toggle("sidebar-collapsed");
+      localStorage.setItem(
+        "sg-gateway-sidebar",
+        shell.classList.contains("sidebar-collapsed") ? "collapsed" : "expanded"
+      );
+    });
+  })();
+  </script>
+  <script id="sg-theme-target-fix2">
+  (() => {
+    const html = document.documentElement;
+    const button = document.getElementById("sg-theme-toggle");
+    if (!button) return;
+
+    const syncThemeTarget = () => {
+      const target = html.dataset.theme === "light" ? "dark" : "light";
+      const label = target === "dark"
+        ? "Включить тёмную тему"
+        : "Включить светлую тему";
+      button.setAttribute("aria-label", label);
+      button.setAttribute("title", label);
+      button.dataset.targetTheme = target;
+    };
+
+    syncThemeTarget();
+
+    new MutationObserver(syncThemeTarget).observe(html, {
+      attributes: true,
+      attributeFilter: ["data-theme"]
+    });
+  })();
+  </script>
+
+  <script id="sg-internal-confirmations-v1">
+  (() => {
+    const layer = document.getElementById("sg-confirm-layer");
+    const card = document.getElementById("sg-confirm-card");
+    const title = document.getElementById("sg-confirm-title");
+    const kicker = document.getElementById("sg-confirm-kicker");
+    const message = document.getElementById("sg-confirm-message");
+    const accept = document.getElementById("sg-confirm-accept");
+    const cancel = document.getElementById("sg-confirm-cancel");
+    const close = document.getElementById("sg-confirm-close");
+    if (!layer || !card || !title || !kicker || !message || !accept || !cancel || !close) return;
+
+    let pendingAction = null;
+    let returnFocus = null;
+
+    const closeModal = () => {
+      layer.hidden = true;
+      layer.setAttribute("aria-hidden", "true");
+      document.body.classList.remove("sg-confirm-open");
+      pendingAction = null;
+      const target = returnFocus;
+      returnFocus = null;
+      if (target && typeof target.focus === "function") target.focus();
+    };
+
+    const openModal = (source, action) => {
+      returnFocus = document.activeElement;
+      pendingAction = action;
+      const tone = source.dataset.sgConfirmTone || "warning";
+      card.dataset.tone = tone;
+      title.textContent = source.dataset.sgConfirmTitle || (tone === "danger" ? "Подтвердите опасное действие" : "Подтвердите действие");
+      kicker.textContent = source.dataset.sgConfirmKicker || (tone === "danger" ? "Требуется подтверждение" : "Подтверждение действия");
+      message.textContent = source.dataset.sgConfirm || "Продолжить выполнение действия?";
+      accept.textContent = source.dataset.sgConfirmButton || (tone === "danger" ? "Подтвердить" : "Продолжить");
+      layer.hidden = false;
+      layer.setAttribute("aria-hidden", "false");
+      document.body.classList.add("sg-confirm-open");
+      window.requestAnimationFrame(() => accept.focus());
+    };
+
+    cancel.addEventListener("click", closeModal);
+    close.addEventListener("click", closeModal);
+    layer.addEventListener("click", (event) => {
+      if (event.target === layer) closeModal();
+    });
+    document.addEventListener("keydown", (event) => {
+      if (layer.hidden) return;
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeModal();
+        return;
+      }
+      if (event.key === "Tab") {
+        const controls = [close, cancel, accept].filter(item => !item.disabled);
+        const index = controls.indexOf(document.activeElement);
+        if (event.shiftKey && index <= 0) {
+          event.preventDefault();
+          controls[controls.length - 1].focus();
+        } else if (!event.shiftKey && index === controls.length - 1) {
+          event.preventDefault();
+          controls[0].focus();
+        }
+      }
+    });
+    accept.addEventListener("click", () => {
+      const action = pendingAction;
+      layer.hidden = true;
+      layer.setAttribute("aria-hidden", "true");
+      document.body.classList.remove("sg-confirm-open");
+      pendingAction = null;
+      returnFocus = null;
+      if (typeof action === "function") action();
+    });
+
+    document.addEventListener("submit", (event) => {
+      const form = event.target;
+      if (!(form instanceof HTMLFormElement) || !form.dataset.sgConfirm) return;
+      if (form.dataset.sgConfirmBypass === "1") {
+        delete form.dataset.sgConfirmBypass;
+        return;
+      }
+      event.preventDefault();
+      const submitter = event.submitter instanceof HTMLElement ? event.submitter : null;
+      openModal(form, () => {
+        form.dataset.sgConfirmBypass = "1";
+        if (typeof form.requestSubmit === "function") {
+          if (submitter instanceof HTMLButtonElement || submitter instanceof HTMLInputElement) form.requestSubmit(submitter);
+          else form.requestSubmit();
+        } else {
+          form.submit();
+        }
+      });
+    }, true);
+
+    document.addEventListener("click", (event) => {
+      const source = event.target instanceof Element ? event.target.closest("[data-sg-confirm]") : null;
+      if (!source || source instanceof HTMLFormElement) return;
+      const form = source.closest("form");
+      const isSubmitControl = form && (source instanceof HTMLButtonElement || source instanceof HTMLInputElement) && (source.type || "submit") === "submit";
+      const link = source instanceof HTMLAnchorElement ? source : null;
+      if (!isSubmitControl && !link) return;
+      event.preventDefault();
+      openModal(source, () => {
+        if (isSubmitControl) {
+          if (typeof form.requestSubmit === "function") form.requestSubmit(source);
+          else form.submit();
+        } else if (link?.href) {
+          window.location.assign(link.href);
+        }
+      });
+    }, true);
+  })();
+  </script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

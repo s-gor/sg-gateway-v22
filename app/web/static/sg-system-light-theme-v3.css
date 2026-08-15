@@ -1,0 +1,161 @@
+/* SG-Gateway 021.7 - System Light Theme Fix 3
+   FINAL 021.7 System only. Graphite/Dark are intentionally untouched. */
+
+html[data-theme="light"] body.page-system {
+  --sg-system-light-ivory: #F8F5EE;
+  --sg-system-light-ivory-high: #FBFAF6;
+  --sg-system-light-soft: #F1EADE;
+  --sg-system-light-soft-2: #E7DED1;
+  --sg-system-light-border: #89968A;
+  --sg-system-light-border-soft: rgba(104,120,108,.35);
+  --sg-system-light-text: #29312C;
+  --sg-system-light-muted: #66716A;
+  --sg-system-light-jade: #456F5C;
+  --sg-system-light-jade-deep: #356B56;
+  --sg-system-light-gold: #B88A45;
+  --sg-system-light-shadow: 0 4px 18px rgba(43,52,46,.14);
+  --sg-system-light-button-shadow:
+    inset 0 1px 0 rgba(255,255,255,.65),
+    inset 1px 0 0 rgba(255,255,255,.45),
+    inset -1px 0 0 rgba(255,255,255,.45),
+    0 3px 12px rgba(43,52,46,.15);
+}
+
+/* RAM / Disk / CPU: all three refresh buttons must use the same light material. */
+html[data-theme="light"] body.page-system .sg-resource-refresh-slot > button,
+html[data-theme="light"] body.page-system [data-sg-memory-refresh],
+html[data-theme="light"] body.page-system [data-sg-disk-refresh],
+html[data-theme="light"] body.page-system [data-sg-cpu-refresh] {
+  border-color: var(--sg-system-light-border) !important;
+  background: linear-gradient(180deg,#F8F0E4 0%,#E8D9C3 100%) !important;
+  color: var(--sg-system-light-text) !important;
+  border-radius: 10px !important;
+  box-shadow: var(--sg-system-light-button-shadow) !important;
+  opacity: 1 !important;
+}
+html[data-theme="light"] body.page-system .sg-resource-refresh-slot > button:hover,
+html[data-theme="light"] body.page-system [data-sg-memory-refresh]:hover,
+html[data-theme="light"] body.page-system [data-sg-disk-refresh]:hover,
+html[data-theme="light"] body.page-system [data-sg-cpu-refresh]:hover {
+  border-color: #68786C !important;
+  background: linear-gradient(180deg,#FFFDFC 0%,#EFE5D5 100%) !important;
+  color: var(--sg-system-light-jade-deep) !important;
+}
+html[data-theme="light"] body.page-system .sg-resource-refresh-slot > button:disabled,
+html[data-theme="light"] body.page-system [data-sg-memory-refresh]:disabled,
+html[data-theme="light"] body.page-system [data-sg-disk-refresh]:disabled,
+html[data-theme="light"] body.page-system [data-sg-cpu-refresh]:disabled {
+  background: linear-gradient(180deg,#F6F0E6 0%,#E7DCCB 100%) !important;
+  color: var(--sg-system-light-muted) !important;
+  opacity: .78 !important;
+}
+
+/* CPU FIX3 had a hard-coded dark centre. Keep the accepted dial geometry, only light the material. */
+html[data-theme="light"] body.page-system [data-sg-cpu-card="1"] .sv1-cpu-dial::before {
+  background: linear-gradient(180deg,#FBF8F1 0%,#ECE7DC 100%) !important;
+  box-shadow:
+    inset 0 0 0 1px rgba(70,103,87,.16),
+    0 1px 3px rgba(43,52,46,.06) !important;
+}
+html[data-theme="light"] body.page-system [data-sg-cpu-card="1"] .sv1-cpu-dial-center strong,
+html[data-theme="light"] body.page-system [data-sg-cpu-card="1"] .sv1-cpu-hero-stat strong,
+html[data-theme="light"] body.page-system [data-sg-cpu-card="1"] .sv1-cpu-hero-load strong,
+html[data-theme="light"] body.page-system [data-sg-cpu-card="1"] .sv1-cpu-runtime-title {
+  color: var(--sg-system-light-text) !important;
+}
+html[data-theme="light"] body.page-system [data-sg-cpu-card="1"] .sv1-cpu-dial-center span,
+html[data-theme="light"] body.page-system [data-sg-cpu-card="1"] .sv1-cpu-hero-stat span,
+html[data-theme="light"] body.page-system [data-sg-cpu-card="1"] .sv1-cpu-hero-load span {
+  color: var(--sg-system-light-muted) !important;
+}
+html[data-theme="light"] body.page-system [data-sg-cpu-card="1"] .sv1-cpu-hero-load,
+html[data-theme="light"] body.page-system [data-sg-cpu-card="1"] .sv1-cpu-runtime-footer {
+  border-color: var(--sg-system-light-border-soft) !important;
+}
+
+/* Current Traffic & Activity uses sa2-*; old light overrides were for obsolete na1-* classes. */
+html[data-theme="light"] body.page-system .sa2-stat {
+  border-color: var(--sg-system-light-border) !important;
+  background: linear-gradient(180deg,#FBFAF6 0%,#F1EADE 100%) !important;
+  color: var(--sg-system-light-text) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.72),
+    0 3px 12px rgba(43,52,46,.10) !important;
+}
+html[data-theme="light"] body.page-system .sa2-stat > span,
+html[data-theme="light"] body.page-system .sa2-stat > small,
+html[data-theme="light"] body.page-system .sa2-chart-head span,
+html[data-theme="light"] body.page-system .sa2-chart-head small,
+html[data-theme="light"] body.page-system .sa2-axis,
+html[data-theme="light"] body.page-system .sa2-foot {
+  color: var(--sg-system-light-muted) !important;
+}
+html[data-theme="light"] body.page-system .sa2-stat > strong,
+html[data-theme="light"] body.page-system .sa2-chart-head strong,
+html[data-theme="light"] body.page-system .sa2-foot b {
+  color: var(--sg-system-light-text) !important;
+}
+html[data-theme="light"] body.page-system .sa2-stat.blue > strong { color:#3D7096 !important; }
+html[data-theme="light"] body.page-system .sa2-stat.green > strong { color:#356B56 !important; }
+html[data-theme="light"] body.page-system .sa2-stat.violet > strong { color:#806BC4 !important; }
+html[data-theme="light"] body.page-system .sa2-stat.gold > strong { color:#B88A45 !important; }
+
+html[data-theme="light"] body.page-system .sa2-chart {
+  border-color: var(--sg-system-light-border) !important;
+  background: linear-gradient(180deg,#FEFCF7 0%,#F2ECE1 100%) !important;
+  color: var(--sg-system-light-text) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.75),
+    0 3px 12px rgba(43,52,46,.08) !important;
+}
+html[data-theme="light"] body.page-system .sa2-axis {
+  border-top-color: var(--sg-system-light-border-soft) !important;
+}
+html[data-theme="light"] body.page-system .sa2-bars > span {
+  background: linear-gradient(180deg,#456F5C 0%,#4BC58A 100%) !important;
+  box-shadow: 0 1px 2px rgba(43,52,46,.12);
+}
+html[data-theme="light"] body.page-system .sa2-bars > span::after {
+  border-color: var(--sg-system-light-border) !important;
+  background: var(--sg-system-light-ivory-high) !important;
+  color: var(--sg-system-light-text) !important;
+  box-shadow: 0 8px 20px rgba(43,52,46,.16) !important;
+}
+html[data-theme="light"] body.page-system .sa2-live {
+  border-color: rgba(53,107,86,.34) !important;
+  background: rgba(115,158,136,.13) !important;
+  color: var(--sg-system-light-jade-deep) !important;
+}
+
+/* Health Checks: preserve layout/status logic, remove any grey-dark residue in light mode. */
+html[data-theme="light"] body.page-system .sv1-health-panel .sv1-check-list {
+  border-color: var(--sg-system-light-border) !important;
+  background: #DDDAD2 !important;
+}
+html[data-theme="light"] body.page-system .sv1-health-panel .sv1-check-row {
+  background: linear-gradient(180deg,#FFFDF8 0%,#F3ECE1 100%) !important;
+  color: var(--sg-system-light-text) !important;
+}
+html[data-theme="light"] body.page-system .sv1-health-panel .sv1-check-row strong {
+  color: var(--sg-system-light-text) !important;
+}
+html[data-theme="light"] body.page-system .sv1-health-panel .sv1-check-row small {
+  color: var(--sg-system-light-muted) !important;
+}
+
+/* Resource/runtime nested rows should remain warm-light instead of inheriting dark FIX backgrounds. */
+html[data-theme="light"] body.page-system .sv1-runtime-list,
+html[data-theme="light"] body.page-system .sv1-cpu-runtime-footer .sv1-runtime-list {
+  border-color: var(--sg-system-light-border) !important;
+  background: #DDDAD2 !important;
+}
+html[data-theme="light"] body.page-system .sv1-runtime-list > div {
+  background: linear-gradient(180deg,#FFFDF8 0%,#F3ECE1 100%) !important;
+  color: var(--sg-system-light-text) !important;
+}
+html[data-theme="light"] body.page-system .sv1-runtime-list span {
+  color: var(--sg-system-light-muted) !important;
+}
+html[data-theme="light"] body.page-system .sv1-runtime-list strong {
+  color: var(--sg-system-light-text) !important;
+}

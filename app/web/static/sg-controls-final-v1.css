@@ -1,0 +1,398 @@
+/* SG-Gateway 021 · final control audit
+   One visual contract for every page: buttons, segmented choices and runtime
+   switches. Routing is the accepted reference. Loaded last. */
+
+html[data-theme="dark"] {
+  --sgc-text: #F4F7FA;
+  --sgc-muted: #8A9AAF;
+  --sgc-line: #34506B;
+  --sgc-line-soft: #24364B;
+  --sgc-secondary: linear-gradient(180deg, #18283B 0%, #111D2B 100%);
+  --sgc-secondary-hover: linear-gradient(180deg, #20344C 0%, #16263A 100%);
+  --sgc-primary: linear-gradient(180deg, #477AAA 0%, #315E8C 100%);
+  --sgc-primary-hover: linear-gradient(180deg, #5288BB 0%, #37699B 100%);
+  --sgc-primary-line: #4E82B1;
+  --sgc-danger: linear-gradient(180deg, #A75761 0%, #7E3B45 100%);
+  --sgc-danger-line: #B86972;
+  --sgc-shadow: 0 8px 18px rgba(0, 0, 0, .22);
+  --sgc-focus: #7FB2E0;
+  --sgc-track: #18263A;
+}
+
+html[data-theme="light"] {
+  --sgc-text: #29312C;
+  --sgc-muted: #66716A;
+  --sgc-line: #89968A;
+  --sgc-line-soft: #B5BDB6;
+  --sgc-secondary: linear-gradient(180deg, #FAF7F0 0%, #ECE2D3 100%);
+  --sgc-secondary-hover: linear-gradient(180deg, #FFFFFF 0%, #F2E9DC 100%);
+  --sgc-primary: linear-gradient(180deg, #6F9A84 0%, #527D69 100%);
+  --sgc-primary-hover: linear-gradient(180deg, #7AA78F 0%, #5B8973 100%);
+  --sgc-primary-line: #5C846F;
+  --sgc-danger: linear-gradient(180deg, #B86B72 0%, #96525A 100%);
+  --sgc-danger-line: #A65D65;
+  --sgc-shadow: 0 10px 22px rgba(69, 111, 92, .18), 0 2px 5px rgba(43, 52, 46, .12);
+  --sgc-focus: #93672E;
+  --sgc-track: #D8DDD8;
+}
+
+/* All ordinary action buttons on every page. */
+.sg-body :is(
+  a.button,
+  button.button,
+  summary.button,
+  .sg-button,
+  .r096-header-button,
+  .r096-primary-button,
+  .r096-secondary-button,
+  .r096-danger-button,
+  .ob49-primary,
+  .ob49-secondary,
+  .ob49-danger,
+  .sv1-action-button,
+  .ts2-template-card button,
+  .sg-user-popover button
+) {
+  appearance: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  min-height: 40px !important;
+  border: 1px solid var(--sgc-line) !important;
+  border-radius: 10px !important;
+  padding: 8px 15px !important;
+  background: var(--sgc-secondary) !important;
+  color: var(--sgc-text) !important;
+  box-shadow: 0 2px 5px rgba(43, 52, 46, .10) !important;
+  font: inherit !important;
+  font-size: 12px !important;
+  font-weight: 750 !important;
+  line-height: 1.15 !important;
+  letter-spacing: 0 !important;
+  text-align: center !important;
+  text-decoration: none !important;
+  white-space: nowrap !important;
+  cursor: pointer !important;
+  transition: background .16s ease, border-color .16s ease,
+              box-shadow .16s ease, filter .16s ease, transform .12s ease !important;
+}
+
+.sg-body :is(
+  a.button,
+  button.button,
+  summary.button,
+  .sg-button,
+  .r096-header-button,
+  .r096-secondary-button,
+  .ob49-secondary,
+  .sv1-action-button,
+  .ts2-template-card button,
+  .sg-user-popover button
+):hover:not(:disabled) {
+  border-color: var(--sgc-line) !important;
+  background: var(--sgc-secondary-hover) !important;
+  color: var(--sgc-text) !important;
+  filter: brightness(1.02) !important;
+}
+
+/* One primary action language: jade in light, blue in dark. */
+.sg-body :is(
+  .button.primary,
+  .sg-button.primary,
+  .sg-ljd-key-action,
+  .r096-primary-button,
+  .ob49-primary,
+  .cv2-open-button,
+  .cv2-button-main
+) {
+  border-color: var(--sgc-primary-line) !important;
+  background: var(--sgc-primary) !important;
+  color: #FFFFFF !important;
+  box-shadow: var(--sgc-shadow) !important;
+}
+
+.sg-body :is(
+  .button.primary,
+  .sg-button.primary,
+  .sg-ljd-key-action,
+  .r096-primary-button,
+  .ob49-primary,
+  .cv2-open-button,
+  .cv2-button-main
+):hover:not(:disabled) {
+  border-color: var(--sgc-primary-line) !important;
+  background: var(--sgc-primary-hover) !important;
+  color: #FFFFFF !important;
+  filter: none !important;
+}
+
+.sg-body :is(.button.danger, .r096-danger-button, .ob49-danger) {
+  border-color: var(--sgc-danger-line) !important;
+  background: var(--sgc-danger) !important;
+  color: #FFFFFF !important;
+  box-shadow: var(--sgc-shadow) !important;
+}
+
+.sg-body :is(.button.danger, .r096-danger-button, .ob49-danger):hover:not(:disabled) {
+  color: #FFFFFF !important;
+  filter: brightness(1.06) !important;
+}
+
+.sg-body :is(
+  a.button,
+  button.button,
+  summary.button,
+  .sg-button,
+  .r096-header-button,
+  .r096-primary-button,
+  .r096-secondary-button,
+  .r096-danger-button,
+  .ob49-primary,
+  .ob49-secondary,
+  .ob49-danger,
+  .sv1-action-button,
+  .ts2-template-card button,
+  .sg-user-popover button
+):active:not(:disabled) {
+  transform: translateY(1px) !important;
+  filter: brightness(.97) !important;
+}
+
+.sg-body :is(
+  a.button,
+  button.button,
+  summary.button,
+  .sg-button,
+  .r096-header-button,
+  .r096-primary-button,
+  .r096-secondary-button,
+  .r096-danger-button,
+  .ob49-primary,
+  .ob49-secondary,
+  .ob49-danger,
+  .sv1-action-button,
+  .ts2-template-card button,
+  .sg-user-popover button
+):focus-visible {
+  outline: 2px solid var(--sgc-focus) !important;
+  outline-offset: 2px !important;
+}
+
+.sg-body :is(
+  button.button,
+  .sg-button,
+  .r096-primary-button,
+  .r096-secondary-button,
+  .r096-danger-button,
+  .ob49-primary,
+  .ob49-secondary,
+  .ob49-danger,
+  .sv1-action-button,
+  .ts2-template-card button
+):disabled {
+  cursor: not-allowed !important;
+  opacity: .48 !important;
+  box-shadow: none !important;
+  transform: none !important;
+  filter: none !important;
+}
+
+/* Compact table/copy controls remain visibly related to full-size buttons. */
+.sg-body :is(
+  .button.small,
+  .cv2-open-button,
+  .cv2-filter-buttons .button,
+  .dv16-technical-actions .button,
+  .dv16-subscription-actions .button,
+  .mtv1-backup-actions .button,
+  .rtux1-copy,
+  .gfv1-hash-copy
+) {
+  min-height: 38px !important;
+  border-radius: 10px !important;
+  padding: 7px 13px !important;
+  font-size: 11px !important;
+}
+
+/* Routing tabs and all segmented radio groups use the same button language. */
+.sg-body :is(.r096-tabs, .r096-rule-tabs) button,
+.sg-body .r096-segments label > span,
+.sg-body .r096-choice-card > span {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 40px !important;
+  border: 1px solid var(--sgc-line) !important;
+  border-radius: 10px !important;
+  padding: 8px 14px !important;
+  background: var(--sgc-secondary) !important;
+  color: var(--sgc-muted) !important;
+  box-shadow: 0 2px 5px rgba(43, 52, 46, .10) !important;
+  font-size: 12px !important;
+  font-weight: 750 !important;
+  line-height: 1.15 !important;
+  cursor: pointer !important;
+  transition: background .16s ease, border-color .16s ease,
+              box-shadow .16s ease, color .16s ease !important;
+}
+
+.sg-body :is(.r096-tabs, .r096-rule-tabs) button:hover,
+.sg-body .r096-segments label:hover > span,
+.sg-body .r096-choice-card:hover > span {
+  border-color: var(--sgc-line) !important;
+  background: var(--sgc-secondary-hover) !important;
+  color: var(--sgc-text) !important;
+}
+
+.sg-body :is(.r096-tabs, .r096-rule-tabs) button.active,
+.sg-body .r096-segments input:checked + span,
+.sg-body .r096-choice-card input:checked + span {
+  border-color: var(--sgc-primary-line) !important;
+  background: var(--sgc-primary) !important;
+  color: #FFFFFF !important;
+  box-shadow: var(--sgc-shadow) !important;
+}
+
+.sg-body .r096-segments label.disabled > span,
+.sg-body .r096-choice-card.disabled > span,
+.sg-body .r096-segments input:disabled + span,
+.sg-body .r096-choice-card input:disabled + span {
+  cursor: not-allowed !important;
+  opacity: .45 !important;
+  box-shadow: none !important;
+}
+
+/* Real runtime switches for Mieru / AnyTLS / TUIC. */
+.sg-runtime-switch {
+  display: grid !important;
+  grid-template-columns: 42px minmax(88px, auto) !important;
+  align-items: center !important;
+  gap: 9px !important;
+  min-width: 148px;
+  cursor: pointer;
+}
+
+.sg-runtime-switch input {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+.sg-runtime-track {
+  position: relative !important;
+  width: 42px !important;
+  height: 24px !important;
+  border: 1px solid var(--sgc-line) !important;
+  border-radius: 999px !important;
+  background: var(--sgc-track) !important;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, .12) !important;
+  transition: background .16s ease, border-color .16s ease !important;
+}
+
+.sg-runtime-track i {
+  position: absolute !important;
+  top: 3px !important;
+  left: 3px !important;
+  width: 16px !important;
+  height: 16px !important;
+  border-radius: 50% !important;
+  background: var(--sgc-muted) !important;
+  transition: left .16s ease, background .16s ease !important;
+}
+
+.sg-runtime-switch input:checked + .sg-runtime-track {
+  border-color: var(--sgc-primary-line) !important;
+  background: color-mix(in srgb, var(--sgc-primary-line) 28%, var(--sgc-track)) !important;
+}
+
+.sg-runtime-switch input:checked + .sg-runtime-track i {
+  left: 21px !important;
+  background: var(--sgc-primary-line) !important;
+}
+
+.sg-runtime-switch input:focus-visible + .sg-runtime-track {
+  outline: 2px solid var(--sgc-focus) !important;
+  outline-offset: 2px !important;
+}
+
+.sg-runtime-switch input:disabled + .sg-runtime-track,
+.sg-runtime-switch input:disabled ~ .sg-runtime-copy {
+  cursor: not-allowed !important;
+  opacity: .48 !important;
+}
+
+.sg-runtime-copy {
+  display: grid !important;
+  gap: 2px !important;
+  min-width: 0 !important;
+}
+
+.sg-runtime-copy strong {
+  color: var(--sgc-text) !important;
+  font-size: 12px !important;
+  font-weight: 800 !important;
+  line-height: 1.15 !important;
+  white-space: nowrap !important;
+}
+
+.sg-runtime-copy small {
+  color: var(--sgc-muted) !important;
+  font-size: 9.5px !important;
+  line-height: 1.25 !important;
+}
+
+.sg-runtime-switch.state-active .sg-runtime-copy strong { color: var(--sgpf-accent, #456F5C) !important; }
+.sg-runtime-switch.state-pending .sg-runtime-copy strong { color: #93672E !important; }
+.sg-runtime-switch.state-error .sg-runtime-copy strong { color: #A64E58 !important; }
+
+.mhv2-pending {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+  padding: 10px 12px !important;
+  border-radius: 10px !important;
+}
+
+.mhv2-pending strong { font-size: 12px !important; }
+.mhv2-pending span { color: var(--sgc-muted) !important; font-size: 11px !important; }
+
+.mhv2-runtime-note {
+  margin: 0 18px 16px !important;
+  color: var(--sgc-muted) !important;
+  font-size: 11px !important;
+  line-height: 1.5 !important;
+}
+
+/* Close controls are deliberately icon buttons, not ordinary actions. */
+.sg-body :is(.cv2-dialog-close, .dv16-dialog-close, .sg-confirm-close, .dv16-qr-popover > button) {
+  display: inline-grid !important;
+  place-items: center !important;
+  width: 34px !important;
+  height: 34px !important;
+  min-width: 34px !important;
+  min-height: 34px !important;
+  border: 1px solid var(--sgc-line) !important;
+  border-radius: 9px !important;
+  background: var(--sgc-secondary) !important;
+  color: var(--sgc-text) !important;
+  padding: 0 !important;
+  font-size: 20px !important;
+  line-height: 1 !important;
+  cursor: pointer !important;
+}
+
+@media (max-width: 760px) {
+  .sg-runtime-switch {
+    grid-template-columns: 42px minmax(0, 1fr) !important;
+    min-width: 0;
+  }
+
+  .mhv2-pending {
+    align-items: flex-start !important;
+    flex-direction: column !important;
+  }
+}

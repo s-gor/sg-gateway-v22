@@ -1,0 +1,106 @@
+{% set primary_tokens = primary_view.protocol_tokens if primary_view else [] %}
+<dialog class="dv16-dialog" id="dv-edit-client-dialog">
+  <form method="post" action="{{ url_for('edit_client', client_id=client.id) }}" class="dv16-create-form">
+    <header class="dv16-dialog-head">
+      <div>
+        <span>РЕДАКТИРОВАНИЕ КЛИЕНТА</span>
+        <h2>{{ client.name }}</h2>
+        <p>Имя, срок и каналы основного устройства. Неизменённые ключи и ссылки сохраняются.</p>
+      </div>
+      <button class="dv16-dialog-close" type="button" data-close-client-edit aria-label="Закрыть">×</button>
+    </header>
+
+    <label class="dv16-field">
+      <span>Имя клиента</span>
+      <input type="text" name="name" maxlength="80" required value="{{ client.name|e }}" autocomplete="off">
+    </label>
+
+    <input type="hidden" name="protocols" value="sgclient">
+    <fieldset class="dv16-protocol-list">
+      <legend>Каналы основного устройства</legend>
+      {% for profile in xray_profiles.profiles %}
+      {% set token = 'xray_' ~ profile.id %}
+      {% set selected = token in primary_tokens %}
+      <label class="dv16-protocol {{ 'is-locked' if not profile.ready and not selected else '' }}">
+        <input type="checkbox" name="protocols" value="{{ token }}" {% if selected %}checked{% endif %} {% if not profile.ready and not selected %}disabled{% endif %}>
+        <span><strong>{{ profile.title }}</strong><small>{% if selected %}Подключён — реквизиты сохранятся{% elif profile.ready %}Доступен для добавления{% elif profile.tls_required %}Нужен HTTPS{% else %}Сначала включите профиль в Connections{% endif %}</small></span>
+      </label>
+      {% endfor %}
+      <label class="dv16-protocol"><input type="checkbox" name="protocols" value="mihomo" {% if 'mihomo' in primary_tokens %}checked{% endif %}><span><strong>Mieru</strong><small>Для SG Client; существующие credentials сохраняются</small></span></label>
+      <label class="dv16-protocol"><input type="checkbox" name="protocols" value="amneziawg" {% if 'amneziawg' in primary_tokens %}checked{% endif %}><span><strong>AmneziaWG</strong><small>Полная конфигурация и QR</small></span></label>
+      {% set anytls_selected = 'anytls' in primary_tokens %}
+      <label class="dv16-protocol {{ 'is-locked' if not tls.https_ready and not anytls_selected else '' }}"><input type="checkbox" name="protocols" value="anytls" {% if anytls_selected %}checked{% endif %} {% if not tls.https_ready and not anytls_selected %}disabled{% endif %}><span><strong>AnyTLS</strong><small>{{ 'Подключён — пароль сохранится' if anytls_selected else ('Доступен' if tls.https_ready else 'Нужен HTTPS') }}</small></span></label>
+      {% set tuic_selected = 'tuic' in primary_tokens %}
+      <label class="dv16-protocol {{ 'is-locked' if not tls.https_ready and not tuic_selected else '' }}"><input type="checkbox" name="protocols" value="tuic" {% if tuic_selected %}checked{% endif %} {% if not tls.https_ready and not tuic_selected %}disabled{% endif %}><span><strong>TUIC v5</strong><small>{{ 'Подключён — реквизиты сохранятся' if tuic_selected else ('Доступен' if tls.https_ready else 'Нужен HTTPS') }}</small></span></label>
+    </fieldset>
+
+    <label class="dv16-field">
+      <span>Срок действия клиента</span>
+      <input type="date" name="expires_at" value="{{ client.expires_at or '' }}">
+      <small>Оставьте пустым для бессрочного доступа.</small>
+    </label>
+
+    <footer class="dv16-dialog-actions">
+      <button class="button" type="button" data-close-client-edit>Отмена</button>
+      <button class="button primary" type="submit">Сохранить и применить</button>
+    </footer>
+  </form>
+</dialog>
+
+{% for view in device_views %}
+{% set device = view.device %}
+{% if not device.is_primary %}
+{% set selected_tokens = view.protocol_tokens %}
+<dialog class="dv16-dialog" id="dv-edit-device-{{ device.id }}">
+  <form method="post" action="{{ url_for('edit_device', client_id=client.id, device_id=device.id) }}" class="dv16-create-form">
+    <header class="dv16-dialog-head">
+      <div>
+        <span>РЕДАКТИРОВАНИЕ УСТРОЙСТВА</span>
+        <h2>{{ device.name }}</h2>
+        <p>Неизменённые UUID, пароли, токены и ссылки не перевыпускаются.</p>
+      </div>
+      <button class="dv16-dialog-close" type="button" data-close-device-edit="{{ device.id }}" aria-label="Закрыть">×</button>
+    </header>
+
+    <label class="dv16-field"><span>Название</span><input type="text" name="name" maxlength="60" required value="{{ device.name|e }}" autocomplete="off"></label>
+    <input type="hidden" name="protocols" value="sgclient">
+    <fieldset class="dv16-protocol-list">
+      <legend>Каналы подключения</legend>
+      {% for profile in xray_profiles.profiles %}
+      {% set token = 'xray_' ~ profile.id %}
+      {% set selected = token in selected_tokens %}
+      <label class="dv16-protocol {{ 'is-locked' if not profile.ready and not selected else '' }}"><input type="checkbox" name="protocols" value="{{ token }}" {% if selected %}checked{% endif %} {% if not profile.ready and not selected %}disabled{% endif %}><span><strong>{{ profile.title }}</strong><small>{% if selected %}Подключён — реквизиты сохранятся{% elif profile.ready %}Доступен для добавления{% elif profile.tls_required %}Нужен HTTPS{% else %}Сначала включите профиль{% endif %}</small></span></label>
+      {% endfor %}
+      <label class="dv16-protocol"><input type="checkbox" name="protocols" value="mihomo" {% if 'mihomo' in selected_tokens %}checked{% endif %}><span><strong>Mieru</strong><small>Для SG Client</small></span></label>
+      <label class="dv16-protocol"><input type="checkbox" name="protocols" value="amneziawg" {% if 'amneziawg' in selected_tokens %}checked{% endif %}><span><strong>AmneziaWG</strong><small>Конфигурация и QR</small></span></label>
+      {% set anytls_selected = 'anytls' in selected_tokens %}
+      <label class="dv16-protocol {{ 'is-locked' if not tls.https_ready and not anytls_selected else '' }}"><input type="checkbox" name="protocols" value="anytls" {% if anytls_selected %}checked{% endif %} {% if not tls.https_ready and not anytls_selected %}disabled{% endif %}><span><strong>AnyTLS</strong><small>{{ 'Подключён — пароль сохранится' if anytls_selected else ('Доступен' if tls.https_ready else 'Нужен HTTPS') }}</small></span></label>
+      {% set tuic_selected = 'tuic' in selected_tokens %}
+      <label class="dv16-protocol {{ 'is-locked' if not tls.https_ready and not tuic_selected else '' }}"><input type="checkbox" name="protocols" value="tuic" {% if tuic_selected %}checked{% endif %} {% if not tls.https_ready and not tuic_selected %}disabled{% endif %}><span><strong>TUIC v5</strong><small>{{ 'Подключён — реквизиты сохранятся' if tuic_selected else ('Доступен' if tls.https_ready else 'Нужен HTTPS') }}</small></span></label>
+    </fieldset>
+
+    <label class="dv16-field"><span>Срок действия</span><input type="date" name="expires_at" value="{{ device.expires_at or '' }}"><small>Пустое поле означает бессрочный доступ.</small></label>
+    <footer class="dv16-dialog-actions"><button class="button" type="button" data-close-device-edit="{{ device.id }}">Отмена</button><button class="button primary" type="submit">Сохранить и применить</button></footer>
+  </form>
+</dialog>
+{% endif %}
+{% endfor %}
+
+<script>
+(() => {
+  const clientDialog = document.getElementById('dv-edit-client-dialog');
+  document.querySelectorAll('[data-open-client-edit]').forEach(button => button.addEventListener('click', () => clientDialog?.showModal()));
+  document.querySelectorAll('[data-close-client-edit]').forEach(button => button.addEventListener('click', () => clientDialog?.close()));
+  clientDialog?.addEventListener('click', event => { if (event.target === clientDialog) clientDialog.close(); });
+
+  document.querySelectorAll('[data-open-device-edit]').forEach(button => {
+    button.addEventListener('click', () => document.getElementById(`dv-edit-device-${button.dataset.openDeviceEdit}`)?.showModal());
+  });
+  document.querySelectorAll('[data-close-device-edit]').forEach(button => {
+    button.addEventListener('click', () => document.getElementById(`dv-edit-device-${button.dataset.closeDeviceEdit}`)?.close());
+  });
+  document.querySelectorAll('dialog[id^="dv-edit-device-"]').forEach(dialog => {
+    dialog.addEventListener('click', event => { if (event.target === dialog) dialog.close(); });
+  });
+})();
+</script>

@@ -1,0 +1,408 @@
+/* SG-Gateway 018 · Readable Typography V3
+   Unifies only secondary/small text across current pages.
+   Large headings and the approved client-detail page is intentionally untouched. */
+
+:root {
+  --sgrt-page-kicker: 14px;
+  --sgrt-card-kicker: 12px;
+  --sgrt-small: 13px;
+  --sgrt-secondary: 14px;
+  --sgrt-control: 14px;
+  --sgrt-code: 12.5px;
+  --sgrt-status: 12px;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Page headings: same readable service scale                                */
+/* -------------------------------------------------------------------------- */
+
+:is(
+  .cv15-clarity-page .cv2-kicker,
+  .sv1-page .sv1-kicker,
+  .cnv1-page .cnv1-kicker,
+  .ob49-page .ob49-kicker,
+  .r096-page .r096-kicker,
+  .mtv2-page .mtv2-kicker,
+  .secv2-page .ts2-kicker,
+  .hlpv1-page .hlpv1-kicker
+) {
+  font-size: var(--sgrt-page-kicker) !important;
+  line-height: 1.25 !important;
+}
+
+:is(
+  .sv1-page .sv1-heading p,
+  .cnv1-page .cnv1-heading p,
+  .ob49-page .ob49-heading p,
+  .r096-page .r096-heading p,
+  .mtv2-page .mtv2-heading p,
+  .secv2-page .ts2-page-heading p,
+  .hlpv1-page .hlpv1-heading p
+) {
+  font-size: 15px !important;
+  line-height: 1.5 !important;
+}
+
+/* Clients list keeps the already approved larger list-page scale. */
+.cv15-clarity-page .cv2-heading-copy > p { font-size: 17px !important; line-height: 1.5 !important; }
+.cv15-clarity-page .cv2-filter-field > span { font-size: 14px !important; }
+.cv15-clarity-page .cv2-filter-field input,
+.cv15-clarity-page .cv2-filter-field select { font-size: 16px !important; }
+.cv15-clarity-page .cv2-filter-footer,
+.cv15-clarity-page .cv2-list-footer { font-size: 14px !important; }
+.cv15-clarity-page .cv2-table thead th { font-size: 13px !important; }
+.cv15-clarity-page .cv2-server-cell small { font-size: 13px !important; line-height: 1.4 !important; }
+.cv15-clarity-page .cv15-device-count span { font-size: 14px !important; }
+.cv15-clarity-page .cv15-device-count small { font-size: 13px !important; }
+.cv15-clarity-page .cv2-expiry { font-size: 15px !important; }
+.cv15-clarity-page .cv15-no-results span { font-size: 14px !important; }
+
+/* -------------------------------------------------------------------------- */
+/* Safe floor for semantic small text on current pages                        */
+/* -------------------------------------------------------------------------- */
+
+:is(
+  .sv1-page,
+  .cnv1-page,
+  .ob49-page,
+  .r096-page,
+  .mtv2-page,
+  .secv2-page,
+  .hlpv1-page,
+  .opjob-page
+) small {
+  font-size: var(--sgrt-small) !important;
+  line-height: 1.45 !important;
+}
+
+:is(
+  .sv1-page,
+  .cnv1-page,
+  .ob49-page,
+  .r096-page,
+  .mtv2-page,
+  .secv2-page,
+  .hlpv1-page
+) table th {
+  font-size: var(--sgrt-small) !important;
+  line-height: 1.35 !important;
+}
+
+:is(
+  .sv1-page,
+  .cnv1-page,
+  .r096-page,
+  .mtv2-page,
+  .secv2-page,
+  .hlpv1-page
+) :is(input, select, textarea) {
+  font-size: var(--sgrt-control) !important;
+  line-height: 1.4 !important;
+}
+
+:is(
+  .sv1-page,
+  .cnv1-page,
+  .ob49-page,
+  .r096-page,
+  .mtv2-page,
+  .secv2-page,
+  .hlpv1-page,
+  .opjob-page
+) .button {
+  font-size: var(--sgrt-small) !important;
+}
+
+/* -------------------------------------------------------------------------- */
+/* System                                                                     */
+/* -------------------------------------------------------------------------- */
+
+.sv1-page :is(.sv1-card-kicker) { font-size: var(--sgrt-card-kicker) !important; }
+.sv1-page :is(.sv1-summary-label) { font-size: 14px !important; }
+.sv1-page :is(.sv1-summary-note) { font-size: var(--sgrt-small) !important; line-height: 1.45 !important; }
+.sv1-page :is(.sv1-state-pill, .sv1-engine-pill, .sv1-check-status) { font-size: var(--sgrt-status) !important; }
+.sv1-page :is(
+  .sv1-donut-center span,
+  .sv1-resource-total,
+  .sv1-resource-available,
+  .sv1-legend-row,
+  .sv1-legend-row strong,
+  .sv1-disk-labels,
+  .sv1-cpu-value span,
+  .sv1-runtime-list span,
+  .sv1-runtime-table span,
+  .sv1-runtime-list strong,
+  .sv1-runtime-table strong,
+  .sv1-runtime-table code,
+  .sv1-connection-meta span,
+  .sv1-connection-meta strong,
+  .sv1-last-error span,
+  .sv1-page-footer
+) { font-size: var(--sgrt-small) !important; }
+.sv1-page :is(.sv1-panel-head p) { font-size: var(--sgrt-secondary) !important; line-height: 1.5 !important; }
+.sv1-page :is(.sv1-connection-identity strong, .sv1-check-row strong, .sv1-last-error strong, .sv1-action-grid strong) { font-size: 14px !important; }
+.sv1-page :is(.sv1-connection-identity small, .sv1-check-row small, .sv1-last-error small, .sv1-action-grid small) { font-size: var(--sgrt-small) !important; }
+
+/* -------------------------------------------------------------------------- */
+/* Connections, Xray profiles and Mihomo                                      */
+/* -------------------------------------------------------------------------- */
+
+.cnv1-page :is(.cnv1-card-kicker, .xps2-salamander-kicker, .mhv2-kicker) { font-size: var(--sgrt-card-kicker) !important; }
+.cnv1-page :is(.cnv1-summary-label) { font-size: 14px !important; }
+.cnv1-page :is(.cnv1-summary-note) { font-size: var(--sgrt-small) !important; }
+.cnv1-page :is(.cnv1-panel-head p, .cnv1-engine-head p, .cnv1-note-panel p, .xps2-section-head p, .mhv2-head p, .mhv2-client-card p, .mhv2-listener p) {
+  font-size: var(--sgrt-secondary) !important;
+  line-height: 1.5 !important;
+}
+.cnv1-page :is(.cnv1-map-status, .cnv1-engine-status, .xps2-choice-status, .xps2-https-state, .mhv2-state, .cdv2-badge) {
+  font-size: var(--sgrt-status) !important;
+}
+.cnv1-page :is(
+  .cnv1-summary-ports span,
+  .cnv1-map-node small,
+  .cnv1-endpoint-main span,
+  .cnv1-endpoint-main small,
+  .cnv1-port-chip,
+  .cnv1-engine-metrics span,
+  .cnv1-form-section-title > span,
+  .cnv1-form-section-title small,
+  .cnv1-advanced summary,
+  .cnv1-advanced summary span:last-child,
+  .cnv1-advanced-body small,
+  .cnv1-form-actions > span,
+  .cnv1-page-footer,
+  .xps2-choice-topline,
+  .xps2-parameter-title span,
+  .xps2-parameter-note,
+  .xps2-parameter-row label > span,
+  .xps2-salamander-version,
+  .xps2-salamander > header p,
+  .xps2-salamander-warning,
+  .xps2-salamander-status,
+  .xps2-salamander-modes span,
+  .xps2-salamander-secret > label > span,
+  .mhv2-version,
+  .mhv2-summary span,
+  .mhv2-summary small,
+  .mhv2-endpoint span,
+  .mhv2-endpoint small,
+  .mhv2-endpoint-meta span,
+  .mhv2-tls-warning span,
+  .mhv2-tls-ready span,
+  .mhv2-sgclient span,
+  .mhv2-switch,
+  .mhv2-check,
+  .mhv2-basic-fields label > span,
+  .mhv2-advanced-body label > span,
+  .mhv2-advanced summary,
+  .mhv2-service-tools summary,
+  .mhv2-service-tools span,
+  .mhv2-client-empty span,
+  .mhv2-client-protocols span,
+  .cnv1-mihomo-mini-list b,
+  .cnv1-readonly-country small
+) { font-size: var(--sgrt-small) !important; }
+.cnv1-page :is(.cnv1-map-node strong, .cnv1-endpoint-main strong, .cnv1-engine-metrics strong, .cnv1-note-panel strong, .mhv2-tls-warning strong, .mhv2-tls-ready strong, .mhv2-sgclient strong, .cnv1-readonly-country strong) {
+  font-size: 14px !important;
+}
+.cnv1-page :is(.cnv1-engine-form label > span) { font-size: var(--sgrt-small) !important; }
+.cnv1-page :is(.cnv1-engine-form input, .cnv1-engine-form select, .cnv1-engine-form textarea, .mhv2-basic-fields input, .mhv2-basic-fields select, .mhv2-advanced-body input, .mhv2-advanced-body select) {
+  font-size: var(--sgrt-control) !important;
+}
+.cnv1-page :is(.xps2-choice > p, .xps2-empty-note, .xps2-actions > p) { font-size: var(--sgrt-small) !important; }
+
+/* -------------------------------------------------------------------------- */
+/* Outbounds                                                                  */
+/* -------------------------------------------------------------------------- */
+
+.ob49-page :is(.ob49-route-copy span, .ob49-route-meta, .ob49-route-meta code, .ob49-warp-facts, .ob49-warp-more summary) {
+  font-size: var(--sgrt-small) !important;
+}
+.ob49-page :is(.ob49-route-copy p, .ob49-custom-card header p, .ob49-empty-row p) {
+  font-size: var(--sgrt-secondary) !important;
+  line-height: 1.5 !important;
+}
+.ob49-page :is(.ob49-primary, .ob49-secondary, .ob49-danger, .ob49-help) { font-size: var(--sgrt-small) !important; }
+
+/* -------------------------------------------------------------------------- */
+/* Routing and GeoFiles                                                       */
+/* -------------------------------------------------------------------------- */
+
+.r096-page :is(
+  .r096-card > p,
+  .r096-geo-card > p,
+  .r096-selected-head p,
+  .r096-user-body > p,
+  .r096-rules-preview header p,
+  .r096-warp-head p,
+  .gfv1-head p,
+  .gfv1-card header p
+) { font-size: var(--sgrt-secondary) !important; line-height: 1.5 !important; }
+.r096-page :is(
+  .r096-diagnostic strong,
+  .r096-diagnostic span,
+  .r096-diagnostic small,
+  .r096-user-rules summary small,
+  .r096-user-rules summary em,
+  .r096-rule-editor label span,
+  .r096-choice-card span,
+  .r096-rule-row small,
+  .r096-russia-block > div:first-child small,
+  .r096-segments span,
+  .r096-warning-card strong,
+  .r096-warning-card span,
+  .r096-rule-list small,
+  .r096-rule-list em,
+  .r096-empty,
+  .r096-geofiles-summary small,
+  .r096-footer > span,
+  .r096-geo-pair span,
+  .r096-geo-validation,
+  .r096-geo-categories summary,
+  .r096-backups summary,
+  .r096-geo-categories strong,
+  .r096-geo-categories p,
+  .r096-source-card small,
+  .r096-source-info span,
+  .r096-source-fields span,
+  .r096-backups strong,
+  .r096-backups span,
+  .r096-roscom-options label,
+  .r096-geo-missing strong,
+  .r096-geo-missing span,
+  .r096-warp-summary small,
+  .r096-warp-grid small,
+  .r096-warp-grid span,
+  .gfv1-kicker,
+  .gfv1-state,
+  .gfv1-summary span,
+  .gfv1-summary small,
+  .gfv1-file > span,
+  .gfv1-file small,
+  .gfv1-file em,
+  .gfv1-validation > span,
+  .gfv1-validation small,
+  .gfv1-form label > span,
+  .gfv1-note strong,
+  .gfv1-note span,
+  .gfv1-footer-note strong,
+  .gfv1-footer-note span,
+  .gfv1-categories summary,
+  .gfv1-categories strong,
+  .gfv1-categories p,
+  .gfv1-empty span
+) { font-size: var(--sgrt-small) !important; }
+.r096-page :is(.r096-state, .gfv1-state) { font-size: var(--sgrt-status) !important; }
+.r096-page :is(.r096-rule-list strong, .r096-source-card strong, .r096-source-info strong, .r096-warp-grid strong, .gfv1-summary strong) { font-size: 14px !important; }
+.r096-page :is(.r096-header-button, .r096-primary-button, .r096-secondary-button, .r096-danger-button, .r096-geo-pair button) { font-size: var(--sgrt-small) !important; }
+.r096-page :is(.gfv1-form input, .gfv1-form select) { font-size: var(--sgrt-control) !important; }
+
+/* -------------------------------------------------------------------------- */
+/* Maintenance and Updates                                                    */
+/* -------------------------------------------------------------------------- */
+
+.mtv2-page :is(.mtv2-card-kicker) { font-size: var(--sgrt-card-kicker) !important; }
+.mtv2-page :is(.mtv2-panel-head p, .mtv31-channel-card > p, .mtv31-channel-message, .mtv31-safety-note span, .mtv31-update-error span) {
+  font-size: var(--sgrt-secondary) !important;
+  line-height: 1.5 !important;
+}
+.mtv2-page :is(
+  .mtv2-summary span,
+  .mtv2-summary small,
+  .mtv2-backup-primary > span,
+  .mtv2-backup-primary small,
+  .mtv2-backup-details summary,
+  .mtv2-backup-details code,
+  .mtv2-older-backups summary,
+  .mtv2-older-backups small,
+  .mtv2-ok-checks summary,
+  .mtv2-more-operations summary,
+  .mtv2-health-issues small,
+  .mtv2-ok-checks small,
+  .mtv2-all-ok span,
+  .mtv2-empty span,
+  .mtv2-recovery-steps article > span,
+  .mtv2-recovery-steps small,
+  .mtv2-recovery-note strong,
+  .mtv2-recovery-note span,
+  .mtv2-diagnostics-grid span,
+  .mtv2-operation-list time,
+  .mtv2-operation-copy small,
+  .mtv2-operation-list p,
+  .mtv2-footer,
+  .mtv31-update-summary span,
+  .mtv31-update-summary small,
+  .mtv31-channel-head span,
+  .mtv31-update-badge
+) { font-size: var(--sgrt-small) !important; }
+.mtv2-page :is(.mtv2-health-status, .mtv2-operation-status, .mtv2-count, .mtv31-update-badge) { font-size: var(--sgrt-status) !important; }
+.mtv2-page :is(.mtv2-backup-primary strong, .mtv2-older-backups strong, .mtv2-health-issues strong, .mtv2-ok-checks strong, .mtv2-all-ok strong, .mtv2-empty strong, .mtv2-recovery-steps strong, .mtv2-diagnostics-grid strong, .mtv2-operation-copy strong) {
+  font-size: 14px !important;
+}
+.mtv2-page :is(.mtv31-tabs a, .mtv31-channel-actions .button) { font-size: var(--sgrt-small) !important; }
+
+/* -------------------------------------------------------------------------- */
+/* Security                                                                   */
+/* -------------------------------------------------------------------------- */
+
+.secv2-page :is(.secv2-kicker) { font-size: var(--sgrt-card-kicker) !important; }
+.secv2-page :is(.secv2-card-head p, .secv2-live-note span, .xray-studio-actions span) {
+  font-size: var(--sgrt-secondary) !important;
+  line-height: 1.5 !important;
+}
+.secv2-page :is(
+  .secv2-summary span,
+  .secv2-summary small,
+  .secv2-checks span,
+  .secv2-endpoint span,
+  .secv2-progress > div,
+  .secv2-domain-form label > span,
+  .secv2-domain-form label > small,
+  .secv2-result span,
+  .secv2-list dt,
+  .secv2-list dd,
+  .secv2-compact-empty span,
+  .secv2-tech summary,
+  .secv2-tech span,
+  .secv2-tech code,
+  .secv2-footer strong,
+  .secv2-footer span
+) { font-size: var(--sgrt-small) !important; }
+.secv2-page :is(.secv2-pill) { font-size: var(--sgrt-status) !important; }
+.secv2-page :is(.secv2-checks strong, .secv2-result strong, .secv2-compact-empty strong, .secv2-live-note strong) { font-size: 14px !important; }
+
+/* -------------------------------------------------------------------------- */
+/* Help                                                                       */
+/* -------------------------------------------------------------------------- */
+
+.hlpv1-page :is(.hlpv1-card-kicker) { font-size: var(--sgrt-card-kicker) !important; }
+.hlpv1-page :is(.hlpv1-summary-label) { font-size: 14px !important; }
+.hlpv1-page :is(.hlpv1-summary-note) { font-size: var(--sgrt-small) !important; }
+.hlpv1-page :is(.hlpv1-search-panel label > span, .hlpv1-clear-search) { font-size: var(--sgrt-small) !important; }
+.hlpv1-page :is(.hlpv1-search-panel input) { font-size: var(--sgrt-control) !important; }
+.hlpv1-page :is(.hlpv1-sidebar-head > span, .hlpv1-step-pill, .hlpv1-step-number, .hlpv1-journey-number) { font-size: var(--sgrt-status) !important; }
+.hlpv1-page :is(.hlpv1-topic-copy strong, .hlpv1-no-results strong, .hlpv1-step-card strong, .hlpv1-related-grid strong, .hlpv1-journey strong, .hlpv1-help-note strong) { font-size: 14px !important; }
+.hlpv1-page :is(
+  .hlpv1-topic-copy small,
+  .hlpv1-no-results small,
+  .hlpv1-article-head p,
+  .hlpv1-welcome-head p,
+  .hlpv1-step-card p,
+  .hlpv1-related-grid small,
+  .hlpv1-article-footer,
+  .hlpv1-journey p,
+  .hlpv1-help-note p,
+  .hlpv1-page-footer
+) { font-size: var(--sgrt-small) !important; line-height: 1.5 !important; }
+
+/* -------------------------------------------------------------------------- */
+/* Live operation terminal, login and Recovery                                */
+/* -------------------------------------------------------------------------- */
+
+.opjob-page :is(.opjob-kicker, .opjob-status, .opjob-terminal-bar strong, .opjob-actions span) { font-size: var(--sgrt-small) !important; }
+.login-shell :is(.brand-note, label, .error-text) { font-size: var(--sgrt-small) !important; }
+.login-shell :is(input, .button) { font-size: var(--sgrt-control) !important; }
+.recovery-shell :is(.brand-note, .section-heading p, .data-table th, .data-table td, .badge, .empty-state p) { font-size: var(--sgrt-small) !important; }
+.recovery-shell .button { font-size: var(--sgrt-small) !important; }
+
+/* Deliberate safeguard: approved client-detail typography is not targeted. */

@@ -1,0 +1,1 @@
+"""SG-Gateway application package."""

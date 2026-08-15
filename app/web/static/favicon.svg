@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="SG-Gateway">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#78B495"/>
+      <stop offset="1" stop-color="#4F83B4"/>
+    </linearGradient>
+  </defs>
+  <path d="M32 4 55 17v30L32 60 9 47V17Z" fill="#111923" stroke="url(#g)" stroke-width="3"/>
+  <text x="32" y="39" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="21" font-weight="800" letter-spacing="-1" fill="#F5F9FF">SG</text>
+</svg>

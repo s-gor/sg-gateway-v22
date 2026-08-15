@@ -1,0 +1,23 @@
+/* SG-Gateway 0.1.0-021.7 — Memory Legend Divider Remove FIX1 */
+
+body.page-system .sv1-memory-legend {
+  border-top: 0 !important;
+  box-shadow: none !important;
+}
+
+body.page-system .sv1-memory-legend::before,
+body.page-system .sv1-memory-legend::after {
+  display: none !important;
+  content: none !important;
+  border: 0 !important;
+  background: none !important;
+  box-shadow: none !important;
+}
+
+body.page-system .sv1-memory-legend > hr,
+body.page-system .sv1-memory-legend .sv1-section-divider {
+  display: none !important;
+  border: 0 !important;
+  background: none !important;
+  box-shadow: none !important;
+}

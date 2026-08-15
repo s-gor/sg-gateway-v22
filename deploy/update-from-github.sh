@@ -1,0 +1,693 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+REPOSITORY="s-gor/sg-gateway"
+BRANCH="${SG_GATEWAY_GITHUB_BRANCH:-main}"
+ARCHIVE_URL="https://github.com/${REPOSITORY}/archive/refs/heads/${BRANCH}.tar.gz"
+GIT_URL="https://github.com/${REPOSITORY}.git"
+
+PREFIX="/opt/sg-gateway"
+CONFIG_DIR="/etc/sg-gateway"
+DATA_DIR="/var/lib/sg-gateway"
+BACKUP_ROOT="/root/sg-gateway-update-safety"
+PANEL_SERVICE="sg-gateway.service"
+HOSTD_SERVICE="sg-hostd.service"
+TEMP_DIR=""
+BACKUP_DIR=""
+SOURCE_DIR=""
+BACKUP_READY=0
+SERVICES_STOPPED=0
+UPDATE_FINISHED=0
+ASSETS_FINGERPRINT=""
+ASSETS_RECOVERY_DIR=""
+ASSETS_RECOVERY_SOURCE=""
+
+GREEN=$'\033[1;32m'
+RED=$'\033[1;31m'
+YELLOW=$'\033[1;33m'
+CYAN=$'\033[1;36m'
+RESET=$'\033[0m'
+
+fail() {
+  printf '%s[SG-Gateway Update] ERROR:%s %s\n' "$RED" "$RESET" "$*" >&2
+  return 1
+}
+
+cleanup() {
+  if [[ -n "$TEMP_DIR" && -d "$TEMP_DIR" ]]; then
+    rm -rf "$TEMP_DIR"
+  fi
+}
+
+env_value() {
+  local file="$1" key="$2"
+  python3 - "$file" "$key" <<'PYENV'
+import shlex
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+key = sys.argv[2]
+try:
+    lines = path.read_text(encoding="utf-8").splitlines()
+except OSError:
+    raise SystemExit(1)
+for raw in lines:
+    line = raw.strip()
+    if not line or line.startswith("#") or "=" not in line:
+        continue
+    name, value = line.split("=", 1)
+    if name.strip() != key:
+        continue
+    value = value.strip()
+    if value[:1] in {'"', "'"}:
+        try:
+            parsed = shlex.split(value, posix=True)
+            value = parsed[0] if parsed else ""
+        except ValueError:
+            value = value[1:-1] if len(value) >= 2 else ""
+    print(value)
+    raise SystemExit(0)
+raise SystemExit(1)
+PYENV
+}
+
+fingerprint_paths() {
+  python3 - "$@" <<'PYFP'
+import hashlib
+import os
+import stat
+import sys
+from pathlib import Path
+
+digest = hashlib.sha256()
+for raw_root in sys.argv[1:]:
+    root = Path(raw_root)
+    digest.update(str(root).encode())
+    digest.update(b"\0")
+    if not root.exists() and not root.is_symlink():
+        digest.update(b"MISSING\0")
+        continue
+    paths = [root]
+    if root.is_dir() and not root.is_symlink():
+        paths.extend(sorted(root.rglob("*"), key=lambda p: p.as_posix()))
+    for path in paths:
+        try:
+            info = path.lstat()
+        except OSError as exc:
+            raise SystemExit(f"cannot stat {path}: {exc}")
+        digest.update(path.as_posix().encode())
+        digest.update(b"\0")
+        digest.update(oct(stat.S_IMODE(info.st_mode)).encode())
+        digest.update(b"\0")
+        if stat.S_ISLNK(info.st_mode):
+            digest.update(b"L")
+            digest.update(os.readlink(path).encode())
+        elif stat.S_ISREG(info.st_mode):
+            digest.update(b"F")
+            try:
+                with path.open("rb") as stream:
+                    for block in iter(lambda: stream.read(1024 * 1024), b""):
+                        digest.update(block)
+            except OSError as exc:
+                raise SystemExit(f"cannot read {path}: {exc}")
+        elif stat.S_ISDIR(info.st_mode):
+            digest.update(b"D")
+        else:
+            digest.update(b"O")
+        digest.update(b"\0")
+print(digest.hexdigest())
+PYFP
+}
+
+fingerprint_tree_relative() {
+  python3 - "$1" <<'PYASSETFP'
+import hashlib
+import os
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+if not root.is_dir():
+    raise SystemExit(1)
+digest = hashlib.sha256()
+for path in sorted(root.rglob("*"), key=lambda p: p.relative_to(root).as_posix()):
+    rel = path.relative_to(root).as_posix()
+    digest.update(rel.encode("utf-8"))
+    digest.update(b"\0")
+    if path.is_symlink():
+        digest.update(b"L")
+        digest.update(os.readlink(path).encode("utf-8"))
+    elif path.is_file():
+        digest.update(b"F")
+        with path.open("rb") as stream:
+            for block in iter(lambda: stream.read(1024 * 1024), b""):
+                digest.update(block)
+    elif path.is_dir():
+        digest.update(b"D")
+    digest.update(b"\0")
+print(digest.hexdigest())
+PYASSETFP
+}
+
+fingerprint_clients() {
+  python3 - "$DATA_DIR/sg-gateway.sqlite" <<'PYCLIENTS'
+import hashlib
+import json
+import sqlite3
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+if not path.is_file():
+    print("NO_DATABASE")
+    raise SystemExit(0)
+
+con = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+con.row_factory = sqlite3.Row
+payload = {}
+try:
+    for table in ("clients", "devices", "device_credentials"):
+        try:
+            rows = con.execute(f"SELECT * FROM {table} ORDER BY 1,2").fetchall()
+        except sqlite3.Error:
+            rows = []
+        cleaned = []
+        for row in rows:
+            item = dict(row)
+            if table == "device_credentials" and item.get("config_json"):
+                try:
+                    cfg = json.loads(item["config_json"])
+                except Exception:
+                    cfg = {}
+                def keep(value):
+                    if isinstance(value, dict):
+                        wanted = {
+                            "uuid", "id", "private_key", "public_key", "password",
+                            "username", "address", "auth", "token", "short_id",
+                            "endpoint", "host", "port",
+                        }
+                        return {
+                            key: keep(val)
+                            for key, val in sorted(value.items())
+                            if key.lower() in wanted
+                        }
+                    if isinstance(value, list):
+                        return [keep(v) for v in value]
+                    return value
+                item["config_json"] = keep(cfg)
+            cleaned.append(item)
+        payload[table] = cleaned
+finally:
+    con.close()
+
+raw = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
+print(hashlib.sha256(raw).hexdigest())
+PYCLIENTS
+}
+
+capture_service_states() {
+  local output="$1" service active enabled
+  : > "$output"
+  for service in \
+    nginx.service xray.service mihomo.service sg-gateway-awg.service \
+    sg-gateway-singbox.service "$HOSTD_SERVICE" "$PANEL_SERVICE"; do
+    active=0
+    enabled=0
+    systemctl is-active --quiet "$service" && active=1 || true
+    systemctl is-enabled --quiet "$service" && enabled=1 || true
+    printf '%s\t%s\t%s\n' "$service" "$active" "$enabled" >> "$output"
+  done
+}
+
+verify_runtime_states_unchanged() {
+  local before="$1" service active enabled now
+  while IFS=$'\t' read -r service active enabled; do
+    [[ -n "$service" ]] || continue
+    case "$service" in
+      "$PANEL_SERVICE"|"$HOSTD_SERVICE") continue ;;
+    esac
+    now=0
+    systemctl is-active --quiet "$service" && now=1 || true
+    if [[ "$now" != "$active" ]]; then
+      echo "Runtime service state changed: $service active before=$active after=$now" >&2
+      return 1
+    fi
+  done < "$before"
+}
+
+https_state() {
+  local state_file="$DATA_DIR/security/tls-state.json"
+  local runtime_file="$CONFIG_DIR/runtime.env"
+  local panel_port
+  panel_port="$(env_value "$runtime_file" SG_GATEWAY_PANEL_PORT 2>/dev/null || true)"
+  python3 - "$state_file" "$panel_port" <<'PYHTTPS'
+import json
+import shlex
+import sys
+from pathlib import Path
+
+state_path = Path(sys.argv[1])
+panel_port = str(sys.argv[2] or "").strip()
+payload = {}
+try:
+    payload = json.loads(state_path.read_text(encoding="utf-8"))
+except Exception:
+    payload = {}
+
+ready = bool(payload.get("https_ready"))
+domain = str(payload.get("domain") or "").strip().lower().rstrip(".")
+cert = str(payload.get("certificate_path") or "").strip()
+key = str(payload.get("key_path") or "").strip()
+public_port = str(payload.get("public_port") or payload.get("panel_port") or panel_port or "").strip()
+
+if ready:
+    if not domain or not cert or not key or not Path(cert).is_file() or not Path(key).is_file():
+        raise SystemExit("HTTPS state says ready, but domain/certificate/key is incomplete")
+    if panel_port and public_port and panel_port != public_port:
+        raise SystemExit(f"HTTPS port mismatch: state={public_port} runtime={panel_port}")
+
+for name, value in (
+    ("HTTPS_READY", "1" if ready else "0"),
+    ("HTTPS_DOMAIN", domain),
+    ("HTTPS_CERT", cert),
+    ("HTTPS_KEY", key),
+    ("PANEL_PORT", public_port or panel_port),
+):
+    print(f"{name}={shlex.quote(value)}")
+PYHTTPS
+}
+
+create_safety_backup() {
+  mkdir -p "$BACKUP_ROOT"
+  chmod 0700 "$BACKUP_ROOT"
+  BACKUP_DIR="$BACKUP_ROOT/$(date -u +%Y%m%d-%H%M%S)-before-update"
+  mkdir -p "$BACKUP_DIR"
+  chmod 0700 "$BACKUP_DIR"
+
+  capture_service_states "$BACKUP_DIR/service-state.tsv"
+  systemctl stop "$PANEL_SERVICE" "$HOSTD_SERVICE"
+  SERVICES_STOPPED=1
+
+  https_state > "$BACKUP_DIR/https-before.env"
+  fingerprint_clients > "$BACKUP_DIR/clients-before.sha256"
+  fingerprint_paths /etc/letsencrypt > "$BACKUP_DIR/letsencrypt-before.sha256"
+  fingerprint_paths \
+    /etc/nginx/nginx.conf \
+    /etc/nginx/sites-available/sg-gateway \
+    /etc/nginx/sites-enabled/sg-gateway \
+    /etc/nginx/stream-conf.d/sg-gateway-443.conf \
+    > "$BACKUP_DIR/nginx-before.sha256"
+
+  local existing=() relative
+  for relative in \
+    opt/sg-gateway \
+    etc/sg-gateway \
+    var/lib/sg-gateway \
+    etc/letsencrypt \
+    etc/nginx/nginx.conf \
+    etc/nginx/sites-available/sg-gateway \
+    etc/nginx/sites-enabled/sg-gateway \
+    etc/nginx/stream-conf.d/sg-gateway-443.conf \
+    etc/systemd/system/sg-gateway.service \
+    etc/systemd/system/sg-hostd.service; do
+    if [[ -e "/$relative" || -L "/$relative" ]]; then
+      existing+=("$relative")
+    fi
+  done
+  printf '%s\n' "${existing[@]}" > "$BACKUP_DIR/existing-paths.txt"
+  tar -C / -cpf "$BACKUP_DIR/state.tar" "${existing[@]}"
+  tar -tf "$BACKUP_DIR/state.tar" >/dev/null
+  BACKUP_READY=1
+}
+
+rollback_update() {
+  (( BACKUP_READY == 1 )) || return 0
+  printf '\n%s[SG-Gateway Update] ROLLBACK:%s restoring the pre-update server state...\n' "$YELLOW" "$RESET"
+  systemctl stop "$PANEL_SERVICE" "$HOSTD_SERVICE" >/dev/null 2>&1 || true
+
+  local path
+  for path in \
+    /opt/sg-gateway \
+    /etc/sg-gateway \
+    /var/lib/sg-gateway \
+    /etc/letsencrypt \
+    /etc/nginx/sites-available/sg-gateway \
+    /etc/nginx/sites-enabled/sg-gateway \
+    /etc/nginx/stream-conf.d/sg-gateway-443.conf \
+    /etc/systemd/system/sg-gateway.service \
+    /etc/systemd/system/sg-hostd.service; do
+    rm -rf "$path"
+  done
+
+  tar -C / -xpf "$BACKUP_DIR/state.tar"
+  systemctl daemon-reload >/dev/null 2>&1 || true
+
+  if command -v nginx >/dev/null 2>&1 && nginx -t >/dev/null 2>&1; then
+    systemctl is-active --quiet nginx.service && systemctl reload nginx.service >/dev/null 2>&1 || true
+  fi
+
+  local service active enabled
+  while IFS=$'\t' read -r service active enabled; do
+    [[ -n "$service" ]] || continue
+    if [[ "$enabled" == "1" ]]; then
+      systemctl enable "$service" >/dev/null 2>&1 || true
+    fi
+    if [[ "$active" == "1" ]]; then
+      systemctl restart "$service" >/dev/null 2>&1 || true
+    fi
+  done < "$BACKUP_DIR/service-state.tsv"
+
+  printf '%s[SG-Gateway Update] ROLLBACK OK.%s Backup: %s\n' "$GREEN" "$RESET" "$BACKUP_DIR"
+}
+
+on_error() {
+  local rc=$?
+  trap - ERR INT TERM
+  if (( UPDATE_FINISHED == 0 )); then
+    if (( BACKUP_READY == 1 )); then
+      rollback_update || true
+    elif (( SERVICES_STOPPED == 1 )); then
+      systemctl start "$HOSTD_SERVICE" >/dev/null 2>&1 || true
+      systemctl start "$PANEL_SERVICE" >/dev/null 2>&1 || true
+    fi
+  fi
+  cleanup
+  printf '%s[SG-Gateway Update] Update failed.%s\n' "$RED" "$RESET" >&2
+  exit "$rc"
+}
+trap on_error ERR
+trap 'exit 130' INT TERM
+trap cleanup EXIT
+
+run_stage() {
+  local number="$1" label="$2"
+  shift 2
+  printf '%s[SG-Gateway Update] [%s/6]%s %s\n' "$CYAN" "$number" "$RESET" "$label"
+  "$@"
+  printf '%s[SG-Gateway Update] [OK]%s %s\n' "$GREEN" "$RESET" "$label"
+}
+
+preflight() {
+  [[ "$(id -u)" -eq 0 ]] || fail "run this updater through sudo"
+  [[ -f "$PREFIX/VERSION" && -f "$CONFIG_DIR/runtime.env" && -f "$CONFIG_DIR/sg-gateway.env" ]] || {
+    fail "SG-Gateway is not installed. Use the Clean Install command instead."
+  }
+
+  local command
+  for command in curl tar gzip python3 sha256sum systemctl; do
+    command -v "$command" >/dev/null 2>&1 || fail "required command is missing: $command"
+  done
+
+  systemctl is-active --quiet nginx.service || fail "nginx.service is not active before update"
+  systemctl is-active --quiet "$HOSTD_SERVICE" || fail "$HOSTD_SERVICE is not active before update"
+  systemctl is-active --quiet "$PANEL_SERVICE" || fail "$PANEL_SERVICE is not active before update"
+
+  local old_version
+  old_version="$(tr -d '\r\n' < "$PREFIX/VERSION")"
+  printf '[SG-Gateway Update] Installed VERSION: %s\n' "$old_version"
+
+  local state
+  state="$(https_state)"
+  eval "$state"
+  if [[ "${HTTPS_READY:-0}" == "1" ]]; then
+    printf '[SG-Gateway Update] HTTPS: %s:%s\n' "$HTTPS_DOMAIN" "$PANEL_PORT"
+    curl --noproxy '*' -fsS --max-time 12 \
+      --resolve "${HTTPS_DOMAIN}:${PANEL_PORT}:127.0.0.1" \
+      "https://${HTTPS_DOMAIN}:${PANEL_PORT}/health" >/dev/null
+  else
+    printf '[SG-Gateway Update] HTTPS: not configured; IP/HTTP mode will be preserved.\n'
+  fi
+}
+
+prepare_source_archive() {
+  local archive="$TEMP_DIR/sg-gateway-main.tar.gz"
+  rm -rf "$SOURCE_DIR"
+  mkdir -p "$SOURCE_DIR"
+
+  printf '[SG-Gateway Update] Source mode: COMPATIBILITY (full GitHub archive)\n'
+  curl -fL --retry 6 --retry-all-errors --retry-delay 3 --connect-timeout 20 \
+    "$ARCHIVE_URL" -o "$archive"
+  gzip -t "$archive"
+  tar -xzf "$archive" -C "$SOURCE_DIR" --strip-components=1
+}
+
+prepare_source_light() {
+  command -v git >/dev/null 2>&1 || return 1
+
+  rm -rf "$SOURCE_DIR"
+  printf '[SG-Gateway Update] Source mode: LIGHT\n'
+  printf '[SG-Gateway Update] Git partial clone: depth=1 + blob:none + runtime whitelist\n'
+  printf '[SG-Gateway Update] non-runtime trees: assets/data/docs/tests/vendor/.github skipped\n'
+
+  git -c advice.detachedHead=false clone \
+    --quiet \
+    --depth=1 \
+    --filter=blob:none \
+    --sparse \
+    --single-branch \
+    --branch "$BRANCH" \
+    "$GIT_URL" "$SOURCE_DIR" || return 1
+
+  # SG_GATEWAY_02112_LIGHT_UPDATE_FIX9_R2
+  # Whitelist only live application source. Cone mode also keeps the small
+  # repository-root files required by validation (VERSION, requirements.txt).
+  git -C "$SOURCE_DIR" sparse-checkout set app hostd deploy || return 1
+
+  local forbidden
+  for forbidden in vendor assets data docs tests .github; do
+    [[ ! -e "$SOURCE_DIR/$forbidden" ]] || {
+      echo "[SG-Gateway Update] LIGHT source unexpectedly contains: $forbidden" >&2
+      return 1
+    }
+  done
+
+  local object_size source_size
+  object_size="$(du -sh "$SOURCE_DIR/.git/objects" 2>/dev/null | awk '{print $1}' || true)"
+  source_size="$(du -sh --exclude=.git "$SOURCE_DIR" 2>/dev/null | awk '{print $1}' || true)"
+  [[ -n "$object_size" ]] && printf '[SG-Gateway Update] Git objects fetched: %s\n' "$object_size"
+  [[ -n "$source_size" ]] && printf '[SG-Gateway Update] Checked-out source: %s\n' "$source_size"
+
+  rm -rf "$SOURCE_DIR/.git"
+}
+
+prepare_source() {
+  TEMP_DIR="$(mktemp -d /tmp/sg-gateway-github-update.XXXXXX)"
+  SOURCE_DIR="$TEMP_DIR/source"
+
+  # SG_GATEWAY_02112_LIGHT_UPDATE_FIX9
+  if command -v git >/dev/null 2>&1; then
+    if ! prepare_source_light; then
+      printf '[SG-Gateway Update] LIGHT source failed; falling back to full archive.\n' >&2
+      prepare_source_archive
+    fi
+  else
+    printf '[SG-Gateway Update] git is not installed; using compatibility source mode.\n'
+    prepare_source_archive
+  fi
+
+  [[ -f "$SOURCE_DIR/VERSION" ]] || fail "VERSION is missing from GitHub source"
+  [[ -f "$SOURCE_DIR/requirements.txt" ]] || fail "requirements.txt is missing from GitHub source"
+  [[ -f "$SOURCE_DIR/hostd/requirements.txt" ]] || fail "hostd/requirements.txt is missing from GitHub source"
+  [[ -f "$SOURCE_DIR/app/main.py" ]] || fail "app/main.py is missing from GitHub source"
+  [[ -f "$SOURCE_DIR/hostd/sg_hostd/app.py" ]] || fail "hostd source is missing from GitHub source"
+
+  if ! cmp -s "$PREFIX/requirements.txt" "$SOURCE_DIR/requirements.txt"; then
+    fail "requirements.txt changed. Safe panel-only Update is blocked; a dedicated dependency migration is required."
+  fi
+  if [[ -f "$PREFIX/hostd/requirements.txt" ]] && ! cmp -s "$PREFIX/hostd/requirements.txt" "$SOURCE_DIR/hostd/requirements.txt"; then
+    fail "hostd/requirements.txt changed. Safe panel-only Update is blocked; a dedicated dependency migration is required."
+  fi
+
+  # SG_GATEWAY_02112_UPDATE_SOURCE_DIR_FIX8
+  "$PREFIX/.venv/bin/python" -B - "$SOURCE_DIR" <<'PYCHECK'
+import compileall
+import sys
+from pathlib import Path
+root = Path(sys.argv[1])
+ok = compileall.compile_dir(root / "app", quiet=1)
+ok = compileall.compile_dir(root / "hostd" / "sg_hostd", quiet=1) and ok
+if not ok:
+    raise SystemExit("Python syntax validation failed")
+print("Python syntax: OK")
+PYCHECK
+
+}
+
+# SG_GATEWAY_02112_LIGHT_UPDATE_ASSET_PRESERVE_FIX10
+prepare_preserved_assets() {
+  local live="$PREFIX/assets"
+  local country_rel="geoip/sg-country-geoip.dat"
+  local archive listing recover_root
+
+  ASSETS_FINGERPRINT=""
+  ASSETS_RECOVERY_DIR=""
+  ASSETS_RECOVERY_SOURCE=""
+
+  if [[ -f "$live/$country_rel" ]]; then
+    ASSETS_FINGERPRINT="$(fingerprint_tree_relative "$live")"
+    ASSETS_RECOVERY_SOURCE="live"
+    printf '[SG-Gateway Update] Local assets: preserving installed payload (not downloaded).\n'
+    return 0
+  fi
+
+  # FIX9-R2 could remove /opt/sg-gateway/assets on an already-updated
+  # server. Recover the last complete copy from our own pre-update
+  # Safety Backups. Never re-download the 100+ MB asset tree in Light mode.
+  listing="$TEMP_DIR/assets-backup-list.txt"
+  while IFS= read -r archive; do
+    [[ -f "$archive" ]] || continue
+    : > "$listing"
+    tar -tf "$archive" > "$listing" 2>/dev/null || continue
+    grep -Fxq "opt/sg-gateway/assets/$country_rel" "$listing" || continue
+
+    recover_root="$TEMP_DIR/recovered-assets"
+    rm -rf "$recover_root"
+    mkdir -p "$recover_root"
+    tar -C "$recover_root" -xpf "$archive" opt/sg-gateway/assets || continue
+    [[ -f "$recover_root/opt/sg-gateway/assets/$country_rel" ]] || continue
+
+    ASSETS_RECOVERY_DIR="$recover_root/opt/sg-gateway/assets"
+    ASSETS_FINGERPRINT="$(fingerprint_tree_relative "$ASSETS_RECOVERY_DIR")"
+    ASSETS_RECOVERY_SOURCE="$(basename "$(dirname "$archive")")"
+    printf '[SG-Gateway Update] Local assets: recovered from Safety Backup %s.\n' "$ASSETS_RECOVERY_SOURCE"
+    return 0
+  done < <(find "$BACKUP_ROOT" -mindepth 2 -maxdepth 2 -type f -name state.tar -print 2>/dev/null | sort -r)
+
+  fail "local assets are missing and no Safety Backup with assets was found; refusing to change the installed application"
+}
+
+deploy_source() {
+  local source="$1"
+  local stage="$TEMP_DIR/live-source"
+  rm -rf "$stage"
+  mkdir -p "$stage"
+  cp -a "$source/." "$stage/"
+  rm -rf "$stage/vendor/cores" "$stage/.git" "$stage/.github"
+  rm -f "$stage/install.sh"
+
+  prepare_preserved_assets
+
+  if (( SERVICES_STOPPED == 0 )); then
+    systemctl stop "$PANEL_SERVICE" "$HOSTD_SERVICE"
+    SERVICES_STOPPED=1
+  fi
+
+  local child
+  while IFS= read -r -d '' child; do
+    case "$(basename "$child")" in
+      ".venv"|"assets") continue ;;
+    esac
+    rm -rf "$child"
+  done < <(find "$PREFIX" -mindepth 1 -maxdepth 1 -print0)
+
+  cp -a "$stage/." "$PREFIX/"
+  if [[ ! -f "$PREFIX/assets/geoip/sg-country-geoip.dat" ]]; then
+    [[ -n "$ASSETS_RECOVERY_DIR" && -d "$ASSETS_RECOVERY_DIR" ]] || fail "preserved assets are unavailable"
+    rm -rf "$PREFIX/assets"
+    cp -a "$ASSETS_RECOVERY_DIR" "$PREFIX/assets"
+  fi
+  chown -R root:root "$PREFIX"
+  chmod 0755 "$PREFIX"
+  find "$PREFIX" -path "$PREFIX/.venv" -prune -o -type d -exec chmod 0755 {} +
+  find "$PREFIX" -path "$PREFIX/.venv" -prune -o -type f -exec chmod 0644 {} +
+  find "$PREFIX/deploy" -maxdepth 1 -type f -name '*.sh' -exec chmod 0755 {} + 2>/dev/null || true
+  chmod -R a+rX "$PREFIX/.venv"
+
+  [[ -f "$PREFIX/assets/geoip/sg-country-geoip.dat" ]] || fail "country GeoIP asset disappeared during Update"
+  local assets_after
+  assets_after="$(fingerprint_tree_relative "$PREFIX/assets")"
+  [[ -n "$ASSETS_FINGERPRINT" && "$assets_after" == "$ASSETS_FINGERPRINT" ]] || fail "local assets changed during panel-only Update"
+  printf '[SG-Gateway Update] Local assets preserved: OK\n'
+
+  runuser -u sg-gateway -- test -r "$PREFIX/app/main.py"
+  runuser -u sg-gateway -- test -x "$PREFIX/.venv/bin/python"
+  runuser -u sg-gateway -- "$PREFIX/.venv/bin/python" -c \
+    'import flask, jinja2, waitress; print("Python runtime: OK")'
+}
+
+restart_panel() {
+  systemctl start "$HOSTD_SERVICE"
+  for _ in $(seq 1 30); do
+    curl -fsS --max-time 2 http://127.0.0.1:8090/health >/dev/null 2>&1 && break
+    sleep 1
+  done
+  curl -fsS --max-time 3 http://127.0.0.1:8090/health >/dev/null
+
+  systemctl start "$PANEL_SERVICE"
+  for _ in $(seq 1 30); do
+    curl -fsS --max-time 2 http://127.0.0.1:18080/health >/dev/null 2>&1 && break
+    sleep 1
+  done
+  curl -fsS --max-time 3 http://127.0.0.1:18080/health >/dev/null
+  SERVICES_STOPPED=0
+}
+
+verify_final() {
+  local before after
+
+  before="$(cat "$BACKUP_DIR/clients-before.sha256")"
+  after="$(fingerprint_clients)"
+  [[ "$before" == "$after" ]] || fail "Clients/credentials changed during Update"
+
+  before="$(cat "$BACKUP_DIR/letsencrypt-before.sha256")"
+  after="$(fingerprint_paths /etc/letsencrypt)"
+  [[ "$before" == "$after" ]] || fail "/etc/letsencrypt changed during Update"
+
+  before="$(cat "$BACKUP_DIR/nginx-before.sha256")"
+  after="$(fingerprint_paths \
+    /etc/nginx/nginx.conf \
+    /etc/nginx/sites-available/sg-gateway \
+    /etc/nginx/sites-enabled/sg-gateway \
+    /etc/nginx/stream-conf.d/sg-gateway-443.conf)"
+  [[ "$before" == "$after" ]] || fail "Nginx configuration changed during Update"
+
+  verify_runtime_states_unchanged "$BACKUP_DIR/service-state.tsv"
+  nginx -t >/dev/null
+
+  # shellcheck disable=SC1090
+  source "$BACKUP_DIR/https-before.env"
+  if [[ "${HTTPS_READY:-0}" == "1" ]]; then
+    curl --noproxy '*' -fsS --max-time 15 \
+      --resolve "${HTTPS_DOMAIN}:${PANEL_PORT}:127.0.0.1" \
+      "https://${HTTPS_DOMAIN}:${PANEL_PORT}/health" >/dev/null
+  else
+    curl -fsS --max-time 8 "http://127.0.0.1:${PANEL_PORT}/health" >/dev/null
+  fi
+
+  systemctl is-active --quiet "$HOSTD_SERVICE"
+  systemctl is-active --quiet "$PANEL_SERVICE"
+  systemctl is-active --quiet nginx.service
+}
+
+main() {
+  printf '\n%s[SG-Gateway Update]%s Dedicated panel-only Update\n' "$CYAN" "$RESET"
+  printf '[SG-Gateway Update] This mode does NOT install packages, Certbot, Nginx or VPN cores.\n\n'
+
+  run_stage 1 "Проверка установленного SG-Gateway и HTTPS" preflight
+
+  # Download and validate the candidate before any server mutation.
+  prepare_source
+
+  run_stage 2 "Safety Backup: SG state + full /etc/letsencrypt" create_safety_backup
+  run_stage 3 "Обновление только исходников SG-Gateway" deploy_source "$SOURCE_DIR"
+  run_stage 4 "Python/UI проверка без изменения runtime" \
+    runuser -u sg-gateway -- "$PREFIX/.venv/bin/python" -B -c \
+      'from pathlib import Path; from jinja2 import Environment; env=Environment(); [env.parse(p.read_text(encoding="utf-8")) for p in Path("/opt/sg-gateway/app/web/templates").rglob("*.html")]; print("Templates: OK")'
+  run_stage 5 "Перезапуск только panel + hostd" restart_panel
+  run_stage 6 "Проверка HTTPS, Clients, Nginx и runtime" verify_final
+
+  UPDATE_FINISHED=1
+  trap - ERR INT TERM
+  local new_version
+  new_version="$(tr -d '\r\n' < "$PREFIX/VERSION")"
+
+  printf '\n%s[SG-Gateway Update] ============================================================%s\n' "$GREEN" "$RESET"
+  printf '%s[SG-Gateway Update] SG-Gateway safely updated.%s\n' "$GREEN" "$RESET"
+  printf '[SG-Gateway Update] VERSION: %s\n' "$new_version"
+  printf '[SG-Gateway Update] Safety Backup: %s\n' "$BACKUP_DIR"
+  printf '[SG-Gateway Update] Nginx/Certbot/Let'\''s Encrypt/cores were not modified.\n'
+  printf '[SG-Gateway Update] ============================================================\n'
+}
+
+main "$@"

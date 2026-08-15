@@ -1,0 +1,238 @@
+{% extends "base.html" %}
+{% block title %}SG-Gateway · Clients{% endblock %}
+
+{% block head %}
+  {{ super() }}
+  <link rel="stylesheet" href="{{ url_for('static', filename='sg-clients-visual-v2.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='sg-clients-runtime-v10.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='sg-preview35-clients.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='sg-clients-readable-small-v1.css') }}">
+  <style id="sg-0217-client-protocol-grid">
+    #cv2-dialog.cv10-dialog { width: min(1180px, calc(100vw - 32px)); max-width: 1180px; }
+    #cv2-dialog .cv12-protocols { display: grid !important; grid-template-columns: repeat(4, minmax(0, 1fr)) !important; gap: 10px !important; }
+    #cv2-dialog .cv12-protocols > legend { grid-column: 1 / -1; }
+    @media (max-width: 980px) { #cv2-dialog .cv12-protocols { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; } }
+    @media (max-width: 620px) { #cv2-dialog .cv12-protocols { grid-template-columns: 1fr !important; } }
+  </style>
+{% endblock %}
+
+{% block content %}
+<script>document.body.classList.add('clients-clarity-hotfix2');</script>
+<section class="cv2-page cv10-page cv35-page cv15-clarity-page">
+  <header class="cv2-heading cv15-heading">
+    <div class="cv2-heading-copy">
+      <div class="cv2-kicker"><span></span> SG-GATEWAY / CLIENTS</div>
+      <h1>Clients</h1>
+      <p>Клиенты и их устройства. Ссылки, QR и управление находятся внутри карточки клиента.</p>
+    </div>
+
+    <div class="cv2-heading-actions cv10-heading-actions">
+      <form method="post" action="{{ url_for('apply_clients') }}">
+        <button class="button cv2-button-secondary" type="submit">Проверить и применить</button>
+      </form>
+      <button class="button primary cv2-button-main sg-ljd-key-action" type="button" data-open-client-form>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        Добавить клиента
+      </button>
+    </div>
+  </header>
+
+  {% set sg_admin_present = clients | selectattr('name', 'equalto', 'sg-admin') | list %}
+  {% if sg_admin_present %}
+  <section id="sg-0217-sg-admin-explainer" class="cv2-filter-panel cv10-filter-panel cv15-filter-panel" aria-label="О клиенте sg-admin" style="display:block;">
+    <div class="cv2-kicker"><span></span> ПЕРВЫЙ VPN-КЛИЕНТ</div>
+    <div style="margin-top:8px; font-size:16px; line-height:1.55;">
+      <strong>sg-admin</strong> — автоматически созданный при установке первый VPN-клиент. Это не системный пользователь Linux и не логин для входа в панель.
+      Создайте собственных клиентов для себя и своих устройств. После проверки их подключений <strong>sg-admin можно удалить</strong> — работа SG-Gateway от него не зависит.
+    </div>
+  </section>
+  {% endif %}
+
+  <section class="cv2-filter-panel cv10-filter-panel cv15-filter-panel" aria-label="Фильтры клиентов">
+    <label class="cv2-filter-field cv2-filter-search">
+      <span>ПОИСК</span>
+      <div class="cv2-input-wrap">
+        <input id="cv2-search" type="search" placeholder="Имя клиента" autocomplete="off">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+      </div>
+    </label>
+
+    <label class="cv2-filter-field">
+      <span>СТАТУС</span>
+      <select id="cv2-status">
+        <option value="all">Все состояния</option>
+        <option value="enabled">Активные</option>
+        <option value="disabled">Отключённые</option>
+      </select>
+    </label>
+
+    <label class="cv2-filter-field">
+      <span>СОРТИРОВКА</span>
+      <select id="cv2-sort">
+        <option value="newest">Сначала новые</option>
+        <option value="oldest">Сначала старые</option>
+        <option value="name">По имени</option>
+      </select>
+    </label>
+
+    <div class="cv2-filter-buttons">
+      <button class="button primary" id="cv2-apply" type="button">Применить</button>
+      <button class="button" id="cv2-reset" type="button">Сбросить</button>
+    </div>
+
+    <div class="cv2-filter-footer">
+      Показано <strong id="cv2-visible-count">{{ clients|length }}</strong> из <strong>{{ clients|length }}</strong>
+    </div>
+  </section>
+
+  {% if clients %}
+  <section class="cv2-list-panel cv15-list-panel" aria-label="Список клиентов">
+    <div class="cv2-table-scroll">
+      <table class="cv2-table cv10-table cv15-table">
+        <thead>
+          <tr>
+            <th>Клиент</th>
+            <th>Сервер</th>
+            <th>Статус</th>
+            <th>Устройства</th>
+            <th>Срок</th>
+            <th class="cv2-actions-heading">Действие</th>
+          </tr>
+        </thead>
+        <tbody id="cv2-table-body">
+          {% for client in clients %}
+          <tr class="cv2-row cv15-row"
+              data-client-id="{{ client.id }}"
+              data-client-name="{{ client.name|e }}"
+              data-client-enabled="{{ 'enabled' if client.enabled else 'disabled' }}">
+            <td>
+              <div class="cv2-client-cell cv15-client-cell">
+                <span class="cv2-state-dot {{ 'online' if client.enabled else 'offline' }}"></span>
+                <div class="cv2-client-copy">
+                  <strong>{{ client.name }}</strong>
+                </div>
+              </div>
+            </td>
+            <td>
+              <div class="cv2-server-cell">
+                <img src="{{ country_flag_url(server_identity.country_code) }}" alt="{{ server_identity.country_name }}" width="24" height="16">
+                <div><strong>{{ server_identity.name }}</strong><small>{{ server_identity.address }}</small></div>
+              </div>
+            </td>
+            <td><span class="cv2-pill {{ 'success' if client.enabled else 'danger' }}">{{ 'Активен' if client.enabled else 'Отключён' }}</span></td>
+            <td>
+              <div class="cv15-device-count">
+                <strong>{{ client.device_count }}</strong>
+                <span>{{ 'устройство' if client.device_count == 1 else 'устройства' if client.device_count in [2, 3, 4] else 'устройств' }}</span>
+                {% if client.active_device_count != client.device_count %}<small>{{ client.active_device_count }} активно</small>{% endif %}
+              </div>
+            </td>
+            <td><span class="cv2-expiry">{{ client.expires_at or 'Без срока' }}</span></td>
+            <td>
+              <div class="cv2-row-actions cv15-row-actions">
+                <a class="button primary cv2-open-button" href="{{ url_for('client_detail', client_id=client.id) }}">Открыть</a>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <footer class="cv2-list-footer cv15-list-footer">
+      <span>Показано: <strong id="cv2-footer-count">{{ clients|length }}</strong></span>
+      <span>Всего клиентов: <strong>{{ clients|length }}</strong></span>
+    </footer>
+    <div class="cv15-no-results" id="cv15-no-results" hidden>
+      <strong>Ничего не найдено</strong>
+      <span>Измените поиск или сбросьте фильтры.</span>
+    </div>
+  </section>
+  {% endif %}
+</section>
+
+<dialog class="cv2-dialog cv10-dialog sg-ljd-raised" id="cv2-dialog">
+  <form method="post" action="{{ url_for('add_client') }}" class="cv2-create-form cv10-create-form">
+    <header class="cv2-dialog-head"><div><div class="cv2-kicker"><span></span> НОВЫЙ КЛИЕНТ</div><h2>Добавить клиента</h2><p>Основное устройство создаётся автоматически. Технические ключи панель подготовит сама.</p></div><button class="cv2-dialog-close" type="button" data-close-client-form aria-label="Закрыть">×</button></header>
+
+    <label><span>Имя клиента</span><input type="text" name="name" maxlength="80" required placeholder="Например: Сергей" autocomplete="off"></label>
+
+    <input type="hidden" name="protocols" value="sgclient">
+    <fieldset class="cv10-protocols cv12-protocols">
+      <legend>Каналы основного устройства</legend>
+      {% for profile in xray_profiles.profiles %}
+      {% set token = 'xray_' ~ profile.id %}
+      <label class="cv10-protocol {{ 'is-locked' if not profile.ready else '' }}">
+        <input type="checkbox" name="protocols" value="{{ token }}" {% if profile.ready and profile.id == 'reality_tcp' %}checked{% elif not profile.ready %}disabled{% endif %}>
+        <span><strong>{{ profile.title }}</strong><small>{% if profile.ready %}Отдельный профиль и QR{% elif profile.tls_required and not xray_profiles.tls_ready %}Требуется HTTPS{% elif profile.encryption_required and not profile.encryption_ready %}Сначала восстановите VLESS Encryption{% elif not profile.enabled %}Сначала включите профиль в Connections{% else %}Проверьте профиль Xray в Connections{% endif %}</small></span>
+      </label>
+      {% endfor %}
+      <label class="cv10-protocol"><input type="checkbox" name="protocols" value="amneziawg"><span><strong>AmneziaWG</strong><small>Полная конфигурация и QR</small></span></label>
+      <label class="cv10-protocol"><input type="checkbox" name="protocols" value="mihomo" checked><span><strong>Mieru</strong><small>Mieru-ссылка и Mihomo YAML</small></span></label>
+      <label class="cv10-protocol {{ 'is-locked' if not tls.https_ready else '' }}"><input type="checkbox" name="protocols" value="anytls" {% if not tls.https_ready %}disabled{% endif %}><span><strong>AnyTLS</strong><small>{{ 'Отдельный TLS-профиль и QR' if tls.https_ready else 'Требуется HTTPS' }}</small></span></label>
+      <label class="cv10-protocol {{ 'is-locked' if not tls.https_ready else '' }}"><input type="checkbox" name="protocols" value="tuic" {% if not tls.https_ready %}disabled{% endif %}><span><strong>TUIC v5</strong><small>{{ 'Отдельный QUIC/UDP-профиль и QR' if tls.https_ready else 'Требуется HTTPS' }}</small></span></label>
+    </fieldset>
+
+    <label><span>Срок действия</span><input type="date" name="expires_at"><small>Пустое поле означает бессрочный доступ.</small></label>
+    <div class="cv2-dialog-actions"><button class="button" type="button" data-close-client-form>Отмена</button><button class="button primary" type="submit">Создать и применить</button></div>
+  </form>
+</dialog>
+{% endblock %}
+
+{% block scripts %}
+  {{ super() }}
+  <script>
+  (() => {
+    const rows = [...document.querySelectorAll('.cv15-row')];
+    const search = document.getElementById('cv2-search');
+    const status = document.getElementById('cv2-status');
+    const sort = document.getElementById('cv2-sort');
+    const body = document.getElementById('cv2-table-body');
+    const countTop = document.getElementById('cv2-visible-count');
+    const countBottom = document.getElementById('cv2-footer-count');
+    const noResults = document.getElementById('cv15-no-results');
+
+    function filterRows() {
+      const query = (search?.value || '').trim().toLocaleLowerCase('ru');
+      const wantedStatus = status?.value || 'all';
+      let visible = 0;
+      rows.forEach(row => {
+        const matchesQuery = !query || row.dataset.clientName.toLocaleLowerCase('ru').includes(query);
+        const matchesStatus = wantedStatus === 'all' || row.dataset.clientEnabled === wantedStatus;
+        row.hidden = !(matchesQuery && matchesStatus);
+        if (!row.hidden) visible += 1;
+      });
+      if (countTop) countTop.textContent = visible;
+      if (countBottom) countBottom.textContent = visible;
+      if (noResults) noResults.hidden = visible !== 0;
+    }
+
+    function sortRows() {
+      if (!body) return;
+      const mode = sort?.value || 'newest';
+      [...rows].sort((a, b) => {
+        if (mode === 'name') return a.dataset.clientName.localeCompare(b.dataset.clientName, 'ru');
+        return mode === 'oldest'
+          ? Number(a.dataset.clientId) - Number(b.dataset.clientId)
+          : Number(b.dataset.clientId) - Number(a.dataset.clientId);
+      }).forEach(row => body.appendChild(row));
+      filterRows();
+    }
+
+    document.getElementById('cv2-apply')?.addEventListener('click', sortRows);
+    document.getElementById('cv2-reset')?.addEventListener('click', () => {
+      if (search) search.value = '';
+      if (status) status.value = 'all';
+      if (sort) sort.value = 'newest';
+      sortRows();
+    });
+    search?.addEventListener('input', filterRows);
+
+    const dialog = document.getElementById('cv2-dialog');
+    document.querySelectorAll('[data-open-client-form]').forEach(button => button.addEventListener('click', () => dialog?.showModal()));
+    document.querySelectorAll('[data-close-client-form]').forEach(button => button.addEventListener('click', () => dialog?.close()));
+    dialog?.addEventListener('click', event => { if (event.target === dialog) dialog.close(); });
+    if (new URLSearchParams(window.location.search).get('new') === '1') dialog?.showModal();
+    sortRows();
+  })();
+  </script>
+{% endblock %}

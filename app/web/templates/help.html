@@ -1,0 +1,356 @@
+{% extends "base.html" %}
+{% block title %}SG-Gateway · Help{% endblock %}
+
+{% block head %}
+  {{ super() }}
+  <link rel="stylesheet" href="{{ url_for('static', filename='sg-help-visual-v1.css') }}">
+{% endblock %}
+
+{% block content %}
+{% set topic_count = topics | length %}
+{% set step_count = namespace(value=0) %}
+{% for item in topics %}
+  {% set step_count.value = step_count.value + (item.body | length) %}
+{% endfor %}
+
+<section class="hlpv1-page">
+  <header class="hlpv1-heading">
+    <div>
+      <div class="hlpv1-kicker"><span></span> SG-GATEWAY / HELP</div>
+      <h1>Help</h1>
+      <p>Короткие практические инструкции по основным разделам SG-Gateway.</p>
+    </div>
+
+    <div class="hlpv1-heading-actions">
+      <a class="button primary" href="{{ url_for('system') }}">Открыть System</a>
+      <a class="button" href="{{ url_for('maintenance') }}">Диагностика и Backup</a>
+    </div>
+  </header>
+
+  <section class="hlpv1-summary sg-ljd-strip">
+    <article class="hlpv1-summary-card sg-ljd-card">
+      <div class="hlpv1-summary-icon blue">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M4 5h7v14H4zM13 5h7v14h-7z"/>
+        </svg>
+      </div>
+      <div>
+        <div class="hlpv1-summary-label">Разделы справки</div>
+        <div class="hlpv1-summary-value">{{ topic_count }}</div>
+        <div class="hlpv1-summary-note">System, Clients, Connections, Routing, Maintenance, Security</div>
+      </div>
+    </article>
+
+    <article class="hlpv1-summary-card sg-ljd-card">
+      <div class="hlpv1-summary-icon green">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M5 6h14M5 12h14M5 18h9"/>
+          <path d="m17 16 2 2 3-4"/>
+        </svg>
+      </div>
+      <div>
+        <div class="hlpv1-summary-label">Практические шаги</div>
+        <div class="hlpv1-summary-value">{{ step_count.value }}</div>
+        <div class="hlpv1-summary-note">Короткие действия без технической перегрузки</div>
+      </div>
+    </article>
+
+    <article class="hlpv1-summary-card sg-ljd-card">
+      <div class="hlpv1-summary-icon violet">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="11" cy="11" r="7"/>
+          <path d="m16 16 5 5"/>
+        </svg>
+      </div>
+      <div>
+        <div class="hlpv1-summary-label">Быстрый поиск</div>
+        <div class="hlpv1-summary-value compact">На странице</div>
+        <div class="hlpv1-summary-note">Фильтрация тем по названию и описанию</div>
+      </div>
+    </article>
+
+    <article class="hlpv1-summary-card sg-ljd-card">
+      <div class="hlpv1-summary-icon amber">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="9"/>
+          <path d="M9.5 9a2.7 2.7 0 1 1 4.7 1.8c-1.2 1-2.2 1.4-2.2 3.2M12 17h.01"/>
+        </svg>
+      </div>
+      <div>
+        <div class="hlpv1-summary-label">Текущая тема</div>
+        <div class="hlpv1-summary-value compact">{{ topic.title if topic else 'Обзор' }}</div>
+        <div class="hlpv1-summary-note">{{ topic.summary if topic else 'Выберите раздел или начните со схемы работы' }}</div>
+      </div>
+    </article>
+  </section>
+
+  <section class="hlpv1-search-panel sg-ljd-card">
+    <div class="hlpv1-search-icon">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="11" cy="11" r="7"/>
+        <path d="m16 16 5 5"/>
+      </svg>
+    </div>
+    <label>
+      <span>Найти раздел справки</span>
+      <input id="help-search"
+             type="search"
+             autocomplete="off"
+             placeholder="Например: клиент, резервная копия, пароль, Xray…">
+    </label>
+    <button class="button hlpv1-clear-search" id="help-clear" type="button">Очистить</button>
+  </section>
+
+  <section class="hlpv1-workspace">
+    <aside class="hlpv1-topic-sidebar sg-ljd-card">
+      <header class="hlpv1-sidebar-head">
+        <div>
+          <div class="hlpv1-card-kicker">РАЗДЕЛЫ</div>
+          <h2>Справка SG-Gateway</h2>
+        </div>
+        <span>{{ topic_count }}</span>
+      </header>
+
+      <nav class="hlpv1-topic-list" aria-label="Разделы справки">
+        {% for item in topics %}
+        <a class="hlpv1-topic-link {{ 'active' if topic and topic.slug == item.slug else '' }} sg-ljd-tile"
+           href="{{ url_for('help_topic', slug=item.slug) }}"
+           data-help-topic
+           data-search="{{ (item.title ~ ' ' ~ item.summary ~ ' ' ~ (item.body | join(' '))) | lower }}">
+          <span class="hlpv1-topic-icon {{ item.slug }}">
+            {% if item.slug == 'system' %}
+            <svg viewBox="0 0 24 24"><path d="M4 5h16v14H4zM8 15l3-4 2 2 3-4"/></svg>
+            {% elif item.slug == 'clients' %}
+            <svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="4"/><path d="M3 21v-2a6 6 0 0 1 12 0v2M17 11h4M19 9v4"/></svg>
+            {% elif item.slug == 'connections' %}
+            <svg viewBox="0 0 24 24"><path d="M3 12h4l2-7 4 14 2-7h6"/></svg>
+            {% elif item.slug == 'routing' %}
+            <svg viewBox="0 0 24 24"><path d="M4 7h8M12 7l-3-3M12 7l-3 3M20 17h-8M12 17l3-3M12 17l3 3"/></svg>
+            {% elif item.slug == 'maintenance' %}
+            <svg viewBox="0 0 24 24"><path d="M5 6c0-1.1 3.1-2 7-2s7 .9 7 2-3.1 2-7 2-7-.9-7-2ZM5 6v12c0 1.1 3.1 2 7 2s7-.9 7-2V6"/></svg>
+            {% else %}
+            <svg viewBox="0 0 24 24"><path d="M12 3 5 6v5c0 4.8 2.9 8.1 7 10 4.1-1.9 7-5.2 7-10V6l-7-3Z"/></svg>
+            {% endif %}
+          </span>
+
+          <span class="hlpv1-topic-copy">
+            <strong>{{ item.title }}</strong>
+            <small>{{ item.summary }}</small>
+          </span>
+          <span class="hlpv1-topic-arrow">→</span>
+        </a>
+        {% endfor %}
+      </nav>
+
+      <div class="hlpv1-no-results" id="help-no-results" hidden>
+        <strong>Ничего не найдено</strong>
+        <small>Попробуйте другое слово или очистите поиск.</small>
+      </div>
+    </aside>
+
+    <main class="hlpv1-article-panel sg-ljd-card-large">
+      {% if topic %}
+      <header class="hlpv1-article-head">
+        <div class="hlpv1-article-title">
+          <span class="hlpv1-article-icon {{ topic.slug }}">
+            {% if topic.slug == 'system' %}
+            <svg viewBox="0 0 24 24"><path d="M4 5h16v14H4zM8 15l3-4 2 2 3-4"/></svg>
+            {% elif topic.slug == 'clients' %}
+            <svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="4"/><path d="M3 21v-2a6 6 0 0 1 12 0v2M17 11h4M19 9v4"/></svg>
+            {% elif topic.slug == 'connections' %}
+            <svg viewBox="0 0 24 24"><path d="M3 12h4l2-7 4 14 2-7h6"/></svg>
+            {% elif topic.slug == 'routing' %}
+            <svg viewBox="0 0 24 24"><path d="M4 7h8M12 7l-3-3M12 7l-3 3M20 17h-8M12 17l3-3M12 17l3 3"/></svg>
+            {% elif topic.slug == 'maintenance' %}
+            <svg viewBox="0 0 24 24"><path d="M5 6c0-1.1 3.1-2 7-2s7 .9 7 2-3.1 2-7 2-7-.9-7-2ZM5 6v12c0 1.1 3.1 2 7 2s7-.9 7-2V6"/></svg>
+            {% else %}
+            <svg viewBox="0 0 24 24"><path d="M12 3 5 6v5c0 4.8 2.9 8.1 7 10 4.1-1.9 7-5.2 7-10V6l-7-3Z"/></svg>
+            {% endif %}
+          </span>
+
+          <div>
+            <div class="hlpv1-card-kicker">ТЕМА СПРАВКИ</div>
+            <h2>{{ topic.title }}</h2>
+            <p>{{ topic.summary }}</p>
+          </div>
+        </div>
+        <span class="hlpv1-step-pill">{{ topic.body | length }} шага</span>
+      </header>
+
+      <section class="hlpv1-steps">
+        {% for paragraph in topic.body %}
+        <article class="hlpv1-step-card sg-ljd-card">
+          <span class="hlpv1-step-number">{{ '%02d' | format(loop.index) }}</span>
+          <div>
+            <strong>
+              {% if loop.index == 1 %}С чего начать
+              {% elif loop.last %}Что проверить
+              {% else %}Следующее действие
+              {% endif %}
+            </strong>
+            <p>{{ paragraph }}</p>
+          </div>
+        </article>
+        {% endfor %}
+      </section>
+
+      <section class="hlpv1-related">
+        <header>
+          <div>
+            <div class="hlpv1-card-kicker">БЫСТРЫЙ ПЕРЕХОД</div>
+            <h3>Открыть связанный раздел</h3>
+          </div>
+        </header>
+
+        <div class="hlpv1-related-grid sg-ljd-tile-grid">
+          {% if topic.slug == 'system' %}
+          <a href="{{ url_for('system') }}"><strong>System</strong><small>Проверить ресурсы и состояние</small><span>→</span></a>
+          <a href="{{ url_for('maintenance') }}"><strong>Maintenance</strong><small>Диагностика и копии</small><span>→</span></a>
+          {% elif topic.slug == 'clients' %}
+          <a href="{{ url_for('clients') }}"><strong>Clients</strong><small>Создать и открыть клиента</small><span>→</span></a>
+          <a href="{{ url_for('connections') }}"><strong>Connections</strong><small>Проверить параметры профиля</small><span>→</span></a>
+          {% elif topic.slug == 'connections' %}
+          <a href="{{ url_for('connections') }}"><strong>Connections</strong><small>Изменить адреса и ключи</small><span>→</span></a>
+          <a href="{{ url_for('routing') }}"><strong>Routing</strong><small>Посмотреть итоговый путь</small><span>→</span></a>
+          {% elif topic.slug == 'routing' %}
+          <a href="{{ url_for('routing') }}"><strong>Routing</strong><small>Открыть фактические пути</small><span>→</span></a>
+          <a href="{{ url_for('clients') }}"><strong>Clients</strong><small>Проверить выданные профили</small><span>→</span></a>
+          {% elif topic.slug == 'maintenance' %}
+          <a href="{{ url_for('maintenance') }}"><strong>Maintenance</strong><small>Копии и журнал операций</small><span>→</span></a>
+          <a href="{{ url_for('recovery') }}"><strong>Recovery</strong><small>Аварийный обзор состояния</small><span>→</span></a>
+          {% else %}
+          <a href="{{ url_for('security') }}"><strong>Security</strong><small>Проверить доступ к панели</small><span>→</span></a>
+          <a href="{{ url_for('download_diagnostics') }}"><strong>Diagnostics</strong><small>Скачать системный отчёт</small><span>→</span></a>
+          {% endif %}
+        </div>
+      </section>
+
+      <footer class="hlpv1-article-footer">
+        <a href="{{ url_for('help_index') }}">← Вернуться к обзору</a>
+        <span>SG-Gateway Help · {{ topic.slug }}</span>
+      </footer>
+      {% else %}
+      <header class="hlpv1-welcome-head">
+        <div>
+          <div class="hlpv1-card-kicker">БЫСТРЫЙ СТАРТ</div>
+          <h2>Рабочий маршрут по SG-Gateway</h2>
+          <p>Начните с состояния сервера, настройте подключения, создайте клиента и сохраните резервную копию.</p>
+        </div>
+        <span class="hlpv1-step-pill">6 этапов</span>
+      </header>
+
+      <section class="hlpv1-journey sg-ljd-tile-grid">
+        <a href="{{ url_for('system') }}">
+          <span class="hlpv1-journey-number">01</span>
+          <div>
+            <strong>Проверить System</strong>
+            <p>Убедитесь, что панель, база, hostd и ресурсы сервера находятся в ожидаемом состоянии.</p>
+          </div>
+          <span class="hlpv1-journey-arrow">→</span>
+        </a>
+
+        <a href="{{ url_for('connections') }}">
+          <span class="hlpv1-journey-number">02</span>
+          <div>
+            <strong>Настроить Connections</strong>
+            <p>Укажите внешний адрес, порты, страну и ключи AmneziaWG и Xray Reality.</p>
+          </div>
+          <span class="hlpv1-journey-arrow">→</span>
+        </a>
+
+        <a href="{{ url_for('routing') }}">
+          <span class="hlpv1-journey-number">03</span>
+          <div>
+            <strong>Проверить Routing</strong>
+            <p>Посмотрите, какие параметры попадут в клиентские профили и каким будет путь трафика.</p>
+          </div>
+          <span class="hlpv1-journey-arrow">→</span>
+        </a>
+
+        <a href="{{ url_for('clients') }}">
+          <span class="hlpv1-journey-number">04</span>
+          <div>
+            <strong>Создать клиента</strong>
+            <p>Выберите AmneziaWG, Xray Reality или оба доступа и откройте карточку клиента.</p>
+          </div>
+          <span class="hlpv1-journey-arrow">→</span>
+        </a>
+
+        <a href="{{ url_for('maintenance') }}">
+          <span class="hlpv1-journey-number">05</span>
+          <div>
+            <strong>Создать Backup</strong>
+            <p>Сохраните SQLite-базу перед значительными изменениями или проверкой восстановления.</p>
+          </div>
+          <span class="hlpv1-journey-arrow">→</span>
+        </a>
+
+        <a href="{{ url_for('security') }}">
+          <span class="hlpv1-journey-number">06</span>
+          <div>
+            <strong>Проверить Security</strong>
+            <p>Убедитесь, что пароль не стандартный, а публикация панели соответствует вашей модели доступа.</p>
+          </div>
+          <span class="hlpv1-journey-arrow">→</span>
+        </a>
+      </section>
+
+      <section class="hlpv1-help-note sg-ljd-card">
+        <div class="hlpv1-note-icon">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="9"/>
+            <path d="M12 11v5M12 8h.01"/>
+          </svg>
+        </div>
+        <div>
+          <strong>Справка отражает текущие возможности</strong>
+          <p>Здесь нет инструкций для функций, которых пока нет в backend. Новые разделы будут добавляться вместе с реальными возможностями SG-Gateway.</p>
+        </div>
+      </section>
+      {% endif %}
+    </main>
+  </section>
+
+  <footer class="hlpv1-page-footer">
+    <span>{{ topic_count }} разделов · {{ step_count.value }} практических шагов</span>
+    <span>SG-Gateway Help · коротко, честно, по действиям</span>
+  </footer>
+</section>
+{% endblock %}
+
+{% block scripts %}
+  {{ super() }}
+  <script>
+  (() => {
+    const input = document.getElementById("help-search");
+    const clear = document.getElementById("help-clear");
+    const topics = Array.from(document.querySelectorAll("[data-help-topic]"));
+    const empty = document.getElementById("help-no-results");
+
+    if (!input || !clear || !topics.length || !empty) return;
+
+    const applyFilter = () => {
+      const query = input.value.trim().toLowerCase();
+      let visible = 0;
+
+      topics.forEach(item => {
+        const matches = !query || (item.dataset.search || "").includes(query);
+        item.hidden = !matches;
+        if (matches) visible += 1;
+      });
+
+      empty.hidden = visible !== 0;
+      clear.disabled = !query;
+    };
+
+    input.addEventListener("input", applyFilter);
+    clear.addEventListener("click", () => {
+      input.value = "";
+      applyFilter();
+      input.focus();
+    });
+
+    applyFilter();
+  })();
+  </script>
+{% endblock %}

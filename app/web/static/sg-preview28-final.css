@@ -1,0 +1,481 @@
+/* SG-Gateway Preview 28 · cumulative final UI corrections.
+   Loaded after every page stylesheet so old cyan/green outlines cannot return. */
+
+html[data-theme="light"] :is(
+  .button,
+  .sg-button,
+  button:not([type="checkbox"]):not([type="radio"]),
+  .sg-icon-button,
+  .sg-sidebar-action,
+  .sg-user-menu > summary,
+  .sg-nav-item,
+  .sg-ljd-tile,
+  .sv1-action-button,
+  [role="button"]
+) {
+  border-color: #89968A !important;
+  outline: 0 !important;
+}
+
+html[data-theme="light"] :is(
+  .button.primary,
+  .sg-button.primary,
+  button.primary,
+  .sg-nav-item.active,
+  .sg-nav-item.is-active
+) {
+  border-color: #68786C !important;
+}
+
+html[data-theme="light"] .sg-ljd-key-action {
+  border-color: #B88A45 !important;
+}
+
+html[data-theme="light"] :is(
+  .button,
+  .sg-button,
+  button:not([type="checkbox"]):not([type="radio"]),
+  .sg-icon-button,
+  .sg-sidebar-action,
+  .sg-user-menu > summary,
+  .sg-nav-item,
+  .sg-ljd-tile,
+  [role="button"]
+):focus-visible {
+  outline: 2px solid #B88A45 !important;
+  outline-offset: 2px !important;
+}
+
+/* Only this four-card row loses the old dark backing layer. */
+html[data-theme="light"] .sv1-summary.sg-ljd-system-summary {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
+/* Xray cards use neutral jade-graphite selection, never cyan. */
+html[data-theme="light"] .xps2-choice,
+html[data-theme="light"] .xps2-choice:hover,
+html[data-theme="light"] .xps2-choice.is-selected,
+html[data-theme="light"] .xps2-selector:checked + .xps2-choice {
+  border-color: #89968A !important;
+  outline: 0 !important;
+}
+
+html[data-theme="light"] .xps2-choice.is-selected,
+html[data-theme="light"] .xps2-selector:checked + .xps2-choice {
+  border-color: #68786C !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .333),
+    inset 1px 0 0 rgba(255, 255, 255, .333),
+    inset -1px 0 0 rgba(255, 255, 255, .333),
+    inset 0 0 0 2px #68786C,
+    0 2px 12px rgba(43, 52, 46, .20) !important;
+}
+
+
+/* Preview 24 · final connection layout and border cleanup. */
+
+/* The user requested no green/cyan outline around buttons.
+   Buttons keep their gradient, depth and upper light rim; the outer border is transparent. */
+html[data-theme="light"] :is(
+  .button:not(.danger),
+  .sg-button:not(.danger),
+  button:not([type="checkbox"]):not([type="radio"]):not(.danger),
+  .sg-icon-button,
+  .sg-sidebar-action,
+  .sg-user-menu > summary,
+  .sg-nav-item,
+  .sg-ljd-tile,
+  .sv1-action-button,
+  [role="button"]
+) {
+  border-color: transparent !important;
+  outline: 0 !important;
+  box-shadow: var(--sg-ljd-button-depth) !important;
+}
+
+html[data-theme="light"] .sg-nav-item {
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+html[data-theme="light"] .sg-nav-item:hover,
+html[data-theme="light"] .sg-nav-item.active,
+html[data-theme="light"] .sg-nav-item.is-active {
+  border-color: transparent !important;
+  box-shadow: var(--sg-ljd-button-depth) !important;
+}
+
+html[data-theme="light"] .sg-ljd-key-action {
+  border-color: #B88A45 !important;
+}
+
+html[data-theme="light"] .mhv2-switch input:checked + span {
+  border-color: transparent !important;
+  outline: 0 !important;
+}
+
+/* Xray is the full-width first section; AWG and Mihomo form equal halves below. */
+.cnv1-engine-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: stretch;
+  gap: 14px;
+}
+
+.cnv1-engine-pair > .cnv1-engine-card,
+.cnv1-engine-pair > .mhv2-panel {
+  min-width: 0;
+  height: auto;
+  align-self: stretch;
+}
+
+.cnv1-engine-awg,
+.cnv1-engine-mihomo {
+  display: flex;
+  flex-direction: column;
+}
+
+.cnv1-engine-form-compact {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+}
+
+.cnv1-compact-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+  margin: 16px 18px 0;
+}
+
+.cnv1-compact-fields label {
+  display: grid;
+  gap: 7px;
+}
+
+.cnv1-compact-fields label > span {
+  color: var(--sg-muted);
+  font-size: 8px;
+  font-weight: 800;
+}
+
+.cnv1-engine-form-compact > .cnv1-advanced {
+  margin: 14px 18px 0;
+}
+
+.cnv1-engine-form-compact > .cnv1-form-actions {
+  margin-top: auto;
+}
+
+/* Compact Mihomo editor for the right half. */
+.cnv1-engine-mihomo.mhv2-panel {
+  margin-top: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.cnv1-engine-mihomo .mhv2-head {
+  padding: 18px;
+}
+
+.cnv1-engine-mihomo .mhv2-head h2 {
+  margin-top: 5px;
+  font-size: 19px;
+}
+
+.cnv1-engine-mihomo .mhv2-head p {
+  margin-top: 6px;
+  font-size: 9.5px;
+}
+
+.cnv1-engine-mihomo .mhv2-head-state,
+.cnv1-engine-mihomo .mhv2-version {
+  display: none;
+}
+
+.mhv2-compact-meta {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+  margin: 0 18px 12px;
+}
+
+.mhv2-compact-meta > :only-child {
+  grid-column: 1 / -1;
+}
+
+.mhv2-compact-endpoint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 70px;
+  margin: 0;
+  padding: 10px 12px;
+}
+
+.mhv2-compact-endpoint > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.mhv2-compact-endpoint > div > span {
+  color: var(--sg-muted);
+  font-size: 7px;
+  font-weight: 850;
+  letter-spacing: .10em;
+}
+
+.mhv2-compact-endpoint > div > strong {
+  overflow: hidden;
+  color: var(--sg-text);
+  font-size: 10.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mhv2-compact-endpoint > div > small {
+  color: var(--sg-muted);
+  font-size: 7.5px;
+}
+
+.mhv2-listener-count {
+  flex: 0 0 auto;
+  color: #356B56;
+  font-size: 8px;
+  font-weight: 800;
+}
+
+.cnv1-engine-mihomo .mhv2-tls-warning-compact {
+  min-height: 70px;
+  margin: 0;
+  padding: 9px 11px;
+}
+
+.cnv1-engine-mihomo .mhv2-tls-warning-compact span {
+  font-size: 8px;
+}
+
+.cnv1-engine-mihomo .mhv2-form-compact {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  flex: 0 0 auto;
+  gap: 0 10px;
+}
+
+.cnv1-engine-mihomo .mhv2-listeners-compact {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: 1fr;
+  align-items: stretch;
+  gap: 8px;
+  padding: 0 18px;
+}
+
+.cnv1-engine-mihomo .mhv2-listener {
+  align-content: start;
+  gap: 9px;
+  padding: 10px;
+}
+
+.cnv1-engine-mihomo .mhv2-listener header {
+  gap: 10px;
+}
+
+.cnv1-engine-mihomo .mhv2-listener-icon {
+  width: 30px;
+  height: 30px;
+  flex-basis: 30px;
+}
+
+.cnv1-engine-mihomo .mhv2-listener-title h3 {
+  font-size: 12px;
+}
+
+.cnv1-engine-mihomo .mhv2-listener-title p {
+  margin-top: 2px;
+  font-size: 7.5px;
+}
+
+.cnv1-engine-mihomo .mhv2-basic-fields {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+  margin-top: 7px;
+}
+
+.cnv1-engine-mihomo .mhv2-basic-fields.one {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.cnv1-engine-mihomo .mhv2-advanced {
+  margin-top: 6px;
+  padding-top: 8px;
+}
+
+.cnv1-engine-mihomo .mhv2-actions {
+  grid-column: 1;
+  align-self: center;
+  margin: 0;
+  padding: 12px 0 14px 18px;
+}
+
+.cnv1-engine-mihomo .mhv2-service-tools {
+  grid-column: 2;
+  align-self: center;
+  margin: 0 18px 14px 0;
+  border-top: 0;
+  padding-top: 0;
+}
+
+.cnv1-engine-mihomo .mhv2-service-tools > summary {
+  white-space: nowrap;
+}
+
+.cnv1-engine-mihomo .mhv2-service-tools[open] {
+  grid-column: 1 / -1;
+  margin: 0 18px 14px;
+}
+
+/* The decorative connection map has been removed from HTML. */
+.cnv1-xray-row {
+  grid-template-columns: 1fr;
+}
+
+@media (max-width: 1100px) {
+  .cnv1-engine-pair {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  .cnv1-engine-pair > .cnv1-engine-card,
+  .cnv1-engine-pair > .mhv2-panel {
+    height: auto;
+    align-self: start;
+  }
+
+  .cnv1-engine-awg .cnv1-engine-form-compact {
+    flex: 0 0 auto;
+  }
+
+  .cnv1-engine-awg .cnv1-form-actions {
+    margin-top: 14px;
+  }
+
+  .cnv1-engine-mihomo .mhv2-form-compact {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .cnv1-engine-mihomo .mhv2-actions {
+    padding-right: 18px;
+  }
+
+  .cnv1-engine-mihomo .mhv2-service-tools {
+    margin-left: 18px;
+  }
+}
+
+@media (max-width: 680px) {
+  .mhv2-compact-meta {
+    grid-template-columns: 1fr;
+  }
+
+  .cnv1-compact-fields,
+  .cnv1-engine-mihomo .mhv2-basic-fields {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Preview 28: all three Mihomo listeners share one compact desktop row. */
+@media (min-width: 1280px) {
+  .cnv1-engine-mihomo .mhv2-listeners-compact {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .cnv1-engine-mihomo .mhv2-basic-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+
+/* Preview 28: equal-height cards without stretching AWG across a tall Mihomo editor. */
+.cnv1-engine-pair { align-items: stretch; }
+.cnv1-engine-pair > .cnv1-engine-card,
+.cnv1-engine-pair > .mhv2-panel { height: auto; align-self: stretch; }
+.cnv1-engine-awg { min-height: 0; }
+.cnv1-engine-awg .cnv1-engine-form-compact { flex: 1 1 auto; }
+.cnv1-engine-awg .cnv1-form-actions { margin-top: auto; }
+
+/* Preview 28: keep XTLS Vision explicit, not implicit in prose. */
+.xps2-flow-field {
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  min-width: 230px;
+  padding: 10px 12px;
+  border: 1px solid #89968A;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #FFFDFC 0%, #F6F1E7 100%);
+}
+.xps2-flow-field > span {
+  color: #66716A;
+  font-size: 8px;
+  font-weight: 850;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.xps2-flow-field > strong { color: #356B56; font-size: 13px; }
+.xps2-flow-field > small { color: #66716A; font-size: 8px; }
+
+
+/* Preview 28: Connections begins with Xray; the compact equal-height engine pair follows it. */
+.cnv1-page > .cnv1-xray-row { margin-top: 2px; }
+
+/* SG-Gateway 021 · Mihomo as a separate full-width Connections block */
+.cnv1-engine-pair {
+  grid-template-columns: minmax(0, 1fr) !important;
+  align-items: start !important;
+}
+
+.cnv1-engine-pair > .cnv1-engine-card,
+.cnv1-engine-pair > .mhv2-panel {
+  width: 100% !important;
+  min-width: 0 !important;
+  height: auto !important;
+  align-self: start !important;
+}
+
+.cnv1-engine-awg .cnv1-engine-form-compact {
+  flex: 0 0 auto !important;
+}
+
+.cnv1-engine-awg .cnv1-form-actions {
+  margin-top: 14px !important;
+}
+
+.cnv1-engine-mihomo .mhv2-listeners-compact {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
+.cnv1-engine-mihomo .mhv2-form-compact {
+  display: flex;
+  flex-direction: column;
+}
+
+.cnv1-engine-mihomo .mhv2-actions {
+  padding-right: 18px;
+}
+
+.cnv1-engine-mihomo .mhv2-service-tools {
+  margin-left: 18px;
+}
+
+@media (max-width: 1180px) {
+  .cnv1-engine-mihomo .mhv2-listeners-compact {
+    grid-template-columns: 1fr !important;
+  }
+}
