@@ -4,6 +4,7 @@ import json
 
 from flask import Flask, Response, abort, jsonify
 
+from app.clients.qr import ClientQrError, build_qr_svg
 from app.clients.repository import get_client
 from app.clients.sg_subscription import (
     SG_SUBSCRIPTION_FORMAT,
@@ -17,6 +18,7 @@ from app.clients.sg_subscription_store import (
 
 PUBLIC_ENDPOINT = "sg_subscription_v1"
 INFO_ENDPOINT = "sg_subscription_v1_info"
+QR_ENDPOINT = "sg_subscription_v1_qr"
 
 
 def register_sg_subscription(app: Flask) -> None:
@@ -72,3 +74,31 @@ def register_sg_subscription(app: Flask) -> None:
             view_func=info,
             methods=["GET"],
         )
+
+    if QR_ENDPOINT not in app.view_functions:
+        def qr(client_id: int):
+            client = get_client(client_id)
+            if client is None:
+                abort(404)
+            url = build_sg_subscription_url(client)
+            if not url:
+                abort(409)
+            try:
+                svg = build_qr_svg(url)
+            except ClientQrError as exc:
+                return Response(str(exc), status=409, mimetype="text/plain")
+            return Response(svg, mimetype="image/svg+xml")
+
+        app.add_url_rule(
+            "/clients/<int:client_id>/sg-subscription-v1/qr",
+            endpoint=QR_ENDPOINT,
+            view_func=qr,
+            methods=["GET"],
+        )
+
+    if not getattr(app, "_sg_subscription_v1_template_context", False):
+        def template_context():
+            return {"sg_subscription_url": build_sg_subscription_url}
+
+        app.context_processor(template_context)
+        setattr(app, "_sg_subscription_v1_template_context", True)
