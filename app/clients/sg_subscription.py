@@ -139,8 +139,32 @@ def _config_marker(profile: dict, device: dict) -> str:
     return "# SG-CONFIG " + json.dumps(metadata, ensure_ascii=False, separators=(",", ":"))
 
 
+
+def _ready_uri_lines(document: dict) -> list[str]:
+    client_name = str((document.get("client") or {}).get("name") or "SG")
+    lines: list[str] = []
+    for device in document.get("devices", []):
+        for profile in device.get("profiles", []):
+            if not profile.get("ready") or profile.get("format") != "uri" or not profile.get("uri"):
+                continue
+            label = _subscription_label(
+                client_name,
+                device,
+                str(profile.get("name") or profile.get("id") or "Профиль"),
+            )
+            lines.append(_with_fragment(str(profile["uri"]), label))
+    return lines
+
+def build_compatible_subscription_body(client: Client) -> str:
+    """Return the proven v2rayN-style Base64 transport for all ready URI profiles."""
+    document = build_sg_subscription_document(client)
+    decoded = "\n".join(_ready_uri_lines(document))
+    if decoded:
+        decoded += "\n"
+    return base64.b64encode(decoded.encode("utf-8")).decode("ascii")
+
 def build_sg_subscription_text(client: Client) -> str:
-    """Build the SG v1 human-readable backward-compatible envelope with URI and SG-CONFIG records."""
+    """Build the SG v1 human-readable envelope with URI and SG-CONFIG records."""
     document = build_sg_subscription_document(client)
     summary = document["summary"]
     lines = [
