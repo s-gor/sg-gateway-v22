@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-REPOSITORY="s-gor/sg-gateway"
-BRANCH="${SG_GATEWAY_GITHUB_BRANCH:-main}"
+REPOSITORY="s-gor/sg-gateway-v22"
+BRANCH="${SG_GATEWAY_GITHUB_BRANCH:-dev-v22}"
 ARCHIVE_URL="https://github.com/${REPOSITORY}/archive/refs/heads/${BRANCH}.tar.gz"
 TEMP_DIR=""
 
