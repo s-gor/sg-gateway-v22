@@ -57,8 +57,10 @@ def public_host(*fallbacks: object) -> str:
         return domain
 
     try:
+        # Preserve the 02112 public endpoint contract literally: this remains
+        # the first IP fallback even after the dual-stack metadata was added.
+        current_address = clean_host(load_config().public_address)
         config = load_config()
-        current_address = clean_host(config.public_address)
         current_ipv4 = clean_host(config.public_ipv4)
         current_ipv6 = clean_host(config.public_ipv6)
     except Exception:
