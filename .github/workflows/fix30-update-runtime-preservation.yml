@@ -21,7 +21,20 @@ jobs:
       - name: Validate repair
         run: |
           bash -n deploy/update-from-github.sh
-          python3 -m pytest -q tests/test_update_runtime_preservation_contract.py
+          python3 -m py_compile tests/test_update_runtime_preservation_contract.py
+          python3 - <<'PY'
+          import importlib.util
+          from pathlib import Path
+          path = Path('tests/test_update_runtime_preservation_contract.py')
+          spec = importlib.util.spec_from_file_location('contract', path)
+          module = importlib.util.module_from_spec(spec)
+          assert spec.loader is not None
+          spec.loader.exec_module(module)
+          tests = [getattr(module, name) for name in dir(module) if name.startswith('test_')]
+          for test in tests:
+              test()
+          print(f'updater preservation contract: {len(tests)} checks passed')
+          PY
 
       - name: Remove one-shot repair files and refresh source integrity
         run: |
