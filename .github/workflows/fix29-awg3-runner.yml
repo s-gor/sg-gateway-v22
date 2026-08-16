@@ -89,7 +89,9 @@ jobs:
           ! grep -RIn 'amneziawg-linux-kernel-module-3\.0' install.sh app hostd deploy vendor/cores/SHA256SUMS
           ! grep -RIn 'AMNEZIAWG_KMOD_VERSION="3\.' install.sh app hostd deploy vendor/cores/SHA256SUMS
           grep -F 'export PATH="$AWG3_ROOT/bin:$PATH"' deploy/sg-gateway-awg3-userspace.sh
-          grep -F 'WG_QUICK_USERSPACE_IMPLEMENTATION="$AWG_GO"' deploy/sg-gateway-awg3-userspace.sh
+          grep -F '"$AWG_GO" "$IFACE"' deploy/sg-gateway-awg3-userspace.sh
+          grep -F '"$AWG_QUICK" strip "$CONFIG"' deploy/sg-gateway-awg3-userspace.sh
+          grep -F '"$AWG" setconf "$IFACE" "$stripped"' deploy/sg-gateway-awg3-userspace.sh
 
       - name: Install test dependencies
         run: python3 -m pip install -q -r requirements-dev.txt
