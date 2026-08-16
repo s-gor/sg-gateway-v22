@@ -69,14 +69,24 @@ start_runtime() {
     "$AWG_QUICK" strip "$CONFIG" > "$stripped"
     "$AWG" setconf "$IFACE" "$stripped"
 
-    local address=""
-    while IFS= read -r address; do
-      [[ -n "$address" ]] || continue
-      if [[ "$address" == *:* ]]; then
-        ip -6 address add "$address" dev "$IFACE"
-      else
-        ip -4 address add "$address" dev "$IFACE"
-      fi
+    # wg-quick permits multiple comma-separated addresses on one Address line.
+    # Split them explicitly because the AWG3 userspace helper configures the
+    # interface itself instead of delegating address setup to wg-quick.
+    local address_line="" address=""
+    local -a addresses=()
+    while IFS= read -r address_line; do
+      [[ -n "$address_line" ]] || continue
+      IFS=',' read -r -a addresses <<< "$address_line"
+      for address in "${addresses[@]}"; do
+        address="${address#"${address%%[![:space:]]*}"}"
+        address="${address%"${address##*[![:space:]]}"}"
+        [[ -n "$address" ]] || continue
+        if [[ "$address" == *:* ]]; then
+          ip -6 address add "$address" dev "$IFACE"
+        else
+          ip -4 address add "$address" dev "$IFACE"
+        fi
+      done
     done < <(config_values Address)
 
     local mtu=""
