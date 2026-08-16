@@ -1,0 +1,130 @@
+name: Validate Connections controls-only v2
+
+on:
+  push:
+    branches:
+      - scratch/connections-controls-only-v2
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout visual patch source
+        uses: actions/checkout@v4
+
+      - name: Checkout exact green 022.04 product
+        uses: actions/checkout@v4
+        with:
+          ref: cf6dd4e8fd34dbcc341050390a9f4e774dbded5e
+          path: product
+          fetch-depth: 0
+
+      - name: Assemble isolated product candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C product rev-parse HEAD)" = "cf6dd4e8fd34dbcc341050390a9f4e774dbded5e"
+          python3 -B tools/apply_connections_controls_only_v2.py product
+          cd product
+          python3 -B - <<'PY'
+          import hashlib
+          import subprocess
+          from pathlib import Path
+
+          paths = subprocess.check_output(['git', 'ls-files'], text=True, encoding='utf-8').splitlines()
+          paths = [path for path in paths if path != 'SOURCE-SHA256SUMS']
+          Path('SOURCE-SHA256SUMS').write_text(
+              '\n'.join(f'{hashlib.sha256(Path(path).read_bytes()).hexdigest()}  {path}' for path in paths) + '\n',
+              encoding='utf-8',
+          )
+          print(f'Rebuilt SOURCE-SHA256SUMS: {len(paths)} files')
+          PY
+          mapfile -t changed < <(git diff --name-only | sort)
+          expected=(
+            SOURCE-SHA256SUMS
+            app/web/static/sg-xmux-settings-v1.css
+            app/web/static/sg-xmux-settings-v1.js
+            app/web/templates/connections.html
+            tests/test_sg_gateway_02204_xmux_sgpanel_contract.py
+            tests/test_ui_connections_visual_v1.py
+          )
+          mapfile -t wanted < <(printf '%s\n' "${expected[@]}" | sort)
+          test "$(printf '%s\n' "${changed[@]}")" = "$(printf '%s\n' "${wanted[@]}")"
+          git diff --check
+          git add "${expected[@]}"
+          git config user.name "Ser.Gor"
+          git config user.email "infosec.co.il@gmail.com"
+          git commit -m "UI: show only real controls in Xray profile settings"
+          echo "CANDIDATE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+          test -z "$(git status --porcelain)"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r product/requirements-dev.txt
+
+      - name: Verify source integrity and syntax
+        shell: bash
+        working-directory: product
+        run: |
+          set -euo pipefail
+          python3 -B - <<'PY'
+          import hashlib, re, subprocess
+          from pathlib import Path
+          expected = {}
+          for raw in Path('SOURCE-SHA256SUMS').read_text(encoding='utf-8').splitlines():
+              if not raw.strip():
+                  continue
+              match = re.fullmatch(r'([0-9a-f]{64})  (.+)', raw)
+              if match is None:
+                  raise SystemExit(f'invalid checksum row: {raw!r}')
+              expected[match.group(2)] = match.group(1)
+          tracked = set(subprocess.check_output(['git','ls-files'], text=True).splitlines())
+          tracked.discard('SOURCE-SHA256SUMS')
+          assert set(expected) == tracked
+          for path in sorted(tracked):
+              data = subprocess.check_output(['git','show',f'HEAD:{path}'])
+              assert hashlib.sha256(data).hexdigest() == expected[path], path
+          print(f'Git-blob source integrity ok: {len(tracked)} files')
+          PY
+          python -B -c "from pathlib import Path; files=list(Path('app').rglob('*.py'))+list(Path('engines').rglob('*.py'))+list(Path('tests').rglob('*.py')); [compile(p.read_text(encoding='utf-8'), str(p), 'exec') for p in files]; print(f'syntax ok: {len(files)} files')"
+
+      - name: Run targeted Connections regressions
+        working-directory: product
+        run: |
+          python -m pytest \
+            tests/test_ui_connections_visual_v1.py \
+            tests/test_sg_gateway_02204_xmux_sgpanel_contract.py \
+            tests/test_sg_gateway_v22_low_resolution.py \
+            tests/test_connections_layout_v24.py \
+            tests/test_xray_profile_flow_v23.py
+
+      - name: Run full tests
+        working-directory: product
+        run: python -m pytest tests
+
+      - name: Build and verify FULL package
+        working-directory: product
+        run: |
+          VERSION="$(tr -d '[:space:]' < VERSION)"
+          test "$VERSION" = "0.1.0-022.04"
+          OUT="/tmp/SG-Gateway-${VERSION}-FULL.run"
+          bash build-run.sh "$OUT"
+          bash "$OUT" --verify-only
+
+      - name: Publish isolated green candidate
+        shell: bash
+        working-directory: product
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"
+          git push --force origin HEAD:refs/heads/scratch/connections-controls-only-candidate
+          echo "GREEN_CANDIDATE=$CANDIDATE_SHA"
