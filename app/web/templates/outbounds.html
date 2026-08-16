@@ -67,10 +67,13 @@
         <h3>Outbound tag <code>{{ warp.tag }}</code></h3>
         <p>protocol: {{ warp.protocol_label }}</p>
         <div class="ob49-warp-facts">
-          {% if warp.profile and warp.profile.endpoint %}<span>Endpoint: {{ warp.profile.endpoint }}</span>{% endif %}
-          {% if warp.last_test and warp.last_test.ip %}<span>Последний IP: {{ warp.last_test.ip }}</span>{% endif %}
-          {% if warp.last_test and warp.last_test.checked_at %}<span>Проверено: {{ warp.last_test.checked_at }}</span>{% else %}<span>Последняя проверка ещё не выполнялась</span>{% endif %}
-        </div>
+    {% if warp.profile and warp.profile.endpoint %}<span>Endpoint: {{ warp.profile.endpoint }}</span>{% endif %}
+    {% set warp4 = warp.last_test.get('ipv4', {}) if warp.last_test else {} %}
+    {% set warp6 = warp.last_test.get('ipv6', {}) if warp.last_test else {} %}
+    <span>WARP IPv4: {% if not warp.families.ipv4 %}нет в профиле{% elif warp4 and warp4.ok %}✓ {{ warp4.ip }}{% elif warp4 and warp4.supported %}✕ {{ warp4.message }}{% else %}не проверен{% endif %}</span>
+    <span>WARP IPv6: {% if not warp.families.ipv6 %}нет в профиле{% elif warp6 and warp6.ok %}✓ {{ warp6.ip }}{% elif warp6 and warp6.supported %}✕ {{ warp6.message }}{% else %}не проверен{% endif %}</span>
+    {% if warp.last_test and warp.last_test.checked_at %}<span>Проверено: {{ warp.last_test.checked_at }}</span>{% else %}<span>Последняя проверка ещё не выполнялась</span>{% endif %}
+  </div>
       </div>
       <div class="ob49-warp-buttons ob49-warp-buttons-full">
         <a class="ob49-secondary" href="{{ url_for('outbounds_warp_json') }}">{ } WARP JSON</a>

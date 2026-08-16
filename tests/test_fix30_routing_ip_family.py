@@ -50,6 +50,7 @@ def _fake_warp_outbound() -> dict:
 def _enable_fake_warp(monkeypatch) -> None:
     monkeypatch.setattr(warp, "enabled", lambda: True)
     monkeypatch.setattr(warp, "family_capabilities", lambda: {"ipv4": True, "ipv6": True})
+    monkeypatch.setattr(warp, "routing_family_capabilities", lambda: {"ipv4": True, "ipv6": True})
     monkeypatch.setattr(warp, "outbound", lambda require_enabled=True: _fake_warp_outbound())
 
 
@@ -88,7 +89,7 @@ def test_managed_outbounds_have_four_family_exits_and_one_warp_core(monkeypatch)
 
 def test_sanitizer_preserves_explicit_family_actions(monkeypatch):
     monkeypatch.setattr(routing_runtime, "routing_capabilities", _all_capabilities)
-    monkeypatch.setattr(warp, "enabled", lambda: True)
+    _enable_fake_warp(monkeypatch)
     fragment = routing_runtime.sanitize_managed_fragment(
         {
             "routing": {
@@ -265,3 +266,92 @@ def test_bundled_xray_accepts_family_gate_schema(tmp_path):
         check=False,
     )
     assert result.returncode == 0, result.stderr or result.stdout
+
+
+
+def test_warp_failed_health_disables_only_failed_routing_family(monkeypatch, tmp_path):
+    state = tmp_path / "warp.json"
+    monkeypatch.setenv("SG_GATEWAY_WARP_STATE_PATH", str(state))
+    warp.save_state(
+        enabled=True,
+        profile_ready=True,
+        profile={
+            "addresses": ["172.16.0.2/32", "2606:4700:110:8::2/128"],
+            "allowed_ips": ["0.0.0.0/0", "::/0"],
+        },
+        last_test={
+            "checked_at": "2026-08-16T00:00:00+00:00",
+            "ipv4": {"supported": True, "ok": True, "ip": "104.16.0.1"},
+            "ipv6": {"supported": True, "ok": False, "message": "IPv6 test failed"},
+        },
+    )
+    assert warp.family_capabilities() == {"ipv4": True, "ipv6": True}
+    assert warp.routing_family_capabilities() == {"ipv4": True, "ipv6": False}
+    monkeypatch.setattr(warp, "profile_ready", lambda: True)
+    view = warp.overview()
+    assert view["families"] == {"ipv4": True, "ipv6": True}
+    assert view["routing_families"] == {"ipv4": True, "ipv6": False}
+    assert view["ipv4_ready"] is True
+    assert view["ipv6_ready"] is False
+
+
+def test_warp_failed_family_remains_profile_capable_for_retest(monkeypatch, tmp_path):
+    state = tmp_path / "warp.json"
+    monkeypatch.setenv("SG_GATEWAY_WARP_STATE_PATH", str(state))
+    warp.save_state(
+        profile_ready=True,
+        profile={
+            "addresses": ["172.16.0.2/32", "2606:4700:110:8::2/128"],
+            "allowed_ips": ["0.0.0.0/0", "::/0"],
+        },
+        last_test={
+            "ipv4": {"supported": True, "ok": True},
+            "ipv6": {"supported": True, "ok": False},
+        },
+    )
+    assert warp.family_capabilities()["ipv6"] is True
+    assert warp.routing_family_capabilities()["ipv6"] is False
+
+
+def test_managed_outbounds_omit_failed_warp_family(monkeypatch):
+    monkeypatch.setattr(warp, "enabled", lambda: True)
+    monkeypatch.setattr(warp, "routing_family_capabilities", lambda: {"ipv4": True, "ipv6": False})
+    monkeypatch.setattr(warp, "outbound", lambda require_enabled=True: _fake_warp_outbound())
+    tags = [item["tag"] for item in routing_runtime.build_managed_outbounds([])]
+    assert "warp4" in tags
+    assert "warp6" not in tags
+    assert "warp-core" in tags
+
+
+def test_health_guard_rejects_only_failed_warp_family(monkeypatch, tmp_path):
+    state = tmp_path / "warp.json"
+    monkeypatch.setenv("SG_GATEWAY_WARP_STATE_PATH", str(state))
+    monkeypatch.setattr(warp, "profile_ready", lambda: True)
+    warp.save_state(
+        enabled=True,
+        profile_ready=True,
+        profile={
+            "addresses": ["172.16.0.2/32", "2606:4700:110:8::2/128"],
+            "allowed_ips": ["0.0.0.0/0", "::/0"],
+        },
+        last_test={
+            "ipv4": {"supported": True, "ok": True},
+            "ipv6": {"supported": True, "ok": False},
+        },
+    )
+    warp.ensure_routing_supported({"routing": {"rules": [{"outboundTag": "warp4"}]}})
+    try:
+        warp.ensure_routing_supported({"routing": {"rules": [{"outboundTag": "warp6"}]}})
+    except warp.WarpError as exc:
+        assert "WARP IPv6" in str(exc)
+    else:
+        raise AssertionError("failed WARP IPv6 must be rejected")
+
+
+def test_outbounds_template_shows_separate_warp_family_health():
+    source = (ROOT / "app/web/templates/outbounds.html").read_text(encoding="utf-8")
+    Environment().parse(source)
+    assert "WARP IPv4:" in source
+    assert "WARP IPv6:" in source
+    assert "warp.last_test.get('ipv4'" in source
+    assert "warp.last_test.get('ipv6'" in source

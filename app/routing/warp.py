@@ -334,6 +334,29 @@ def family_capabilities() -> dict[str, bool]:
     return _profile_family_flags(profile)
 
 
+def routing_family_capabilities() -> dict[str, bool]:
+    """Return WARP families currently eligible for Routing.
+
+    Profile support stays separate from health. A supported family is
+    selectable before the first test. After an explicit family test
+    fails, only that family is disabled until a later successful test
+    or profile regeneration clears the recorded health result.
+    """
+    families = family_capabilities()
+    state = _read_state()
+    last_test = state.get("last_test") if isinstance(state.get("last_test"), dict) else {}
+    for key in ("ipv4", "ipv6"):
+        result = last_test.get(key) if isinstance(last_test, dict) else None
+        if (
+            isinstance(result, dict)
+            and bool(result.get("supported"))
+            and "ok" in result
+            and not bool(result.get("ok"))
+        ):
+            families[key] = False
+    return families
+
+
 def export_document() -> str:
     document = outbound(require_enabled=False)
     if document is None:
@@ -351,9 +374,31 @@ def routing_uses_warp(payload: object) -> bool:
     return False
 
 
+def _routing_warp_tags(payload: object) -> set[str]:
+    tags: set[str] = set()
+    if isinstance(payload, dict):
+        tag = str(payload.get("outboundTag") or "").strip().lower()
+        if tag in WARP_ROUTING_TAGS:
+            tags.add(tag)
+        for value in payload.values():
+            tags.update(_routing_warp_tags(value))
+    elif isinstance(payload, list):
+        for value in payload:
+            tags.update(_routing_warp_tags(value))
+    return tags
+
+
 def ensure_routing_supported(payload: object) -> None:
-    if routing_uses_warp(payload) and not enabled():
+    tags = _routing_warp_tags(payload)
+    if not tags:
+        return
+    if not enabled():
         raise WarpError("В маршрутизации выбран WARP, но WARP ещё не установлен или выключен")
+    families = routing_family_capabilities()
+    if tags & {"warp", "warp4"} and not families.get("ipv4"):
+        raise WarpError("В маршрутизации выбран WARP IPv4, но его проверка не пройдена")
+    if "warp6" in tags and not families.get("ipv6"):
+        raise WarpError("В маршрутизации выбран WARP IPv6, но его проверка не пройдена")
 
 
 def overview() -> dict:
@@ -365,6 +410,7 @@ def overview() -> dict:
     if not profile and os.geteuid() == 0:
         profile = scrubbed_profile()
     families = _profile_family_flags(profile)
+    routing_families = routing_family_capabilities()
     return {
         "installed": ready,
         "enabled": active,
@@ -374,8 +420,9 @@ def overview() -> dict:
         "profile": profile,
         "last_test": last_test,
         "families": families,
-        "ipv4_ready": bool(families.get("ipv4")),
-        "ipv6_ready": bool(families.get("ipv6")),
+        "routing_families": routing_families,
+        "ipv4_ready": bool(routing_families.get("ipv4")),
+        "ipv6_ready": bool(routing_families.get("ipv6")),
         "updated_at": str(state.get("updated_at") or ""),
         "tag": WARP_TAG,
         "protocol_label": "wireguard · noKernelTun",
@@ -409,7 +456,7 @@ def set_last_test(
 def compatible_actions() -> tuple[str, ...]:
     actions = ["direct4", "direct6"]
     if enabled():
-        families = family_capabilities()
+        families = routing_family_capabilities()
         if families.get("ipv4"):
             actions.append("warp4")
         if families.get("ipv6"):
@@ -430,8 +477,8 @@ def validate_rules(actions: Iterable[str]) -> None:
     requested = {str(action).strip().lower() for action in actions}
     if requested & WARP_ROUTING_TAGS and not enabled():
         raise WarpError("Сначала создайте WARP")
-    families = family_capabilities() if enabled() else {"ipv4": False, "ipv6": False}
+    families = routing_family_capabilities() if enabled() else {"ipv4": False, "ipv6": False}
     if "warp4" in requested and not families.get("ipv4"):
-        raise WarpError("WARP-профиль не поддерживает IPv4")
+        raise WarpError("WARP IPv4 не готов: выполните проверку WARP")
     if "warp6" in requested and not families.get("ipv6"):
-        raise WarpError("WARP-профиль не поддерживает IPv6")
+        raise WarpError("WARP IPv6 не готов: выполните проверку WARP")

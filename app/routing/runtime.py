@@ -139,10 +139,10 @@ def routing_capabilities() -> dict[str, bool]:
     warp_ipv4 = False
     warp_ipv6 = False
     try:
-        from app.routing.warp import enabled as warp_is_enabled, family_capabilities
+        from app.routing.warp import enabled as warp_is_enabled, routing_family_capabilities
 
         warp_enabled = bool(warp_is_enabled())
-        families = family_capabilities() if warp_enabled else {"ipv4": False, "ipv6": False}
+        families = routing_family_capabilities() if warp_enabled else {"ipv4": False, "ipv6": False}
         warp_ipv4 = warp_enabled and bool(families.get("ipv4"))
         warp_ipv6 = warp_enabled and bool(families.get("ipv6"))
     except Exception:
@@ -327,13 +327,13 @@ def build_managed_outbounds(existing_outbounds: list | None = None) -> list[dict
     managed: list[dict] = [direct_legacy]
     warp_bundle: list[dict] = []
     try:
-        from app.routing.warp import outbound as warp_outbound, family_capabilities
+        from app.routing.warp import outbound as warp_outbound, routing_family_capabilities
 
         warp = warp_outbound(require_enabled=True)
         if warp is not None:
             core = json.loads(json.dumps(warp))
             core["tag"] = "warp-core"
-            families = family_capabilities()
+            families = routing_family_capabilities()
             if families.get("ipv4"):
                 # Hidden old `warp` tag is an IPv4-only compatibility alias.
                 managed.append(family_gate_outbound("warp", 4, proxy_tag="warp-core"))

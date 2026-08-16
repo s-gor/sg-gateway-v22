@@ -287,6 +287,7 @@ def _persist_and_apply(account: bytes, document: dict, *, event: str) -> tuple[s
             enabled=True,
             profile_ready=True,
             profile=scrubbed_profile(),
+            last_test={},
             wgcf_version=WGCF_VERSION,
             **{event: time.time()},
         )
