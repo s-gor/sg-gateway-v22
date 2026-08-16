@@ -164,6 +164,6 @@ def test_connections_ui_exposes_exact_sg_panel_modes_in_full_02204_template() ->
     assert "maxConnections 2-4" in partial
     assert "maxConcurrency 0" in partial
     assert ".xps2-xmux" in css and "display: none" in css
-    assert "stream-one" in js
-    assert "hidden.name = 'xhttp_reality_mode'" in js
-    assert "hidden.value = 'stream-one'" in js
+    assert '<input type="hidden" name="{{ profile.id }}_mode" value="stream-one">' in template
+    assert "Reality XHTTP mode is rendered by the main form as a hidden stream-one" in js
+    assert "label.replaceWith" not in js

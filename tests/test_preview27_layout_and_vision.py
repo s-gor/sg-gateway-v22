@@ -30,8 +30,9 @@ def test_vision_is_explicit_in_connections_ui():
     template = (ROOT / "app/web/templates/connections.html").read_text(encoding="utf-8")
     assert "XTLS VISION" in template
     assert "{{ profile.flow }}" in template
-    assert "Обязательный XTLS Vision для выбранного VLESS-профиля" in template
-    assert "VLESS Encryption" in template
+    assert "Vision · {{ profile.flow }}" in template
+    assert "VLESS Encryption ·" in template
+    assert "Обязательный XTLS Vision для выбранного VLESS-профиля" not in template
 
 
 def _profiles():

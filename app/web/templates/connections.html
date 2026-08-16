@@ -122,8 +122,8 @@
             <header class="xps2-section-head">
               <div>
                 <div class="cnv1-card-kicker">ПАРАМЕТРЫ</div>
-                <h3>Настройки выбранных профилей</h3>
-                <p>Показываются только параметры карточек, которые сейчас выбраны.</p>
+                <h3>Параметры выбранных профилей</h3>
+                <p>Здесь только то, что можно изменить. Фиксированные параметры показаны компактно рядом с названием профиля.</p>
               </div>
             </header>
 
@@ -137,30 +137,33 @@
                 <div class="xps2-parameter-title">
                   <strong>{{ profile.title }}</strong>
                   <span>{{ profile.transport }} · {{ profile.security }}</span>
+                  <div class="xps2-profile-meta">
+                    {% if profile.flow %}<span>Vision · {{ profile.flow }}</span>{% endif %}
+                    {% if profile.id == 'xhttp_reality' %}<span>XHTTP client · stream-one</span>{% endif %}
+                    {% if profile.encryption_required %}<span class="{{ 'is-ready' if profile.encryption_ready else 'is-warning' }}">VLESS Encryption · {{ 'готово' if profile.encryption_ready else 'не создано' }}</span>{% endif %}
+                    {% if not profile.path %}<span>Path · —</span>{% endif %}
+                  </div>
                 </div>
-                <label>
+                <label class="xps2-field-port">
                   <span>{{ 'UDP-порт' if profile.id == 'hysteria2' else 'TCP-порт' }}</span>
                   <input type="number" min="1" max="65535"
                          name="{{ profile.id }}_port" value="{{ profile.port }}"
                          {% if locked %}disabled{% endif %}>
                 </label>
-                {% if profile.flow %}
-                <div class="xps2-flow-field">
-                  <span>Flow</span>
-                  <strong>{{ profile.flow }}</strong>
-                  <small>Обязательный XTLS Vision для выбранного VLESS-профиля</small>
-                </div>
-                {% endif %}
                 {% if profile.mode %}
-                <label>
+                {% if profile.id == 'xhttp_reality' %}
+                <input type="hidden" name="{{ profile.id }}_mode" value="stream-one">
+                {% else %}
+                <label class="xps2-field-mode">
                   <span>XHTTP mode клиента</span>
                   <select name="{{ profile.id }}_mode" {% if locked %}disabled{% endif %}>
                     {% for item in xray_profiles.xhttp_mode_options %}
                     <option value="{{ item.value }}" {% if item.value == profile.mode %}selected{% endif %}>{{ item.title }} · {{ item.value }}</option>
                     {% endfor %}
                   </select>
-                  <small>Сервер остаётся в auto и принимает все четыре режима. Выбор меняет клиентские ссылки, QR и SG Client subscription.</small>
+                  <small>Сервер остаётся в auto. Выбор меняет клиентские ссылки, QR и SG Client subscription.</small>
                 </label>
+                {% endif %}
 
                 <section class="xps2-xmux">
                   <div class="xps2-xmux-main">
@@ -187,21 +190,12 @@
                   </details>
                 </section>
                 {% endif %}
-                {% if profile.encryption_required %}
-                <div class="xps2-flow-field">
-                  <span>VLESS Encryption</span>
-                  <strong>{{ 'Готово' if profile.encryption_ready else 'Не создано' }}</strong>
-                  <small>Ключ клиента хранится в защищённых настройках и полностью здесь не показывается</small>
-                </div>
-                {% endif %}
                 {% if profile.path %}
-                <label>
+                <label class="xps2-field-path">
                   <span>Public Path</span>
                   <input type="text" name="{{ profile.id }}_path" value="{{ profile.path }}"
                          {% if locked %}disabled{% endif %}>
                 </label>
-                {% else %}
-                <div class="xps2-parameter-note">Без дополнительного Path</div>
                 {% endif %}
 
                 {% if profile.id == 'hysteria2' %}
@@ -210,9 +204,8 @@
                          data-password-configured="{{ '1' if xray_profiles.hysteria2_obfs.password_configured else '0' }}">
                   <header>
                     <div>
-                      <span class="xps2-salamander-kicker">ОБФУСКАЦИЯ</span>
-                      <strong>Hysteria2 Obfuscation</strong>
-                      <p>Salamander остаётся совместимым базовым режимом. Gecko добавляет к нему фрагментацию QUIC handshake и случайный padding 512–1200 байт.</p>
+                      <strong>Obfuscation</strong>
+                      <p>Off · Salamander · Gecko</p>
                     </div>
                     <span class="xps2-salamander-version {{ 'ready' if xray_profiles.hysteria2_obfs.version_ready else 'blocked' }}">
                       Salamander ≥ {{ xray_profiles.hysteria2_obfs.salamander_minimum_version }} · Gecko ≥ {{ xray_profiles.hysteria2_obfs.gecko_minimum_version }}

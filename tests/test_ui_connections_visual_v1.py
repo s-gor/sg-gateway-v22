@@ -100,44 +100,70 @@ def test_connections_visual_v1_css_exists():
     assert "grid-template-columns: minmax(0, 1fr) minmax(0, 1fr)" in final
 
 
-def test_connections_protocol_cards_have_explicit_profile_grid_areas():
+
+def test_connections_protocol_cards_show_only_real_controls_as_fields():
+    template = (ROOT / "app/web/templates/connections.html").read_text(encoding="utf-8")
     css = (ROOT / "app/web/static/sg-xmux-settings-v1.css").read_text(encoding="utf-8")
-    polish = css.split("SG-Gateway 022.04 · Connections protocol-card polish", 1)[1]
-    for profile_id in ("reality_tcp", "xhttp_reality", "xhttp_tls", "hysteria2"):
-        assert f'data-profile-panel="{profile_id}"' in polish
-    for area in ("title", "port", "flow", "encryption", "mode", "path", "obfs"):
-        assert area in polish
-    assert "grid-auto-flow: row dense" in polish
+    polish = css.split("SG-Gateway 022.04 · Connections controls-only polish", 1)[1]
+    assert "Здесь только то, что можно изменить" in template
+    for field_class in ("xps2-field-port", "xps2-field-mode", "xps2-field-path"):
+        assert field_class in template
+    for meta in ("xps2-profile-meta", "Vision · {{ profile.flow }}", "XHTTP client · stream-one", "VLESS Encryption ·"):
+        assert meta in template
+    assert "Без дополнительного Path" not in template
+    assert "Обязательный XTLS Vision для выбранного VLESS-профиля" not in template
+    assert "Ключ клиента хранится в защищённых настройках" not in template
+    assert ".xps2-profile-meta" in polish
+    assert ".xps2-field-port" in polish
+    assert ".xps2-field-mode" in polish
+    assert ".xps2-field-path" in polish
     assert "display: none" not in polish
 
 
-def test_connections_protocol_cards_are_compact_without_changing_form_contract():
-    css = (ROOT / "app/web/static/sg-xmux-settings-v1.css").read_text(encoding="utf-8")
-    polish = css.split("SG-Gateway 022.04 · Connections protocol-card polish", 1)[1]
+def test_reality_xhttp_fixed_mode_is_native_hidden_form_value_not_fake_control():
     template = (ROOT / "app/web/templates/connections.html").read_text(encoding="utf-8")
-    for marker in (
-        ".xps2-flow-field",
-        ".xps2-parameter-note",
-        ".xps2-salamander",
-        "border-left: 2px solid",
-        "box-shadow: none",
-    ):
-        assert marker in polish
+    js = (ROOT / "app/web/static/sg-xmux-settings-v1.js").read_text(encoding="utf-8")
+    assert "{% if profile.id == 'xhttp_reality' %}" in template
+    assert '<input type="hidden" name="{{ profile.id }}_mode" value="stream-one">' in template
+    assert "data-xmux-reality-fixed" not in js
+    assert "label.replaceWith" not in js
+    assert "Reality XHTTP mode is rendered by the main form as a hidden stream-one" in js
+
+
+def test_connections_protocol_cards_keep_all_mutable_form_contracts():
+    template = (ROOT / "app/web/templates/connections.html").read_text(encoding="utf-8")
     for field in (
         'name="{{ profile.id }}_port"',
         'name="{{ profile.id }}_mode"',
         'name="{{ profile.id }}_path"',
         'name="hysteria2_obfs_mode"',
+        'name="hysteria2_obfs_password"',
+        'name="hysteria2_obfs_rotate"',
     ):
         assert field in template
-    assert 'value="gecko"' in template
+    for value in ('value="none"', 'value="salamander"', 'value="gecko"'):
+        assert value in template
+    assert "Проверить конфигурацию" in template
+    assert "Сохранить и применить" in template
+
+
+def test_connections_protocol_cards_have_compact_profile_specific_grids():
+    css = (ROOT / "app/web/static/sg-xmux-settings-v1.css").read_text(encoding="utf-8")
+    polish = css.split("SG-Gateway 022.04 · Connections controls-only polish", 1)[1]
+    for profile_id in ("reality_tcp", "xhttp_reality", "xhttp_tls", "hysteria2"):
+        assert f'data-profile-panel="{profile_id}"' in polish
+    assert 'grid-template-areas: "title port";' in polish
+    assert 'grid-template-areas: "title port path";' in polish
+    assert 'grid-template-areas: "title port mode path";' in polish
+    assert '"obfs obfs"' in polish
+    assert "box-shadow: none" in polish
 
 
 def test_connections_protocol_cards_cover_low_resolution_and_mobile():
     css = (ROOT / "app/web/static/sg-xmux-settings-v1.css").read_text(encoding="utf-8")
-    polish = css.split("SG-Gateway 022.04 · Connections protocol-card polish", 1)[1]
+    polish = css.split("SG-Gateway 022.04 · Connections controls-only polish", 1)[1]
     assert "@media (min-width: 981px) and (max-width: 1366px)" in polish
     assert "(min-width: 981px) and (max-height: 820px)" in polish
     assert "@media (max-width: 1050px)" in polish
     assert "@media (max-width: 760px)" in polish
-    assert 'grid-template-areas: "title" "port" "flow" "path"' in polish
+    assert 'grid-template-areas: "title" "port" "mode" "path";' in polish
