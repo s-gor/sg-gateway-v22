@@ -5,10 +5,10 @@ ROOT=Path(__file__).resolve().parents[1]
 
 def test_dev_rebuild_identity_is_explicit_and_not_live():
     manifest=json.loads((ROOT/'release-manifest.json').read_text(encoding='utf-8'))
-    assert (ROOT/'VERSION').read_text(encoding='utf-8').strip() == '0.1.0-021.12'
+    assert (ROOT/'VERSION').read_text(encoding='utf-8').strip() == '0.1.0-022.04'
     assert manifest['status'] == 'DEV'
     assert manifest['channel'] == 'dev-v22'
-    assert manifest['rebuild_target'] == '0.1.0-022.05'
+    assert manifest["rebuild_target"] == "0.1.0-022.04"
     assert manifest['rebuild_policy']['baseline'] == '0.1.0-021.12'
     assert manifest['rebuild_policy']['awg3'] is True
     assert manifest['rebuild_policy']['publication_requires_real_clean_install'] is True

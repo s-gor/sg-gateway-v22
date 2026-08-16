@@ -145,7 +145,7 @@ def test_save_normalises_reality_mode_without_touching_server_runtime(monkeypatc
     assert config["xhttp_extra_client_json"] == {"headers": {"X-Test": "kept"}}
 
 
-def test_connections_ui_exposes_exact_sg_panel_modes_in_full_02205_template() -> None:
+def test_connections_ui_exposes_exact_sg_panel_modes_in_full_02204_template() -> None:
     template = (ROOT / "app/web/templates/connections.html").read_text(encoding="utf-8")
     partial = (ROOT / "app/web/templates/_xray_xmux_settings.html").read_text(encoding="utf-8")
     css = (ROOT / "app/web/static/sg-xmux-settings-v1.css").read_text(encoding="utf-8")
@@ -154,7 +154,7 @@ def test_connections_ui_exposes_exact_sg_panel_modes_in_full_02205_template() ->
     assert 'include "_xray_xmux_settings.html"' in template
     assert "sg-xmux-settings-v1.css" in template
     assert "sg-xmux-settings-v1.js" in template
-    # Historical 022.05 source markers stay in the real template; only the old
+    # Historical source markers stay in the real template; only the old
     # fixed-RF presentation is hidden in favour of the SG-Panel mode selector.
     assert "xps2-xmux" in template
     assert "XMUX для XHTTP" in partial

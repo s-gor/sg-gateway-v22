@@ -11,9 +11,10 @@ def text(path: str) -> str:
 
 
 def test_02111_scope_is_backup_and_domain_only() -> None:
-    assert text("VERSION").strip() == "0.1.0-021.12"
+    assert text("VERSION").strip() == "0.1.0-022.04"
     manifest = json.loads(text("release-manifest.json"))
-    assert manifest["version"] == "0.1.0-021.12"
+    assert manifest["version"] == "0.1.0-022.04"
+    assert manifest["rebuild_policy"]["baseline"] == "0.1.0-021.12"
     assert manifest["portable_full_backup"]["single_file"] is True
     assert manifest["portable_full_backup"]["includes_https_certificates"] is True
     assert manifest["portable_full_backup"]["restore_live_terminal"] is True

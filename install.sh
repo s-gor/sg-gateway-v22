@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-VERSION="0.1.0-021.12"
-INSTALLER_BUILD="02112-full-clean-backup-domain"
+VERSION="0.1.0-022.04"
+INSTALLER_BUILD="02204-full-clean-dual-stack"
 SOURCE_DIR="${SG_GATEWAY_SOURCE_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)}"
 PREFIX="/opt/sg-gateway"
 CONFIG_DIR="/etc/sg-gateway"
 DATA_DIR="/var/lib/sg-gateway"
 LOG_DIR="/var/log/sg-gateway"
-INSTALL_LOG="/var/log/sg-gateway-installer-02112.log"
+INSTALL_LOG="/var/log/sg-gateway-installer-02204.log"
 BACKUP_ROOT="/root/sg-gateway-backups"
-RESUME_FILE="/root/sg-gateway-02112-installer-resume.env"
+RESUME_FILE="/root/sg-gateway-02204-installer-resume.env"
 MIHOMO_VERSION="v1.19.29"
 SING_BOX_VERSION="1.13.14"
 WGCF_CLI_VERSION="v0.3.6"
@@ -24,7 +24,7 @@ PANEL_GROUP="sg-gateway"
 XRAY_REQUIRED_VERSION="v26.6.27"
 XRAY_MINIMUM_VERSION="v26.6.27"
 
-# SG-Gateway 021 vendor bundle. Clean installation does not download these
+# SG-Gateway V22 vendor bundle. Clean installation does not download these
 # runtimes from upstream projects. The files are committed with the source.
 VENDOR_CORES_DIR="${SG_GATEWAY_VENDOR_CORES_DIR:-$SOURCE_DIR/vendor/cores}"
 VENDOR_CORES_MANIFEST="$VENDOR_CORES_DIR/SHA256SUMS"

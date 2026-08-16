@@ -17,12 +17,12 @@ def _text(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def test_02112_active_installer_identity_has_no_02111_tail() -> None:
+def test_current_installer_identity_is_02204_and_has_no_02111_tail() -> None:
     text = _text(INSTALLER)
-    assert 'VERSION="0.1.0-021.12"' in text
-    assert 'INSTALLER_BUILD="02112-full-clean-backup-domain"' in text
-    assert 'INSTALL_LOG="/var/log/sg-gateway-installer-02112.log"' in text
-    assert 'RESUME_FILE="/root/sg-gateway-02112-installer-resume.env"' in text
+    assert 'VERSION="0.1.0-022.04"' in text
+    assert 'INSTALLER_BUILD="02204-full-clean-dual-stack"' in text
+    assert 'INSTALL_LOG="/var/log/sg-gateway-installer-02204.log"' in text
+    assert 'RESUME_FILE="/root/sg-gateway-02204-installer-resume.env"' in text
 
     assert 'INSTALLER_BUILD="02111-full-clean-backup-domain"' not in text
     assert 'INSTALL_LOG="/var/log/sg-gateway-installer-02111.log"' not in text
@@ -31,7 +31,7 @@ def test_02112_active_installer_identity_has_no_02111_tail() -> None:
 
 def test_02112_uninstall_has_current_identity_and_legacy_cleanup() -> None:
     text = _text(UNINSTALLER)
-    assert 'UNINSTALL_LOG="/var/log/sg-gateway-full-uninstall-02112.log"' in text
+    assert 'UNINSTALL_LOG="/var/log/sg-gateway-full-uninstall-02204.log"' in text
     assert "/root/sg-gateway-02112-installer-resume.env" in text
     assert "/var/log/sg-gateway-installer-02112.log" in text
 
@@ -74,11 +74,12 @@ def test_final_publication_metadata_is_consistent() -> None:
     assert "/opt/sg-gateway/assets" in publication
 
     release = json.loads(_text(ROOT / "release-manifest.json"))
-    assert release["version"] == "0.1.0-021.12"
+    assert release["version"] == "0.1.0-022.04"
     assert release["status"] == "DEV"
     assert release["next_development_line"] == "0.1.0-022.05"
     assert release["channel"] == "dev-v22"
-    assert release["rebuild_target"] == "0.1.0-022.05"
+    assert release["rebuild_target"] == "0.1.0-022.04"
+    assert release["rebuild_policy"]["baseline"] == "0.1.0-021.12"
     assert release["rebuild_policy"]["awg3"] is True
     assert release["safe_update"]["preserve_local_assets"] is True
     assert release["safe_update"]["download_assets"] is False

@@ -1,3 +1,21 @@
+# Changelog
+
+## 0.1.0-022.04 — 2026-08-16
+
+- Added optional Dual Stack IPv4 + IPv6 across public metadata, Xray listeners, exports, AWG2 and AWG3.
+- Added isolated AWG3 3.x userspace runtime with independent IPv6 ULA space and lifecycle handling.
+- Made WARP opt-in on clean install and added independent IPv4/IPv6 health with shared-core family gates.
+- Added fail-closed Family Routing: SG-Gateway IPv4/IPv6, WARP IPv4/IPv6 and Block, with legacy IPv4 migration.
+- Fixed default-traffic Block UI/backend mismatch.
+- Hardened the updater to preserve TLS/HTTPS, AWG3 and runtime state with safety backup and rollback validation.
+- Added SG subscription/device compatibility pipeline and accumulated client/device UX fixes.
+- Added Hysteria2 Off/Salamander/Gecko cleanup and canonical URI handling.
+- Added XHTTP XMUX presets/expert mode while keeping XMUX out of server inbound configuration.
+- Expanded Full Backup verification/restore safety and panel-update state preservation.
+- Added production WSGI/systemd contract and accumulated installer/diagnostic hardening.
+- Added low-resolution desktop support that compacts without hiding actions.
+- Added AWG3-aware full uninstall and 022.04 release-contract regression coverage.
+
 # SG-Gateway 0.1.0-021.12 — Full Backup / Full Restore / Recovery
 
 - R5-R3 PS1 archive EOL: `SOURCE-SHA256SUMS` hashes canonical LF Git blobs; four tracked `scripts/*.ps1` files previously had `eol=crlf`, so `git archive` exported different bytes and FULL CLEAN reported exactly four checksum mismatches. PS1 export is now fixed to LF; runtime code is unchanged.

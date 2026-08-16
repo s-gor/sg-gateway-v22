@@ -13,8 +13,9 @@ def source(relative: str) -> str:
 def test_0219_version_and_manifest_are_synchronized() -> None:
     version = source("VERSION").strip()
     manifest = json.loads(source("release-manifest.json"))
-    assert version == "0.1.0-021.12"
+    assert version == "0.1.0-022.04"
     assert manifest["version"] == version
+    assert manifest["rebuild_policy"]["baseline"] == "0.1.0-021.12"
     assert manifest["mieru_export"]["ordinary_uri"] is True
     assert manifest["mieru_export"]["separate_json"] is True
     assert manifest["mieru_export"]["separate_json_qr"] is True

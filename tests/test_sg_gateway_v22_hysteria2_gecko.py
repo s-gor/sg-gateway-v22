@@ -20,5 +20,5 @@ def test_gecko_integration_preserves_xmux_alongside_isolated_awg3() -> None:
     assert 'obfs_mode in {"salamander", "gecko"}' in exports
 
 def test_gecko_recovery_does_not_change_release_identity() -> None:
-    assert (ROOT / 'VERSION').read_text(encoding='utf-8').strip() == '0.1.0-021.12'
-    assert (ROOT / 'BUILD-ID').read_text(encoding='utf-8').strip() == 'MAIN-02112'
+    assert (ROOT / 'VERSION').read_text(encoding='utf-8').strip() == '0.1.0-022.04'
+    assert (ROOT / 'BUILD-ID').read_text(encoding='utf-8').strip() == 'MAIN-02204'
