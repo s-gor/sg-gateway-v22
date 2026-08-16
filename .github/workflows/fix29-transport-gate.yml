@@ -1,0 +1,84 @@
+name: transport validated Fix29 dual AWG
+
+on:
+  push:
+    branches: [audit-v22-prepublish]
+
+permissions:
+  contents: write
+
+jobs:
+  transport:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout unchanged Fix29 product branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix29-awg3-dual
+          fetch-depth: 0
+
+      - name: Guard exact clean Fix28 parent
+        run: |
+          test "$(git rev-parse HEAD)" = "04345198231bbe3eb75d9061b879887a0f9cecfd"
+          test "$(git rev-parse HEAD^{tree})" = "b9a4cb7b4ae5f2f80e81749b03220de3f4082d00"
+
+      - name: Rebuild exact validated Fix29 working tree
+        run: |
+          rm -rf /tmp/old
+          git clone -q --no-checkout https://github.com/s-gor/sg-gateway.git /tmp/old
+          git -C /tmp/old fetch -q --depth=1 origin 816804dfae23fc854444bc274c254b9e47efaed2
+          git -C /tmp/old checkout -q --detach FETCH_HEAD
+          cp /tmp/old/vendor/cores/amneziawg-tools-3.0.20260805.tar.gz vendor/cores/
+          cp /tmp/old/vendor/cores/amneziawg-go-linux-amd64-v3.0.0 vendor/cores/
+          cp /tmp/old/hostd/sg_hostd/awg3_runtime.py hostd/sg_hostd/awg3_runtime.py
+          cp /tmp/old/deploy/sg-gateway-awg3-userspace.sh deploy/sg-gateway-awg3-userspace.sh
+          cp /tmp/old/deploy/sg-gateway-awg3.service deploy/sg-gateway-awg3.service
+          chmod 0755 vendor/cores/amneziawg-go-linux-amd64-v3.0.0 deploy/sg-gateway-awg3-userspace.sh
+          echo '090f9383532822a756d078890b447e00af7f46bd30a10f9f47c46d633d807b19  vendor/cores/amneziawg-tools-3.0.20260805.tar.gz' | sha256sum -c -
+          echo '131110027db6d5dc0e35b19eb5b8a2692676081366c34112088dc68bbb050bcd  vendor/cores/amneziawg-go-linux-amd64-v3.0.0' | sha256sum -c -
+          test ! -e vendor/cores/amneziawg-linux-kernel-module-3.0.20260805.tar.gz
+          git fetch -q origin audit-v22-prepublish
+          git show origin/audit-v22-prepublish:.github/workflows/fix29-awg3-implement.yml > /tmp/fix29-carrier.yml
+          git show origin/audit-v22-prepublish:.github/fix29-extract-carrier.py > /tmp/fix29-extract.py
+          git show origin/audit-v22-prepublish:.github/fix29-postpatch.py > /tmp/fix29-postpatch.py
+          git show origin/audit-v22-prepublish:.github/fix29-corrections.py > /tmp/fix29-corrections.py
+          git show origin/audit-v22-prepublish:.github/fix29-finalize.py > /tmp/fix29-finalize.py
+          python3 /tmp/fix29-extract.py
+          python3 /tmp/fix29_patch.py
+          python3 /tmp/fix29-postpatch.py
+          python3 /tmp/fix29-corrections.py
+          chmod 0755 deploy/sg-gateway-awg3-userspace.sh vendor/cores/amneziawg-go-linux-amd64-v3.0.0
+
+      - name: Reconfirm code tests before transport
+        run: |
+          python3 -m pip install -q -r requirements-dev.txt
+          PYTHONPATH=.:hostd python3 -m pytest -q tests --tb=short -ra
+          python3 -c "from pathlib import Path; from jinja2 import Environment; env=Environment(); [env.parse(p.read_text(encoding='utf-8')) for p in Path('app/web/templates').rglob('*.html')]; print('JINJA_OK')"
+          while IFS= read -r -d '' file; do bash -n "$file"; done < <(find . -type f -name '*.sh' -not -path './.git/*' -print0)
+          while IFS= read -r -d '' file; do node --check "$file" >/dev/null; done < <(find app/web/static -type f -name '*.js' -print0)
+
+      - name: Restore only CI workflow for Actions-token transport
+        run: |
+          git checkout 04345198231bbe3eb75d9061b879887a0f9cecfd -- .github/workflows/ci.yml
+          grep -F "manifest['rebuild_policy']['awg3'] is False" .github/workflows/ci.yml
+          git diff -- .github/workflows/ci.yml
+
+      - name: Build transport commit with exact integrity
+        run: |
+          git add -A
+          python3 /tmp/fix29-finalize.py inventory
+          git add SOURCE-SHA256SUMS
+          git diff --cached --check
+          (cd vendor/cores && sha256sum -c SHA256SUMS)
+          OUT=/tmp/SG-Gateway-0.1.0-021.12-DEV-v22-Fix29-AWG3-DUAL-FULL.run
+          bash build-run.sh "$OUT"
+          bash "$OUT" --verify-only
+          git config user.name 'Ser.Gor'
+          git config user.email 'infosec.co.il@gmail.com'
+          git commit -m 'Fix 29: add isolated AWG3 userspace alongside frozen AWG2'
+          python3 /tmp/fix29-finalize.py git-blobs
+
+      - name: Push product tree without workflow delta
+        run: |
+          git push origin HEAD:fix29-awg3-dual
+          echo "FIX29_TRANSPORT_COMMIT=$(git rev-parse HEAD)"
