@@ -10,7 +10,8 @@ def _section(start: str, end: str) -> str:
 
 def test_update_preserves_awg3_binary_tree_and_does_not_permission_sweep_it():
     deploy = _section("deploy_source() {", "restart_panel() {")
-    assert '".venv"|"assets"|"awg3"' in deploy
+    assert '".venv"|"awg3"' in deploy
+    assert '"assets") continue ;;' in deploy
     assert '-path "$AWG3_ROOT"' in deploy
     assert 'chown -R root:root "$PREFIX"' not in deploy
 

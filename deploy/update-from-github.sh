@@ -808,7 +808,8 @@ deploy_source() {
   local child
   while IFS= read -r -d '' child; do
     case "$(basename "$child")" in
-      ".venv"|"assets"|"awg3") continue ;;
+      ".venv"|"awg3") continue ;;
+      "assets") continue ;;
     esac
     rm -rf "$child"
   done < <(find "$PREFIX" -mindepth 1 -maxdepth 1 -print0)
