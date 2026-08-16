@@ -801,10 +801,6 @@ def _smart_state_from_form(form) -> dict:
 
     if state["preset"] != "custom":
         state = _smart_apply_preset(state)
-    # Block is not allowed as the final catch-all.  Keep the family explicit
-    # and fall back only to the selected SG-Gateway IPv4 action, never IPv6.
-    if state["default_action"] == "block":
-        state["default_action"] = "direct4"
     return state
 
 
