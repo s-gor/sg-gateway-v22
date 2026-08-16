@@ -98,10 +98,11 @@ def xhttp_reality_inbound(
     server_name: str,
     private_key: str,
     short_id: str,
+    listen: str = "0.0.0.0",
 ) -> dict[str, Any]:
     return {
         "tag": "sg-vless-xhttp-reality",
-        "listen": "0.0.0.0",
+        "listen": str(listen),
         "port": int(port),
         "protocol": "vless",
         "settings": {"clients": clients, "decryption": str(decryption)},
