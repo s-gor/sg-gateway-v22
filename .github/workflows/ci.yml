@@ -48,10 +48,11 @@ jobs:
           listed = set(expected)
           missing = sorted(tracked - listed)
           extra = sorted(listed - tracked)
-          if missing or extra:
-              raise SystemExit(
-                  f"checksum inventory mismatch: missing={missing[:20]} extra={extra[:20]}"
-              )
+          problems = []
+          if missing:
+              problems.append(f"checksum inventory missing: {missing}")
+          if extra:
+              problems.append(f"checksum inventory extra: {extra}")
 
           for path in sorted(tracked):
               proc = subprocess.Popen(
@@ -67,12 +68,20 @@ jobs:
                   digest.update(chunk)
               rc = proc.wait()
               if rc != 0:
-                  raise SystemExit(f"git show failed for {path}: rc={rc}")
+                  problems.append(f"git show failed for {path}: rc={rc}")
+                  continue
               actual = digest.hexdigest()
-              if actual != expected[path]:
-                  raise SystemExit(
-                      f"source hash mismatch: {path}: expected={expected[path]} actual={actual}"
+              wanted = expected.get(path)
+              if actual != wanted:
+                  problems.append(
+                      f"source hash mismatch: {path}: expected={wanted or '<missing>'} actual={actual}"
                   )
+
+          if problems:
+              print("Source integrity mismatches:")
+              for problem in problems:
+                  print(problem)
+              raise SystemExit(f"source integrity failed: {len(problems)} problem(s)")
 
           print(f"Git-blob source integrity ok: {len(tracked)} tracked files verified")
           PY
