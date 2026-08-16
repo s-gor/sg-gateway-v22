@@ -62,43 +62,33 @@ ROUTING_MANAGED = Path("/etc/sg-gateway/xray-routing-managed.json")
 
 
 def _load_managed_routing() -> dict:
-    # Xray already uses the first outbound when no rule matches.  Keep the
-    # safe fallback implicit so a panel update does not alter a previously
-    # working runtime just to express "everything else -> Direct".
+    # Preserve the known Preview 40 recovery, then validate every
+    # family-explicit action with the same sanitizer as panel apply.
     default = {"domainStrategy": "AsIs", "rules": []}
     try:
         payload = json.loads(ROUTING_MANAGED.read_text(encoding="utf-8"))
     except (OSError, ValueError, json.JSONDecodeError):
         return default
     routing = payload.get("routing") if isinstance(payload, dict) else None
-    if not isinstance(routing, dict) or not isinstance(routing.get("rules"), list):
+    rules = routing.get("rules") if isinstance(routing, dict) else None
+    if not isinstance(rules, list):
         raise ClientRuntimeError("Managed Routing повреждён")
-    rules: list[dict] = []
-    for index, raw in enumerate(routing["rules"], start=1):
-        if not isinstance(raw, dict):
-            raise ClientRuntimeError(f"Managed Routing rule {index} повреждён")
-        tag = str(raw.get("outboundTag") or "")
-        if tag not in {"direct", "warp", "block"}:
-            # Preview 40 stored a decorative xray/proxy outbound. Ignore the
-            # entire legacy fragment instead of breaking client application.
-            return default
-        if tag == "warp":
-            try:
-                from app.routing.warp import enabled as warp_enabled
-            except ImportError as exc:
-                raise ClientRuntimeError("Модуль WARP недоступен") from exc
-            if not warp_enabled():
-                raise ClientRuntimeError(
-                    "Managed Routing использует WARP, но WARP выключен"
-                )
-        item = dict(raw)
-        item["type"] = "field"
-        item["outboundTag"] = tag
-        rules.append(item)
-    return {
-        "domainStrategy": str(routing.get("domainStrategy") or ("IPIfNonMatch" if rules else "AsIs")),
-        "rules": rules,
-    }
+    legacy_bad_tags = {
+        str(item.get("outboundTag") or "").strip().lower()
+        for item in rules
+        if isinstance(item, dict)
+    } & {"xray", "proxy", "vpn"}
+    if legacy_bad_tags:
+        return default
+    try:
+        from app.routing.runtime import RoutingRuntimeError, sanitize_managed_fragment
+
+        fragment = sanitize_managed_fragment(payload)
+    except RoutingRuntimeError as exc:
+        raise ClientRuntimeError(str(exc)) from exc
+    except Exception as exc:
+        raise ClientRuntimeError(str(exc)) from exc
+    return fragment["routing"]
 
 
 def _read_env(path: Path) -> dict[str, str]:
@@ -1167,18 +1157,12 @@ def _render_xray_config(rows) -> str:
     if not inbounds:
         raise ClientRuntimeError("У активных клиентов не выбран ни один Xray-профиль")
 
-    outbounds = [{"tag": "direct", "protocol": "freedom"}]
     try:
-        from app.routing.warp import outbound as warp_outbound
+        from app.routing.runtime import build_managed_outbounds
 
-        warp = warp_outbound(require_enabled=True)
-        if warp is not None:
-            outbounds.append(warp)
-    except ImportError:
-        pass
+        outbounds = build_managed_outbounds([])
     except Exception as exc:
         raise ClientRuntimeError(str(exc)) from exc
-    outbounds.append({"tag": "block", "protocol": "blackhole"})
 
     payload = {
         "log": {"loglevel": "warning"},

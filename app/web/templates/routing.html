@@ -8,7 +8,8 @@
 {% set smart = shown.get('smart', {}) %}
 {% set preset = smart.get('preset', 'direct') %}
 {% set rules = shown.get('rules', []) %}
-{% set selected_title = shown.get('title', 'Обычный доступ · через SG-Gateway') %}
+{% set caps = routing_templates.capabilities or {} %}
+{% set selected_title = shown.get('title', 'Обычный доступ · SG-Gateway · IPv4') %}
 {% set selected_message = shown.get('message', 'Выберите базовую схему и выполните проверку.') %}
 
 <section class="r096-page">
@@ -57,14 +58,19 @@
         <div class="r096-user-body">
           <p>Для доменов можно использовать <code>full:</code>, <code>domain:</code>, <code>regexp:</code>, <code>keyword:</code> и <code>geosite:</code>. Без префикса используется <code>domain:</code>.</p>
           <div class="r096-rule-tabs">
-            <button type="button" data-r096-rule-tab="direct" class="active">Через SG-Gateway</button>
-            <button type="button" data-r096-rule-tab="warp">Через WARP</button>
+            <button type="button" data-r096-rule-tab="direct4" class="active">SG-Gateway · IPv4</button>
+            <button type="button" data-r096-rule-tab="direct6">SG-Gateway · IPv6</button>
+            <button type="button" data-r096-rule-tab="warp4">WARP · IPv4</button>
+            <button type="button" data-r096-rule-tab="warp6">WARP · IPv6</button>
             <button type="button" data-r096-rule-tab="block">Заблокировать</button>
           </div>
-          {% for action, label in [('direct','Через SG-Gateway'),('warp','Через WARP'),('block','Заблокировать')] %}
-          <div class="r096-rule-editor" data-r096-rule-panel="{{ action }}" {% if action != 'direct' %}hidden{% endif %}>
-            <label><span>Домены</span><textarea name="custom_{{ action }}_domains" rows="6">{{ smart.get('custom_' ~ action ~ '_domains', []) | join('\n') }}</textarea></label>
-            <label><span>IP и подсети</span><textarea name="custom_{{ action }}_ips" rows="6">{{ smart.get('custom_' ~ action ~ '_ips', []) | join('\n') }}</textarea></label>
+          {% for action, label in [('direct4','SG-Gateway · IPv4'),('direct6','SG-Gateway · IPv6'),('warp4','WARP · IPv4'),('warp6','WARP · IPv6'),('block','Заблокировать')] %}
+          {% set legacy_action = 'direct' if action == 'direct4' else ('warp' if action == 'warp4' else '') %}
+          {% set domains_value = smart.get('custom_' ~ action ~ '_domains', smart.get('custom_' ~ legacy_action ~ '_domains', []) if legacy_action else []) %}
+          {% set ips_value = smart.get('custom_' ~ action ~ '_ips', smart.get('custom_' ~ legacy_action ~ '_ips', []) if legacy_action else []) %}
+          <div class="r096-rule-editor" data-r096-rule-panel="{{ action }}" {% if action != 'direct4' %}hidden{% endif %}>
+            <label><span>Домены · {{ label }}</span><textarea name="custom_{{ action }}_domains" rows="6">{{ domains_value | join('\n') }}</textarea></label>
+            <label><span>IP и подсети · {{ label }}</span><textarea name="custom_{{ action }}_ips" rows="6">{{ ips_value | join('\n') }}</textarea></label>
           </div>
           {% endfor %}
         </div>
@@ -75,14 +81,15 @@
         <p>Выберите основу маршрутизации. Любое ручное изменение ниже переключает схему в пользовательский режим.</p>
         <div class="r096-preset-grid">
           {% for value, label in [
-            ('direct','Обычный доступ · через SG-Gateway'),
+            ('direct','Обычный доступ · SG-Gateway · IPv4'),
             ('ads_block','Блокировка рекламы и трекеров'),
-            ('blocked_warp','Ресурсы, заблокированные в РФ через WARP'),
-            ('all_warp','Весь интернет через WARP'),
+            ('blocked_warp','Ресурсы, заблокированные в РФ через WARP · IPv4'),
+            ('all_warp','Весь интернет через WARP · IPv4'),
             ('custom','Пользовательская схема')
           ] %}
-          <label class="r096-choice-card{% if value in ['blocked_warp','all_warp'] and not warp.enabled %} disabled{% endif %}" {% if value in ['blocked_warp','all_warp'] and not warp.enabled %}title="Сначала установите и включите WARP"{% endif %}>
-            <input type="radio" name="preset" value="{{ value }}" {% if preset == value %}checked{% endif %} {% if value in ['blocked_warp','all_warp'] and not warp.enabled %}disabled{% endif %}>
+          {% set warp_preset = value in ['blocked_warp','all_warp'] %}
+          <label class="r096-choice-card{% if warp_preset and not caps.get('warp4') %} disabled{% endif %}" {% if warp_preset and not caps.get('warp4') %}title="Сначала подготовьте и включите WARP IPv4"{% endif %}>
+            <input type="radio" name="preset" value="{{ value }}" {% if preset == value %}checked{% endif %} {% if warp_preset and not caps.get('warp4') %}disabled{% endif %}>
             <span>{{ label }}</span>
           </label>
           {% endfor %}
@@ -93,16 +100,21 @@
         <h2>Основные правила</h2>
 
         {% macro action_group(name, value, allow_warp=True, allow_block=True) %}
+        {% set current = {'direct':'direct4','warp':'warp4'}.get(value, value) %}
         <div class="r096-segments" data-action-group="{{ name }}">
-          <label><input type="radio" name="{{ name }}" value="direct" {% if value == 'direct' %}checked{% endif %}><span>Через SG-Gateway</span></label>
-          {% if allow_warp %}<label class="{% if not warp.enabled %}disabled{% endif %}" {% if not warp.enabled %}title="Сначала включите WARP"{% endif %}><input type="radio" name="{{ name }}" value="warp" {% if value == 'warp' %}checked{% endif %} {% if not warp.enabled %}disabled{% endif %}><span>Через WARP</span></label>{% endif %}
-          {% if allow_block %}<label><input type="radio" name="{{ name }}" value="block" {% if value == 'block' %}checked{% endif %}><span>Заблокировать</span></label>{% endif %}
+          <label><input type="radio" name="{{ name }}" value="direct4" {% if current == 'direct4' %}checked{% endif %}><span>SG-Gateway · IPv4</span></label>
+          <label class="{% if not caps.get('direct6') %}disabled{% endif %}" {% if not caps.get('direct6') %}title="На сервере нет доступного публичного IPv6"{% endif %}><input type="radio" name="{{ name }}" value="direct6" {% if current == 'direct6' %}checked{% endif %} {% if not caps.get('direct6') %}disabled{% endif %}><span>SG-Gateway · IPv6</span></label>
+          {% if allow_warp %}
+          <label class="{% if not caps.get('warp4') %}disabled{% endif %}" {% if not caps.get('warp4') %}title="WARP IPv4 не готов или выключен"{% endif %}><input type="radio" name="{{ name }}" value="warp4" {% if current == 'warp4' %}checked{% endif %} {% if not caps.get('warp4') %}disabled{% endif %}><span>WARP · IPv4</span></label>
+          <label class="{% if not caps.get('warp6') %}disabled{% endif %}" {% if not caps.get('warp6') %}title="WARP IPv6 не готов или выключен"{% endif %}><input type="radio" name="{{ name }}" value="warp6" {% if current == 'warp6' %}checked{% endif %} {% if not caps.get('warp6') %}disabled{% endif %}><span>WARP · IPv6</span></label>
+          {% endif %}
+          {% if allow_block %}<label><input type="radio" name="{{ name }}" value="block" {% if current == 'block' %}checked{% endif %}><span>Заблокировать</span></label>{% endif %}
         </div>
         {% endmacro %}
 
         <div class="r096-rule-row">
           <div><strong>Локальная сеть</strong><small>Домашний роутер, NAS, принтеры и частные адреса</small></div>
-          {{ action_group('local_action', smart.get('local_action', 'direct'), False, True) }}
+          {{ action_group('local_action', smart.get('local_action', 'direct4'), False, True) }}
         </div>
 
         <section class="r096-russia-block" hidden aria-hidden="true">
@@ -115,29 +127,29 @@
           </div>
           <div class="r096-rule-row nested">
             <div><strong>Действие выбранного набора</strong><small id="r096-russia-syntax">Правило выключено</small></div>
-            {{ action_group('russia_action', smart.get('russia_action', 'direct')) }}
+            {{ action_group('russia_action', smart.get('russia_action', 'direct4')) }}
           </div>
         </section>
 
         <div class="r096-rule-row">
           <div><strong>Ресурсы, заблокированные в РФ</strong><small>Категория выбирается из фактически установленных GeoFiles</small></div>
-          {{ action_group('blocked_action', smart.get('blocked_action', 'direct')) }}
+          {{ action_group('blocked_action', smart.get('blocked_action', 'direct4')) }}
         </div>
 
         <div class="r096-rule-row">
           <div><strong>Реклама и трекеры</strong><small>category-ads-all или совместимая категория текущего набора</small></div>
-          {{ action_group('ads_action', smart.get('ads_action', 'direct')) }}
+          {{ action_group('ads_action', smart.get('ads_action', 'direct4')) }}
         </div>
 
         <div class="r096-rule-row last">
           <div><strong>Остальной трафик</strong><small>Действие, если ни одно правило выше не совпало</small></div>
-          {{ action_group('default_action', smart.get('default_action', 'direct'), True, False) }}
+          {{ action_group('default_action', smart.get('default_action', 'direct4'), True, False) }}
         </div>
       </article>
 
       <article class="r096-warning-card">
-        <strong>Серверная маршрутизация</strong>
-        <span>Весь трафик уже пришёл на SG-Gateway через защищённое VPN-подключение. Здесь выбирается только выход в интернет: <strong>Через SG-Gateway</strong> — сайт увидит IP сервера; <strong>Через WARP</strong> — трафик дополнительно пойдёт через Cloudflare WARP; <strong>Заблокировать</strong> — соединение будет остановлено. Настоящий BYPASS выполняется на клиенте до отправки трафика в VPN.</span>
+        <strong>Фиксированное семейство IP</strong>
+        <span>Режимы <strong>Через SG-Gateway</strong> и <strong>Через WARP</strong> всегда используют выбранное семейство адреса. Для каждого правила выбирается не только выход, но и семейство адреса. <strong>IPv4</strong> никогда автоматически не переключается на IPv6, а <strong>IPv6</strong> — на IPv4. Если ресурс не имеет адреса выбранного семейства, соединение завершается без fallback. Это не позволяет одному правилу по очереди показывать сайту оба внешних адреса.</span>
       </article>
 
       <article class="r096-card r096-rules-preview">
@@ -148,10 +160,11 @@
         {% if rules %}
         <div class="r096-rule-list">
           {% for rule in rules %}
+          {% set route_kind = 'direct' if rule.action in ['direct','direct4','direct6'] else ('warp' if rule.action in ['warp','warp4','warp6'] else 'block') %}
           <div class="{{ '' if rule.enabled else 'disabled' }}">
             <b>{{ '%02d' | format(loop.index * 10) }}</b>
-            <span><strong>{{ rule.title }}</strong><small>{% if rule.missing %}Не найдено: {{ rule.missing | join(', ') }}{% elif rule.selected_geosite %}geosite:{{ rule.selected_geosite }}{% elif rule.selected_geoip %}geoip:{{ rule.selected_geoip }}{% elif rule.get('implicit_default') %}Через SG-Gateway по умолчанию · без отдельного catch-all правила{% elif rule.xray_rule and rule.xray_rule.get('network') %}tcp,udp · финальное правило{% else %}Пользовательские значения{% endif %}</small></span>
-            <em class="route-{{ rule.action }}">{{ {'direct':'Через SG-Gateway','warp':'Через WARP','block':'Заблокировать'}.get(rule.action, rule.action) }}</em>
+            <span><strong>{{ rule.title }}</strong><small>{% if rule.missing %}Не найдено: {{ rule.missing | join(', ') }}{% elif rule.selected_geosite %}geosite:{{ rule.selected_geosite }}{% elif rule.selected_geoip %}geoip:{{ rule.selected_geoip }}{% elif rule.get('implicit_default') %}Legacy SG-Gateway · IPv4 по умолчанию{% elif rule.xray_rule and rule.xray_rule.get('network') %}tcp,udp · финальное правило{% else %}Пользовательские значения{% endif %}</small></span>
+            <em class="route-{{ route_kind }}">{{ {'direct':'SG-Gateway · IPv4','direct4':'SG-Gateway · IPv4','direct6':'SG-Gateway · IPv6','warp':'WARP · IPv4','warp4':'WARP · IPv4','warp6':'WARP · IPv6','block':'Заблокировать'}.get(rule.action, rule.action) }}</em>
           </div>
           {% endfor %}
         </div>
@@ -176,8 +189,12 @@
       <article class="r096-card r096-warp-summary">
         <div>
           <h2>Cloudflare WARP</h2>
-          <p>{{ warp.status_label }}{% if warp.last_test and warp.last_test.ip %} · IP {{ warp.last_test.ip }}{% endif %}</p>
-          <small>Третий реальный выход для выбранных правил. Через SG-Gateway остаётся обычным серверным выходом по умолчанию.</small>
+          <p>
+            {{ warp.status_label }} ·
+            IPv4 {{ 'готов' if warp.ipv4_ready else 'нет' }}{% if warp.last_test and warp.last_test.get('ipv4') and warp.last_test.ipv4.ip %} · {{ warp.last_test.ipv4.ip }}{% endif %} ·
+            IPv6 {{ 'готов' if warp.ipv6_ready else 'нет' }}{% if warp.last_test and warp.last_test.get('ipv6') and warp.last_test.ipv6.ip %} · {{ warp.last_test.ipv6.ip }}{% endif %}
+          </p>
+          <small>WARP IPv4 и WARP IPv6 — независимые выходы Routing; автоматического перехода между ними нет.</small>
         </div>
         <a class="r096-secondary-button" href="{{ url_for('outbounds') }}#warp">Открыть Outbounds</a>
       </article>
@@ -230,10 +247,10 @@
 
   const form = document.getElementById('r096-smart-form');
   const presetDefaults = {
-    direct: {local_action:'direct',russia_scope:'none',russia_action:'direct',blocked_action:'direct',ads_action:'direct',default_action:'direct'},
-    ads_block: {local_action:'direct',russia_scope:'none',russia_action:'direct',blocked_action:'direct',ads_action:'block',default_action:'direct'},
-    blocked_warp: {local_action:'direct',russia_scope:'none',russia_action:'direct',blocked_action:'warp',ads_action:'direct',default_action:'direct'},
-    all_warp: {local_action:'direct',russia_scope:'none',russia_action:'direct',blocked_action:'direct',ads_action:'direct',default_action:'warp'}
+    direct: {local_action:'direct4',russia_scope:'none',russia_action:'direct4',blocked_action:'direct4',ads_action:'direct4',default_action:'direct4'},
+    ads_block: {local_action:'direct4',russia_scope:'none',russia_action:'direct4',blocked_action:'direct4',ads_action:'block',default_action:'direct4'},
+    blocked_warp: {local_action:'direct4',russia_scope:'none',russia_action:'direct4',blocked_action:'warp4',ads_action:'direct4',default_action:'direct4'},
+    all_warp: {local_action:'direct4',russia_scope:'none',russia_action:'direct4',blocked_action:'warp4',ads_action:'warp4',default_action:'warp4'}
   };
   let applyingPreset = false;
   const setValue = (name, value) => { const input = form?.querySelector(`input[name="${name}"][value="${value}"]`); if (input) input.checked = true; };
