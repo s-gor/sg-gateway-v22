@@ -1,0 +1,85 @@
+name: audit v22 prepublication parity
+
+on:
+  push:
+    branches: [audit-v22-prepublish]
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: audit-v22-prepublish
+          fetch-depth: 0
+      - name: Guard exact clean Fix28 parent
+        run: test "$(git rev-parse HEAD^)" = "04345198231bbe3eb75d9061b879887a0f9cecfd"
+      - name: Fetch historical AWG3-free 022.05 tree
+        run: |
+          git clone -q --no-checkout https://github.com/s-gor/sg-gateway.git /tmp/old
+          git -C /tmp/old fetch -q --depth=1 origin a0c2537b6c55d1fd974afe3aab586a7d41777cd8
+          git -C /tmp/old checkout -q --detach FETCH_HEAD
+          test "$(git -C /tmp/old rev-parse HEAD)" = "a0c2537b6c55d1fd974afe3aab586a7d41777cd8"
+      - name: Inventory active-source differences
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          from pathlib import Path
+
+          new=Path('.')
+          old=Path('/tmp/old')
+          roots=('app','hostd','engines','deploy','tests')
+          top_files=(
+              'install.sh','build-run.sh','build-run-vendored.sh','requirements.txt',
+              'requirements-dev.txt','release-manifest.json','VERSION','BUILD-ID',
+          )
+          def files(root):
+              out={}
+              for prefix in roots:
+                  base=root/prefix
+                  if not base.exists(): continue
+                  for p in base.rglob('*'):
+                      if p.is_file():
+                          rel=p.relative_to(root).as_posix()
+                          if '/__pycache__/' in rel or rel.endswith(('.pyc','.pyo')): continue
+                          out[rel]=hashlib.sha256(p.read_bytes()).hexdigest()
+              for rel in top_files:
+                  p=root/rel
+                  if p.is_file(): out[rel]=hashlib.sha256(p.read_bytes()).hexdigest()
+              return out
+          a=files(old); b=files(new)
+          added=sorted(set(b)-set(a)); removed=sorted(set(a)-set(b)); changed=sorted(p for p in set(a)&set(b) if a[p]!=b[p])
+          print(f'ACTIVE_ADDED={len(added)} ACTIVE_REMOVED={len(removed)} ACTIVE_CHANGED={len(changed)}')
+          print('=== ADDED CURRENT ===')
+          for p in added: print(p)
+          print('=== MISSING VS HISTORICAL ===')
+          for p in removed: print(p)
+          print('=== CHANGED ===')
+          for p in changed: print(p)
+          PY
+      - name: Search historical-only active features in missing files
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          from pathlib import Path
+          new=Path('.'); old=Path('/tmp/old')
+          roots=('app','hostd','engines','deploy')
+          missing=[]
+          for root in roots:
+              base=old/root
+              if not base.exists(): continue
+              for p in base.rglob('*'):
+                  if p.is_file():
+                      rel=p.relative_to(old)
+                      if not (new/rel).exists(): missing.append(rel.as_posix())
+          print(f'RUNTIME_MISSING_COUNT={len(missing)}')
+          for rel in sorted(missing):
+              print(rel)
+          PY
+      - name: AWG3 exclusion audit
+        run: |
+          ! grep -RInE --exclude-dir=.git 'amneziawg3|AWG3|awg3' app hostd engines deploy install.sh || { echo 'AWG3_ACTIVE_REFERENCE_FOUND'; exit 1; }
+          echo AWG3_ACTIVE_REFERENCES=0
