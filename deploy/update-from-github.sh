@@ -212,7 +212,7 @@ capture_service_states() {
   local output="$1" service active enabled
   : > "$output"
   for service in \
-    nginx.service xray.service mihomo.service sg-gateway-awg.service \
+    nginx.service xray.service mihomo.service sg-gateway-awg.service sg-gateway-awg3.service \
     sg-gateway-singbox.service "$HOSTD_SERVICE" "$PANEL_SERVICE"; do
     active=0
     enabled=0
@@ -712,7 +712,7 @@ deploy_source() {
   local child
   while IFS= read -r -d '' child; do
     case "$(basename "$child")" in
-      ".venv"|"assets") continue ;;
+      ".venv"|"assets"|"awg3") continue ;;
     esac
     rm -rf "$child"
   done < <(find "$PREFIX" -mindepth 1 -maxdepth 1 -print0)
