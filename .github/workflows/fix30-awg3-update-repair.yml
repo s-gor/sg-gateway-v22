@@ -1,0 +1,58 @@
+name: Fix30 AWG3 updater repair
+
+on:
+  push:
+    branches: [fix30-ipv6-dual-stack]
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix30-ipv6-dual-stack
+          fetch-depth: 0
+      - name: Repair updater and add regression coverage
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          updater = Path('deploy/update-from-github.sh')
+          text = updater.read_text(encoding='utf-8')
+          old1 = '    nginx.service xray.service mihomo.service sg-gateway-awg.service \\\n    sg-gateway-singbox.service "$HOSTD_SERVICE" "$PANEL_SERVICE"; do'
+          new1 = '    nginx.service xray.service mihomo.service sg-gateway-awg.service sg-gateway-awg3.service \\\n    sg-gateway-singbox.service "$HOSTD_SERVICE" "$PANEL_SERVICE"; do'
+          old2 = '      ".venv"|"assets") continue ;;'
+          new2 = '      ".venv"|"assets"|"awg3") continue ;;'
+          if text.count(old1) != 1:
+              raise SystemExit(f'expected one service-state block, found {text.count(old1)}')
+          if text.count(old2) != 1:
+              raise SystemExit(f'expected one preserve block, found {text.count(old2)}')
+          text = text.replace(old1, new1).replace(old2, new2)
+          updater.write_text(text, encoding='utf-8')
+
+          Path('tests/test_fix30_awg3_update_preservation.py').write_text('''from pathlib import Path\n\n\ndef test_panel_update_preserves_awg3_userspace_and_checks_service_state():\n    text = Path("deploy/update-from-github.sh").read_text(encoding="utf-8")\n    assert "sg-gateway-awg3.service" in text\n    assert '\".venv\"|\"assets\"|\"awg3\") continue ;;' in text\n    assert "verify_runtime_states_unchanged" in text\n\n''', encoding='utf-8')
+          PY
+          rm -f .github/workflows/fix30-awg3-update-repair.yml
+      - name: Refresh source integrity
+        run: |
+          python3 - <<'PY'
+          import hashlib, subprocess
+          from pathlib import Path
+          paths = subprocess.check_output(['git','ls-files'], text=True).splitlines()
+          paths = [p for p in paths if p != 'SOURCE-SHA256SUMS' and Path(p).exists()]
+          rows=[]
+          for p in sorted(paths):
+              data=Path(p).read_bytes()
+              rows.append(f"{hashlib.sha256(data).hexdigest()}  {p}")
+          Path('SOURCE-SHA256SUMS').write_text('\n'.join(rows)+'\n', encoding='utf-8')
+          PY
+      - name: Commit repair
+        run: |
+          git config user.name 'SG-Gateway CI'
+          git config user.email 'actions@users.noreply.github.com'
+          git add -A
+          git commit -m 'Fix30: preserve AWG3 userspace across panel update'
+          git push origin HEAD:fix30-ipv6-dual-stack
