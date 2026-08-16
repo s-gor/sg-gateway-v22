@@ -12,6 +12,10 @@ DATA_DIR="/var/lib/sg-gateway"
 BACKUP_ROOT="/root/sg-gateway-update-safety"
 PANEL_SERVICE="sg-gateway.service"
 HOSTD_SERVICE="sg-hostd.service"
+AWG3_SERVICE="sg-gateway-awg3.service"
+AWG3_CONFIG="/etc/amnezia/amneziawg/awg3.conf"
+AWG3_UNIT="/etc/systemd/system/sg-gateway-awg3.service"
+AWG3_ROOT="$PREFIX/awg3"
 TEMP_DIR=""
 BACKUP_DIR=""
 SOURCE_DIR=""
@@ -209,30 +213,36 @@ PYCLIENTS
 }
 
 capture_service_states() {
-  local output="$1" service active enabled
+  local output="$1" service active enabled failed
   : > "$output"
   for service in \
-    nginx.service xray.service mihomo.service sg-gateway-awg.service sg-gateway-awg3.service \
+    nginx.service xray.service mihomo.service sg-gateway-awg.service "$AWG3_SERVICE" \
     sg-gateway-singbox.service "$HOSTD_SERVICE" "$PANEL_SERVICE"; do
     active=0
     enabled=0
+    failed=0
     systemctl is-active --quiet "$service" && active=1 || true
     systemctl is-enabled --quiet "$service" && enabled=1 || true
-    printf '%s\t%s\t%s\n' "$service" "$active" "$enabled" >> "$output"
+    systemctl is-failed --quiet "$service" && failed=1 || true
+    printf '%s\t%s\t%s\t%s\n' "$service" "$active" "$enabled" "$failed" >> "$output"
   done
 }
 
 verify_runtime_states_unchanged() {
-  local before="$1" service active enabled now
-  while IFS=$'\t' read -r service active enabled; do
+  local before="$1" service active enabled failed now now_enabled now_failed
+  while IFS=$'\t' read -r service active enabled failed; do
     [[ -n "$service" ]] || continue
     case "$service" in
       "$PANEL_SERVICE"|"$HOSTD_SERVICE") continue ;;
     esac
     now=0
+    now_enabled=0
+    now_failed=0
     systemctl is-active --quiet "$service" && now=1 || true
-    if [[ "$now" != "$active" ]]; then
-      echo "Runtime service state changed: $service active before=$active after=$now" >&2
+    systemctl is-enabled --quiet "$service" && now_enabled=1 || true
+    systemctl is-failed --quiet "$service" && now_failed=1 || true
+    if [[ "$now" != "$active" || "$now_enabled" != "$enabled" || "$now_failed" != "$failed" ]]; then
+      echo "Runtime service state changed: $service active $active->$now enabled $enabled->$now_enabled failed $failed->$now_failed" >&2
       return 1
     fi
   done < "$before"
@@ -280,6 +290,49 @@ for name, value in (
 PYHTTPS
 }
 
+protected_runtime_paths() {
+  local https_env="$1" output="$2"
+  local cert="" key=""
+  # shellcheck disable=SC1090
+  source "$https_env"
+  cert="${HTTPS_CERT:-}"
+  key="${HTTPS_KEY:-}"
+  python3 - "$output" "$cert" "$key" <<'PYPROTECTED'
+import os
+import sys
+from pathlib import Path
+
+output = Path(sys.argv[1])
+values = [
+    "/etc/letsencrypt",
+    "/var/lib/sg-gateway/security/tls-state.json",
+    "/etc/amnezia/amneziawg/awg3.conf",
+    "/etc/systemd/system/sg-gateway-awg3.service",
+    "/opt/sg-gateway/awg3",
+]
+for raw in sys.argv[2:]:
+    raw = str(raw or "").strip()
+    if not raw:
+        continue
+    path = Path(raw)
+    if not path.is_absolute() or ".." in path.parts or str(path) == "/":
+        raise SystemExit(f"unsafe protected runtime path: {raw!r}")
+    values.append(os.path.normpath(str(path)))
+    if path.exists() or path.is_symlink():
+        values.append(os.path.realpath(str(path)))
+
+seen = set()
+ordered = []
+for raw in values:
+    value = os.path.normpath(str(raw))
+    if value == "/" or not value.startswith("/") or value in seen:
+        continue
+    seen.add(value)
+    ordered.append(value)
+output.write_text("\n".join(ordered) + "\n", encoding="utf-8")
+PYPROTECTED
+}
+
 create_safety_backup() {
   mkdir -p "$BACKUP_ROOT"
   chmod 0700 "$BACKUP_ROOT"
@@ -292,6 +345,11 @@ create_safety_backup() {
   SERVICES_STOPPED=1
 
   https_state > "$BACKUP_DIR/https-before.env"
+  protected_runtime_paths "$BACKUP_DIR/https-before.env" "$BACKUP_DIR/protected-runtime-paths.txt"
+
+  local protected_paths=()
+  mapfile -t protected_paths < "$BACKUP_DIR/protected-runtime-paths.txt"
+  fingerprint_paths "${protected_paths[@]}" > "$BACKUP_DIR/protected-runtime-before.sha256"
   fingerprint_clients > "$BACKUP_DIR/clients-before.sha256"
   fingerprint_paths /etc/letsencrypt > "$BACKUP_DIR/letsencrypt-before.sha256"
   fingerprint_paths \
@@ -301,22 +359,42 @@ create_safety_backup() {
     /etc/nginx/stream-conf.d/sg-gateway-443.conf \
     > "$BACKUP_DIR/nginx-before.sha256"
 
-  local existing=() relative
+  local existing=() relative absolute
   for relative in \
     opt/sg-gateway \
     etc/sg-gateway \
     var/lib/sg-gateway \
     etc/letsencrypt \
+    etc/amnezia/amneziawg/awg3.conf \
     etc/nginx/nginx.conf \
     etc/nginx/sites-available/sg-gateway \
     etc/nginx/sites-enabled/sg-gateway \
     etc/nginx/stream-conf.d/sg-gateway-443.conf \
     etc/systemd/system/sg-gateway.service \
-    etc/systemd/system/sg-hostd.service; do
+    etc/systemd/system/sg-hostd.service \
+    etc/systemd/system/sg-gateway-awg3.service; do
     if [[ -e "/$relative" || -L "/$relative" ]]; then
       existing+=("$relative")
     fi
   done
+
+  while IFS= read -r absolute; do
+    [[ -n "$absolute" && "$absolute" == /* ]] || continue
+    if [[ -e "$absolute" || -L "$absolute" ]]; then
+      existing+=("${absolute#/}")
+    fi
+  done < "$BACKUP_DIR/protected-runtime-paths.txt"
+
+  local unique=() item
+  declare -A seen=()
+  for item in "${existing[@]}"; do
+    [[ -n "$item" ]] || continue
+    [[ -n "${seen[$item]+x}" ]] && continue
+    seen[$item]=1
+    unique+=("$item")
+  done
+  existing=("${unique[@]}")
+
   printf '%s\n' "${existing[@]}" > "$BACKUP_DIR/existing-paths.txt"
   tar -C / -cpf "$BACKUP_DIR/state.tar" "${existing[@]}"
   tar -tf "$BACKUP_DIR/state.tar" >/dev/null
@@ -326,7 +404,7 @@ create_safety_backup() {
 rollback_update() {
   (( BACKUP_READY == 1 )) || return 0
   printf '\n%s[SG-Gateway Update] ROLLBACK:%s restoring the pre-update server state...\n' "$YELLOW" "$RESET"
-  systemctl stop "$PANEL_SERVICE" "$HOSTD_SERVICE" >/dev/null 2>&1 || true
+  systemctl stop "$PANEL_SERVICE" "$HOSTD_SERVICE" "$AWG3_SERVICE" >/dev/null 2>&1 || true
 
   local path
   for path in \
@@ -334,13 +412,27 @@ rollback_update() {
     /etc/sg-gateway \
     /var/lib/sg-gateway \
     /etc/letsencrypt \
+    /etc/amnezia/amneziawg/awg3.conf \
     /etc/nginx/sites-available/sg-gateway \
     /etc/nginx/sites-enabled/sg-gateway \
     /etc/nginx/stream-conf.d/sg-gateway-443.conf \
     /etc/systemd/system/sg-gateway.service \
-    /etc/systemd/system/sg-hostd.service; do
-    rm -rf "$path"
+    /etc/systemd/system/sg-hostd.service \
+    /etc/systemd/system/sg-gateway-awg3.service; do
+    rm -rf -- "$path"
   done
+
+  while IFS= read -r path; do
+    [[ -n "$path" && "$path" == /* ]] || continue
+    case "$path" in
+      /opt/sg-gateway|/opt/sg-gateway/*|/etc/sg-gateway|/etc/sg-gateway/*|/var/lib/sg-gateway|/var/lib/sg-gateway/*|/etc/letsencrypt|/etc/letsencrypt/*|/etc/amnezia/amneziawg/awg3.conf|/etc/systemd/system/sg-gateway-awg3.service)
+        continue
+        ;;
+    esac
+    if [[ -f "$path" || -L "$path" ]]; then
+      rm -f -- "$path"
+    fi
+  done < "$BACKUP_DIR/protected-runtime-paths.txt"
 
   tar -C / -xpf "$BACKUP_DIR/state.tar"
   systemctl daemon-reload >/dev/null 2>&1 || true
@@ -349,14 +441,18 @@ rollback_update() {
     systemctl is-active --quiet nginx.service && systemctl reload nginx.service >/dev/null 2>&1 || true
   fi
 
-  local service active enabled
-  while IFS=$'\t' read -r service active enabled; do
+  local service active enabled failed
+  while IFS=$'\t' read -r service active enabled failed; do
     [[ -n "$service" ]] || continue
     if [[ "$enabled" == "1" ]]; then
       systemctl enable "$service" >/dev/null 2>&1 || true
+    else
+      systemctl disable "$service" >/dev/null 2>&1 || true
     fi
     if [[ "$active" == "1" ]]; then
       systemctl restart "$service" >/dev/null 2>&1 || true
+    else
+      systemctl stop "$service" >/dev/null 2>&1 || true
     fi
   done < "$BACKUP_DIR/service-state.tsv"
 
@@ -723,10 +819,16 @@ deploy_source() {
     rm -rf "$PREFIX/assets"
     cp -a "$ASSETS_RECOVERY_DIR" "$PREFIX/assets"
   fi
-  chown -R root:root "$PREFIX"
   chmod 0755 "$PREFIX"
-  find "$PREFIX" -path "$PREFIX/.venv" -prune -o -type d -exec chmod 0755 {} +
-  find "$PREFIX" -path "$PREFIX/.venv" -prune -o -type f -exec chmod 0644 {} +
+  find "$PREFIX" \
+    \( -path "$PREFIX/.venv" -o -path "$PREFIX/assets" -o -path "$AWG3_ROOT" \) -prune -o \
+    -exec chown root:root {} +
+  find "$PREFIX" \
+    \( -path "$PREFIX/.venv" -o -path "$PREFIX/assets" -o -path "$AWG3_ROOT" \) -prune -o \
+    -type d -exec chmod 0755 {} +
+  find "$PREFIX" \
+    \( -path "$PREFIX/.venv" -o -path "$PREFIX/assets" -o -path "$AWG3_ROOT" \) -prune -o \
+    -type f -exec chmod 0644 {} +
   find "$PREFIX/deploy" -maxdepth 1 -type f -name '*.sh' -exec chmod 0755 {} + 2>/dev/null || true
   chmod -R a+rX "$PREFIX/.venv"
 
@@ -761,6 +863,7 @@ restart_panel() {
 
 verify_final() {
   local before after
+  local protected_paths=()
 
   before="$(cat "$BACKUP_DIR/clients-before.sha256")"
   after="$(fingerprint_clients)"
@@ -769,6 +872,15 @@ verify_final() {
   before="$(cat "$BACKUP_DIR/letsencrypt-before.sha256")"
   after="$(fingerprint_paths /etc/letsencrypt)"
   [[ "$before" == "$after" ]] || fail "/etc/letsencrypt changed during Update"
+
+  mapfile -t protected_paths < "$BACKUP_DIR/protected-runtime-paths.txt"
+  before="$(cat "$BACKUP_DIR/protected-runtime-before.sha256")"
+  after="$(fingerprint_paths "${protected_paths[@]}")"
+  [[ "$before" == "$after" ]] || fail "TLS/AWG3 protected runtime changed during Update"
+
+  https_state > "$TEMP_DIR/https-after.env"
+  cmp -s "$BACKUP_DIR/https-before.env" "$TEMP_DIR/https-after.env" || \
+    fail "HTTPS certificate state changed during Update"
 
   before="$(cat "$BACKUP_DIR/nginx-before.sha256")"
   after="$(fingerprint_paths \
@@ -861,7 +973,7 @@ main() {
   # Download and validate the candidate before any server mutation.
   prepare_source
 
-  run_stage 2 "Safety Backup: SG state + full /etc/letsencrypt" create_safety_backup
+  run_stage 2 "Safety Backup: SG state + TLS + AWG3 runtime" create_safety_backup
   run_stage 3 "Обновление только исходников SG-Gateway" deploy_source "$SOURCE_DIR"
   run_stage 4 "Python/UI проверка без изменения runtime" validate_deployed_panel
   run_stage 5 "Перезапуск только panel + hostd" restart_panel
@@ -877,7 +989,7 @@ main() {
   printf '%s[SG-Gateway Update] SG-Gateway safely updated.%s\n' "$GREEN" "$RESET"
   printf '[SG-Gateway Update] VERSION: %s\n' "$new_version"
   printf '[SG-Gateway Update] Safety Backup: %s\n' "$BACKUP_DIR"
-  printf '[SG-Gateway Update] Nginx/Certbot/Let'\''s Encrypt/cores were not modified.\n'
+  printf '[SG-Gateway Update] TLS certificates/Nginx/AWG3 runtime/VPN cores were not modified.\n'
   printf '[SG-Gateway Update] ============================================================\n'
 }
 
