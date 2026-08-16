@@ -79,7 +79,7 @@ def test_final_publication_metadata_is_consistent() -> None:
     assert release["next_development_line"] == "0.1.0-022.05"
     assert release["channel"] == "dev-v22"
     assert release["rebuild_target"] == "0.1.0-022.05"
-    assert release["rebuild_policy"]["awg3"] is False
+    assert release["rebuild_policy"]["awg3"] is True
     assert release["safe_update"]["preserve_local_assets"] is True
     assert release["safe_update"]["download_assets"] is False
     assert release["source_integrity"]["mode"] == "git-blob-sha256"

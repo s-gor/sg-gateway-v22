@@ -9,9 +9,9 @@ def test_gecko_contract_is_three_mode_and_requires_current_xray() -> None:
     assert 'GECKO_PACKET_SIZE = "512-1200"' in body
     assert 'SALAMANDER_MODES = (SALAMANDER_MODE_NONE, SALAMANDER_MODE, GECKO_MODE)' in body
 
-def test_gecko_integration_preserves_xmux_and_excludes_awg3() -> None:
-    assert not (ROOT / 'hostd/sg_hostd/awg3_runtime.py').exists()
-    assert not (ROOT / 'deploy/sg-gateway-awg3.service').exists()
+def test_gecko_integration_preserves_xmux_alongside_isolated_awg3() -> None:
+    assert (ROOT / 'hostd/sg_hostd/awg3_runtime.py').is_file()
+    assert (ROOT / 'deploy/sg-gateway-awg3.service').is_file()
     assert (ROOT / 'app/xray/xmux.py').is_file()
     connections = (ROOT / 'app/web/templates/connections.html').read_text(encoding='utf-8')
     assert 'sg-xmux-settings-v1.js' in connections

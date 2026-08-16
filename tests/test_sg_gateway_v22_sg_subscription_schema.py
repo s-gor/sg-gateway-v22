@@ -29,18 +29,19 @@ def _device(device_id: int, name: str, primary: bool) -> Device:
     )
 
 
-def test_canonical_profile_ids_preserve_v1_order_without_awg3() -> None:
+def test_canonical_profile_ids_preserve_v1_order_with_independent_awg3() -> None:
     assert subscription.canonical_profile_ids() == (
         "xray_reality_tcp",
         "xray_xhttp_reality",
         "xray_xhttp_tls",
         "xray_hysteria2",
         "amneziawg",
+        "amneziawg3",
         "mieru",
         "anytls",
         "tuic",
     )
-    assert "amneziawg3" not in subscription.canonical_profile_ids()
+    assert "amneziawg3" in subscription.canonical_profile_ids()
 
 
 def test_anytls_and_tuic_uris_are_canonicalized() -> None:

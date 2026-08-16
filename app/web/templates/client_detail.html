@@ -226,7 +226,11 @@
         </label>
         <label class="dv16-protocol">
           <input type="checkbox" name="protocols" value="amneziawg">
-          <span><strong>AmneziaWG</strong><small>Отдельная конфигурация и QR</small></span>
+          <span><strong>AmneziaWG 2</strong><small>AWG2 · отдельная конфигурация и QR</small></span>
+        </label>
+        <label class="dv16-protocol">
+          <input type="checkbox" name="protocols" value="amneziawg3">
+          <span><strong>AmneziaWG 3</strong><small>AWG3 userspace · отдельная конфигурация и QR</small></span>
         </label>
         <label class="dv16-protocol {{ 'is-locked' if not tls.https_ready else '' }}">
           <input type="checkbox" name="protocols" value="anytls" {% if not tls.https_ready %}disabled{% endif %}>

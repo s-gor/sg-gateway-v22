@@ -16,6 +16,7 @@ _PROFILE_SPECS = (
     ("xray_xhttp_tls", "xray_xhttp_tls", "xray-xhttp-tls", "VLESS XHTTP TLS", "vless", "uri"),
     ("xray_hysteria2", "xray_hysteria2", "hysteria2", "Hysteria 2", "hysteria2", "uri"),
     ("amneziawg", "amneziawg", "amneziawg", "AmneziaWG 2.0", "amneziawg", "config"),
+    ("amneziawg3", "amneziawg3", "amneziawg3", "AmneziaWG 3.0", "amneziawg", "config"),
     ("mieru", "mihomo", "mieru", "Mieru", "mieru", "uri"),
     ("anytls", "anytls", "anytls", "AnyTLS", "anytls", "uri"),
     ("tuic", "tuic", "tuic", "TUIC v5", "tuic", "uri"),

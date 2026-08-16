@@ -6,7 +6,7 @@ import sqlite3
 from pathlib import Path
 
 from app.config import load_config
-from app.constants import AMNEZIAWG_UDP_PORT
+from app.constants import AMNEZIAWG3_UDP_PORT, AMNEZIAWG_UDP_PORT
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS clients (
@@ -108,6 +108,14 @@ DEFAULT_CONNECTIONS = {
         "config_json": (
             '{"dns":"1.1.1.1","country_code":"nl","server_public_key":"PLACEHOLDER_SERVER_PUBLIC_KEY",'
             '"allowed_ips":"0.0.0.0/0, ::/0","persistent_keepalive":25}'
+        ),
+    },
+    "amneziawg3": {
+        "host": "",
+        "port": AMNEZIAWG3_UDP_PORT,
+        "config_json": (
+            '{"dns":"1.1.1.1","country_code":"nl","server_public_key":"PLACEHOLDER_AWG3_SERVER_PUBLIC_KEY",'
+            '"allowed_ips":"0.0.0.0/0, ::/0","persistent_keepalive":"25-35","generation":3}'
         ),
     },
     "xray": {

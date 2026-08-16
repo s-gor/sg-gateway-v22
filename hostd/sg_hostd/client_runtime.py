@@ -1701,7 +1701,7 @@ def apply_split_mihomo_singbox_runtime() -> dict[str, Any]:
 def apply_all_clients() -> dict[str, Any]:
     """Apply critical engines and report optional engines independently.
 
-    Client catalogue operations are committed when AmneziaWG and Xray are
+    Client catalogue operations are committed when selected AWG2/AWG3 and Xray are
     healthy. Mieru, AnyTLS, TUIC and SG Client exports remain visible in the
     result, but an optional engine can no longer roll back a client create,
     update, delete or the whole SG-Gateway installation.
@@ -1724,8 +1724,11 @@ def apply_all_clients() -> dict[str, Any]:
 
         _repair_deployment_configs()
 
+        from sg_hostd.awg3_runtime import apply_awg3
+
         critical_results = [
             _apply_awg(),
+            apply_awg3(),
             _apply_xray(),
         ]
         optional_results = [

@@ -61,5 +61,5 @@ def test_empty_ready_uri_set_encodes_to_empty_string(monkeypatch) -> None:
     assert subscription.build_compatible_subscription_body(_client()) == ""
 
 
-def test_awg3_stays_out_of_canonical_schema() -> None:
-    assert "amneziawg3" not in subscription.canonical_profile_ids()
+def test_awg3_is_an_independent_canonical_config_profile() -> None:
+    assert "amneziawg3" in subscription.canonical_profile_ids()

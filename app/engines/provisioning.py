@@ -12,6 +12,7 @@ from app.xray.profiles import REALITY_TCP_FLOW
 
 ANYTLS_PORT = 9443
 TUIC_PORT = 10443
+AWG3_AWG = "/opt/sg-gateway/awg3/bin/awg"
 
 
 def _run(command: list[str], input_text: str | None = None) -> str:
@@ -34,6 +35,12 @@ def _run(command: list[str], input_text: str | None = None) -> str:
 def _awg_keypair() -> tuple[str, str]:
     private_key = _run(["awg", "genkey"])
     public_key = _run(["awg", "pubkey"], private_key + "\n")
+    return private_key, public_key
+
+
+def _awg3_keypair() -> tuple[str, str]:
+    private_key = _run([AWG3_AWG, "genkey"])
+    public_key = _run([AWG3_AWG, "pubkey"], private_key + "\n")
     return private_key, public_key
 
 
@@ -87,6 +94,23 @@ def build_engine_config(
             ensure_ascii=False,
             sort_keys=True,
         )
+
+    if engine == "amneziawg3":
+        settings = get_connection_settings(engine)
+        private_key, public_key = _awg3_keypair()
+        payload = {
+            "client_name": access_name,
+            "private_key": private_key,
+            "public_key": public_key,
+            "address": f"10.67.{min(254, access_id // 250)}.{2 + (access_id % 250)}/32",
+            "dns": settings.config.get("dns", "1.1.1.1"),
+            "server_public_key": settings.config.get("server_public_key", ""),
+            "endpoint": f"{settings.host}:{settings.port}",
+            "allowed_ips": settings.config.get("allowed_ips", "0.0.0.0/0, ::/0"),
+            "persistent_keepalive": settings.config.get("persistent_keepalive", "25-35"),
+            "generation": 3,
+        }
+        return public_key, json.dumps(payload, ensure_ascii=False, sort_keys=True)
 
     if engine == "xray":
         settings = get_connection_settings(engine)

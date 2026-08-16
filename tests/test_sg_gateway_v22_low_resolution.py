@@ -29,5 +29,5 @@ def test_low_resolution_recovery_preserves_current_runtime_features() -> None:
     assert 'sg-xmux-settings-v1.js' in connections
     assert 'value="gecko"' in connections
     assert (ROOT / 'app/production.py').exists()
-    assert not (ROOT / 'hostd/sg_hostd/awg3_runtime.py').exists()
+    assert (ROOT / 'hostd/sg_hostd/awg3_runtime.py').is_file()
     assert 'sg-low-resolution-v1.css' in base

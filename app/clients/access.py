@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from app.clients.exports import (
     build_anytls_link,
     build_awg_config,
+    build_awg3_config,
     build_mieru_json,
     build_mieru_link,
     build_subscription_url,
@@ -90,13 +91,30 @@ def build_access_cards(
         cards.append(
             AccessCard(
                 kind="amneziawg",
-                title="AmneziaWG",
+                title="AmneziaWG 2",
                 status=status,
                 description="Полная AWG-конфигурация с параметрами маскировки.",
                 primary_action="Скачать конфигурацию",
                 export_url=export_url,
                 qr_url=qr_url,
                 payload=build_awg_config(client, device).body if status == "applied" else "",
+            )
+        )
+
+    awg3 = deployments.get("amneziawg3")
+    if awg3 is not None:
+        status = _status(client, device, awg3)
+        export_url, qr_url = _urls(client, device, "amneziawg3")
+        cards.append(
+            AccessCard(
+                kind="amneziawg3",
+                title="AmneziaWG 3",
+                status=status,
+                description="Отдельный AWG3 userspace-профиль с параметрами 3.0.",
+                primary_action="Скачать конфигурацию",
+                export_url=export_url,
+                qr_url=qr_url,
+                payload=build_awg3_config(client, device).body if status == "applied" else "",
             )
         )
 

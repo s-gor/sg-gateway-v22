@@ -46,7 +46,7 @@ def test_all_connection_summaries_use_same_public_domain(tmp_path, monkeypatch):
 
     rows = list_connections()
 
-    assert {item.name for item in rows} == {"amneziawg", "xray", "mihomo"}
+    assert {item.name for item in rows} == {"amneziawg", "amneziawg3", "xray", "mihomo"}
     assert all(item.public_host == DOMAIN for item in rows)
     assert all(DOMAIN in item.note for item in rows)
     assert all(IP not in item.note for item in rows)
@@ -60,6 +60,7 @@ def test_connections_page_uses_public_host_for_every_engine():
 
     assert "SG_GATEWAY_02112_ALL_CONNECTIONS_DOMAIN_FIX3" in service
     assert "awg_public_host = public_host(awg.host)" in service
+    assert "awg3_public_host = public_host(awg3.host)" in service
     assert "xray_public_host = public_host(xray.host)" in service
     assert "mihomo_public_host = public_host(mihomo.host)" in service
 
@@ -67,7 +68,10 @@ def test_connections_page_uses_public_host_for_every_engine():
     assert 'name="host" value="{{ xray_public_host }}"' in page
     assert "<strong>{{ awg_public_host }}</strong>" in page
     assert 'name="host" value="{{ awg_public_host }}"' in page
-    assert "AmneziaWG: {{ awg_public_host }}:{{ awg_settings.port }}" in page
+    assert "<strong>{{ awg3_public_host }}</strong>" in page
+    assert 'name="host" value="{{ awg3_public_host }}"' in page
+    assert "AWG2: {{ awg_public_host }}:{{ awg_settings.port }}" in page
+    assert "AWG3: {{ awg3_public_host }}:{{ awg3_settings.port }}" in page
     assert "Xray Reality: {{ xray_public_host }}:{{ xray_settings.port }}" in page
     assert "Mihomo: {{ mihomo_public_host }}" in page
     assert "<strong>{{ mihomo_public_host or 'Не определён' }}</strong>" in mihomo_panel

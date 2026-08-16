@@ -68,8 +68,8 @@ def test_fragment_replacement_and_awg3_exclusion() -> None:
     assert urlsplit(value).query == "q=1"
     assert unquote(urlsplit(value).fragment) == "Новая метка"
     assert subscription._with_fragment("plain-text", "ignored") == "plain-text"
-    assert "amneziawg3" not in subscription.canonical_profile_ids()
+    assert "amneziawg3" in subscription.canonical_profile_ids()
     assert subscription.canonical_profile_ids() == (
         "xray_reality_tcp", "xray_xhttp_reality", "xray_xhttp_tls", "xray_hysteria2",
-        "amneziawg", "mieru", "anytls", "tuic",
+        "amneziawg", "amneziawg3", "mieru", "anytls", "tuic",
     )

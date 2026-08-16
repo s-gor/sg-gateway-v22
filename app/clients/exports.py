@@ -162,6 +162,57 @@ PersistentKeepalive = {config.get("persistent_keepalive", 25)}
     )
 
 
+def build_awg3_config(client: Client, device: Device | None = None) -> ClientExport:
+    config = _deployment_config(client, "amneziawg3", device)
+    label = _label(client, device)
+    endpoint = str(config.get("endpoint") or "")
+    try:
+        settings = get_connection_settings("amneziawg3")
+        endpoint_host = _public_export_host(settings.host)
+        endpoint_port = int(settings.port or 586)
+        if endpoint_host:
+            endpoint = _format_endpoint(endpoint_host, endpoint_port)
+    except Exception:
+        pass
+    body = f"""# SG-Gateway AmneziaWG 3.0
+# Access: {label}
+
+[Interface]
+PrivateKey = {config.get("private_key", "")}
+Address = {config.get("address", "")}
+DNS = {config.get("dns", "1.1.1.1")}
+Jc = {config.get("jc", "")}
+Jmin = {config.get("jmin", "")}
+Jmax = {config.get("jmax", "")}
+S1 = {config.get("s1", "")}
+S2 = {config.get("s2", "")}
+S3 = {config.get("s3", "")}
+S4 = {config.get("s4", "")}
+H1 = {config.get("h1", "")}
+H2 = {config.get("h2", "")}
+H3 = {config.get("h3", "")}
+H4 = {config.get("h4", "")}
+HeaderProtectionKey = {config.get("header_protection_key", "")}
+ContentPaddingAddition = {config.get("content_padding_addition", "")}
+RekeyAfterTime = {config.get("rekey_after_time", "")}
+RekeyTimeout = {config.get("rekey_timeout", "")}
+RejectAfterTime = {config.get("reject_after_time", "")}
+KeepaliveTimeout = {config.get("keepalive_timeout", "")}
+MaxHandshakeAttempts = {config.get("max_handshake_attempts", "")}
+
+[Peer]
+PublicKey = {config.get("server_public_key", "")}
+Endpoint = {endpoint}
+AllowedIPs = {config.get("allowed_ips", "0.0.0.0/0, ::/0")}
+PersistentKeepalive = {config.get("persistent_keepalive", "25-35")}
+"""
+    return ClientExport(
+        filename=f"sg-gateway-{_slug(client, device)}-amneziawg3.conf",
+        media_type="text/plain; charset=utf-8",
+        body=body,
+    )
+
+
 def _xray_profile(profile_id: str):
     state = xray_profiles_overview()
     return state, next(
@@ -517,6 +568,7 @@ def build_tuic_link(client: Client, device: Device | None = None) -> ClientExpor
 def protocol_engine(kind: str) -> str:
     return {
         "amneziawg": "amneziawg",
+        "amneziawg3": "amneziawg3",
         "xray": "xray",
         "xray-reality-tcp": "xray",
         "xray-xhttp-reality": "xray",
@@ -538,6 +590,7 @@ def build_protocol_export(
 ) -> ClientExport:
     builders = {
         "amneziawg": build_awg_config,
+        "amneziawg3": build_awg3_config,
         "xray": build_xray_link,
         "xray-reality-tcp": lambda item, access=None: build_xray_profile_link(item, "reality_tcp", access),
         "xray-xhttp-reality": lambda item, access=None: build_xray_profile_link(item, "xhttp_reality", access),

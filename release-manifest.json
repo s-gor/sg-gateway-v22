@@ -30,7 +30,8 @@
     ],
     "user_entity": "clients",
     "vless_uuid_per_device": true,
-    "vless_uuid_shared_by_device_profiles": true
+    "vless_uuid_shared_by_device_profiles": true,
+    "awg2_awg3_independent_selection": true
   },
   "client_creation": {
     "atomic": true,
@@ -106,6 +107,10 @@
       "download",
       "disable",
       "delete-additional"
+    ],
+    "awg_generations": [
+      "AWG2",
+      "AWG3"
     ]
   },
   "geofiles": {
@@ -230,7 +235,9 @@
     "template_endpoint_audit": true,
     "version": "021-rebuilt",
     "warp_panel_port_v017": true,
-    "xhttp_reality_stream_one_migration": true
+    "xhttp_reality_stream_one_migration": true,
+    "awg2_runtime_line": "frozen-1.x-kernel",
+    "awg3_runtime_line": "isolated-3.x-userspace-no-kernel-module"
   },
   "maintenance_updates": {
     "cores": {
@@ -329,7 +336,7 @@
     "ip_fallback_when_https_not_ready": true
   },
   "rebuild_policy": {
-    "awg3": false,
+    "awg3": true,
     "baseline": "0.1.0-021.12",
     "publication_requires_real_clean_install": true
   },

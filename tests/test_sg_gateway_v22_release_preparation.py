@@ -10,7 +10,7 @@ def test_dev_rebuild_identity_is_explicit_and_not_live():
     assert manifest['channel'] == 'dev-v22'
     assert manifest['rebuild_target'] == '0.1.0-022.05'
     assert manifest['rebuild_policy']['baseline'] == '0.1.0-021.12'
-    assert manifest['rebuild_policy']['awg3'] is False
+    assert manifest['rebuild_policy']['awg3'] is True
     assert manifest['rebuild_policy']['publication_requires_real_clean_install'] is True
 
 def test_full_builder_is_version_driven():

@@ -8,6 +8,7 @@ from flask import Flask, Response, abort, flash, jsonify, redirect, render_templ
 from app.clients.access import build_access_cards
 from app.clients.exports import (
     build_awg_config,
+    build_awg3_config,
     build_mihomo_yaml,
     build_mieru_link,
     build_subscription,
@@ -1141,6 +1142,7 @@ def create_app() -> Flask:
 
         builders = {
             "amneziawg": build_awg_config,
+        "amneziawg3": build_awg3_config,
             "xray": build_xray_link,
             "mihomo": build_mihomo_yaml,
             "mieru": build_mieru_link,
@@ -1406,6 +1408,7 @@ def create_app() -> Flask:
             active_page="connections",
             connections=list_connections(),
             awg_settings=get_connection_settings("amneziawg"),
+            awg3_settings=get_connection_settings("amneziawg3"),
             xray_settings=get_connection_settings("xray"),
             xray_profiles=xray_profiles_overview(),
             mihomo=mihomo_overview(),
@@ -1431,6 +1434,29 @@ def create_app() -> Flask:
             config,
         )
         flash("Настройки AmneziaWG сохранены." if updated else "Настройки AmneziaWG не применены. Проверьте адрес и порт.", "success" if updated else "error")
+        return redirect(url_for("connections"))
+
+    @app.post("/connections/amneziawg3")
+    def update_amneziawg3():
+        current = get_connection_settings("amneziawg3")
+        config = dict(current.config)
+        config["dns"] = request.form.get("dns", config.get("dns", "1.1.1.1"))
+        config["server_public_key"] = request.form.get(
+            "server_public_key", config.get("server_public_key", "")
+        )
+        config["generation"] = 3
+        updated = update_connection_settings(
+            "amneziawg3",
+            request.form.get("host", current.host),
+            request.form.get("port", str(current.port)),
+            config,
+        )
+        flash(
+            "Настройки AmneziaWG 3 сохранены."
+            if updated
+            else "Настройки AmneziaWG 3 не применены. Проверьте адрес.",
+            "success" if updated else "error",
+        )
         return redirect(url_for("connections"))
 
     @app.post("/connections/xray")

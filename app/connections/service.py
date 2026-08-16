@@ -63,11 +63,13 @@ def list_connections() -> list[ConnectionSummary]:
     awg = get_connection_settings("amneziawg")
     xray = get_connection_settings("xray")
     mihomo = get_connection_settings("mihomo")
+    awg3 = get_connection_settings("amneziawg3")
 
     # SG_GATEWAY_02112_ALL_CONNECTIONS_DOMAIN_FIX3
     awg_public_host = public_host(awg.host)
     xray_public_host = public_host(xray.host)
     mihomo_public_host = public_host(mihomo.host)
+    awg3_public_host = public_host(awg3.host)
 
     return [
         ConnectionSummary(
@@ -106,5 +108,16 @@ def list_connections() -> list[ConnectionSummary]:
             country_code=_country_for(mihomo),
             country_name=country_name(_country_for(mihomo)),
             public_host=mihomo_public_host,
+        ),
+        ConnectionSummary(
+            name="amneziawg3",
+            label="AmneziaWG 3",
+            status="Configured" if awg3.enabled else "Disabled",
+            port=f"UDP {awg3.port}",
+            clients=counts.get("amneziawg3", 0),
+            note=f"Адрес: {awg3_public_host}:{awg3.port}",
+            country_code=_country_for(awg3),
+            country_name=country_name(_country_for(awg3)),
+            public_host=awg3_public_host,
         ),
     ]

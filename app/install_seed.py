@@ -6,7 +6,7 @@ from typing import Any
 
 from app.connections.settings import get_connection_settings, update_connection_settings
 from app.clients.repository import count_clients, create_client
-from app.constants import AMNEZIAWG_UDP_PORT
+from app.constants import AMNEZIAWG3_UDP_PORT, AMNEZIAWG_UDP_PORT
 from app.db import connect, init_db
 
 _PLACEHOLDER_PREFIXES = ("PLACEHOLDER_", "CHANGEME", "TODO")
@@ -181,6 +181,15 @@ def seed_or_migrate() -> None:
             }
         )
     _save("amneziawg", awg_host, awg_port, awg_config)
+
+    awg3 = get_connection_settings("amneziawg3")
+    awg3_config = dict(awg3.config)
+    awg3_host = str(awg3.host or "").strip() or awg_host or public_host
+    _country(awg3_config, country)
+    awg3_config.setdefault("allowed_ips", "0.0.0.0/0, ::/0")
+    awg3_config.setdefault("persistent_keepalive", "25-35")
+    awg3_config["generation"] = 3
+    _save("amneziawg3", awg3_host, AMNEZIAWG3_UDP_PORT, awg3_config)
 
     mihomo = get_connection_settings("mihomo")
     mihomo_config = dict(mihomo.config)
