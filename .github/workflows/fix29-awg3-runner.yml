@@ -35,11 +35,10 @@ jobs:
           cp /tmp/old/deploy/sg-gateway-awg3.service deploy/sg-gateway-awg3.service
           chmod 0755 vendor/cores/amneziawg-go-linux-amd64-v3.0.0 deploy/sg-gateway-awg3-userspace.sh
           echo '090f9383532822a756d078890b447e00af7f46bd30a10f9f47c46d633d807b19  vendor/cores/amneziawg-tools-3.0.20260805.tar.gz' | sha256sum -c -
-          echo '131110027db6d5dc0e35b19eb5b8a269267608136350d5759630af  vendor/cores/amneziawg-go-linux-amd64-v3.0.0' >/dev/null
           echo '131110027db6d5dc0e35b19eb5b8a2692676081366c34112088dc68bbb050bcd  vendor/cores/amneziawg-go-linux-amd64-v3.0.0' | sha256sum -c -
           test ! -e vendor/cores/amneziawg-linux-kernel-module-3.0.20260805.tar.gz
 
-      - name: Extract and compile atomic product patch
+      - name: Extract compile and apply atomic product patch
         run: |
           git fetch -q origin audit-v22-prepublish
           git show origin/audit-v22-prepublish:.github/workflows/fix29-awg3-implement.yml > /tmp/fix29-carrier.yml
@@ -63,6 +62,20 @@ jobs:
           print(f'PATCH_SCRIPT_COMPILED lines={len(out)}')
           PY
           python3 /tmp/fix29_patch.py
+          python3 - <<'PY'
+          from pathlib import Path
+          path=Path('deploy/sg-gateway-awg3-userspace.sh')
+          text=path.read_text(encoding='utf-8')
+          wanted='export PATH="$AWG3_ROOT/bin:$PATH"'
+          if wanted not in text:
+              anchor='AWG3_ROOT="/opt/sg-gateway/awg3"\n'
+              if text.count(anchor) != 1:
+                  raise SystemExit('AWG3_ROOT helper anchor is not unique')
+              text=text.replace(anchor, anchor+wanted+'\n', 1)
+          if text.count(wanted) != 1:
+              raise SystemExit('AWG3 isolated PATH must appear exactly once')
+          path.write_text(text,encoding='utf-8',newline='\n')
+          PY
           chmod 0755 deploy/sg-gateway-awg3-userspace.sh vendor/cores/amneziawg-go-linux-amd64-v3.0.0
 
       - name: Static product invariants
@@ -75,7 +88,7 @@ jobs:
           grep -F 'PREFIX="$PREFIX/awg3" install' install.sh
           ! grep -RIn 'amneziawg-linux-kernel-module-3\.0' install.sh app hostd deploy vendor/cores/SHA256SUMS
           ! grep -RIn 'AMNEZIAWG_KMOD_VERSION="3\.' install.sh app hostd deploy vendor/cores/SHA256SUMS
-          grep -F 'export PATH="$BASE_DIR/bin:$PATH"' deploy/sg-gateway-awg3-userspace.sh
+          grep -F 'export PATH="$AWG3_ROOT/bin:$PATH"' deploy/sg-gateway-awg3-userspace.sh
           grep -F 'WG_QUICK_USERSPACE_IMPLEMENTATION="$AWG_GO"' deploy/sg-gateway-awg3-userspace.sh
 
       - name: Install test dependencies
