@@ -22,6 +22,8 @@ def test_dual_ui_is_source_native_exactly_once_before_devices() -> None:
     assert text.index(marker) < text.index(include) < text.index(devices)
     assert "<strong>Подписка устройства</strong>" not in text
     assert text.count("<strong>Legacy SUB устройства</strong>") == 1
+    assert text.count("<span>Совместимая legacy-подписка устройства.</span>") == 1
+    assert "Ссылка для NekoBox и совместимых клиентов." not in text
     assert not PATCHER.exists()
 
 
