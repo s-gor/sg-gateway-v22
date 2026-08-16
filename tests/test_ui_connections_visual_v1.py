@@ -98,3 +98,50 @@ def test_connections_visual_v1_css_exists():
     final = (ROOT / "app/web/static/sg-preview28-final.css").read_text(encoding="utf-8")
     assert ".cnv1-engine-pair" in final
     assert "grid-template-columns: minmax(0, 1fr) minmax(0, 1fr)" in final
+
+
+def test_connections_protocol_cards_have_explicit_profile_grid_areas():
+    css = (ROOT / "app/web/static/sg-xmux-settings-v1.css").read_text(encoding="utf-8")
+    polish = css.split("SG-Gateway 022.04 · Connections protocol-card polish", 1)[1]
+    for profile_id in ("reality_tcp", "xhttp_reality", "xhttp_tls", "hysteria2"):
+        assert f'data-profile-panel="{profile_id}"' in polish
+    for area in ("title", "port", "flow", "encryption", "mode", "path", "obfs"):
+        assert area in polish
+    assert "grid-auto-flow: row dense" in polish
+    assert "display: none" not in polish
+
+
+def test_connections_protocol_cards_are_compact_without_changing_form_contract():
+    css = (ROOT / "app/web/static/sg-xmux-settings-v1.css").read_text(encoding="utf-8")
+    polish = css.split("SG-Gateway 022.04 · Connections protocol-card polish", 1)[1]
+    template = (ROOT / "app/web/templates/connections.html").read_text(encoding="utf-8")
+    for marker in (
+        ".xps2-flow-field",
+        ".xps2-parameter-note",
+        ".xps2-salamander",
+        "border-left: 2px solid",
+        "box-shadow: none",
+    ):
+        assert marker in polish
+    for field in (
+        'name="reality_tcp_port"',
+        'name="xhttp_reality_port"',
+        'name="xhttp_tls_port"',
+        'name="hysteria2_port"',
+        'name="xhttp_reality_mode"',
+        'name="xhttp_tls_mode"',
+        'name="xhttp_reality_path"',
+        'name="xhttp_tls_path"',
+        'name="hysteria2_obfs_mode"',
+    ):
+        assert field in template
+
+
+def test_connections_protocol_cards_cover_low_resolution_and_mobile():
+    css = (ROOT / "app/web/static/sg-xmux-settings-v1.css").read_text(encoding="utf-8")
+    polish = css.split("SG-Gateway 022.04 · Connections protocol-card polish", 1)[1]
+    assert "@media (min-width: 981px) and (max-width: 1366px)" in polish
+    assert "(min-width: 981px) and (max-height: 820px)" in polish
+    assert "@media (max-width: 1050px)" in polish
+    assert "@media (max-width: 760px)" in polish
+    assert 'grid-template-areas: "title" "port" "flow" "path"' in polish
