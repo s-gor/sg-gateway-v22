@@ -124,17 +124,14 @@ def test_connections_protocol_cards_are_compact_without_changing_form_contract()
     ):
         assert marker in polish
     for field in (
-        'name="reality_tcp_port"',
-        'name="xhttp_reality_port"',
-        'name="xhttp_tls_port"',
-        'name="hysteria2_port"',
-        'name="xhttp_reality_mode"',
-        'name="xhttp_tls_mode"',
-        'name="xhttp_reality_path"',
-        'name="xhttp_tls_path"',
+        'name="{{ profile.id }}_port"',
+        'name="{{ profile.id }}_mode"',
+        'name="{{ profile.id }}_path"',
         'name="hysteria2_obfs_mode"',
     ):
         assert field in template
+    assert 'value="stream-one"' in template
+    assert 'value="gecko"' in template
 
 
 def test_connections_protocol_cards_cover_low_resolution_and_mobile():
