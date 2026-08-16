@@ -75,18 +75,18 @@ def test_helper_uses_verified_sg_panel_registration_contract():
     assert "tar --use-compress-program=unzstd" in deploy
 
 
-def test_installer_creates_and_activates_warp_automatically_and_hides_links():
+def test_installer_keeps_warp_manual_and_hides_links():
     source = Path("install.sh").read_text(encoding="utf-8")
     assert "stage9_ensure_warp" in source
     assert "/commands/warp.install" in source
-    assert "Создание и активация WARP" in source
+    assert "Создание и активация WARP" not in source
+    assert "helper установлен; создаётся при необходимости в Outbounds" in source
+    assert "существующий профиль сохранён" in source
     assert "Первый клиент sg-admin: создан" in source
     assert "Первый VPN-клиент sg-admin будет создан автоматически" in source
     final = source.rsplit("INSTALL_SUCCESS=1", 1)[1]
     assert "subscription-base64" not in final
     assert "Ссылки первого клиента" not in source
-    assert "WARP создаётся в Outbounds" not in source
-
 
 def test_amneziawg_has_fixed_udp_585_contract():
     source = Path("install.sh").read_text(encoding="utf-8")

@@ -2686,10 +2686,9 @@ run_final_stage() {
   local started=$SECONDS
   run_hidden "Этап 9/9 · 1/5 · Запуск sg-hostd" stage9_start_hostd
   run_hidden "Этап 9/9 · 2/5 · Проверка команд hostd" stage9_verify_hostd
-  run_hidden "Этап 9/9 · 3/6 · Сохранение/применение Xray runtime" stage9_apply_runtime
-  run_hidden "Этап 9/9 · 4/6 · Создание и активация WARP" stage9_ensure_warp
-  run_hidden "Этап 9/9 · 5/6 · Запуск панели" stage9_start_panel
-  run_hidden "Этап 9/9 · 6/6 · Проверка Nginx и служб" stage9_verify_nginx
+  run_hidden "Этап 9/9 · 3/5 · Сохранение/применение Xray runtime" stage9_apply_runtime
+  run_hidden "Этап 9/9 · 4/5 · Запуск панели" stage9_start_panel
+  run_hidden "Этап 9/9 · 5/5 · Проверка Nginx и служб" stage9_verify_nginx
   local elapsed=$((SECONDS - started))
   printf "%s[OK]%s Этап 9/%s · Запуск и финальная проверка (%s сек.)\n" \
     "$GREEN" "$RESET" "$TOTAL_STAGES" "$elapsed"
@@ -2785,7 +2784,6 @@ main() {
   run_quiet "Этап 10/10 · Запуск sg-hostd" stage9_start_hostd
   run_quiet "Этап 10/10 · Проверка команд hostd" stage9_verify_hostd
   run_quiet "Этап 10/10 · Применение подтверждённого Xray и клиентов" stage9_apply_runtime
-  run_quiet "Этап 10/10 · Создание и активация WARP" stage9_ensure_warp
   run_quiet "Этап 10/10 · Запуск панели" stage9_start_panel
   run_quiet "Этап 10/10 · Проверка Nginx и служб" stage9_verify_nginx
   run_quiet "Этап 10/10 · Контроль неизменности Clients" verify_client_identities_after_update
@@ -2829,7 +2827,11 @@ main() {
   printf '[SG-Gateway] Backup:       %s\n' "$BACKUP_DIR"
   printf '[SG-Gateway] SSH hostname станет виден после нового подключения: %s\n' "$SERVER_NAME"
   print_sg_admin_status
-  printf '[SG-Gateway] WARP:         создан и активен\n'
+  if [[ -s "$DATA_DIR/warp/wgcf.xray.json" || -s "$DATA_DIR/warp/wgcf-profile.conf" ]]; then
+    printf '[SG-Gateway] WARP:         существующий профиль сохранён\n'
+  else
+    printf '[SG-Gateway] WARP:         helper установлен; создаётся при необходимости в Outbounds\n'
+  fi
 
 }
 
