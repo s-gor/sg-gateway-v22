@@ -1,0 +1,89 @@
+name: build Fix28 clean VPS candidate
+
+on:
+  push:
+    branches: [fix28-clean-vps-candidate]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact clean Fix28 product commit
+        uses: actions/checkout@v4
+        with:
+          ref: 04345198231bbe3eb75d9061b879887a0f9cecfd
+          fetch-depth: 0
+
+      - name: Assert exact validated source tree
+        run: |
+          test "$(git rev-parse HEAD)" = "04345198231bbe3eb75d9061b879887a0f9cecfd"
+          test "$(git rev-parse 'HEAD^{tree}')" = "b9a4cb7b4ae5f2f80e81749b03220de3f4082d00"
+          test "$(tr -d '[:space:]' < VERSION)" = "0.1.0-021.12"
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          m=json.loads(Path('release-manifest.json').read_text(encoding='utf-8'))
+          assert m['status']=='DEV'
+          assert m['rebuild_target']=='0.1.0-022.05'
+          assert m['rebuild_policy']['awg3'] is False
+          print('CANDIDATE_IDENTITY=DEV TARGET=0.1.0-022.05 AWG3=false')
+          PY
+
+      - name: Verify exact git-blob source integrity
+        run: |
+          python3 - <<'PY'
+          import hashlib,re,subprocess
+          from pathlib import Path
+          expected={}
+          for raw in Path('SOURCE-SHA256SUMS').read_text(encoding='utf-8').splitlines():
+              if not raw: continue
+              m=re.fullmatch(r'([0-9a-f]{64})  (.+)',raw); assert m,raw
+              expected[m.group(2)]=m.group(1)
+          tracked=set(subprocess.check_output(['git','ls-files'],text=True).splitlines())
+          tracked.discard('SOURCE-SHA256SUMS')
+          assert set(expected)==tracked, (sorted(tracked-set(expected))[:20],sorted(set(expected)-tracked)[:20])
+          for item in sorted(tracked):
+              data=subprocess.check_output(['git','show',f'HEAD:{item}'])
+              assert hashlib.sha256(data).hexdigest()==expected[item],item
+          print(f'SOURCE_INTEGRITY_OK={len(tracked)}')
+          PY
+
+      - name: Build and verify FULL candidate plus transfer package
+        run: |
+          OUT="/tmp/SG-Gateway-0.1.0-021.12-DEV-v22-Fix28-FULL.run"
+          bash build-run.sh "$OUT"
+          bash "$OUT" --verify-only
+          SHA="${OUT%.run}-SHA256.txt"
+          ZIP="${OUT%.run}-TRANSFER.zip"
+          test -s "$OUT"
+          test -s "$SHA"
+          test -s "$ZIP"
+          mkdir -p /tmp/fix28-transfer-check
+          unzip -q "$ZIP" -d /tmp/fix28-transfer-check
+          cd /tmp/fix28-transfer-check
+          sha256sum -c "$(basename "$SHA")"
+          bash "$(basename "$OUT")" --verify-only
+          cd "$GITHUB_WORKSPACE"
+          mkdir -p candidate
+          cp "$OUT" "$SHA" "$ZIP" candidate/
+          cat > candidate/CANDIDATE-INFO.txt <<'EOF'
+          SG-Gateway v22 clean VPS candidate
+          Source commit: 04345198231bbe3eb75d9061b879887a0f9cecfd
+          Source tree: b9a4cb7b4ae5f2f80e81749b03220de3f4082d00
+          Current VERSION: 0.1.0-021.12
+          Release state: DEV rebuild target 0.1.0-022.05
+          AWG3: excluded
+          Purpose: real clean-VPS installation gate before publication identity bump
+          EOF
+          ls -lh candidate/
+
+      - name: Upload clean VPS candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: SG-Gateway-Fix28-clean-VPS-candidate
+          path: candidate/
+          if-no-files-found: error
+          retention-days: 7
