@@ -1,0 +1,66 @@
+name: audit v22 full backup route parity
+
+on:
+  push:
+    branches: [audit-v22-prepublish]
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: audit-v22-prepublish
+          fetch-depth: 0
+
+      - name: Guard audit branch over clean Fix28
+        run: |
+          git merge-base --is-ancestor 04345198231bbe3eb75d9061b879887a0f9cecfd HEAD
+
+      - name: Fetch historical AWG3-free 022.05
+        run: |
+          git clone -q --no-checkout https://github.com/s-gor/sg-gateway.git /tmp/old
+          git -C /tmp/old fetch -q --depth=1 origin a0c2537b6c55d1fd974afe3aab586a7d41777cd8
+          git -C /tmp/old checkout -q --detach FETCH_HEAD
+
+      - name: Show historical backup verify HTTP contract
+        run: |
+          echo '===== HISTORICAL full_backup_verify_http.py ====='
+          cat /tmp/old/app/maintenance/full_backup_verify_http.py
+
+      - name: Show current source-native backup route definitions
+        run: |
+          echo '===== CURRENT route-related source lines ====='
+          grep -RInE 'full.?backup|stage_uploaded_full_backup_for_verification|verify_full_backup|verification' app/main.py app/maintenance hostd/sg_hostd | head -n 300 || true
+
+      - name: Install dependencies
+        run: |
+          python3 -m pip install -q -r requirements-dev.txt
+
+      - name: Inspect actual production Flask route map
+        env:
+          SG_GATEWAY_DATA_DIR: /tmp/sg-gateway-audit-data
+        run: |
+          python3 - <<'PY'
+          from app.production import app
+          print('===== PRODUCTION FULL BACKUP ROUTES =====')
+          found=[]
+          for rule in sorted(app.url_map.iter_rules(), key=lambda r: r.rule):
+              hay=(rule.rule+' '+rule.endpoint).lower()
+              if 'backup' in hay or 'verify' in hay:
+                  methods=','.join(sorted(m for m in rule.methods if m not in {'HEAD','OPTIONS'}))
+                  print(f'{rule.rule} :: endpoint={rule.endpoint} :: methods={methods}')
+                  if 'full' in hay and ('verify' in hay or 'restore' in hay):
+                      found.append((rule.rule, rule.endpoint, methods))
+          print('MATCHING_FULL_VERIFY_RESTORE_ROUTES='+repr(found))
+          assert found, 'no production Full Backup verify/restore route found'
+          PY
+
+      - name: Run current Full Backup verification contracts
+        env:
+          SG_GATEWAY_DATA_DIR: /tmp/sg-gateway-audit-data-tests
+        run: |
+          python3 -m pytest -q \
+            tests/test_sg_gateway_v22_full_backup_verify.py \
+            tests/test_sg_gateway_v22_full_backup_upload_unlimited.py \
+            tests/test_sg_gateway_v22_full_backup_ui_layout.py
