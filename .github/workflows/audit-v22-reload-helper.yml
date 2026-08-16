@@ -1,0 +1,47 @@
+name: audit v22 nginx reload helper
+
+on:
+  push:
+    branches: [audit-v22-prepublish]
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: audit-v22-prepublish
+          fetch-depth: 0
+
+      - name: Guard over clean Fix28
+        run: git merge-base --is-ancestor 04345198231bbe3eb75d9061b879887a0f9cecfd HEAD
+
+      - name: Fetch historical AWG3-free 022.05
+        run: |
+          git clone -q --no-checkout https://github.com/s-gor/sg-gateway.git /tmp/old
+          git -C /tmp/old fetch -q --depth=1 origin a0c2537b6c55d1fd974afe3aab586a7d41777cd8
+          git -C /tmp/old checkout -q --detach FETCH_HEAD
+
+      - name: Show current references and creation sites
+        run: |
+          echo '===== CURRENT REFERENCES ====='
+          grep -RInC 5 'reload-sg-gateway-nginx.sh' install.sh deploy || true
+          echo '===== CURRENT CREATION/COPY CANDIDATES ====='
+          grep -RInE -C 3 '(cat|tee|install|cp|mv|printf).*(reload-sg-gateway-nginx|NGINX.*RELOAD|reload.*nginx)' install.sh deploy || true
+          echo '===== CURRENT FILE EXISTS ====='
+          if test -f deploy/reload-sg-gateway-nginx.sh; then echo YES; else echo NO; fi
+
+      - name: Show historical references and existence
+        run: |
+          cd /tmp/old
+          echo '===== HISTORICAL REFERENCES ====='
+          grep -RInC 5 'reload-sg-gateway-nginx.sh' install.sh deploy || true
+          echo '===== HISTORICAL CREATION/COPY CANDIDATES ====='
+          grep -RInE -C 3 '(cat|tee|install|cp|mv|printf).*(reload-sg-gateway-nginx|NGINX.*RELOAD|reload.*nginx)' install.sh deploy || true
+          echo '===== HISTORICAL FILE EXISTS ====='
+          if test -f deploy/reload-sg-gateway-nginx.sh; then echo YES; else echo NO; fi
+
+      - name: Check source package inventory for helper
+        run: |
+          grep -F 'deploy/reload-sg-gateway-nginx.sh' SOURCE-SHA256SUMS || true
+          grep -RIn 'reload-sg-gateway-nginx' build-run.sh build-run-vendored.sh install.sh deploy || true
