@@ -207,11 +207,11 @@
                   <header>
                     <div>
                       <span class="xps2-salamander-kicker">ОБФУСКАЦИЯ</span>
-                      <strong>Salamander FinalMask</strong>
-                      <p>Дополнительный UDP-слой для всего Hysteria2 inbound. Один пароль используется всеми его клиентами.</p>
+                      <strong>Hysteria2 Obfuscation</strong>
+                      <p>Salamander остаётся совместимым базовым режимом. Gecko добавляет к нему фрагментацию QUIC handshake и случайный padding 512–1200 байт.</p>
                     </div>
                     <span class="xps2-salamander-version {{ 'ready' if xray_profiles.hysteria2_obfs.version_ready else 'blocked' }}">
-                      Xray ≥ {{ xray_profiles.hysteria2_obfs.minimum_version }}
+                      Salamander ≥ {{ xray_profiles.hysteria2_obfs.salamander_minimum_version }} · Gecko ≥ {{ xray_profiles.hysteria2_obfs.gecko_minimum_version }}
                     </span>
                   </header>
 
@@ -223,15 +223,20 @@
                     </label>
                     <label>
                       <input type="radio" name="hysteria2_obfs_mode" value="salamander"
-                             {% if xray_profiles.hysteria2_obfs.mode == 'salamander' %}checked{% endif %}
-                             {% if not xray_profiles.hysteria2_obfs.version_ready %}disabled{% endif %}>
+                             {% if xray_profiles.hysteria2_obfs.mode == 'salamander' %}checked{% endif %}>
                       <span>Salamander</span>
+                    </label>
+                    <label>
+                      <input type="radio" name="hysteria2_obfs_mode" value="gecko"
+                             {% if xray_profiles.hysteria2_obfs.mode == 'gecko' %}checked{% endif %}
+                             {% if not xray_profiles.hysteria2_obfs.version_ready and xray_profiles.hysteria2_obfs.mode == 'gecko' %}disabled{% endif %}>
+                      <span>Gecko · рекомендуется</span>
                     </label>
                   </div>
 
                   <div class="xps2-salamander-secret" data-salamander-secret>
                     <label>
-                      <span>Пароль Salamander</span>
+                      <span>Пароль Hysteria2 obfs</span>
                       <input id="hysteria2-obfs-password" type="password"
                              name="hysteria2_obfs_password" value=""
                              placeholder="{{ xray_profiles.hysteria2_obfs.password_mask or 'Будет создан при первом включении' }}"
@@ -247,7 +252,7 @@
                   <p class="xps2-salamander-status" data-salamander-status>
                     {% if xray_profiles.hysteria2_obfs.password_configured %}Пароль настроен и не выводится в журналах.{% else %}Пароль ещё не создан.{% endif %}
                   </p>
-                  <p class="xps2-salamander-warning">После включения или замены пароля старые Hysteria2-профили без актуального Salamander перестанут подключаться. Ссылки, QR и subscription обновятся только после успешного применения Xray.</p>
+                  <p class="xps2-salamander-warning">Смена Off / Salamander / Gecko или замена пароля меняет Hysteria2-профили. Ссылки, QR и subscription обновляются после успешного применения Xray.</p>
                 </section>
                 {% endif %}
               </article>
@@ -405,6 +410,8 @@
   const modes = [...form.querySelectorAll('input[name="hysteria2_obfs_mode"]')];
 
   const currentMode = () => modes.find(item => item.checked)?.value || 'none';
+  const modeLabel = mode => mode === 'gecko' ? 'Gecko' : (mode === 'salamander' ? 'Salamander' : 'Off');
+  const obfsEnabled = mode => mode === 'salamander' || mode === 'gecko';
   const setStatus = (text, tone = '') => {
     if (!status) return;
     status.textContent = text;
@@ -421,24 +428,24 @@
     delete applyButton.dataset.sgConfirmTitle;
     delete applyButton.dataset.sgConfirmButton;
     delete applyButton.dataset.sgConfirmTone;
-    if (rotated || (mode === 'salamander' && typed && salamander.dataset.passwordConfigured === '1')) {
-      applyButton.dataset.sgConfirm = 'После замены пароля все старые Hysteria2-профили перестанут подключаться. Обновите профиль или subscription на каждом устройстве.';
-      applyButton.dataset.sgConfirmTitle = 'Заменить пароль Salamander';
+    if (rotated || (obfsEnabled(mode) && typed && salamander.dataset.passwordConfigured === '1')) {
+      applyButton.dataset.sgConfirm = 'После замены пароля старые Hysteria2-профили перестанут подключаться. Обновите профиль или subscription на каждом устройстве.';
+      applyButton.dataset.sgConfirmTitle = 'Заменить пароль Hysteria2';
       applyButton.dataset.sgConfirmButton = 'Заменить и применить';
       applyButton.dataset.sgConfirmTone = 'danger';
-    } else if (initialMode !== mode && mode === 'salamander') {
-      applyButton.dataset.sgConfirm = 'Включение Salamander изменит транспорт Hysteria2. Все ранее выданные Hysteria2-профили без Salamander перестанут подключаться. SG-Gateway создаст новые ссылки, QR-коды и subscription.';
-      applyButton.dataset.sgConfirmTitle = 'Включить Salamander';
-      applyButton.dataset.sgConfirmButton = 'Включить и обновить профили';
+    } else if (initialMode !== mode && obfsEnabled(mode)) {
+      applyButton.dataset.sgConfirm = `Переключение Hysteria2 на ${modeLabel(mode)} изменит транспорт. SG-Gateway обновит ссылки, QR-коды и subscription после успешного применения.`;
+      applyButton.dataset.sgConfirmTitle = `Включить ${modeLabel(mode)}`;
+      applyButton.dataset.sgConfirmButton = 'Применить режим';
     } else if (initialMode !== mode && mode === 'none') {
-      applyButton.dataset.sgConfirm = 'Отключение Salamander изменит транспорт Hysteria2. Старые профили с параметрами obfs перестанут подключаться.';
-      applyButton.dataset.sgConfirmTitle = 'Отключить Salamander';
+      applyButton.dataset.sgConfirm = 'Отключение обфускации изменит транспорт Hysteria2. Старые профили с параметрами obfs перестанут подключаться.';
+      applyButton.dataset.sgConfirmTitle = 'Отключить обфускацию';
       applyButton.dataset.sgConfirmButton = 'Отключить и применить';
     }
   };
 
   const syncSalamander = () => {
-    const enabled = currentMode() === 'salamander';
+    const enabled = obfsEnabled(currentMode());
     secretArea?.classList.toggle('is-disabled', !enabled);
     if (passwordInput) passwordInput.disabled = !enabled;
     secretArea?.querySelectorAll('button').forEach(button => { button.disabled = !enabled; });
