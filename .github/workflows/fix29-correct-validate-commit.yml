@@ -1,0 +1,321 @@
+name: validate corrected Fix29 dual AWG
+
+on:
+  push:
+    branches: [audit-v22-prepublish]
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout unchanged Fix29 product branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix29-awg3-dual
+          fetch-depth: 0
+
+      - name: Guard exact clean Fix28 parent
+        run: |
+          test "$(git rev-parse HEAD)" = "04345198231bbe3eb75d9061b879887a0f9cecfd"
+          test "$(git rev-parse HEAD^{tree})" = "b9a4cb7b4ae5f2f80e81749b03220de3f4082d00"
+
+      - name: Import userspace-only historical AWG3 inputs
+        run: |
+          rm -rf /tmp/old
+          git clone -q --no-checkout https://github.com/s-gor/sg-gateway.git /tmp/old
+          git -C /tmp/old fetch -q --depth=1 origin 816804dfae23fc854444bc274c254b9e47efaed2
+          git -C /tmp/old checkout -q --detach FETCH_HEAD
+          cp /tmp/old/vendor/cores/amneziawg-tools-3.0.20260805.tar.gz vendor/cores/
+          cp /tmp/old/vendor/cores/amneziawg-go-linux-amd64-v3.0.0 vendor/cores/
+          cp /tmp/old/hostd/sg_hostd/awg3_runtime.py hostd/sg_hostd/awg3_runtime.py
+          cp /tmp/old/deploy/sg-gateway-awg3-userspace.sh deploy/sg-gateway-awg3-userspace.sh
+          cp /tmp/old/deploy/sg-gateway-awg3.service deploy/sg-gateway-awg3.service
+          chmod 0755 vendor/cores/amneziawg-go-linux-amd64-v3.0.0 deploy/sg-gateway-awg3-userspace.sh
+          echo '090f9383532822a756d078890b447e00af7f46bd30a10f9f47c46d633d807b19  vendor/cores/amneziawg-tools-3.0.20260805.tar.gz' | sha256sum -c -
+          echo '131110027db6d5dc0e35b19eb5b8a2692676081366c34112088dc68bbb050bcd  vendor/cores/amneziawg-go-linux-amd64-v3.0.0' | sha256sum -c -
+          test ! -e vendor/cores/amneziawg-linux-kernel-module-3.0.20260805.tar.gz
+
+      - name: Reproduce base Fix29 patch and prior validated corrections
+        run: |
+          git fetch -q origin audit-v22-prepublish
+          git show origin/audit-v22-prepublish:.github/workflows/fix29-awg3-implement.yml > /tmp/fix29-carrier.yml
+          python3 - <<'PY'
+          from pathlib import Path
+          source=Path('/tmp/fix29-carrier.yml').read_text(encoding='utf-8').splitlines()
+          begin=next(i for i,line in enumerate(source) if line == "          python3 - <<'PY'")
+          end=next(i for i,line in enumerate(source[begin+1:],begin+1) if line == '          PY')
+          out=[]; in_triple=False
+          for raw in source[begin+1:end]:
+              line=raw if in_triple else (raw[10:] if raw.startswith('          ') else raw)
+              out.append(line)
+              if line.count("'''") % 2: in_triple=not in_triple
+          assert not in_triple
+          script='\n'.join(out)+'\n'
+          compile(script,'/tmp/fix29_patch.py','exec')
+          Path('/tmp/fix29_patch.py').write_text(script,encoding='utf-8',newline='\n')
+          PY
+          python3 /tmp/fix29_patch.py
+          python3 - <<'PY'
+          from pathlib import Path
+          helper_path=Path('deploy/sg-gateway-awg3-userspace.sh')
+          helper=helper_path.read_text(encoding='utf-8')
+          wanted='export PATH="$AWG3_ROOT/bin:$PATH"'
+          if wanted not in helper:
+              anchor='AWG3_ROOT="/opt/sg-gateway/awg3"\n'; assert helper.count(anchor)==1
+              helper=helper.replace(anchor,anchor+wanted+'\n',1)
+          assert helper.count(wanted)==1
+          helper_path.write_text(helper,encoding='utf-8',newline='\n')
+
+          main_path=Path('app/main.py'); main=main_path.read_text(encoding='utf-8')
+          context='            awg3_settings=get_connection_settings("amneziawg3"),\n'
+          conn_start=main.index('    @app.get("/connections")\n')
+          before,after=main[:conn_start],main[conn_start:]
+          if context in before: before=before.replace(context,'',1)
+          main=before+after
+          conn_start=main.index('    @app.get("/connections")\n')
+          conn_end=main.index('    @app.post("/connections/amneziawg")\n',conn_start)
+          block=main[conn_start:conn_end]
+          if context not in block:
+              anchor='            awg_settings=get_connection_settings("amneziawg"),\n'; assert block.count(anchor)==1
+              block=block.replace(anchor,anchor+context,1)
+              main=main[:conn_start]+block+main[conn_end:]
+          assert main.count(context)==1
+          assert main.count('@app.post("/connections/amneziawg3")')==1
+          main_path.write_text(main,encoding='utf-8',newline='\n')
+          PY
+
+      - name: Apply compatibility and migrated contract corrections
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def get(path): return Path(path).read_text(encoding='utf-8')
+          def put(path,text): Path(path).write_text(text,encoding='utf-8',newline='\n')
+          def one(path,old,new):
+              text=get(path)
+              if text.count(old)!=1:
+                  raise SystemExit(f'{path}: expected exactly one marker, got {text.count(old)}: {old[:100]!r}')
+              put(path,text.replace(old,new,1))
+
+          # Public Client constructor remains backward compatible: AWG3 is optional and appended.
+          one('app/clients/repository.py','    awg3_status: str\n','')
+          one('app/clients/repository.py','    active_device_count: int = 0\n','    active_device_count: int = 0\n    awg3_status: str = "missing"\n')
+
+          # Device picker actually knows and orders AWG3, not only the server-side HTML.
+          one('app/web/static/sg-device-collapse-v1.js',"    'amneziawg',\n    'mihomo',","    'amneziawg',\n    'amneziawg3',\n    'mihomo',")
+          one('app/web/static/sg-device-collapse-v1.js',"    setLabelTitle(byValue.get('amneziawg'), 'AmneziaWG 2.0');\n","    setLabelTitle(byValue.get('amneziawg'), 'AmneziaWG 2.0');\n    setLabelTitle(byValue.get('amneziawg3'), 'AmneziaWG 3.0');\n")
+          one('app/web/static/sg-device-collapse-v1.js',"      setAvailableNote(byValue.get('amneziawg'), 'UDP 585 · отдельная конфигурация и QR');\n","      setAvailableNote(byValue.get('amneziawg'), 'UDP 585 · отдельная конфигурация и QR');\n      setAvailableNote(byValue.get('amneziawg3'), 'UDP 586 · userspace-конфигурация и QR');\n")
+
+          # Fix28 DEV metadata assertions advance to the intentionally enabled Fix29 policy.
+          for path in ('tests/test_sg_gateway_v22_release_preparation.py','tests/test_sg_gateway_02112_final_cumulative_cleanup_r5.py'):
+              text=get(path)
+              old="assert manifest['rebuild_policy']['awg3'] is False" if 'release_preparation' in path else 'assert release["rebuild_policy"]["awg3"] is False'
+              new=old.replace('False','True')
+              if old not in text: raise SystemExit(f'{path}: AWG3 policy assertion missing')
+              put(path,text.replace(old,new,1))
+
+          # Stage6 now has a fourth independent connection endpoint.
+          one('tests/test_preview52_installer_stage6_and_progress.py',
+              '        "amneziawg": "203.0.113.10",\n        "mihomo": "203.0.113.10",',
+              '        "amneziawg": "203.0.113.10",\n        "amneziawg3": "203.0.113.10",\n        "mihomo": "203.0.113.10",')
+
+          # Connections domain contract now covers both generations.
+          text=get('tests/test_sg_gateway_02112_all_connections_domain_fix3.py')
+          text=text.replace('{"amneziawg", "xray", "mihomo"}','{"amneziawg", "amneziawg3", "xray", "mihomo"}',1)
+          text=text.replace('    assert "xray_public_host = public_host(xray.host)" in service\n',
+                            '    assert "awg3_public_host = public_host(awg3.host)" in service\n    assert "xray_public_host = public_host(xray.host)" in service\n',1)
+          text=text.replace('    assert "AmneziaWG: {{ awg_public_host }}:{{ awg_settings.port }}" in page\n',
+                            '    assert "AWG2: {{ awg_public_host }}:{{ awg_settings.port }}" in page\n    assert "AWG3: {{ awg3_public_host }}:{{ awg3_settings.port }}" in page\n',1)
+          text=text.replace('    assert \'name="host" value="{{ awg_public_host }}"\' in page\n',
+                            '    assert \'name="host" value="{{ awg_public_host }}"\' in page\n    assert "<strong>{{ awg3_public_host }}</strong>" in page\n    assert \'name="host" value="{{ awg3_public_host }}"\' in page\n',1)
+          put('tests/test_sg_gateway_02112_all_connections_domain_fix3.py',text)
+
+          # Vendored runtime contract becomes six engine steps / eight media files while AWG2 DKMS stays pinned.
+          path='tests/test_sg_gateway_021_vendored_five_engines.py'; text=get(path)
+          text=text.replace('def test_installer_uses_five_vendored_engines():','def test_installer_uses_six_vendored_engine_steps_with_isolated_awg3():',1)
+          for old,new in (
+              ('[Engine 1/5] AmneziaWG','[Engine 1/6] AmneziaWG 2'),
+              ('[Engine 2/5] Xray','[Engine 2/6] AmneziaWG 3 userspace'),
+              ('[Engine 3/5] Mihomo','[Engine 3/6] Xray'),
+              ('[Engine 4/5] sing-box','[Engine 4/6] Mihomo'),
+              ('[Engine 5/5] WARP','[Engine 5/6] sing-box'),
+          ): text=text.replace(old,new,1)
+          text=text.replace('    assert "install_xray_from_vendor" in stage\n','    assert "install_amneziawg3_userspace_from_vendor" in stage\n    assert "[Engine 6/6] WARP" in stage\n    assert "install_xray_from_vendor" in stage\n',1)
+          text=text.replace('def test_all_six_vendor_files_are_required():','def test_all_eight_vendor_files_are_required():',1)
+          text=text.replace('        "amneziawg-linux-kernel-module-1.0.20260329-2.tar.gz",\n',
+                            '        "amneziawg-linux-kernel-module-1.0.20260329-2.tar.gz",\n        "amneziawg-tools-3.0.20260805.tar.gz",\n        "amneziawg-go-linux-amd64-v3.0.0",\n',1)
+          text += '\n\ndef test_awg3_vendor_set_has_no_3x_kernel_module():\n    installer = read("install.sh")\n    assert "amneziawg-linux-kernel-module-3.0" not in installer\n    assert not any((ROOT / "vendor" / "cores").glob("amneziawg-linux-kernel-module-3.0*"))\n'
+          put(path,text)
+
+          # WARP remains optional; AWG3 is allowed only as isolated userspace and must not alter AWG2 pins.
+          path='tests/test_sg_gateway_v22_optional_warp_install.py'; text=get(path)
+          text=text.replace("assert '[Engine 5/5] WARP wgcf-cli' in body","assert '[Engine 6/6] WARP wgcf-cli' in body",1)
+          old='''def test_optional_warp_fix_preserves_awg2_and_xmux_only() -> None:
+    installer = (ROOT / 'install.sh').read_text(encoding='utf-8').lower()
+    assert 'amneziawg3' not in installer
+    assert 'awg3' not in installer
+    assert (ROOT / 'app/xray/xmux.py').is_file()
+'''
+          new='''def test_optional_warp_fix_preserves_awg2_xmux_and_isolates_awg3() -> None:
+    installer = (ROOT / 'install.sh').read_text(encoding='utf-8').lower()
+    assert 'amneziawg_tools_version="1.0.20260618-2"' in installer
+    assert 'amneziawg_kmod_version="1.0.20260329-2"' in installer
+    assert 'awg3_tools_version="3.0.20260805"' in installer
+    assert 'prefix="$prefix/awg3" install' in installer
+    assert 'amneziawg-linux-kernel-module-3.0' not in installer
+    assert (ROOT / 'app/xray/xmux.py').is_file()
+'''
+          if old not in text: raise SystemExit('optional WARP legacy AWG3 exclusion block missing')
+          put(path,text.replace(old,new,1))
+
+          # Existing UX/gecko/low-resolution layers must survive alongside AWG3 instead of excluding it.
+          path='tests/test_sg_gateway_v22_clients_devices_ux.py'; text=get(path)
+          text=text.replace("expected = ['xray_reality_tcp','xray_xhttp_reality','xray_xhttp_tls','xray_hysteria2','amneziawg','mihomo','anytls','tuic']",
+                            "expected = ['xray_reality_tcp','xray_xhttp_reality','xray_xhttp_tls','xray_hysteria2','amneziawg','amneziawg3','mihomo','anytls','tuic']",1)
+          text=text.replace("    assert \"setLabelTitle(byValue.get('amneziawg'), 'AmneziaWG 2.0')\" in body\n    lowered = body.lower()\n    assert 'awg3' not in lowered\n    assert 'amneziawg 3.0' not in lowered\n",
+                            "    assert \"setLabelTitle(byValue.get('amneziawg'), 'AmneziaWG 2.0')\" in body\n    assert \"setLabelTitle(byValue.get('amneziawg3'), 'AmneziaWG 3.0')\" in body\n    assert \"setAvailableNote(byValue.get('amneziawg3'), 'UDP 586 · userspace-конфигурация и QR')\" in body\n",1)
+          text=text.replace("    assert not (ROOT / 'hostd/sg_hostd/awg3_runtime.py').exists()","    assert (ROOT / 'hostd/sg_hostd/awg3_runtime.py').exists()",1)
+          put(path,text)
+
+          path='tests/test_sg_gateway_v22_hysteria2_gecko.py'; text=get(path)
+          text=text.replace('def test_gecko_integration_preserves_xmux_and_excludes_awg3() -> None:','def test_gecko_integration_preserves_xmux_alongside_isolated_awg3() -> None:',1)
+          text=text.replace("    assert not (ROOT / 'hostd/sg_hostd/awg3_runtime.py').exists()\n    assert not (ROOT / 'deploy/sg-gateway-awg3.service').exists()\n",
+                            "    assert (ROOT / 'hostd/sg_hostd/awg3_runtime.py').is_file()\n    assert (ROOT / 'deploy/sg-gateway-awg3.service').is_file()\n",1)
+          put(path,text)
+
+          path='tests/test_sg_gateway_v22_low_resolution.py'; text=get(path)
+          text=text.replace("    assert not (ROOT / 'hostd/sg_hostd/awg3_runtime.py').exists()","    assert (ROOT / 'hostd/sg_hostd/awg3_runtime.py').is_file()",1)
+          put(path,text)
+
+          # XMUX itself stays AWG-agnostic; generic exports may now legitimately expose AWG3.
+          path='tests/test_sg_gateway_v22_xmux_integration.py'; text=get(path)
+          text=text.replace("def test_xmux_block_does_not_reintroduce_awg3() -> None:","def test_xmux_block_stays_awg_agnostic_while_exports_support_awg3() -> None:",1)
+          text=text.replace("        ROOT / 'app/web/static/sg-xmux-settings-v1.js',\n        ROOT / 'app/clients/exports.py',\n", "        ROOT / 'app/web/static/sg-xmux-settings-v1.js',\n",1)
+          text=text.replace("    assert 'awg3' not in joined\n", "    assert 'awg3' not in joined\n    exports = (ROOT / 'app/clients/exports.py').read_text(encoding='utf-8')\n    assert 'def build_awg3_config' in exports\n",1)
+          put(path,text)
+
+          # SG Subscription v1 now has an independent AWG3 config profile; compatible Base64 still emits URI profiles only.
+          path='tests/test_sg_gateway_v22_sg_subscription_base64_body.py'; text=get(path)
+          text=text.replace('def test_awg3_stays_out_of_canonical_schema() -> None:\n    assert "amneziawg3" not in subscription.canonical_profile_ids()\n',
+                            'def test_awg3_is_an_independent_canonical_config_profile() -> None:\n    assert "amneziawg3" in subscription.canonical_profile_ids()\n',1)
+          put(path,text)
+
+          path='tests/test_sg_gateway_v22_sg_subscription_compat_text.py'; text=get(path)
+          text=text.replace('    assert "amneziawg3" not in subscription.canonical_profile_ids()\n','    assert "amneziawg3" in subscription.canonical_profile_ids()\n',1)
+          text=text.replace('        "amneziawg", "mieru", "anytls", "tuic",\n','        "amneziawg", "amneziawg3", "mieru", "anytls", "tuic",\n',1)
+          put(path,text)
+
+          path='tests/test_sg_gateway_v22_sg_subscription_schema.py'; text=get(path)
+          text=text.replace('def test_canonical_profile_ids_preserve_v1_order_without_awg3() -> None:','def test_canonical_profile_ids_preserve_v1_order_with_independent_awg3() -> None:',1)
+          text=text.replace('        "amneziawg",\n        "mieru",','        "amneziawg",\n        "amneziawg3",\n        "mieru",',1)
+          text=text.replace('    assert "amneziawg3" not in subscription.canonical_profile_ids()\n','    assert "amneziawg3" in subscription.canonical_profile_ids()\n',1)
+          put(path,text)
+
+          # Focused contract also locks public Client constructor compatibility and device JS integration.
+          path='tests/test_sg_gateway_v22_awg3_dual_contract.py'; text=get(path)
+          text += '''\n\ndef test_client_dataclass_keeps_pre_awg3_constructor_compatible():\n    client = repository.Client(1, "Legacy", True, None, "applied", "applied")\n    assert client.xray_status == "applied"\n    assert client.awg3_status == "missing"\n\n\ndef test_device_picker_orders_both_awg_generations():\n    body = Path("app/web/static/sg-device-collapse-v1.js").read_text(encoding="utf-8")\n    assert "'amneziawg3'" in body\n    assert "AmneziaWG 3.0" in body\n    assert "UDP 586 · userspace-конфигурация и QR" in body\n'''
+          put(path,text)
+
+          # No old active exclusion contract may still require AWG3 to be absent.
+          stale=[]
+          for path in Path('tests').glob('test_*.py'):
+              body=path.read_text(encoding='utf-8').lower()
+              if "assert 'amneziawg3' not in" in body or 'assert "amneziawg3" not in subscription.canonical_profile_ids()' in body:
+                  stale.append(str(path))
+              if "assert not (root / 'hostd/sg_hostd/awg3_runtime.py').exists()" in body:
+                  stale.append(str(path))
+          if stale:
+              raise SystemExit('stale Fix28 AWG3 exclusion assertions: '+', '.join(sorted(set(stale))))
+          PY
+
+      - name: Static isolation and UI contracts
+        run: |
+          bash -n install.sh
+          bash -n deploy/sg-gateway-awg3-userspace.sh
+          grep -F 'AMNEZIAWG_TOOLS_VERSION="1.0.20260618-2"' install.sh
+          grep -F 'AMNEZIAWG_KMOD_VERSION="1.0.20260329-2"' install.sh
+          grep -F 'AWG3_TOOLS_VERSION="3.0.20260805"' install.sh
+          grep -F 'PREFIX="$PREFIX/awg3" install' install.sh
+          ! grep -RIn 'amneziawg-linux-kernel-module-3\.0' install.sh app hostd deploy vendor/cores/SHA256SUMS
+          ! grep -RIn 'AMNEZIAWG_KMOD_VERSION="3\.' install.sh app hostd deploy vendor/cores/SHA256SUMS
+          grep -F 'export PATH="$AWG3_ROOT/bin:$PATH"' deploy/sg-gateway-awg3-userspace.sh
+          grep -F '"$AWG_GO" "$IFACE"' deploy/sg-gateway-awg3-userspace.sh
+          grep -F '"$AWG_QUICK" strip "$CONFIG"' deploy/sg-gateway-awg3-userspace.sh
+          grep -F '"$AWG" setconf "$IFACE" "$stripped"' deploy/sg-gateway-awg3-userspace.sh
+          grep -F "'amneziawg3'" app/web/static/sg-device-collapse-v1.js
+          ! grep -F '.button' app/web/static/sg-awg-dual-v1.css
+
+      - name: Install dependencies
+        run: python3 -m pip install -q -r requirements-dev.txt
+
+      - name: Focused Fix29 contracts
+        env:
+          PYTHONPATH: .:hostd
+        run: python3 -m pytest -q tests/test_sg_gateway_v22_awg3_dual_contract.py tests/test_awg_style_ui.py tests/test_sg_gateway_v22_clients_devices_ux.py
+
+      - name: Full test suite
+        env:
+          PYTHONPATH: .:hostd
+        run: python3 -m pytest -q tests --tb=short -ra
+
+      - name: Template shell and JavaScript syntax
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from jinja2 import Environment
+          env=Environment()
+          for path in Path('app/web/templates').rglob('*.html'):
+              env.parse(path.read_text(encoding='utf-8'))
+          print('JINJA_OK')
+          PY
+          while IFS= read -r -d '' file; do bash -n "$file"; done < <(find . -type f -name '*.sh' -not -path './.git/*' -print0)
+          while IFS= read -r -d '' file; do node --check "$file" >/dev/null; done < <(find app/web/static -type f -name '*.js' -print0)
+
+      - name: Regenerate exact source inventory
+        run: |
+          git add -A
+          python3 - <<'PY'
+          import hashlib, subprocess
+          from pathlib import Path
+          files=subprocess.check_output(['git','ls-files'],text=True,encoding='utf-8').splitlines()
+          rows=[]
+          for rel in sorted(files):
+              if rel == 'SOURCE-SHA256SUMS': continue
+              rows.append(f"{hashlib.sha256(Path(rel).read_bytes()).hexdigest()}  {rel}")
+          Path('SOURCE-SHA256SUMS').write_text('\n'.join(rows)+'\n',encoding='utf-8',newline='\n')
+          print(f'SOURCE_INVENTORY={len(rows)}')
+          PY
+          git add SOURCE-SHA256SUMS
+          git diff --cached --check
+
+      - name: Vendor integrity and FULL verify
+        run: |
+          (cd vendor/cores && sha256sum -c SHA256SUMS)
+          OUT=/tmp/SG-Gateway-0.1.0-021.12-DEV-v22-Fix29-AWG3-DUAL-FULL.run
+          bash build-run.sh "$OUT"
+          bash "$OUT" --verify-only
+
+      - name: Commit only after every gate is green
+        run: |
+          git config user.name 'Ser.Gor'
+          git config user.email 'infosec.co.il@gmail.com'
+          git commit -m 'Fix 29: add isolated AWG3 userspace alongside frozen AWG2'
+          python3 - <<'PY'
+          import hashlib,re,subprocess
+          from pathlib import Path
+          expected={}
+          for raw in Path('SOURCE-SHA256SUMS').read_text(encoding='utf-8').splitlines():
+              m=re.fullmatch(r'([0-9a-f]{64})  (.+)',raw); assert m,raw
+              expected[m.group(2)]=m.group(1)
+          tracked=set(subprocess.check_output(['git','ls-files'],text=True).splitlines()); tracked.discard('SOURCE-SHA256SUMS')
+          assert tracked==set(expected)
+          for path in sorted(tracked):
+              actual=hashlib.sha256(subprocess.check_output(['git','show',f'HEAD:{path}'])).hexdigest()
+              assert actual==expected[path],(path,actual,expected[path])
+          print(f'GIT_BLOB_INTEGRITY_OK={len(tracked)}')
+          PY
+          git push origin HEAD:fix29-awg3-dual
+          echo "FIX29_COMMIT=$(git rev-parse HEAD)"
