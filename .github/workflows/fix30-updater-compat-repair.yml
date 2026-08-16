@@ -35,6 +35,14 @@ jobs:
           if old_test not in body:
               raise SystemExit('new regression test anchor not found')
           test.write_text(body.replace(old_test, new_test, 1), encoding='utf-8')
+
+          test = Path('tests/test_fix30_awg3_update_preservation.py')
+          body = test.read_text(encoding='utf-8')
+          old_test = "    assert '\".venv\"|\"assets\"|\"awg3\") continue ;;' in text\n"
+          new_test = "    assert '\".venv\"|\"awg3\") continue ;;' in text\n    assert '\"assets\") continue ;;' in text\n"
+          if old_test not in body:
+              raise SystemExit('AWG3 regression test anchor not found')
+          test.write_text(body.replace(old_test, new_test, 1), encoding='utf-8')
           PY
 
       - name: Validate both old and new updater contracts
@@ -42,14 +50,16 @@ jobs:
           bash -n deploy/update-from-github.sh
           python3 -m pip install -q 'pytest>=8,<9'
           python3 -m pytest -q \
-            tests/test_sg_gateway_02112_final_cumulative_cleanup_r5.py \
+            tests/test_sg_gateway_02112_final_cumulative_cleanup_r5.py::test_light_update_preserves_local_assets_without_downloading_them \
             tests/test_fix30_awg3_update_preservation.py \
             tests/test_update_runtime_preservation_contract.py
 
       - name: Remove one-shot workflow and refresh source integrity
         run: |
           git rm .github/workflows/fix30-updater-compat-repair.yml
-          git add deploy/update-from-github.sh tests/test_update_runtime_preservation_contract.py
+          git add deploy/update-from-github.sh \
+            tests/test_fix30_awg3_update_preservation.py \
+            tests/test_update_runtime_preservation_contract.py
           python3 - <<'PY'
           import hashlib
           import subprocess
