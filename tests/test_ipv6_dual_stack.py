@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 from types import SimpleNamespace
 
+from app import net as app_net
 from app.net import clean_host, format_host, format_host_port, ip_version
 from app.xray.sg_panel_vless import (
     reality_tcp_link,
@@ -16,7 +17,7 @@ HOSTD_ROOT = Path(__file__).resolve().parents[1] / "hostd"
 if str(HOSTD_ROOT) not in sys.path:
     sys.path.insert(0, str(HOSTD_ROOT))
 
-from sg_hostd import awg3_runtime, client_runtime  # noqa: E402
+from sg_hostd import awg3_runtime, client_runtime, dual_stack_runtime  # noqa: E402
 
 
 def test_host_formatting_preserves_ipv4_and_domains() -> None:
@@ -34,6 +35,16 @@ def test_host_formatting_brackets_ipv6_literals() -> None:
     assert format_host("2001:db8::7") == "[2001:db8::7]"
     assert format_host("[2001:db8::7]") == "[2001:db8::7]"
     assert format_host_port("2001:db8::7", 443) == "[2001:db8::7]:443"
+
+
+def test_live_ipv6_detection_uses_routing_source(monkeypatch) -> None:
+    result = SimpleNamespace(
+        returncode=0,
+        stdout="2606:4700:4700::1111 from :: dev eth0 src 2a01:db8:10::7 metric 1024\n",
+        stderr="",
+    )
+    monkeypatch.setattr(app_net.subprocess, "run", lambda *args, **kwargs: result)
+    assert app_net.detect_global_ipv6() == "2a01:db8:10::7"
 
 
 def test_reality_tcp_link_uses_ipv6_safe_authority() -> None:
@@ -237,6 +248,30 @@ def test_xray_public_listener_family_preserves_ipv4_only() -> None:
     assert client_runtime._dual_stack_enabled(
         {"SG_GATEWAY_PUBLIC_IPV6": "2606:4700:4700::1111"}
     ) is True
+
+
+def test_hostd_refresh_persists_ipv4_and_ipv6_after_network_online(
+    monkeypatch, tmp_path
+) -> None:
+    runtime = tmp_path / "runtime.env"
+    app_env = tmp_path / "sg-gateway.env"
+    runtime.write_text("SG_GATEWAY_PUBLIC_ADDRESS=8.8.8.8\n", encoding="utf-8")
+    app_env.write_text("SG_GATEWAY_ENV=production\n", encoding="utf-8")
+    monkeypatch.setattr(dual_stack_runtime, "RUNTIME_ENV", runtime)
+    monkeypatch.setattr(dual_stack_runtime, "APP_ENV", app_env)
+    monkeypatch.setattr(
+        dual_stack_runtime,
+        "detect_global_ipv6",
+        lambda: "2606:4700:4700::1111",
+    )
+
+    state = dual_stack_runtime.refresh_runtime_metadata()
+
+    assert state["dual_stack"] is True
+    for path in (runtime, app_env):
+        text = path.read_text(encoding="utf-8")
+        assert "SG_GATEWAY_PUBLIC_IPV4=8.8.8.8" in text
+        assert "SG_GATEWAY_PUBLIC_IPV6=2606:4700:4700::1111" in text
 
 
 def test_awg3_userspace_helper_splits_dual_stack_address_line() -> None:
