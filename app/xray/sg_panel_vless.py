@@ -12,6 +12,8 @@ import re
 from typing import Any
 from urllib.parse import quote
 
+from app.net import format_host_port
+
 REALITY_TCP_FLOW = "xtls-rprx-vision"
 VLESSENC_SERVER_MODE_DEFAULT = "auto"
 VLESSENC_CLIENT_MODE_DEFAULT = "stream-one"
@@ -139,8 +141,9 @@ def reality_tcp_link(
         f"&sid={quote(str(short_id), safe='')}"
         f"&flow={REALITY_TCP_FLOW}&spx=%2F"
     )
+    endpoint = format_host_port(host, port)
     return (
-        f"vless://{uuid}@{host}:{int(port)}?{query}"
+        f"vless://{uuid}@{endpoint}?{query}"
         f"#{quote(str(title), safe='')}"
     )
 
@@ -180,7 +183,8 @@ def xhttp_reality_link(
         f"&mode={quote(str(client_mode or VLESSENC_CLIENT_MODE_DEFAULT), safe='-_')}"
         f"{extra}&spx=%2F"
     )
+    endpoint = format_host_port(host, port)
     return (
-        f"vless://{uuid}@{host}:{int(port)}?{query}"
+        f"vless://{uuid}@{endpoint}?{query}"
         f"#{quote(str(title), safe='')}"
     )
