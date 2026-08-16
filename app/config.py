@@ -22,6 +22,16 @@ class AppConfig:
     admin_password: str
     admin_password_hash: str
 
+    @property
+    def public_ipv4(self) -> str:
+        """Return the detected public IPv4 without changing the legacy contract."""
+        return os.getenv("SG_GATEWAY_PUBLIC_IPV4", "").strip()
+
+    @property
+    def public_ipv6(self) -> str:
+        """Return the detected public IPv6 when the host has one."""
+        return os.getenv("SG_GATEWAY_PUBLIC_IPV6", "").strip()
+
 
 def load_config() -> AppConfig:
     return AppConfig(
