@@ -1,0 +1,60 @@
+name: audit v22 missing historical runtime files
+
+on:
+  push:
+    branches: [audit-v22-prepublish]
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: audit-v22-prepublish
+          fetch-depth: 0
+      - name: Fetch historical AWG3-free 022.05 tree
+        run: |
+          git clone -q --no-checkout https://github.com/s-gor/sg-gateway.git /tmp/old
+          git -C /tmp/old fetch -q --depth=1 origin a0c2537b6c55d1fd974afe3aab586a7d41777cd8
+          git -C /tmp/old checkout -q --detach FETCH_HEAD
+      - name: Prove inline-test JS was not wired into historical runtime
+        run: |
+          cd /tmp/old
+          matches="$(grep -RIl --exclude='sg-connections-inline-test-v1.js' 'sg-connections-inline-test-v1\|data-xps2-inline-test-result' app hostd engines deploy install.sh || true)"
+          printf 'INLINE_TEST_EXTERNAL_REFS=%s\n' "$(printf '%s\n' "$matches" | sed '/^$/d' | wc -l)"
+          printf '%s\n' "$matches"
+          test -z "$matches"
+      - name: Classify historical runtime-only files
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          current=Path('.')
+          old=Path('/tmp/old')
+          missing=[]
+          for root in ('app','hostd','engines','deploy'):
+              for p in (old/root).rglob('*'):
+                  if p.is_file() and not (current/p.relative_to(old)).exists():
+                      missing.append(p.relative_to(old).as_posix())
+          expected={
+            'app/maintenance/full_backup_verify_http.py':'replaced-by-direct-source-backup-route',
+            'app/web/static/sg-connections-inline-test-v1.js':'historical-unwired-static-artifact',
+            'deploy/patch_full_backup_upload_routes.py':'one-shot-live-patcher-replaced-by-source',
+            'deploy/patch_full_backup_verify_ui.py':'one-shot-live-patcher-replaced-by-source',
+            'deploy/sg-gateway-02204-low-resolution.sh':'live-patcher-replaced-by-source-native-lowres',
+            'deploy/sg-gateway-awg3-userspace.sh':'intentionally-excluded-awg3',
+            'deploy/sg-gateway-awg3.service':'intentionally-excluded-awg3',
+            'deploy/sg-gateway-sg-subscription-native-ui.sh':'live-patcher-replaced-by-source-native-ui',
+            'deploy/update-02202-dual-awg-from-github.sh':'intentionally-excluded-dual-awg-awg3-era-updater',
+            'hostd/sg_hostd/awg3_runtime.py':'intentionally-excluded-awg3',
+          }
+          print(f'MISSING={len(missing)}')
+          for p in sorted(missing): print(f'{p} :: {expected.get(p,"UNCLASSIFIED")}')
+          unknown=sorted(set(missing)-set(expected))
+          stale=sorted(set(expected)-set(missing))
+          assert not unknown, f'unclassified missing historical runtime files: {unknown}'
+          assert not stale, f'classification no longer matches missing set: {stale}'
+          print('MISSING_RUNTIME_CLASSIFICATION=COMPLETE')
+          PY
