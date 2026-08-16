@@ -93,14 +93,16 @@ jobs:
 
       - name: Check release manifest
         run: |
-          python -B -c "import json, pathlib; manifest=json.loads(pathlib.Path('release-manifest.json').read_text(encoding='utf-8')); version=pathlib.Path('VERSION').read_text(encoding='utf-8').strip(); assert manifest['version']==version; assert manifest['status']=='FINAL-AWG2'; assert manifest['next_development_line']=='0.1.0-022.01'; assert manifest['source_integrity']['mode']=='git-blob-sha256'; assert manifest['safe_update']['preserve_local_assets'] is True; assert manifest['images']['panel']; assert manifest['images']['xray']; print('manifest ok')"
+          python -B -c "import json, pathlib; manifest=json.loads(pathlib.Path('release-manifest.json').read_text(encoding='utf-8')); version=pathlib.Path('VERSION').read_text(encoding='utf-8').strip(); assert manifest['version']==version; assert manifest['status']=='DEV'; assert manifest['rebuild_target']=='0.1.0-022.05'; assert manifest['channel']=='dev-v22'; assert manifest['rebuild_policy']['awg3'] is False; assert manifest['source_integrity']['mode']=='git-blob-sha256'; assert manifest['safe_update']['preserve_local_assets'] is True; assert manifest['images']['panel']; assert manifest['images']['xray']; print('manifest ok')"
 
       - name: Run panel tests
         run: python -m pytest tests
 
-      - name: Build and verify FINAL FULL CLEAN
+      - name: Build and verify current FULL package
         run: |
           command -v zip
           command -v unzip
-          bash build-run.sh /tmp/SG-Gateway-02112-FULL-CLEAN.run
-          bash /tmp/SG-Gateway-02112-FULL-CLEAN.run --verify-only
+          VERSION="$(tr -d '[:space:]' < VERSION)"
+          OUT="/tmp/SG-Gateway-${VERSION}-FULL.run"
+          bash build-run.sh "$OUT"
+          bash "$OUT" --verify-only
