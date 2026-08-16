@@ -1,0 +1,151 @@
+name: audit v22 final structural parity
+
+on:
+  push:
+    branches: [audit-v22-prepublish]
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: audit-v22-prepublish
+          fetch-depth: 0
+
+      - name: Guard over clean Fix28
+        run: git merge-base --is-ancestor 04345198231bbe3eb75d9061b879887a0f9cecfd HEAD
+
+      - name: Fetch historical AWG3-free 022.05
+        run: |
+          git clone -q --no-checkout https://github.com/s-gor/sg-gateway.git /tmp/old
+          git -C /tmp/old fetch -q --depth=1 origin a0c2537b6c55d1fd974afe3aab586a7d41777cd8
+          git -C /tmp/old checkout -q --detach FETCH_HEAD
+
+      - name: Prove Stage10 call sequence exact
+        run: |
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+
+          old=Path('/tmp/old/install.sh').read_text(encoding='utf-8')
+          new=Path('install.sh').read_text(encoding='utf-8')
+
+          m=re.search(r'(?ms)^stage10_start_and_verify\(\) \{\n(?P<body>.*?)^\}',old)
+          assert m, 'historical stage10 wrapper not found'
+          old_calls=[]
+          for raw in m.group('body').splitlines():
+              line=raw.strip()
+              if not line or line.startswith('#'): continue
+              call=line.split()[0]
+              old_calls.append(call)
+
+          start=new.index('  CURRENT_STAGE="10"')
+          end=new.index('  INSTALL_SUCCESS=1',start)
+          block=new[start:end]
+          new_calls=[]
+          for raw in block.splitlines():
+              line=raw.strip()
+              if not line.startswith('run_quiet '): continue
+              mm=re.search(r'\"[^\"]+\"\s+([A-Za-z_][A-Za-z0-9_]*)\s*$',line)
+              assert mm, f'cannot parse current stage10 line: {line}'
+              new_calls.append(mm.group(1))
+
+          print('HISTORICAL_STAGE10_CALLS='+repr(old_calls))
+          print('CURRENT_STAGE10_CALLS='+repr(new_calls))
+          assert old_calls==new_calls, (old_calls,new_calls)
+          print('STAGE10_SEQUENCE=EXACT')
+          PY
+
+      - name: Prove legacy run_final_stage is unused
+        run: |
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          text=Path('install.sh').read_text(encoding='utf-8')
+          occurrences=[m.start() for m in re.finditer(r'\brun_final_stage\b',text)]
+          print('RUN_FINAL_STAGE_OCCURRENCES='+str(len(occurrences)))
+          assert len(occurrences)==1, 'run_final_stage is referenced outside its definition'
+          assert 'run_final_stage() {' in text
+          print('RUN_FINAL_STAGE=DEAD_LEGACY_HELPER')
+          PY
+
+      - name: Classify key token count differences
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import difflib
+          old=Path('/tmp/old/install.sh').read_text(encoding='utf-8').splitlines()
+          new=Path('install.sh').read_text(encoding='utf-8').splitlines()
+          needles=('systemctl enable','sg-gateway-awg.service','client')
+          for needle in needles:
+              print(f'===== {needle} HISTORICAL =====')
+              for i,line in enumerate(old,1):
+                  if needle in line: print(f'{i}:{line}')
+              print(f'===== {needle} CURRENT =====')
+              for i,line in enumerate(new,1):
+                  if needle in line: print(f'{i}:{line}')
+          PY
+
+      - name: Verify repository-relative deploy path closure
+        run: |
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          root=Path('.')
+          scan=[root/'install.sh',root/'build-run.sh',root/'build-run-vendored.sh']
+          scan += list((root/'deploy').rglob('*.sh'))
+          refs={}
+          # A source-relative deploy/ reference must not be part of an absolute or other slash-prefixed path.
+          pat=re.compile(r'(?<![A-Za-z0-9_./-])(deploy/[A-Za-z0-9_./-]+\.(?:sh|service|py|conf))(?![A-Za-z0-9_.-])')
+          for p in scan:
+              if not p.is_file(): continue
+              text=p.read_text(encoding='utf-8',errors='ignore')
+              for rel in pat.findall(text): refs.setdefault(rel,set()).add(p.as_posix())
+          missing=sorted(rel for rel in refs if not (root/rel).is_file())
+          print(f'REPO_DEPLOY_PATH_REFS={len(refs)} REPO_DEPLOY_PATH_MISSING={len(missing)}')
+          for rel in missing: print(rel+' :: '+','.join(sorted(refs[rel])))
+          assert not missing, missing
+          PY
+
+      - name: Verify all shell syntax
+        run: |
+          count=0
+          while IFS= read -r -d '' file; do
+            bash -n "$file"
+            count=$((count+1))
+          done < <(find . -type f -name '*.sh' -not -path './.git/*' -print0)
+          bash -n install.sh
+          bash -n build-run.sh
+          bash -n build-run-vendored.sh
+          echo SHELL_SYNTAX_OK=$count
+
+      - name: Verify template static asset closure
+        run: |
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          root=Path('.'); static=root/'app/web/static'; refs={}
+          pat=re.compile(r"url_for\(\s*['\"]static['\"]\s*,\s*filename\s*=\s*['\"]([^'\"]+)['\"]")
+          for p in (root/'app/web/templates').rglob('*.html'):
+              for asset in pat.findall(p.read_text(encoding='utf-8')):
+                  refs.setdefault(asset,set()).add(p.as_posix())
+          missing=sorted(a for a in refs if not (static/a).is_file())
+          print(f'STATIC_REFS={len(refs)} STATIC_MISSING={len(missing)}')
+          for a in missing: print(a+' :: '+','.join(sorted(refs[a])))
+          assert not missing, missing
+          PY
+
+      - name: Verify JavaScript syntax
+        run: |
+          count=0
+          while IFS= read -r -d '' file; do
+            node --check "$file" >/dev/null
+            count=$((count+1))
+          done < <(find app/web/static -type f -name '*.js' -print0)
+          echo JS_SYNTAX_OK=$count
+
+      - name: Confirm AWG3-free active tree
+        run: |
+          ! grep -RInE --exclude-dir=.git 'amneziawg3|AWG3|awg3' app hostd engines deploy install.sh
+          echo AWG3_ACTIVE_REFERENCES=0
