@@ -1,0 +1,82 @@
+name: Fix30 updater env permission repair
+
+on:
+  push:
+    branches: [fix30-ipv6-dual-stack]
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Patch deployed-panel validation env handling
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          updater = Path('deploy/update-from-github.sh')
+          text = updater.read_text(encoding='utf-8')
+
+          text = text.replace(
+              '  local target validation_root\n',
+              '  local target validation_root validation_env\n',
+              1,
+          )
+
+          old = '''  install -d -m 0750 -o sg-gateway -g sg-gateway \\
+    "$validation_root" "$validation_root/data" "$validation_root/log"\n\n  runuser -u sg-gateway -- "$PREFIX/.venv/bin/python" -B - \\
+    "$PREFIX" "$CONFIG_DIR/sg-gateway.env" "$target" "$validation_root" <<'PYDEPLOYEDWSGI'\n'''
+          new = '''  install -d -m 0750 -o sg-gateway -g sg-gateway \\
+    "$validation_root" "$validation_root/data" "$validation_root/log"\n  validation_env="$validation_root/sg-gateway.env"\n  install -m 0600 -o sg-gateway -g sg-gateway \\
+    "$CONFIG_DIR/sg-gateway.env" "$validation_env"\n\n  runuser -u sg-gateway -- "$PREFIX/.venv/bin/python" -B - \\
+    "$PREFIX" "$validation_env" "$target" "$validation_root" <<'PYDEPLOYEDWSGI'\n'''
+          if old not in text:
+              raise SystemExit('validate_deployed_panel anchor not found')
+          text = text.replace(old, new, 1)
+          updater.write_text(text, encoding='utf-8')
+
+          test = Path('tests/test_update_runtime_preservation_contract.py')
+          body = test.read_text(encoding='utf-8')
+          addition = '''\n\ndef test_deployed_panel_validation_uses_private_temp_env_copy():\n    validate = _section("validate_deployed_panel() {", "preflight() {")\n    assert 'validation_env="$validation_root/sg-gateway.env"' in validate\n    assert 'install -m 0600 -o sg-gateway -g sg-gateway' in validate\n    assert '"$CONFIG_DIR/sg-gateway.env" "$validation_env"' in validate\n    assert '"$PREFIX" "$validation_env" "$target" "$validation_root"' in validate\n    assert '"$PREFIX" "$CONFIG_DIR/sg-gateway.env" "$target" "$validation_root"' not in validate\n'''
+          if 'test_deployed_panel_validation_uses_private_temp_env_copy' not in body:
+              body += addition
+          test.write_text(body, encoding='utf-8')
+          PY
+
+      - name: Validate targeted updater contract
+        run: |
+          bash -n deploy/update-from-github.sh
+          python3 -m pip install -q 'pytest>=8,<9'
+          python3 -m pytest -q \
+            tests/test_update_runtime_preservation_contract.py \
+            tests/test_sg_gateway_02112_final_cumulative_cleanup_r5.py \
+            tests/test_fix30_awg3_update_preservation.py
+
+      - name: Remove one-shot workflow and refresh source integrity
+        run: |
+          git rm .github/workflows/fix30-updater-env-permission-repair.yml
+          git add deploy/update-from-github.sh tests/test_update_runtime_preservation_contract.py
+          python3 - <<'PY'
+          import hashlib
+          import subprocess
+          from pathlib import Path
+
+          tracked = subprocess.check_output(['git', 'ls-files'], text=True).splitlines()
+          tracked = [p for p in tracked if p != 'SOURCE-SHA256SUMS']
+          rows = [f"{hashlib.sha256(Path(name).read_bytes()).hexdigest()}  {name}" for name in sorted(tracked)]
+          Path('SOURCE-SHA256SUMS').write_text('\n'.join(rows) + '\n', encoding='utf-8')
+          PY
+          git add SOURCE-SHA256SUMS
+
+      - name: Commit repair
+        run: |
+          git config user.name "SG-Gateway CI"
+          git config user.email "actions@users.noreply.github.com"
+          git commit -m "Fix30: validate deployed panel without reading root env as service user"
+          git push origin HEAD:fix30-ipv6-dual-stack
