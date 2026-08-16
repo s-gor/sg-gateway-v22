@@ -1,0 +1,52 @@
+name: audit v22 stage10 parity
+
+on:
+  push:
+    branches: [audit-v22-prepublish]
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: audit-v22-prepublish
+          fetch-depth: 0
+      - name: Guard over clean Fix28
+        run: git merge-base --is-ancestor 04345198231bbe3eb75d9061b879887a0f9cecfd HEAD
+      - name: Fetch historical AWG3-free 022.05
+        run: |
+          git clone -q --no-checkout https://github.com/s-gor/sg-gateway.git /tmp/old
+          git -C /tmp/old fetch -q --depth=1 origin a0c2537b6c55d1fd974afe3aab586a7d41777cd8
+          git -C /tmp/old checkout -q --detach FETCH_HEAD
+      - name: Show historical stage10 body and callers
+        run: |
+          echo '===== HISTORICAL stage10 symbols ====='
+          grep -nE 'stage10_start_and_verify|Этап 10/10|10/10|stage10_' /tmp/old/install.sh || true
+          echo '===== HISTORICAL stage10 context ====='
+          line="$(grep -n 'stage10_start_and_verify' /tmp/old/install.sh | head -n1 | cut -d: -f1)"
+          if test -n "$line"; then start=$((line-20)); test "$start" -gt 0 || start=1; end=$((line+180)); sed -n "${start},${end}p" /tmp/old/install.sh; fi
+      - name: Show current stage10 flow
+        run: |
+          echo '===== CURRENT stage10 symbols ====='
+          grep -nE 'stage10_start_and_verify|Этап 10/10|10/10|stage10_' install.sh || true
+          echo '===== CURRENT final installer context ====='
+          line="$(grep -nE 'Этап 10/10|10/10' install.sh | tail -n1 | cut -d: -f1)"
+          if test -z "$line"; then line="$(wc -l < install.sh)"; fi
+          start=$((line-120)); test "$start" -gt 0 || start=1; end=$((line+220)); sed -n "${start},${end}p" install.sh
+      - name: Compare key stage10 runtime actions
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          old=Path('/tmp/old/install.sh').read_text(encoding='utf-8')
+          new=Path('install.sh').read_text(encoding='utf-8')
+          needles=[
+            'systemctl daemon-reload','systemctl enable','systemctl restart',
+            'xray','sg-gateway-awg.service','sg-gateway-hostd','sg-gateway-panel',
+            'backup.full','client','health','rollback','stage10_start_and_verify'
+          ]
+          print('===== KEY TOKEN COUNTS OLD/CURRENT =====')
+          for n in needles:
+              print(f'{n} :: old={old.count(n)} current={new.count(n)}')
+          PY
