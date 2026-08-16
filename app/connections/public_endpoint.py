@@ -1,49 +1,8 @@
 from __future__ import annotations
 
-import ipaddress
-
 from app.config import load_config
+from app.net import clean_host, ip_version
 from app.security.tls import overview as tls_overview
-
-
-def _clean_host(value: object) -> str:
-    host = str(value or "").strip().rstrip(".")
-    if len(host) >= 2 and host.startswith("[") and host.endswith("]"):
-        host = host[1:-1].strip()
-    return host
-
-
-def _ip_version(value: object) -> int | None:
-    host = _clean_host(value)
-    if not host:
-        return None
-    try:
-        return ipaddress.ip_address(host).version
-    except ValueError:
-        return None
-
-
-def format_host(host: object) -> str:
-    """Format a host for URI/endpoint authority use.
-
-    IPv6 literals are enclosed in brackets. DNS names and IPv4 addresses are
-    returned unchanged. Already-bracketed IPv6 literals are normalised.
-    """
-    value = _clean_host(host)
-    if not value:
-        return ""
-    try:
-        address = ipaddress.ip_address(value)
-    except ValueError:
-        return value
-    if address.version == 6:
-        return f"[{address.compressed}]"
-    return str(address)
-
-
-def format_host_port(host: object, port: int) -> str:
-    value = format_host(host)
-    return f"{value}:{int(port)}" if value else ""
 
 
 # SG_GATEWAY_02112_ALL_CONNECTIONS_DOMAIN_FIX3
@@ -65,8 +24,8 @@ def public_ipv4(*fallbacks: object) -> str:
     except Exception:
         candidates = fallbacks
     for value in candidates:
-        host = _clean_host(value)
-        if _ip_version(host) == 4:
+        host = clean_host(value)
+        if ip_version(host) == 4:
             return host
     return ""
 
@@ -79,8 +38,8 @@ def public_ipv6(*fallbacks: object) -> str:
     except Exception:
         candidates = fallbacks
     for value in candidates:
-        host = _clean_host(value)
-        if _ip_version(host) == 6:
+        host = clean_host(value)
+        if ip_version(host) == 6:
             return host
     return ""
 
@@ -99,16 +58,16 @@ def public_host(*fallbacks: object) -> str:
 
     try:
         config = load_config()
-        current_address = _clean_host(config.public_address)
-        current_ipv4 = _clean_host(config.public_ipv4)
-        current_ipv6 = _clean_host(config.public_ipv6)
+        current_address = clean_host(config.public_address)
+        current_ipv4 = clean_host(config.public_ipv4)
+        current_ipv6 = clean_host(config.public_ipv6)
     except Exception:
         current_address = ""
         current_ipv4 = ""
         current_ipv6 = ""
 
     for value in (current_address, current_ipv4, current_ipv6, *fallbacks):
-        host = _clean_host(value)
+        host = clean_host(value)
         if host:
             return host
     return ""
