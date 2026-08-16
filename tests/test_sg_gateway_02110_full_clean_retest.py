@@ -60,7 +60,7 @@ def test_uninstall_cleans_02110_resume_file() -> None:
 
 def test_builder_uses_binary_payload_and_transfer_recheck() -> None:
     script = (ROOT / "build-run.sh").read_text(encoding="utf-8")
-    assert "__SG_GATEWAY_02110_BINARY_PAYLOAD_BELOW__" in script
+    assert "__SG_GATEWAY_BINARY_PAYLOAD_V1__" in script
     assert 'cat "$PAYLOAD" >> "$OUT"' in script
     assert "base64 -d" not in script
     assert "unzip -q \"$TRANSFER_ZIP\"" in script

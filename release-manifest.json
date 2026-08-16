@@ -1,20 +1,6 @@
 {
-  "build": "full-clean-ec2-02112-full-backup-domain-endpoint",
-  "status": "FINAL-AWG2",
-  "next_development_line": "0.1.0-022.01",
-  "safe_update": {
-    "mode": "light-runtime-whitelist",
-    "download_assets": false,
-    "preserve_local_assets": true,
-    "recover_missing_assets_from_safety_backup": true
-  },
-  "source_integrity": {
-    "manifest": "SOURCE-SHA256SUMS",
-    "mode": "git-blob-sha256",
-    "ci_verified": true,
-    "build_run_verified": true
-  },
-  "channel": "main-02112",
+  "build": "DEV-V22-02205-REBUILD-PREPUBLICATION",
+  "channel": "dev-v22",
   "client_access_model": {
     "hysteria_auth_per_device": true,
     "independent_enable_disable": true,
@@ -271,6 +257,7 @@
     },
     "panel": {
       "automatic_rollback": true,
+      "channel": "dev-v22",
       "full_code_backup": true,
       "health_checks": [
         "sg-hostd",
@@ -309,6 +296,7 @@
     "public_sni_router_port": 443,
     "reality_internal_listener": "127.0.0.1:7443"
   },
+  "next_development_line": "0.1.0-022.05",
   "portable_full_backup": {
     "automatic_safety_backup_before_restore": true,
     "certificate_files_verified_before_success": true,
@@ -340,6 +328,12 @@
     "https_domain_preferred_when_ready": true,
     "ip_fallback_when_https_not_ready": true
   },
+  "rebuild_policy": {
+    "awg3": false,
+    "baseline": "0.1.0-021.12",
+    "publication_requires_real_clean_install": true
+  },
+  "rebuild_target": "0.1.0-022.05",
   "rollback": {
     "atomic_application": true,
     "requires_backup": true,
@@ -384,6 +378,12 @@
     "source": "SG Client 096"
   },
   "runtime": "native-systemd",
+  "safe_update": {
+    "download_assets": false,
+    "mode": "light-runtime-whitelist",
+    "preserve_local_assets": true,
+    "recover_missing_assets_from_safety_backup": true
+  },
   "services": [
     "sg-gateway",
     "sg-hostd",
@@ -403,6 +403,13 @@
     "xray_contract": "VLESS Reality TCP + XHTTP Reality + XTLS Vision; server auto, client stream-one",
     "xray_preservation": "Reality X25519, ShortID and full ML-KEM-768 pair from 013 are preserved"
   },
+  "source_integrity": {
+    "build_run_verified": true,
+    "ci_verified": true,
+    "manifest": "SOURCE-SHA256SUMS",
+    "mode": "git-blob-sha256"
+  },
+  "status": "DEV",
   "system_ui_02110": {
     "cpu_breakdown_margin_top_px": -16,
     "cpu_title_margin_bottom_px": 6,
