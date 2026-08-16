@@ -1,0 +1,76 @@
+{% set xmux_mode = xray_xmux.mode if xray_xmux is defined else 'auto' %}
+{% set xmux_stored_json = xray_xmux.stored_json if xray_xmux is defined else '{}' %}
+
+<section id="xray-xmux" class="xmux1-wrap cnv1-page">
+  <article class="xmux1-card sg-ljd-card">
+    <header class="xmux1-head">
+      <div>
+        <div class="cnv1-card-kicker">XRAY · XHTTP · CLIENT EXTRA</div>
+        <h2>XMUX для XHTTP</h2>
+        <p>Общие клиентские параметры VLESS XHTTP Reality и VLESS XHTTP TLS. Серверный Xray XMUX не получает.</p>
+      </div>
+      <span class="xmux1-chip">SG-Panel contract</span>
+    </header>
+
+    <form method="post" action="/connections/xmux" data-xmux-form>
+      <div class="xmux1-modes" role="radiogroup" aria-label="Режим XMUX">
+        <label class="xmux1-mode">
+          <input type="radio" name="xhttp_xmux_mode" value="auto" {% if xmux_mode == 'auto' %}checked{% endif %}>
+          <span>
+            <strong>Стандартный</strong>
+            <small>Рекомендуется. maxConnections 2-4 · reuse 300-600 · requests 1000-2000 · lifetime 1200-2400 · keepalive 600.</small>
+          </span>
+        </label>
+        <label class="xmux1-mode">
+          <input type="radio" name="xhttp_xmux_mode" value="reduced" {% if xmux_mode == 'reduced' %}checked{% endif %}>
+          <span>
+            <strong>Для РФ — уменьшенный</strong>
+            <small>maxConcurrency 0 · maxConnections 6 · reuse 0 · requests 600-900 · lifetime 1800-3000 · keepalive 0.</small>
+          </span>
+        </label>
+        <label class="xmux1-mode">
+          <input type="radio" name="xhttp_xmux_mode" value="expert" {% if xmux_mode == 'expert' %}checked{% endif %}>
+          <span>
+            <strong>Ручной</strong>
+            <small>Полный Client Extra JSON. Объект <code>xmux</code> обязателен; остальные поля сохраняются.</small>
+          </span>
+        </label>
+      </div>
+
+      <div class="xmux1-contract">
+        <div>
+          <span>VLESS XHTTP Reality</span>
+          <strong>Client mode: stream-one</strong>
+          <small>Серверный mode остаётся auto.</small>
+        </div>
+        <div>
+          <span>VLESS XHTTP TLS</span>
+          <strong>Client mode: из карточки профиля</strong>
+          <small>По умолчанию auto; серверный mode остаётся auto.</small>
+        </div>
+        <div>
+          <span>Scope</span>
+          <strong>Только клиент</strong>
+          <small>extra.xmux не добавляется в server inbound.</small>
+        </div>
+      </div>
+
+      <details class="xmux1-extra" data-xmux-extra {% if xmux_mode == 'expert' %}open{% endif %}>
+        <summary>Client Extra JSON</summary>
+        <label>
+          <span>Дополнительные клиентские поля</span>
+          <textarea name="xhttp_extra_client_json" rows="12" spellcheck="false" data-xmux-json>{{ xmux_stored_json }}</textarea>
+          <small>В Стандартном/РФ режимах дополнительные поля сохраняются, а <code>xmux</code> заменяется выбранным пресетом. В Ручном режиме JSON используется как есть после проверки конфликта maxConnections/maxConcurrency.</small>
+        </label>
+      </details>
+
+      {% if xray_xmux is defined and xray_xmux.error %}
+      <div class="xmux1-error">{{ xray_xmux.error }}</div>
+      {% endif %}
+
+      <div class="xmux1-actions">
+        <button class="button primary" type="submit">Сохранить XMUX</button>
+      </div>
+    </form>
+  </article>
+</section>

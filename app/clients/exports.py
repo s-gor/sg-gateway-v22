@@ -3,7 +3,7 @@ from __future__ import annotations
 import base64
 import json
 from dataclasses import dataclass
-from urllib.parse import quote, urlencode
+from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
 
 from flask import has_request_context, request
 
@@ -21,6 +21,7 @@ from app.mihomo.service import build_device_yaml
 
 from app.security.tls import overview as tls_overview
 from app.xray.profiles import REALITY_TCP_FLOW, overview as xray_profiles_overview
+from app.xray.xmux import XmuxError, effective_client_extra
 from app.xray.sg_panel_vless import reality_tcp_link, xhttp_reality_link
 from app.xray.settings_transactions import pending as pending_settings_transaction
 
@@ -166,6 +167,41 @@ def _xray_profile(profile_id: str):
     return state, next(
         (item for item in state["profiles"] if item.id == profile_id),
         None,
+    )
+
+
+def _rewrite_xhttp_link(body: str, profile_id: str, config: dict) -> str:
+    """Apply the SG-Panel client-side XMUX contract to one ready XHTTP link."""
+    if not body or profile_id not in {"xhttp_reality", "xhttp_tls"}:
+        return body
+
+    try:
+        extra = effective_client_extra(config)
+    except XmuxError:
+        # Invalid restored expert JSON must never leak a malformed Client Extra.
+        extra = {}
+
+    parts = urlsplit(body)
+    pairs = parse_qsl(parts.query, keep_blank_values=True)
+    rewritten: list[tuple[str, str]] = []
+    mode_seen = False
+    for key, value in pairs:
+        if key == "extra":
+            continue
+        if profile_id == "xhttp_reality" and key == "mode":
+            value = "stream-one"
+            mode_seen = True
+        rewritten.append((key, value))
+
+    if profile_id == "xhttp_reality" and not mode_seen:
+        rewritten.append(("mode", "stream-one"))
+    if extra:
+        rewritten.append(
+            ("extra", json.dumps(extra, ensure_ascii=False, separators=(",", ":")))
+        )
+
+    return urlunsplit(
+        (parts.scheme, parts.netloc, parts.path, urlencode(rewritten), parts.fragment)
     )
 
 
@@ -341,6 +377,9 @@ def build_xray_profile_link(
             body = f"{scheme}://{quote(auth, safe='')}@{host}:{profile.port}/?{query}#{safe_name}"
     else:
         body = ""
+
+    if profile_id in {"xhttp_reality", "xhttp_tls"} and body:
+        body = _rewrite_xhttp_link(body, profile_id, current_config)
 
     return ClientExport(filename, "text/plain; charset=utf-8", body)
 

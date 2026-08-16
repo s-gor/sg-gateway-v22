@@ -5,6 +5,7 @@
   {{ super() }}
   <link rel="stylesheet" href="{{ url_for('static', filename='sg-connections-visual-v1.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='sg-xray-profiles-v2.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='sg-xmux-settings-v1.css') }}">
 {% endblock %}
 
 {% block content %}
@@ -289,6 +290,8 @@
     </article>
   </section>
 
+  {% include "_xray_xmux_settings.html" %}
+
   <section class="cnv1-engine-pair">
     <article class="cnv1-engine-card cnv1-engine-awg sg-ljd-card">
       <header class="cnv1-engine-head">
@@ -385,6 +388,7 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="{{ url_for('static', filename='sg-xmux-settings-v1.js') }}"></script>
 <script>
 (() => {
   const form = document.getElementById('xps2-form');
