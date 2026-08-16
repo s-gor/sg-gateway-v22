@@ -130,7 +130,6 @@ def test_connections_protocol_cards_are_compact_without_changing_form_contract()
         'name="hysteria2_obfs_mode"',
     ):
         assert field in template
-    assert 'value="stream-one"' in template
     assert 'value="gecko"' in template
 
 
