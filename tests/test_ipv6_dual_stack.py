@@ -3,15 +3,20 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 from app.net import clean_host, format_host, format_host_port, ip_version
-from app.xray.sg_panel_vless import reality_tcp_link, xhttp_reality_link
+from app.xray.sg_panel_vless import (
+    reality_tcp_link,
+    xhttp_reality_inbound,
+    xhttp_reality_link,
+)
 
 HOSTD_ROOT = Path(__file__).resolve().parents[1] / "hostd"
 if str(HOSTD_ROOT) not in sys.path:
     sys.path.insert(0, str(HOSTD_ROOT))
 
-from sg_hostd import awg3_runtime  # noqa: E402
+from sg_hostd import awg3_runtime, client_runtime  # noqa: E402
 
 
 def test_host_formatting_preserves_ipv4_and_domains() -> None:
@@ -63,6 +68,21 @@ def test_xhttp_reality_link_uses_ipv6_safe_authority() -> None:
     assert link.startswith(
         "vless://22222222-2222-2222-2222-222222222222@[2001:db8::20]:8444?"
     )
+
+
+def test_xhttp_reality_listener_is_parameterized_for_dual_stack() -> None:
+    inbound = xhttp_reality_inbound(
+        clients=[],
+        port=8444,
+        path="/sg",
+        decryption="none",
+        dest="www.bing.com:443",
+        server_name="www.bing.com",
+        private_key="private",
+        short_id="abcd1234",
+        listen="::",
+    )
+    assert inbound["listen"] == "::"
 
 
 def _awg3_secrets() -> dict[str, str]:
@@ -131,6 +151,92 @@ def test_awg3_dual_stack_render_adds_stable_ipv6_peer(monkeypatch) -> None:
     assert "AllowedIPs = 10.67.0.2/32," in body
     assert "table ip6 sg_gateway_awg3" in body
     assert f"ip6 saddr {network} masquerade" in body
+
+
+def _awg2_secrets() -> dict[str, str]:
+    return {
+        "SG_GATEWAY_AWG_PRIVATE_KEY": "server-private",
+        "SG_GATEWAY_AWG_PUBLIC_KEY": "server-public",
+        "SG_GATEWAY_AWG_JC": "4",
+        "SG_GATEWAY_AWG_JMIN": "10",
+        "SG_GATEWAY_AWG_JMAX": "50",
+        "SG_GATEWAY_AWG_S1": "64",
+        "SG_GATEWAY_AWG_S2": "96",
+        "SG_GATEWAY_AWG_H1": "101",
+        "SG_GATEWAY_AWG_H2": "102",
+        "SG_GATEWAY_AWG_H3": "103",
+        "SG_GATEWAY_AWG_H4": "104",
+    }
+
+
+def _awg2_row(address: str = "10.66.0.2/32") -> dict[str, object]:
+    return {
+        "client_id": 1,
+        "client_name": "Dual Stack",
+        "config_json": json.dumps(
+            {
+                "public_key": "client-public",
+                "address": address,
+            }
+        ),
+    }
+
+
+def _prepare_awg2_render(monkeypatch, runtime: dict[str, str]) -> None:
+    secrets = _awg2_secrets()
+
+    def read_env(path):
+        if path == client_runtime.ENGINE_SECRETS:
+            return secrets
+        if path == client_runtime.RUNTIME_ENV:
+            return runtime
+        raise AssertionError(f"unexpected env path: {path}")
+
+    monkeypatch.setattr(client_runtime, "_read_env", read_env)
+    monkeypatch.setattr(client_runtime, "_default_interface", lambda: "eth0")
+    monkeypatch.setattr(
+        client_runtime,
+        "get_connection_settings",
+        lambda _engine: SimpleNamespace(
+            host="198.51.100.10",
+            port=585,
+            config={"server_public_key": "server-public"},
+        ),
+    )
+
+
+def test_awg2_ipv4_only_render_keeps_frozen_address_contract(monkeypatch) -> None:
+    _prepare_awg2_render(monkeypatch, {})
+
+    body = client_runtime._render_awg_config([_awg2_row()])
+
+    assert "Address = 10.66.0.1/16\n" in body
+    assert "AllowedIPs = 10.66.0.2/32" in body
+    assert "table ip6 sg_gateway_awg" not in body
+
+
+def test_awg2_dual_stack_render_adds_stable_ipv6_peer(monkeypatch) -> None:
+    _prepare_awg2_render(
+        monkeypatch,
+        {"SG_GATEWAY_PUBLIC_IPV6": "2606:4700:4700::1111"},
+    )
+
+    network = client_runtime._awg_ipv6_network("server-public")
+    body = client_runtime._render_awg_config([_awg2_row()])
+
+    assert str(network).startswith("fd")
+    assert f"{network.network_address + 1}/64" in body
+    assert f"{network.network_address + 2}/128" in body
+    assert "AllowedIPs = 10.66.0.2/32," in body
+    assert "table ip6 sg_gateway_awg" in body
+    assert f"ip6 saddr {network} masquerade" in body
+
+
+def test_xray_public_listener_family_preserves_ipv4_only() -> None:
+    assert client_runtime._dual_stack_enabled({}) is False
+    assert client_runtime._dual_stack_enabled(
+        {"SG_GATEWAY_PUBLIC_IPV6": "2606:4700:4700::1111"}
+    ) is True
 
 
 def test_awg3_userspace_helper_splits_dual_stack_address_line() -> None:
