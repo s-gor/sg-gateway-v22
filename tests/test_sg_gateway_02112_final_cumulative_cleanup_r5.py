@@ -57,12 +57,13 @@ def test_light_update_preserves_local_assets_without_downloading_them() -> None:
     assert "sparse-checkout set app hostd deploy assets" not in text
 
 
-def test_build_run_uses_committed_git_archive_and_checks_both_resume_generations() -> None:
+def test_build_run_uses_committed_git_archive_and_version_driven_identity() -> None:
     text = _text(BUILD_RUN)
-    assert "SG_GATEWAY_02112_CANONICAL_GIT_ARCHIVE_FIX11" in text
+    assert 'VERSION="$(tr -d' in text
+    assert 'BUILD_ID="$(tr -d' in text
     assert 'git -C "$ROOT" archive --format=tar HEAD' in text
-    assert "/root/sg-gateway-02112-installer-resume.env" in text
-    assert "/root/sg-gateway-02111-installer-resume.env" in text
+    assert 'DEFAULT_BASENAME="SG-Gateway-${VERSION}-FULL"' in text
+    assert 'EXPECTED_VERSION="0.1.0-021.12"' not in text
 
 
 def test_final_publication_metadata_is_consistent() -> None:
@@ -74,8 +75,11 @@ def test_final_publication_metadata_is_consistent() -> None:
 
     release = json.loads(_text(ROOT / "release-manifest.json"))
     assert release["version"] == "0.1.0-021.12"
-    assert release["status"] == "FINAL-AWG2"
-    assert release["next_development_line"] == "0.1.0-022.01"
+    assert release["status"] == "DEV"
+    assert release["next_development_line"] == "0.1.0-022.05"
+    assert release["channel"] == "dev-v22"
+    assert release["rebuild_target"] == "0.1.0-022.05"
+    assert release["rebuild_policy"]["awg3"] is False
     assert release["safe_update"]["preserve_local_assets"] is True
     assert release["safe_update"]["download_assets"] is False
     assert release["source_integrity"]["mode"] == "git-blob-sha256"
@@ -114,5 +118,5 @@ def test_ci_checks_canonical_integrity_and_full_clean() -> None:
     assert "Verify FINAL source integrity" in workflow
     assert '["git", "show", f"HEAD:{path}"]' in workflow
     assert "Git-blob source integrity ok:" in workflow
-    assert "Build and verify FINAL FULL CLEAN" in workflow
-    assert "bash build-run.sh /tmp/SG-Gateway-02112-FULL-CLEAN.run" in workflow
+    assert "Build and verify current FULL package" in workflow
+    assert 'OUT="/tmp/SG-Gateway-${VERSION}-FULL.run"' in workflow
