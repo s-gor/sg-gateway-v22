@@ -1,0 +1,79 @@
+name: audit v22 historical runtime markers
+
+on:
+  push:
+    branches: [audit-v22-prepublish]
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: audit-v22-prepublish
+          fetch-depth: 0
+      - name: Fetch historical AWG3-free 022.05 tree
+        run: |
+          git clone -q --no-checkout https://github.com/s-gor/sg-gateway.git /tmp/old
+          git -C /tmp/old fetch -q --depth=1 origin a0c2537b6c55d1fd974afe3aab586a7d41777cd8
+          git -C /tmp/old checkout -q --detach FETCH_HEAD
+      - name: Compare historical SG contract markers in active runtime
+        run: |
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+
+          old=Path('/tmp/old'); new=Path('.')
+          roots=('app','hostd','engines','deploy')
+          top=('install.sh','build-run.sh','build-run-vendored.sh')
+          marker_re=re.compile(r'\b(?:SG_GATEWAY|SG_[A-Z0-9]+)[A-Z0-9_]*(?:_V\d+|_FIX\d+(?:_R\d+)?|_R\d+|_LAST_CSS|_PATCH|_HOTFIX\d*|_CONTRACT\d*)\b')
+
+          def scan(root):
+              hits={}
+              paths=[]
+              for d in roots:
+                  base=root/d
+                  if base.exists(): paths += [p for p in base.rglob('*') if p.is_file()]
+              paths += [root/p for p in top if (root/p).is_file()]
+              for p in paths:
+                  try: text=p.read_text(encoding='utf-8')
+                  except Exception: continue
+                  for m in marker_re.findall(text):
+                      hits.setdefault(m,set()).add(p.relative_to(root).as_posix())
+              return hits
+
+          a=scan(old); b=scan(new)
+          missing=sorted(set(a)-set(b))
+          added=sorted(set(b)-set(a))
+          print(f'HIST_MARKERS={len(a)} CURRENT_MARKERS={len(b)} MISSING_MARKERS={len(missing)} ADDED_MARKERS={len(added)}')
+          print('=== HISTORICAL MARKERS ABSENT CURRENT ===')
+          for m in missing:
+              print(f'{m} :: {",".join(sorted(a[m]))}')
+          print('=== CURRENT-ONLY MARKERS ===')
+          for m in added:
+              print(f'{m} :: {",".join(sorted(b[m]))}')
+          PY
+      - name: Compare historical production registration modules
+        run: |
+          python3 - <<'PY'
+          import ast
+          from pathlib import Path
+          for label,root in [('OLD',Path('/tmp/old')),('NEW',Path('.'))]:
+              p=root/'app/production.py'
+              tree=ast.parse(p.read_text(encoding='utf-8'))
+              imports=[]; calls=[]
+              for node in ast.walk(tree):
+                  if isinstance(node,ast.ImportFrom):
+                      imports.append((node.module,tuple(n.name for n in node.names)))
+                  if isinstance(node,ast.Call) and isinstance(node.func,ast.Name):
+                      calls.append(node.func.id)
+              print(label+'_PRODUCTION_IMPORTS='+repr(sorted(imports)))
+              print(label+'_PRODUCTION_CALLS='+repr(sorted(calls)))
+          PY
+      - name: Confirm no AWG3 active markers
+        run: |
+          ! grep -RInE --exclude-dir=.git 'amneziawg3|AWG3|awg3' app hostd engines deploy install.sh
+          echo AWG3_ACTIVE_REFERENCES=0
