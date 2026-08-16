@@ -1,0 +1,129 @@
+name: diagnose Fix29 full suite
+
+on:
+  push:
+    branches: [audit-v22-prepublish]
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact clean Fix28 product base
+        uses: actions/checkout@v4
+        with:
+          ref: fix29-awg3-dual
+          fetch-depth: 0
+
+      - name: Guard product branch unchanged
+        run: |
+          test "$(git rev-parse HEAD)" = "04345198231bbe3eb75d9061b879887a0f9cecfd"
+          test "$(git rev-parse HEAD^{tree})" = "b9a4cb7b4ae5f2f80e81749b03220de3f4082d00"
+
+      - name: Import exact historical AWG3 userspace inputs
+        run: |
+          rm -rf /tmp/old
+          git clone -q --no-checkout https://github.com/s-gor/sg-gateway.git /tmp/old
+          git -C /tmp/old fetch -q --depth=1 origin 816804dfae23fc854444bc274c254b9e47efaed2
+          git -C /tmp/old checkout -q --detach FETCH_HEAD
+          cp /tmp/old/vendor/cores/amneziawg-tools-3.0.20260805.tar.gz vendor/cores/
+          cp /tmp/old/vendor/cores/amneziawg-go-linux-amd64-v3.0.0 vendor/cores/
+          cp /tmp/old/hostd/sg_hostd/awg3_runtime.py hostd/sg_hostd/awg3_runtime.py
+          cp /tmp/old/deploy/sg-gateway-awg3-userspace.sh deploy/sg-gateway-awg3-userspace.sh
+          cp /tmp/old/deploy/sg-gateway-awg3.service deploy/sg-gateway-awg3.service
+          chmod 0755 vendor/cores/amneziawg-go-linux-amd64-v3.0.0 deploy/sg-gateway-awg3-userspace.sh
+
+      - name: Reproduce exact currently validated Fix29 working tree
+        run: |
+          git fetch -q origin audit-v22-prepublish
+          git show origin/audit-v22-prepublish:.github/workflows/fix29-awg3-implement.yml > /tmp/fix29-carrier.yml
+          python3 - <<'PY'
+          from pathlib import Path
+          source=Path('/tmp/fix29-carrier.yml').read_text(encoding='utf-8').splitlines()
+          begin=next(i for i,line in enumerate(source) if line == "          python3 - <<'PY'")
+          end=next(i for i,line in enumerate(source[begin+1:],begin+1) if line == '          PY')
+          out=[]
+          in_triple=False
+          for raw in source[begin+1:end]:
+              line = raw if in_triple else (raw[10:] if raw.startswith('          ') else raw)
+              out.append(line)
+              if line.count("'''") % 2:
+                  in_triple = not in_triple
+          assert not in_triple
+          script='\n'.join(out)+'\n'
+          compile(script,'/tmp/fix29_patch.py','exec')
+          Path('/tmp/fix29_patch.py').write_text(script,encoding='utf-8',newline='\n')
+          PY
+          python3 /tmp/fix29_patch.py
+          python3 - <<'PY'
+          from pathlib import Path
+          helper_path=Path('deploy/sg-gateway-awg3-userspace.sh')
+          helper=helper_path.read_text(encoding='utf-8')
+          wanted='export PATH="$AWG3_ROOT/bin:$PATH"'
+          if wanted not in helper:
+              anchor='AWG3_ROOT="/opt/sg-gateway/awg3"\n'
+              assert helper.count(anchor) == 1
+              helper=helper.replace(anchor,anchor+wanted+'\n',1)
+          assert helper.count(wanted) == 1
+          helper_path.write_text(helper,encoding='utf-8',newline='\n')
+
+          main_path=Path('app/main.py')
+          main=main_path.read_text(encoding='utf-8')
+          context='            awg3_settings=get_connection_settings("amneziawg3"),\n'
+          conn_start=main.index('    @app.get("/connections")\n')
+          before=main[:conn_start]
+          after=main[conn_start:]
+          if context in before:
+              before=before.replace(context,'',1)
+          main=before+after
+          conn_start=main.index('    @app.get("/connections")\n')
+          conn_end=main.index('    @app.post("/connections/amneziawg")\n',conn_start)
+          block=main[conn_start:conn_end]
+          if context not in block:
+              anchor='            awg_settings=get_connection_settings("amneziawg"),\n'
+              assert block.count(anchor) == 1
+              block=block.replace(anchor,anchor+context,1)
+              main=main[:conn_start]+block+main[conn_end:]
+          assert main.count(context) == 1
+          assert main.count('@app.post("/connections/amneziawg3")') == 1
+          main_path.write_text(main,encoding='utf-8',newline='\n')
+          PY
+
+      - name: Install test dependencies
+        run: python3 -m pip install -q -r requirements-dev.txt
+
+      - name: Reconfirm focused contracts
+        env:
+          PYTHONPATH: .:hostd
+        run: python3 -m pytest -q tests/test_sg_gateway_v22_awg3_dual_contract.py tests/test_awg_style_ui.py
+
+      - name: Run full suite and preserve complete short report
+        id: full
+        continue-on-error: true
+        env:
+          PYTHONPATH: .:hostd
+        run: |
+          set +e
+          python3 -m pytest -q tests --tb=short -ra 2>&1 | tee /tmp/fix29-full-suite.log
+          rc=${PIPESTATUS[0]}
+          {
+            echo '===== FAILURE HEADERS ====='
+            grep -E '^_{2,} .* _{2,}$|^FAILED |^ERROR ' /tmp/fix29-full-suite.log || true
+            echo '===== SHORT TEST SUMMARY ====='
+            sed -n '/short test summary info/,$p' /tmp/fix29-full-suite.log || true
+          } > /tmp/fix29-failures.txt
+          cat /tmp/fix29-failures.txt
+          exit "$rc"
+
+      - name: Upload complete failure report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Fix29-full-suite-failure-report
+          path: |
+            /tmp/fix29-full-suite.log
+            /tmp/fix29-failures.txt
+          if-no-files-found: error
+
+      - name: Stop after diagnostic failure
+        if: steps.full.outcome != 'success'
+        run: exit 1
