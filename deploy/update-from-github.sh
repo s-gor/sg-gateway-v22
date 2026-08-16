@@ -15,6 +15,8 @@ HOSTD_SERVICE="sg-hostd.service"
 TEMP_DIR=""
 BACKUP_DIR=""
 SOURCE_DIR=""
+SOURCE_COMMIT=""
+PANEL_UPDATE_STATE="${SG_GATEWAY_PANEL_UPDATE_STATE:-$DATA_DIR/updates/panel-state.json}"
 BACKUP_READY=0
 SERVICES_STOPPED=0
 UPDATE_FINISHED=0
@@ -515,14 +517,47 @@ preflight() {
   fi
 }
 
+resolve_source_commit() {
+  local resolved=""
+
+  if command -v git >/dev/null 2>&1; then
+    resolved="$(git ls-remote --exit-code "$GIT_URL" "refs/heads/$BRANCH" 2>/dev/null | awk 'NR==1 {print $1}' || true)"
+  fi
+
+  if [[ ! "$resolved" =~ ^[0-9a-f]{40}$ ]]; then
+    resolved="$(
+      curl -4 -fsSL --max-time 20 -A 'SG-Gateway-Updater' \
+        "https://api.github.com/repos/${REPOSITORY}/commits/${BRANCH}" 2>/dev/null \
+      | python3 -c 'import json,re,sys; value=str(json.load(sys.stdin).get("sha") or "").strip().lower(); print(value if re.fullmatch(r"[0-9a-f]{40}", value) else "")' \
+        2>/dev/null || true
+    )"
+  fi
+
+  if [[ ! "$resolved" =~ ^[0-9a-f]{40}$ ]]; then
+    resolved="$(
+      curl -4 -fsSL --max-time 20 -A 'SG-Gateway-Updater' \
+        "https://github.com/${REPOSITORY}/commits/${BRANCH}.atom" 2>/dev/null \
+      | python3 -c 'import re,sys; match=re.search(r"Grit::Commit/([0-9a-fA-F]{40})", sys.stdin.read()); print(match.group(1).lower() if match else "")' \
+        2>/dev/null || true
+    )"
+  fi
+
+  [[ "$resolved" =~ ^[0-9a-f]{40}$ ]] || fail "cannot resolve exact GitHub commit for update channel $BRANCH"
+  SOURCE_COMMIT="$resolved"
+}
+
 prepare_source_archive() {
-  local archive="$TEMP_DIR/sg-gateway-main.tar.gz"
+  local archive archive_url
+  resolve_source_commit
+  archive="$TEMP_DIR/sg-gateway-${SOURCE_COMMIT}.tar.gz"
+  archive_url="https://github.com/${REPOSITORY}/archive/${SOURCE_COMMIT}.tar.gz"
   rm -rf "$SOURCE_DIR"
   mkdir -p "$SOURCE_DIR"
 
   printf '[SG-Gateway Update] Source mode: COMPATIBILITY (full GitHub archive)\n'
+  printf '[SG-Gateway Update] Source commit: %s\n' "$SOURCE_COMMIT"
   curl -fL --retry 6 --retry-all-errors --retry-delay 3 --connect-timeout 20 \
-    "$ARCHIVE_URL" -o "$archive"
+    "$archive_url" -o "$archive"
   gzip -t "$archive"
   tar -xzf "$archive" -C "$SOURCE_DIR" --strip-components=1
 }
@@ -543,6 +578,10 @@ prepare_source_light() {
     --single-branch \
     --branch "$BRANCH" \
     "$GIT_URL" "$SOURCE_DIR" || return 1
+
+  SOURCE_COMMIT="$(git -C "$SOURCE_DIR" rev-parse HEAD 2>/dev/null || true)"
+  [[ "$SOURCE_COMMIT" =~ ^[0-9a-f]{40}$ ]] || return 1
+  printf '[SG-Gateway Update] Source commit: %s\n' "$SOURCE_COMMIT"
 
   # SG_GATEWAY_02112_LIGHT_UPDATE_FIX9_R2
   # Whitelist only live application source. Cone mode also keeps the small
@@ -757,6 +796,62 @@ verify_final() {
   systemctl is-active --quiet nginx.service
 }
 
+bind_panel_update_state() {
+  [[ "$SOURCE_COMMIT" =~ ^[0-9a-f]{40}$ ]] || fail "source commit is unavailable after deployment"
+
+  local new_version
+  new_version="$(tr -d '\r\n' < "$PREFIX/VERSION")"
+  install -d -m 0750 -o root -g sg-gateway "$(dirname "$PANEL_UPDATE_STATE")"
+
+  PYTHONPATH="$PREFIX:$PREFIX/hostd" \
+  SG_GATEWAY_APP_ROOT="$PREFIX" \
+  SG_GATEWAY_PANEL_UPDATE_STATE="$PANEL_UPDATE_STATE" \
+  "$PREFIX/.venv/bin/python" -B - \
+    "$SOURCE_COMMIT" "$new_version" "$BACKUP_DIR" "$BRANCH" <<'PYPANELSTATE'
+import json
+import os
+import re
+import shutil
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+from app.maintenance.panel_updates import source_fingerprint
+
+commit = sys.argv[1].strip().lower()
+version = sys.argv[2].strip()
+backup = Path(sys.argv[3]).name
+channel = sys.argv[4].strip()
+root = Path(os.environ["SG_GATEWAY_APP_ROOT"])
+state_path = Path(os.environ["SG_GATEWAY_PANEL_UPDATE_STATE"])
+
+if not re.fullmatch(r"[0-9a-f]{40}", commit):
+    raise SystemExit("invalid source commit")
+
+fingerprint = source_fingerprint(root)
+if not re.fullmatch(r"[0-9a-f]{64}", fingerprint):
+    raise SystemExit("invalid deployed source fingerprint")
+
+payload = {
+    "commit": commit,
+    "version": version,
+    "channel": channel,
+    "updated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+    "backup": backup,
+    "source_fingerprint": fingerprint,
+}
+state_path.parent.mkdir(parents=True, exist_ok=True)
+temporary = state_path.with_name(state_path.name + ".new")
+temporary.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+os.chmod(temporary, 0o640)
+shutil.chown(temporary, user="root", group="sg-gateway")
+os.replace(temporary, state_path)
+print(f"Panel Update baseline: {commit[:12]} ({channel})")
+PYPANELSTATE
+
+  runuser -u sg-gateway -- test -r "$PANEL_UPDATE_STATE"
+}
+
 main() {
   printf '\n%s[SG-Gateway Update]%s Dedicated panel-only Update\n' "$CYAN" "$RESET"
   printf '[SG-Gateway Update] This mode does NOT install packages, Certbot, Nginx or VPN cores.\n\n'
@@ -771,6 +866,7 @@ main() {
   run_stage 4 "Python/UI проверка без изменения runtime" validate_deployed_panel
   run_stage 5 "Перезапуск только panel + hostd" restart_panel
   run_stage 6 "Проверка HTTPS, Clients, Nginx и runtime" verify_final
+  bind_panel_update_state
 
   UPDATE_FINISHED=1
   trap - ERR INT TERM
