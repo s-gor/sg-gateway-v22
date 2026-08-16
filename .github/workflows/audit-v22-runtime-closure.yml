@@ -1,0 +1,122 @@
+name: audit v22 runtime dependency closure
+
+on:
+  push:
+    branches: [audit-v22-prepublish]
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: audit-v22-prepublish
+          fetch-depth: 0
+
+      - name: Guard audit branch over clean Fix28
+        run: git merge-base --is-ancestor 04345198231bbe3eb75d9061b879887a0f9cecfd HEAD
+
+      - name: Fetch historical AWG3-free 022.05
+        run: |
+          git clone -q --no-checkout https://github.com/s-gor/sg-gateway.git /tmp/old
+          git -C /tmp/old fetch -q --depth=1 origin a0c2537b6c55d1fd974afe3aab586a7d41777cd8
+          git -C /tmp/old checkout -q --detach FETCH_HEAD
+
+      - name: Compare shell function surface in common scripts
+        run: |
+          python3 - <<'PY'
+          import re, hashlib
+          from pathlib import Path
+          old=Path('/tmp/old'); new=Path('.')
+          roots=('deploy',)
+          tops=('install.sh','build-run.sh','build-run-vendored.sh')
+          func_re=re.compile(r'^\s*(?:function\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*\(\s*\)\s*\{',re.M)
+          def scripts(root):
+              out={}
+              for d in roots:
+                  base=root/d
+                  if base.exists():
+                      for p in base.rglob('*.sh'):
+                          out[p.relative_to(root).as_posix()]=p
+              for rel in tops:
+                  p=root/rel
+                  if p.is_file(): out[rel]=p
+              return out
+          a=scripts(old); b=scripts(new)
+          missing=[]; added=[]
+          for rel in sorted(set(a)&set(b)):
+              if hashlib.sha256(a[rel].read_bytes()).digest()==hashlib.sha256(b[rel].read_bytes()).digest(): continue
+              sa=set(func_re.findall(a[rel].read_text(encoding='utf-8',errors='ignore')))
+              sb=set(func_re.findall(b[rel].read_text(encoding='utf-8',errors='ignore')))
+              for f in sorted(sa-sb): missing.append((rel,f))
+              for f in sorted(sb-sa): added.append((rel,f))
+          print(f'MISSING_SHELL_FUNCTIONS={len(missing)} ADDED_SHELL_FUNCTIONS={len(added)}')
+          print('=== HISTORICAL SHELL FUNCTIONS ABSENT CURRENT ===')
+          for rel,f in missing: print(f'{rel} :: {f}')
+          print('=== CURRENT-ONLY SHELL FUNCTIONS ===')
+          for rel,f in added: print(f'{rel} :: {f}')
+          PY
+
+      - name: Verify all current shell syntax
+        run: |
+          count=0
+          while IFS= read -r -d '' file; do
+            bash -n "$file"
+            count=$((count+1))
+          done < <(find . -type f -name '*.sh' -not -path './.git/*' -print0)
+          bash -n install.sh
+          bash -n build-run.sh
+          bash -n build-run-vendored.sh
+          echo SHELL_SYNTAX_OK=$count
+
+      - name: Verify template static asset closure
+        run: |
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          root=Path('.')
+          static=root/'app/web/static'
+          refs={}
+          pat=re.compile(r"url_for\(\s*['\"]static['\"]\s*,\s*filename\s*=\s*['\"]([^'\"]+)['\"]")
+          for p in (root/'app/web/templates').rglob('*.html'):
+              text=p.read_text(encoding='utf-8')
+              for asset in pat.findall(text): refs.setdefault(asset,set()).add(p.as_posix())
+          missing=sorted(a for a in refs if not (static/a).is_file())
+          print(f'STATIC_REFS={len(refs)} STATIC_MISSING={len(missing)}')
+          for asset in missing: print(asset+' :: '+','.join(sorted(refs[asset])))
+          assert not missing, missing
+          PY
+
+      - name: Verify referenced deploy paths exist
+        run: |
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          root=Path('.')
+          scan=[root/'install.sh',root/'build-run.sh',root/'build-run-vendored.sh']
+          scan += list((root/'deploy').rglob('*.sh'))
+          refs={}
+          pat=re.compile(r'(?<![A-Za-z0-9_.-])(deploy/[A-Za-z0-9_./-]+\.(?:sh|service|py|conf))(?![A-Za-z0-9_.-])')
+          for p in scan:
+              if not p.is_file(): continue
+              text=p.read_text(encoding='utf-8',errors='ignore')
+              for rel in pat.findall(text): refs.setdefault(rel,set()).add(p.as_posix())
+          missing=sorted(rel for rel in refs if not (root/rel).is_file())
+          print(f'DEPLOY_PATH_REFS={len(refs)} DEPLOY_PATH_MISSING={len(missing)}')
+          for rel in missing: print(rel+' :: '+','.join(sorted(refs[rel])))
+          assert not missing, missing
+          PY
+
+      - name: Verify JavaScript syntax
+        run: |
+          count=0
+          while IFS= read -r -d '' file; do
+            node --check "$file" >/dev/null
+            count=$((count+1))
+          done < <(find app/web/static -type f -name '*.js' -print0)
+          echo JS_SYNTAX_OK=$count
+
+      - name: Confirm AWG3-free active tree
+        run: |
+          ! grep -RInE --exclude-dir=.git 'amneziawg3|AWG3|awg3' app hostd engines deploy install.sh
+          echo AWG3_ACTIVE_REFERENCES=0
