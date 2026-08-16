@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import ipaddress
 import json
 import secrets as pysecrets
@@ -15,6 +16,7 @@ AWG3_PORT = 586
 AWG3_CONFIG = Path("/etc/amnezia/amneziawg/awg3.conf")
 AWG3_SERVICE = "sg-gateway-awg3.service"
 AWG3_SUBNET = "10.67.0.0/16"
+AWG3_IPV6_SUBNET_ID = 3
 AWG3_ROOT = Path("/opt/sg-gateway/awg3")
 AWG3_AWG = AWG3_ROOT / "bin/awg"
 AWG3_AWG_QUICK = AWG3_ROOT / "bin/awg-quick"
@@ -49,18 +51,101 @@ def _run_awg(args: list[str], *, input_text: str | None = None, timeout: int = 3
     return cr._run([_tool(AWG3_AWG), *args], input_text=input_text, timeout=timeout)
 
 
+def _address_values(value: str) -> list[str]:
+    return [part.strip() for part in str(value or "").split(",") if part.strip()]
+
+
 def _normalise_address(device_id: int, value: str) -> str:
-    raw = str(value or "").strip()
-    try:
-        interface = ipaddress.ip_interface(raw)
-        if interface.version == 4 and interface.ip in ipaddress.ip_network(AWG3_SUBNET):
-            return str(interface)
-    except ValueError:
-        pass
+    """Keep the frozen AWG3 IPv4 allocation contract."""
+    for raw in _address_values(value):
+        try:
+            interface = ipaddress.ip_interface(raw)
+            if interface.version == 4 and interface.ip in ipaddress.ip_network(AWG3_SUBNET):
+                return str(interface)
+        except ValueError:
+            continue
     slot = max(1, int(device_id))
     third = min(254, slot // 250)
     fourth = 2 + (slot % 250)
     return f"10.67.{third}.{fourth}/32"
+
+
+def _dual_stack_enabled() -> bool:
+    runtime = cr._read_env(cr.RUNTIME_ENV)
+    raw = str(runtime.get("SG_GATEWAY_PUBLIC_IPV6") or "").strip()
+    try:
+        address = ipaddress.ip_address(raw)
+    except ValueError:
+        return False
+    return address.version == 6 and address.is_global
+
+
+def _ipv6_network(server_public_key: str) -> ipaddress.IPv6Network:
+    """Derive one stable RFC4193 /64 from this AWG3 server identity."""
+    material = f"SG-Gateway:{ENGINE}:{server_public_key}".encode("utf-8")
+    global_id = int.from_bytes(hashlib.sha256(material).digest()[:5], "big")
+    network_value = (
+        (0xFD << 120)
+        | (global_id << 80)
+        | (AWG3_IPV6_SUBNET_ID << 64)
+    )
+    return ipaddress.IPv6Network((network_value, 64))
+
+
+def _normalise_ipv6_address(
+    device_id: int,
+    value: str,
+    network: ipaddress.IPv6Network,
+) -> str:
+    for raw in _address_values(value):
+        try:
+            interface = ipaddress.ip_interface(raw)
+            if interface.version == 6 and interface.ip in network:
+                return f"{interface.ip}/128"
+        except ValueError:
+            continue
+    slot = max(1, int(device_id))
+    address = ipaddress.IPv6Address(int(network.network_address) + slot + 1)
+    return f"{address}/128"
+
+
+def _normalise_addresses(
+    device_id: int,
+    value: str,
+    network: ipaddress.IPv6Network | None,
+) -> str:
+    ipv4 = _normalise_address(device_id, value)
+    if network is None:
+        return ipv4
+    ipv6 = _normalise_ipv6_address(device_id, value, network)
+    return f"{ipv4}, {ipv6}"
+
+
+def _peer_allowed_ips(value: str) -> str:
+    result: list[str] = []
+    for raw in _address_values(value):
+        try:
+            interface = ipaddress.ip_interface(raw)
+        except ValueError:
+            continue
+        suffix = 32 if interface.version == 4 else 128
+        result.append(f"{interface.ip}/{suffix}")
+    return ", ".join(result)
+
+
+def _format_endpoint(host: str, port: int) -> str:
+    value = str(host or "").strip()
+    if not value:
+        return ""
+    if value.startswith("[") and value.endswith("]"):
+        value = value[1:-1]
+    try:
+        address = ipaddress.ip_address(value)
+    except ValueError:
+        formatted = value
+    else:
+        formatted = f"[{address.compressed}]" if address.version == 6 else str(address)
+    return f"{formatted}:{int(port)}"
 
 
 def _derive_public(private_key: str) -> str:
@@ -155,7 +240,6 @@ def _ensure_server_secrets() -> dict[str, str]:
     return secrets
 
 
-
 def _values(secrets: dict[str, str]) -> dict[str, object]:
     result: dict[str, object] = {}
     for name in ("jc", "jmin", "jmax", "s1", "s2", "s3", "s4"):
@@ -200,6 +284,7 @@ def _repair_configs(secrets: dict[str, str]) -> None:
     runtime = cr._read_env(cr.RUNTIME_ENV)
     public_address = str(runtime.get("SG_GATEWAY_PUBLIC_ADDRESS") or "").strip()
     server_public = str(secrets.get("SG_GATEWAY_AWG3_PUBLIC_KEY") or "").strip()
+    ipv6_network = _ipv6_network(server_public) if _dual_stack_enabled() else None
     values = _values(secrets)
     with cr.connect() as connection:
         rows = connection.execute(
@@ -222,14 +307,16 @@ def _repair_configs(secrets: dict[str, str]) -> None:
                 "client_name": str(row["client_name"]),
                 "private_key": private_key,
                 "public_key": public_key,
-                "address": _normalise_address(device_id, str(config.get("address") or "")),
+                "address": _normalise_addresses(device_id, str(config.get("address") or ""), ipv6_network),
                 "dns": settings.config.get("dns", "1.1.1.1"),
                 "server_public_key": server_public,
-                "endpoint": f"{settings.host or public_address}:{AWG3_PORT}",
+                "endpoint": _format_endpoint(str(settings.host or public_address), AWG3_PORT),
                 "port": AWG3_PORT,
                 "allowed_ips": settings.config.get("allowed_ips", "0.0.0.0/0, ::/0"),
                 "persistent_keepalive": AWG3_DEFAULTS["persistent_keepalive"],
                 "generation": 3,
+                "dual_stack": ipv6_network is not None,
+                "ipv6_network": str(ipv6_network) if ipv6_network is not None else "",
                 **values,
             })
             connection.execute(
@@ -241,13 +328,39 @@ def _repair_configs(secrets: dict[str, str]) -> None:
 
 def _render(rows, secrets: dict[str, str]) -> str:
     server_private = str(secrets.get("SG_GATEWAY_AWG3_PRIVATE_KEY") or "").strip()
+    server_public = str(secrets.get("SG_GATEWAY_AWG3_PUBLIC_KEY") or "").strip()
     if not server_private:
         raise cr.ClientRuntimeError("AWG3: серверный приватный ключ отсутствует")
     values = _values(secrets)
     external_interface = cr._default_interface()
+    ipv6_network = _ipv6_network(server_public) if _dual_stack_enabled() else None
+    server_address = "10.67.0.1/16"
+    if ipv6_network is not None:
+        server_ipv6 = ipaddress.IPv6Address(int(ipv6_network.network_address) + 1)
+        server_address = f"{server_address}, {server_ipv6}/64"
+
+    post_up = (
+        "PostUp = nft delete table ip sg_gateway_awg3 2>/dev/null || true; "
+        "nft add table ip sg_gateway_awg3; "
+        "nft 'add chain ip sg_gateway_awg3 forward { type filter hook forward priority filter; policy accept; }'; "
+        "nft 'add chain ip sg_gateway_awg3 postrouting { type nat hook postrouting priority srcnat; policy accept; }'; "
+        f"nft add rule ip sg_gateway_awg3 postrouting oifname \"{external_interface}\" ip saddr 10.67.0.0/16 masquerade"
+    )
+    post_down = "PostDown = nft delete table ip sg_gateway_awg3 2>/dev/null || true"
+    if ipv6_network is not None:
+        post_up += (
+            "; sysctl -w net.ipv6.conf.all.forwarding=1 >/dev/null; "
+            "nft delete table ip6 sg_gateway_awg3 2>/dev/null || true; "
+            "nft add table ip6 sg_gateway_awg3; "
+            "nft 'add chain ip6 sg_gateway_awg3 forward { type filter hook forward priority filter; policy accept; }'; "
+            "nft 'add chain ip6 sg_gateway_awg3 postrouting { type nat hook postrouting priority srcnat; policy accept; }'; "
+            f"nft add rule ip6 sg_gateway_awg3 postrouting oifname \"{external_interface}\" ip6 saddr {ipv6_network} masquerade"
+        )
+        post_down += "; nft delete table ip6 sg_gateway_awg3 2>/dev/null || true"
+
     lines = [
         "[Interface]",
-        "Address = 10.67.0.1/16",
+        f"Address = {server_address}",
         f"ListenPort = {AWG3_PORT}",
         f"PrivateKey = {server_private}",
         f"Jc = {values['jc']}", f"Jmin = {values['jmin']}", f"Jmax = {values['jmax']}",
@@ -260,24 +373,22 @@ def _render(rows, secrets: dict[str, str]) -> str:
         f"RejectAfterTime = {values['reject_after_time']}",
         f"KeepaliveTimeout = {values['keepalive_timeout']}",
         f"MaxHandshakeAttempts = {values['max_handshake_attempts']}",
-        (
-            "PostUp = nft delete table ip sg_gateway_awg3 2>/dev/null || true; "
-            "nft add table ip sg_gateway_awg3; "
-            "nft 'add chain ip sg_gateway_awg3 forward { type filter hook forward priority filter; policy accept; }'; "
-            "nft 'add chain ip sg_gateway_awg3 postrouting { type nat hook postrouting priority srcnat; policy accept; }'; "
-            f"nft add rule ip sg_gateway_awg3 postrouting oifname \"{external_interface}\" ip saddr 10.67.0.0/16 masquerade"
-        ),
-        "PostDown = nft delete table ip sg_gateway_awg3 2>/dev/null || true",
+        post_up,
+        post_down,
         "",
     ]
     for row in rows:
         config = cr._json(row["config_json"])
         public_key = str(config.get("public_key") or "").strip()
-        address = _normalise_address(int(row["client_id"]), str(config.get("address") or ""))
+        address = _normalise_addresses(
+            int(row["client_id"]),
+            str(config.get("address") or ""),
+            ipv6_network,
+        )
         if not public_key:
             raise cr.ClientRuntimeError(f"AWG3: отсутствует public key клиента {row['client_name']}")
-        peer_ip = str(ipaddress.ip_interface(address).ip)
-        lines.extend(["[Peer]", f"# {row['client_name']} · device {row['client_id']}", f"PublicKey = {public_key}", f"AllowedIPs = {peer_ip}/32", ""])
+        allowed_ips = _peer_allowed_ips(address)
+        lines.extend(["[Peer]", f"# {row['client_name']} · device {row['client_id']}", f"PublicKey = {public_key}", f"AllowedIPs = {allowed_ips}", ""])
     return "\n".join(lines).rstrip() + "\n"
 
 
