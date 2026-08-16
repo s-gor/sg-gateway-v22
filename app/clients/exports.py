@@ -18,6 +18,7 @@ from app.config import load_config
 from app.connections.settings import get_connection_settings
 from app.connections.public_endpoint import public_host, working_tls_domain
 from app.mihomo.service import build_device_yaml
+from app.net import format_host, format_host_port
 
 from app.security.tls import overview as tls_overview
 from app.xray.profiles import REALITY_TCP_FLOW, overview as xray_profiles_overview
@@ -84,12 +85,7 @@ def _public_export_host(*fallbacks: object) -> str:
 
 
 def _format_endpoint(host: str, port: int) -> str:
-    value = str(host or "").strip()
-    if not value:
-        return ""
-    if ":" in value and not value.startswith("["):
-        value = f"[{value}]"
-    return f"{value}:{int(port)}"
+    return format_host_port(host, port)
 
 
 def is_export_ready(
@@ -398,7 +394,8 @@ def build_xray_profile_link(
                     separators=(",", ":"),
                 )
             query = urlencode(query_values)
-            body = f"vless://{user_id}@{host}:{profile.port}?{query}#{safe_name}"
+            endpoint = format_host_port(host, profile.port)
+            body = f"vless://{user_id}@{endpoint}?{query}#{safe_name}"
     elif profile_id == "hysteria2":
         domain = _working_tls_domain() or str(state.get("tls_domain") or "")
         auth = str(config.get("hysteria_auth") or user_id)
@@ -408,6 +405,7 @@ def build_xray_profile_link(
         }
         obfs_mode = str(server_config.get("hysteria2_obfs_mode") or "none").strip().lower()
         obfs_password = str(server_config.get("hysteria2_obfs_password") or "").strip()
+        endpoint = format_host_port(host, profile.port)
         if obfs_mode in {"salamander", "gecko"}:
             if not obfs_password:
                 body = ""
@@ -418,13 +416,13 @@ def build_xray_profile_link(
                 if scheme not in {"hysteria2", "hy2"}:
                     scheme = "hysteria2"
                 query = urlencode(query_values)
-                body = f"{scheme}://{quote(auth, safe='')}@{host}:{profile.port}/?{query}#{safe_name}"
+                body = f"{scheme}://{quote(auth, safe='')}@{endpoint}/?{query}#{safe_name}"
         else:
             scheme = str(server_config.get("hysteria2_uri_scheme") or "hysteria2").strip().lower()
             if scheme not in {"hysteria2", "hy2"}:
                 scheme = "hysteria2"
             query = urlencode(query_values)
-            body = f"{scheme}://{quote(auth, safe='')}@{host}:{profile.port}/?{query}#{safe_name}"
+            body = f"{scheme}://{quote(auth, safe='')}@{endpoint}/?{query}#{safe_name}"
     else:
         body = ""
 
@@ -448,6 +446,7 @@ def build_mieru_link(client: Client, device: Device | None = None) -> ClientExpo
     username = quote(str(mieru.get("username") or ""), safe="")
     password = quote(str(mieru.get("password") or ""), safe="")
     host = _public_export_host(settings.host)
+    authority_host = format_host(host)
     port = int(settings.config.get("mieru_port", settings.port or 2099))
     transport = str(settings.config.get("mieru_transport", "TCP")).upper()
     multiplexing = str(settings.config.get("mieru_multiplexing", "MULTIPLEXING_LOW"))
@@ -461,7 +460,7 @@ def build_mieru_link(client: Client, device: Device | None = None) -> ClientExpo
             "handshake-mode": handshake,
         }
     )
-    body = f"mierus://{username}:{password}@{host}?{query}#{quote(_label(client, device), safe='')}"
+    body = f"mierus://{username}:{password}@{authority_host}?{query}#{quote(_label(client, device), safe='')}"
     return ClientExport(
         filename=f"sg-gateway-{_slug(client, device)}-mieru.txt",
         media_type="text/plain; charset=utf-8",
@@ -519,6 +518,7 @@ def build_mihomo_yaml(client: Client, device: Device | None = None) -> ClientExp
 def build_anytls_link(client: Client, device: Device | None = None) -> ClientExport:
     config = _deployment_config(client, "anytls", device)
     host = _public_export_host(config.get("host", ""))
+    endpoint = format_host_port(host, int(config.get("port", 9443)))
     tls_domain = _working_tls_domain() or str(config.get("server_name") or "")
     safe_name = quote(f"{_label(client, device)} · AnyTLS", safe="")
     query = urlencode(
@@ -531,7 +531,7 @@ def build_anytls_link(client: Client, device: Device | None = None) -> ClientExp
     )
     body = (
         f"anytls://{quote(str(config.get('password') or ''), safe='')}"
-        f"@{host}:{config.get('port', 9443)}?{query}#{safe_name}"
+        f"@{endpoint}?{query}#{safe_name}"
     )
     return ClientExport(
         filename=f"sg-gateway-{_slug(client, device)}-anytls.txt",
@@ -543,6 +543,7 @@ def build_anytls_link(client: Client, device: Device | None = None) -> ClientExp
 def build_tuic_link(client: Client, device: Device | None = None) -> ClientExport:
     config = _deployment_config(client, "tuic", device)
     host = _public_export_host(config.get("host", ""))
+    endpoint = format_host_port(host, int(config.get("port", 10443)))
     tls_domain = _working_tls_domain() or str(config.get("server_name") or "")
     safe_name = quote(f"{_label(client, device)} · TUIC v5", safe="")
     query = urlencode(
@@ -556,7 +557,7 @@ def build_tuic_link(client: Client, device: Device | None = None) -> ClientExpor
     body = (
         f"tuic://{config.get('uuid', '')}:"
         f"{quote(str(config.get('password') or ''), safe='')}"
-        f"@{host}:{config.get('port', 10443)}?{query}#{safe_name}"
+        f"@{endpoint}?{query}#{safe_name}"
     )
     return ClientExport(
         filename=f"sg-gateway-{_slug(client, device)}-tuic-v5.txt",
@@ -645,11 +646,11 @@ def _subscription_base_url() -> str:
         return public_url.rstrip("/")
 
     config = load_config()
-    address = str(config.public_address or "").strip()
+    address = str(config.public_address or config.public_ipv4 or config.public_ipv6 or "").strip()
     if address:
         if address.startswith(("http://", "https://")):
             return address.rstrip("/")
-        host = f"[{address}]" if ":" in address and not address.startswith("[") else address
+        host = format_host(address)
         suffix = "" if int(config.public_port) == 80 else f":{int(config.public_port)}"
         return f"http://{host}{suffix}"
 
