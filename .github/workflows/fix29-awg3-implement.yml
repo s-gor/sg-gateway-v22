@@ -1,0 +1,836 @@
+name: implement Fix29 isolated AWG3 dual runtime
+
+on:
+  push:
+    branches: [audit-v22-prepublish]
+
+permissions:
+  contents: write
+
+jobs:
+  implement:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact Fix29 branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix29-awg3-dual
+          fetch-depth: 0
+
+      - name: Guard clean Fix28 base
+        run: |
+          test "$(git rev-parse HEAD)" = "04345198231bbe3eb75d9061b879887a0f9cecfd"
+          test "$(git rev-parse HEAD^{tree})" = "b9a4cb7b4ae5f2f80e81749b03220de3f4082d00"
+
+      - name: Import only historical AWG3 userspace media
+        run: |
+          git clone -q --no-checkout https://github.com/s-gor/sg-gateway.git /tmp/old
+          git -C /tmp/old fetch -q --depth=1 origin 816804dfae23fc854444bc274c254b9e47efaed2
+          git -C /tmp/old checkout -q --detach FETCH_HEAD
+
+          cp /tmp/old/vendor/cores/amneziawg-tools-3.0.20260805.tar.gz vendor/cores/
+          cp /tmp/old/vendor/cores/amneziawg-go-linux-amd64-v3.0.0 vendor/cores/
+          cp /tmp/old/hostd/sg_hostd/awg3_runtime.py hostd/sg_hostd/awg3_runtime.py
+          cp /tmp/old/deploy/sg-gateway-awg3-userspace.sh deploy/sg-gateway-awg3-userspace.sh
+          cp /tmp/old/deploy/sg-gateway-awg3.service deploy/sg-gateway-awg3.service
+          chmod 0755 vendor/cores/amneziawg-go-linux-amd64-v3.0.0 deploy/sg-gateway-awg3-userspace.sh
+
+          echo '090f9383532822a756d078890b447e00af7f46bd30a10f9f47c46d633d807b19  vendor/cores/amneziawg-tools-3.0.20260805.tar.gz' | sha256sum -c -
+          echo '131110027db6d5dc0e35b19eb5b8a2692676081366c34112088dc68bbb050bcd  vendor/cores/amneziawg-go-linux-amd64-v3.0.0' | sha256sum -c -
+          test ! -e vendor/cores/amneziawg-linux-kernel-module-3.0.20260805.tar.gz
+
+      - name: Apply one atomic dual-AWG product patch
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import json, re
+
+          def read(path):
+              return Path(path).read_text(encoding='utf-8')
+
+          def write(path, text):
+              Path(path).write_text(text, encoding='utf-8', newline='\n')
+
+          def replace(path, old, new, count=1):
+              text=read(path)
+              actual=text.count(old)
+              if actual < count:
+                  raise SystemExit(f'{path}: expected at least {count} occurrences, found {actual}: {old[:120]!r}')
+              text=text.replace(old,new,count)
+              write(path,text)
+
+          # Product constants: frozen AWG2 + independent AWG3.
+          replace('app/constants.py',
+                  'AMNEZIAWG_UDP_PORT = 585',
+                  'AMNEZIAWG_UDP_PORT = 585\n\n# SG-Gateway AWG3 is a separate userspace transport and never replaces AWG2.\nAMNEZIAWG3_UDP_PORT = 586')
+
+          # Database: a fourth connection row; AWG2 migration remains untouched.
+          replace('app/db.py',
+                  'from app.constants import AMNEZIAWG_UDP_PORT',
+                  'from app.constants import AMNEZIAWG3_UDP_PORT, AMNEZIAWG_UDP_PORT')
+          replace('app/db.py',
+                  '    "xray": {',
+                  '''    "amneziawg3": {
+        "host": "",
+        "port": AMNEZIAWG3_UDP_PORT,
+        "config_json": (
+            '{"dns":"1.1.1.1","country_code":"nl","server_public_key":"PLACEHOLDER_AWG3_SERVER_PUBLIC_KEY",'
+            '"allowed_ips":"0.0.0.0/0, ::/0","persistent_keepalive":"25-35","generation":3}'
+        ),
+    },
+    "xray": {''')
+
+          # Connection settings enforce both product ports independently.
+          replace('app/connections/settings.py',
+                  'from app.constants import AMNEZIAWG_UDP_PORT',
+                  'from app.constants import AMNEZIAWG3_UDP_PORT, AMNEZIAWG_UDP_PORT')
+          replace('app/connections/settings.py',
+                  '    clean_port = AMNEZIAWG_UDP_PORT if engine == "amneziawg" else _clean_port(port)',
+                  '''    if engine == "amneziawg":
+        clean_port = AMNEZIAWG_UDP_PORT
+    elif engine == "amneziawg3":
+        clean_port = AMNEZIAWG3_UDP_PORT
+    else:
+        clean_port = _clean_port(port)''')
+
+          # Keep existing Connections indexes 0/1/2 stable; append AWG3 as fourth summary.
+          text=read('app/connections/service.py')
+          text=text.replace('    mihomo = get_connection_settings("mihomo")\n',
+                            '    mihomo = get_connection_settings("mihomo")\n    awg3 = get_connection_settings("amneziawg3")\n',1)
+          text=text.replace('    mihomo_public_host = public_host(mihomo.host)\n',
+                            '    mihomo_public_host = public_host(mihomo.host)\n    awg3_public_host = public_host(awg3.host)\n',1)
+          marker='''        ConnectionSummary(
+            name="mihomo",
+            label="Mihomo Multi-Protocol",'''
+          if marker not in text:
+              raise SystemExit('connections service Mihomo marker missing')
+          end=text.rfind('    ]')
+          if end < 0:
+              raise SystemExit('connections service return list end missing')
+          awg3='''        ConnectionSummary(
+            name="amneziawg3",
+            label="AmneziaWG 3",
+            status="Configured" if awg3.enabled else "Disabled",
+            port=f"UDP {awg3.port}",
+            clients=counts.get("amneziawg3", 0),
+            note=f"Адрес: {awg3_public_host}:{awg3.port}",
+            country_code=_country_for(awg3),
+            country_name=country_name(_country_for(awg3)),
+            public_host=awg3_public_host,
+        ),
+'''
+          text=text[:end]+awg3+text[end:]
+          write('app/connections/service.py',text)
+
+          # Isolated client key generation: AWG3 can never call global /usr/bin/awg.
+          replace('app/engines/provisioning.py',
+                  'TUIC_PORT = 10443\n',
+                  'TUIC_PORT = 10443\nAWG3_AWG = "/opt/sg-gateway/awg3/bin/awg"\n')
+          replace('app/engines/provisioning.py',
+                  '''def _tls_endpoint() -> tuple[str, str]:''',
+                  '''def _awg3_keypair() -> tuple[str, str]:
+    private_key = _run([AWG3_AWG, "genkey"])
+    public_key = _run([AWG3_AWG, "pubkey"], private_key + "\\n")
+    return private_key, public_key
+
+
+def _tls_endpoint() -> tuple[str, str]:''')
+          replace('app/engines/provisioning.py',
+                  '    if engine == "xray":\n',
+                  '''    if engine == "amneziawg3":
+        settings = get_connection_settings(engine)
+        private_key, public_key = _awg3_keypair()
+        payload = {
+            "client_name": access_name,
+            "private_key": private_key,
+            "public_key": public_key,
+            "address": f"10.67.{min(254, access_id // 250)}.{2 + (access_id % 250)}/32",
+            "dns": settings.config.get("dns", "1.1.1.1"),
+            "server_public_key": settings.config.get("server_public_key", ""),
+            "endpoint": f"{settings.host}:{settings.port}",
+            "allowed_ips": settings.config.get("allowed_ips", "0.0.0.0/0, ::/0"),
+            "persistent_keepalive": settings.config.get("persistent_keepalive", "25-35"),
+            "generation": 3,
+        }
+        return public_key, json.dumps(payload, ensure_ascii=False, sort_keys=True)
+
+    if engine == "xray":
+''')
+
+          # Client model: independent AWG2 and AWG3 selections.
+          replace('app/clients/repository.py',
+                  '''SUPPORTED_ENGINES = (
+    "amneziawg",
+    "xray",''',
+                  '''SUPPORTED_ENGINES = (
+    "amneziawg",
+    "amneziawg3",
+    "xray",''')
+          replace('app/clients/repository.py',
+                  'RUNTIME_ENGINES = ("amneziawg", "xray", "mihomo", "anytls", "tuic")',
+                  'RUNTIME_ENGINES = ("amneziawg", "amneziawg3", "xray", "mihomo", "anytls", "tuic")')
+          replace('app/clients/repository.py',
+                  '    awg_status: str\n    xray_status: str',
+                  '    awg_status: str\n    awg3_status: str\n    xray_status: str')
+          replace('app/clients/repository.py',
+                  '        awg_status=_aggregate_status(credentials, "amneziawg"),\n        xray_status=',
+                  '        awg_status=_aggregate_status(credentials, "amneziawg"),\n        awg3_status=_aggregate_status(credentials, "amneziawg3"),\n        xray_status=')
+          replace('app/clients/repository.py',
+                  '            "amneziawg,xray_reality_tcp,xray_xhttp_reality,',
+                  '            "amneziawg,amneziawg3,xray_reality_tcp,xray_xhttp_reality,')
+
+          # AWG3 export contains the complete 3.x userspace profile.
+          replace('app/clients/exports.py',
+                  '\ndef _xray_profile(profile_id: str):',
+                  '''
+def build_awg3_config(client: Client, device: Device | None = None) -> ClientExport:
+    config = _deployment_config(client, "amneziawg3", device)
+    label = _label(client, device)
+    endpoint = str(config.get("endpoint") or "")
+    try:
+        settings = get_connection_settings("amneziawg3")
+        endpoint_host = _public_export_host(settings.host)
+        endpoint_port = int(settings.port or 586)
+        if endpoint_host:
+            endpoint = _format_endpoint(endpoint_host, endpoint_port)
+    except Exception:
+        pass
+    body = f"""# SG-Gateway AmneziaWG 3.0
+# Access: {label}
+
+[Interface]
+PrivateKey = {config.get("private_key", "")}
+Address = {config.get("address", "")}
+DNS = {config.get("dns", "1.1.1.1")}
+Jc = {config.get("jc", "")}
+Jmin = {config.get("jmin", "")}
+Jmax = {config.get("jmax", "")}
+S1 = {config.get("s1", "")}
+S2 = {config.get("s2", "")}
+S3 = {config.get("s3", "")}
+S4 = {config.get("s4", "")}
+H1 = {config.get("h1", "")}
+H2 = {config.get("h2", "")}
+H3 = {config.get("h3", "")}
+H4 = {config.get("h4", "")}
+HeaderProtectionKey = {config.get("header_protection_key", "")}
+ContentPaddingAddition = {config.get("content_padding_addition", "")}
+RekeyAfterTime = {config.get("rekey_after_time", "")}
+RekeyTimeout = {config.get("rekey_timeout", "")}
+RejectAfterTime = {config.get("reject_after_time", "")}
+KeepaliveTimeout = {config.get("keepalive_timeout", "")}
+MaxHandshakeAttempts = {config.get("max_handshake_attempts", "")}
+
+[Peer]
+PublicKey = {config.get("server_public_key", "")}
+Endpoint = {endpoint}
+AllowedIPs = {config.get("allowed_ips", "0.0.0.0/0, ::/0")}
+PersistentKeepalive = {config.get("persistent_keepalive", "25-35")}
+"""
+    return ClientExport(
+        filename=f"sg-gateway-{_slug(client, device)}-amneziawg3.conf",
+        media_type="text/plain; charset=utf-8",
+        body=body,
+    )
+
+
+def _xray_profile(profile_id: str):''')
+          replace('app/clients/exports.py',
+                  '        "amneziawg": "amneziawg",\n',
+                  '        "amneziawg": "amneziawg",\n        "amneziawg3": "amneziawg3",\n')
+          replace('app/clients/exports.py',
+                  '        "amneziawg": build_awg_config,\n',
+                  '        "amneziawg": build_awg_config,\n        "amneziawg3": build_awg3_config,\n')
+
+          # Access cards: display AWG2 and AWG3 separately.
+          replace('app/clients/access.py',
+                  '    build_awg_config,\n',
+                  '    build_awg_config,\n    build_awg3_config,\n')
+          replace('app/clients/access.py',
+                  '                title="AmneziaWG",',
+                  '                title="AmneziaWG 2",')
+          replace('app/clients/access.py',
+                  '\n    xray = deployments.get("xray")\n',
+                  '''
+    awg3 = deployments.get("amneziawg3")
+    if awg3 is not None:
+        status = _status(client, device, awg3)
+        export_url, qr_url = _urls(client, device, "amneziawg3")
+        cards.append(
+            AccessCard(
+                kind="amneziawg3",
+                title="AmneziaWG 3",
+                status=status,
+                description="Отдельный AWG3 userspace-профиль с параметрами 3.0.",
+                primary_action="Скачать конфигурацию",
+                export_url=export_url,
+                qr_url=qr_url,
+                payload=build_awg3_config(client, device).body if status == "applied" else "",
+            )
+        )
+
+    xray = deployments.get("xray")
+''')
+
+          # SG subscription v1 exposes both config profiles independently.
+          replace('app/clients/sg_subscription.py',
+                  '    ("amneziawg", "amneziawg", "amneziawg", "AmneziaWG 2.0", "amneziawg", "config"),\n',
+                  '    ("amneziawg", "amneziawg", "amneziawg", "AmneziaWG 2.0", "amneziawg", "config"),\n    ("amneziawg3", "amneziawg3", "amneziawg3", "AmneziaWG 3.0", "amneziawg", "config"),\n')
+
+          # Seed AWG3 endpoint metadata without auto-assigning AWG3 to sg-admin.
+          replace('app/install_seed.py',
+                  'from app.constants import AMNEZIAWG_UDP_PORT',
+                  'from app.constants import AMNEZIAWG3_UDP_PORT, AMNEZIAWG_UDP_PORT')
+          replace('app/install_seed.py',
+                  '    _save("amneziawg", awg_host, awg_port, awg_config)\n\n    mihomo = get_connection_settings("mihomo")',
+                  '''    _save("amneziawg", awg_host, awg_port, awg_config)
+
+    awg3 = get_connection_settings("amneziawg3")
+    awg3_config = dict(awg3.config)
+    awg3_host = str(awg3.host or "").strip() or awg_host or public_host
+    _country(awg3_config, country)
+    awg3_config.setdefault("allowed_ips", "0.0.0.0/0, ::/0")
+    awg3_config.setdefault("persistent_keepalive", "25-35")
+    awg3_config["generation"] = 3
+    _save("amneziawg3", awg3_host, AMNEZIAWG3_UDP_PORT, awg3_config)
+
+    mihomo = get_connection_settings("mihomo")''')
+
+          # Historical AWG3 runtime, corrected for independent selection and isolated settings.
+          runtime=read('hostd/sg_hostd/awg3_runtime.py')
+          runtime=re.sub(r'\ndef _ensure_credentials\(\) -> None:\n.*?(?=\ndef _values\()', '\n', runtime, flags=re.S)
+          runtime=runtime.replace('cr.get_connection_settings("amneziawg")','cr.get_connection_settings("amneziawg3")')
+          runtime=runtime.replace('AWG3_AWG_QUICK = AWG3_ROOT / "bin/awg-quick"\n',
+                                  'AWG3_AWG_QUICK = AWG3_ROOT / "bin/awg-quick"\nAWG3_GO = AWG3_ROOT / "bin/amneziawg-go"\nAWG3_HELPER = Path("/opt/sg-gateway/deploy/sg-gateway-awg3-userspace.sh")\n')
+          runtime=runtime.replace('def _ensure_server_secrets() -> dict[str, str]:\n',
+                                  '''def _sync_connection_public_key(public_key: str) -> None:
+    settings = cr.get_connection_settings(ENGINE)
+    config = dict(settings.config)
+    config["server_public_key"] = public_key
+    config["generation"] = 3
+    runtime = cr._read_env(cr.RUNTIME_ENV)
+    host = str(settings.host or runtime.get("SG_GATEWAY_PUBLIC_ADDRESS") or "").strip()
+    if not host or not cr.update_connection_settings(ENGINE, host, AWG3_PORT, config):
+        raise cr.ClientRuntimeError("AWG3: не удалось синхронизировать серверный public key")
+
+
+def _ensure_server_secrets() -> dict[str, str]:
+''')
+          runtime=runtime.replace('''    if all(str(secrets.get(name) or "").strip() for name in required):
+        return secrets
+''','''    if all(str(secrets.get(name) or "").strip() for name in required):
+        _sync_connection_public_key(str(secrets["SG_GATEWAY_AWG3_PUBLIC_KEY"]).strip())
+        return secrets
+''')
+          runtime=runtime.replace('''    _set_env_values(cr.ENGINE_SECRETS, values)
+    return cr._read_env(cr.ENGINE_SECRETS)
+''','''    _set_env_values(cr.ENGINE_SECRETS, values)
+    secrets = cr._read_env(cr.ENGINE_SECRETS)
+    _sync_connection_public_key(public_key)
+    return secrets
+''')
+          runtime=runtime.replace('''def apply_awg3() -> cr.EngineResult:
+    _tool(AWG3_AWG)
+    _tool(AWG3_AWG_QUICK)
+    _ensure_credentials()
+''','''def apply_awg3() -> cr.EngineResult:
+    _tool(AWG3_AWG)
+    _tool(AWG3_AWG_QUICK)
+    _tool(AWG3_GO)
+    if not AWG3_HELPER.is_file():
+        raise cr.ClientRuntimeError(f"AWG3 runtime helper missing: {AWG3_HELPER}")
+''')
+          runtime=runtime.replace('''        cr._atomic_write(AWG3_CONFIG, body, 0o600)
+        cr._run(["systemctl", "restart", AWG3_SERVICE], timeout=90)
+''','''        cr._atomic_write(AWG3_CONFIG, body, 0o600)
+        cr._run(["systemctl", "daemon-reload"], timeout=30)
+        cr._run(["systemctl", "enable", AWG3_SERVICE], timeout=30)
+        cr._run(["systemctl", "restart", AWG3_SERVICE], timeout=90)
+''')
+          runtime=runtime.replace('''        AWG3_CONFIG.is_file()
+        and AWG3_AWG.is_file()
+''','''        AWG3_CONFIG.is_file()
+        and AWG3_AWG.is_file()
+        and AWG3_AWG_QUICK.is_file()
+        and AWG3_GO.is_file()
+''')
+          if '_ensure_credentials' in runtime:
+              raise SystemExit('historical AWG3 auto-credential logic still present')
+          write('hostd/sg_hostd/awg3_runtime.py',runtime)
+
+          # Ensure awg-quick resolves AWG3 awg, never the global AWG2 binary.
+          helper=read('deploy/sg-gateway-awg3-userspace.sh')
+          helper=helper.replace('BASE_DIR="/opt/sg-gateway/awg3"\n',
+                                'BASE_DIR="/opt/sg-gateway/awg3"\nexport PATH="$BASE_DIR/bin:$PATH"\n',1)
+          write('deploy/sg-gateway-awg3-userspace.sh',helper)
+
+          # Main client runtime treats a selected AWG3 profile transactionally.
+          replace('hostd/sg_hostd/client_runtime.py',
+                  '''        critical_results = [
+            _apply_awg(),
+            _apply_xray(),
+        ]''',
+                  '''        from sg_hostd.awg3_runtime import apply_awg3
+
+        critical_results = [
+            _apply_awg(),
+            apply_awg3(),
+            _apply_xray(),
+        ]''')
+          replace('hostd/sg_hostd/client_runtime.py',
+                  'Client catalogue operations are committed when AmneziaWG and Xray are\n    healthy.',
+                  'Client catalogue operations are committed when selected AWG2/AWG3 and Xray are\n    healthy.')
+
+          # Flask routes and exports.
+          replace('app/main.py','    build_awg_config,\n','    build_awg_config,\n    build_awg3_config,\n')
+          replace('app/main.py',
+                  '            awg_settings=get_connection_settings("amneziawg"),\n',
+                  '            awg_settings=get_connection_settings("amneziawg"),\n            awg3_settings=get_connection_settings("amneziawg3"),\n')
+          main=read('app/main.py')
+          xray_route='    @app.post("/connections/xray")\n'
+          pos=main.find(xray_route)
+          if pos < 0:
+              raise SystemExit('xray route marker missing')
+          awg3_route='''    @app.post("/connections/amneziawg3")
+    def update_amneziawg3():
+        current = get_connection_settings("amneziawg3")
+        config = dict(current.config)
+        config["dns"] = request.form.get("dns", config.get("dns", "1.1.1.1"))
+        config["server_public_key"] = request.form.get(
+            "server_public_key", config.get("server_public_key", "")
+        )
+        config["generation"] = 3
+        updated = update_connection_settings(
+            "amneziawg3",
+            request.form.get("host", current.host),
+            request.form.get("port", str(current.port)),
+            config,
+        )
+        flash(
+            "Настройки AmneziaWG 3 сохранены."
+            if updated
+            else "Настройки AmneziaWG 3 не применены. Проверьте адрес.",
+            "success" if updated else "error",
+        )
+        return redirect(url_for("connections"))
+
+'''
+          main=main[:pos]+awg3_route+main[pos:]
+          main=main.replace('        "amneziawg": build_awg_config,\n',
+                            '        "amneziawg": build_awg_config,\n        "amneziawg3": build_awg3_config,\n')
+          write('app/main.py',main)
+
+          # Installer: AWG2 remains frozen 1.x; AWG3 installs only to /opt userspace.
+          install=read('install.sh')
+          install=install.replace('AMNEZIAWG_DKMS_VERSION="1.0.0"\n',
+                                  'AMNEZIAWG_DKMS_VERSION="1.0.0"\nAWG3_TOOLS_VERSION="3.0.20260805"\nAWG3_GO_VERSION="v3.0.0"\n')
+          install=install.replace('AWG_KMOD_VENDOR_FILE="amneziawg-linux-kernel-module-1.0.20260329-2.tar.gz"\n',
+                                  'AWG_KMOD_VENDOR_FILE="amneziawg-linux-kernel-module-1.0.20260329-2.tar.gz"\nAWG3_TOOLS_VENDOR_FILE="amneziawg-tools-3.0.20260805.tar.gz"\nAWG3_GO_VENDOR_FILE="amneziawg-go-linux-amd64-v3.0.0"\n')
+          install=install.replace('DEFAULT_AWG_PORT="585"\n',
+                                  'DEFAULT_AWG_PORT="585"\nDEFAULT_AWG3_PORT="586"\n')
+          install=install.replace('  etc/systemd/system/sg-gateway-awg.service\n',
+                                  '  etc/systemd/system/sg-gateway-awg.service\n  etc/systemd/system/sg-gateway-awg3.service\n')
+          install=install.replace('    "$AWG_KMOD_VENDOR_FILE"; do',
+                                  '    "$AWG_KMOD_VENDOR_FILE" \\\n    "$AWG3_TOOLS_VENDOR_FILE" \\\n    "$AWG3_GO_VENDOR_FILE"; do')
+          install=install.replace('  tar -tzf "$VENDOR_CORES_DIR/$AWG_KMOD_VENDOR_FILE" >/dev/null\n  echo "[SG-Gateway] Vendor core set: OK (6/6, linux/amd64)"',
+                                  '  tar -tzf "$VENDOR_CORES_DIR/$AWG_KMOD_VENDOR_FILE" >/dev/null\n  tar -tzf "$VENDOR_CORES_DIR/$AWG3_TOOLS_VENDOR_FILE" >/dev/null\n  test -s "$VENDOR_CORES_DIR/$AWG3_GO_VENDOR_FILE"\n  echo "[SG-Gateway] Vendor core set: OK (8/8, linux/amd64)"')
+          anchor='\nxray_installed_version() {'
+          pos=install.find(anchor)
+          if pos < 0:
+              raise SystemExit('installer xray anchor missing')
+          awg3_installer='''
+
+install_amneziawg3_userspace_from_vendor() {
+  local tools_archive temp tools_src jobs
+  tools_archive="$VENDOR_CORES_DIR/$AWG3_TOOLS_VENDOR_FILE"
+  temp="$(mktemp -d)"
+  tar -xzf "$tools_archive" -C "$temp"
+  tools_src="$(find "$temp" -maxdepth 1 -type d -name 'amneziawg-tools-*' -print -quit)"
+  [[ -n "$tools_src" ]] || {
+    rm -rf "$temp"
+    echo "AWG3 tools source directory not found in vendor archive" >&2
+    return 1
+  }
+
+  jobs="$(nproc 2>/dev/null || echo 1)"
+  rm -rf "$PREFIX/awg3"
+  install -d -m 0755 "$PREFIX/awg3/bin"
+  echo "AmneziaWG 3 tools ${AWG3_TOOLS_VERSION}: изолированная userspace-сборка"
+  make -C "$tools_src/src" PLATFORM=linux -j"$jobs"
+  make -C "$tools_src/src" \\
+    PLATFORM=linux WITH_WGQUICK=yes WITH_BASHCOMPLETION=no WITH_SYSTEMDUNITS=no \\
+    PREFIX="$PREFIX/awg3" install
+  install -m 0755 "$VENDOR_CORES_DIR/$AWG3_GO_VENDOR_FILE" "$PREFIX/awg3/bin/amneziawg-go"
+  [[ -x "$PREFIX/awg3/bin/awg" ]]
+  [[ -x "$PREFIX/awg3/bin/awg-quick" ]]
+  [[ -x "$PREFIX/awg3/bin/amneziawg-go" ]]
+  "$PREFIX/awg3/bin/awg" --version
+  rm -rf "$temp"
+  echo "AmneziaWG 3 userspace ${AWG3_GO_VERSION}: готов; AWG2 runtime не изменён"
+}
+'''
+          install=install[:pos]+awg3_installer+install[pos:]
+          old_stage='''  echo "[Engine 1/5] AmneziaWG tools ${AMNEZIAWG_TOOLS_VERSION} / kernel ${AMNEZIAWG_KMOD_VERSION}"
+  install_amneziawg_from_vendor
+
+  echo "[Engine 2/5] Xray ${XRAY_REQUIRED_VERSION}"'''
+          new_stage='''  echo "[Engine 1/6] AmneziaWG 2 tools ${AMNEZIAWG_TOOLS_VERSION} / kernel ${AMNEZIAWG_KMOD_VERSION}"
+  install_amneziawg_from_vendor
+
+  echo "[Engine 2/6] AmneziaWG 3 userspace ${AWG3_TOOLS_VERSION} / ${AWG3_GO_VERSION}"
+  install_amneziawg3_userspace_from_vendor
+
+  echo "[Engine 3/6] Xray ${XRAY_REQUIRED_VERSION}"'''
+          if old_stage not in install:
+              raise SystemExit('installer engine stage anchor missing')
+          install=install.replace(old_stage,new_stage,1)
+          install=install.replace('[Engine 3/5] Mihomo','[Engine 4/6] Mihomo',1)
+          install=install.replace('[Engine 4/5] sing-box','[Engine 5/6] sing-box',1)
+          install=install.replace('[Engine 5/5] WARP','[Engine 6/6] WARP',1)
+          install=install.replace('  install -m 0644 "$PREFIX/deploy/sg-gateway-awg.service" /etc/systemd/system/sg-gateway-awg.service\n',
+                                  '  install -m 0644 "$PREFIX/deploy/sg-gateway-awg.service" /etc/systemd/system/sg-gateway-awg.service\n  install -m 0644 "$PREFIX/deploy/sg-gateway-awg3.service" /etc/systemd/system/sg-gateway-awg3.service\n')
+          install=install.replace('systemctl disable sg-gateway-awg.service sg-gateway-singbox.service',
+                                  'systemctl disable sg-gateway-awg.service sg-gateway-awg3.service sg-gateway-singbox.service')
+          install=install.replace('"${AWG_PORT}/udp" "${HYSTERIA2_PORT}/udp"',
+                                  '"${AWG_PORT}/udp" "${AWG3_PORT}/udp" "${HYSTERIA2_PORT}/udp"')
+          install=install.replace('  AWG_PORT="$DEFAULT_AWG_PORT"\n',
+                                  '  AWG_PORT="$DEFAULT_AWG_PORT"\n  AWG3_PORT="$DEFAULT_AWG3_PORT"\n')
+          # Service-state/rollback lists: add AWG3 wherever AWG2 and sing-box are paired.
+          install=install.replace('sg-gateway-awg.service sg-gateway-singbox.service',
+                                  'sg-gateway-awg.service sg-gateway-awg3.service sg-gateway-singbox.service')
+          if 'amneziawg-linux-kernel-module-3.0' in install or 'AMNEZIAWG_KMOD_VERSION="3.' in install:
+              raise SystemExit('forbidden AWG3 kernel install leaked into new installer')
+          write('install.sh',install)
+
+          # Vendor checksum set: retain frozen AWG2 entries and add userspace-only AWG3 media.
+          vendor=read('vendor/cores/SHA256SUMS').rstrip()+"\n"
+          vendor += '090f9383532822a756d078890b447e00af7f46bd30a10f9f47c46d633d807b19  amneziawg-tools-3.0.20260805.tar.gz\n'
+          vendor += '131110027db6d5dc0e35b19eb5b8a2692676081366c34112088dc68bbb050bcd  amneziawg-go-linux-amd64-v3.0.0\n'
+          write('vendor/cores/SHA256SUMS',vendor)
+
+          # Scoped Connections styling only; no button color override.
+          write('app/web/static/sg-awg-dual-v1.css', r'''/* SG-Gateway Fix29 — dual AWG presentation. Scoped to Connections. */
+.page-connections .awgd-shell { grid-column: 1 / -1; }
+.page-connections .awgd-shell > .cnv1-engine-head { border-bottom: 1px solid var(--sg-line-soft); }
+.page-connections .awgd-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; padding: 14px 18px 18px; }
+.page-connections .awgd-card { position: relative; overflow: hidden; border: 1px solid var(--sg-line-soft); border-radius: 14px; background: var(--sg-panel-deep); box-shadow: inset 0 1px rgba(255,255,255,.025); }
+.page-connections .awgd-card::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 2px; background: linear-gradient(90deg, var(--sg-green), transparent 75%); opacity: .75; }
+.page-connections .awgd-card-v3::before { background: linear-gradient(90deg, var(--sg-blue), var(--sg-green), transparent 82%); }
+.page-connections .awgd-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 16px 16px 11px; }
+.page-connections .awgd-title { display: flex; gap: 11px; min-width: 0; }
+.page-connections .awgd-generation { display: grid; place-items: center; min-width: 54px; height: 34px; border: 1px solid var(--sg-green-line); border-radius: 10px; background: var(--sg-green-bg); color: var(--sg-green); font-size: 10px; font-weight: 900; letter-spacing: .05em; }
+.page-connections .awgd-card-v3 .awgd-generation { border-color: color-mix(in srgb, var(--sg-blue) 40%, var(--sg-line)); background: color-mix(in srgb, var(--sg-blue) 9%, var(--sg-panel-soft)); color: var(--sg-blue); }
+.page-connections .awgd-title strong { display: block; color: var(--sg-text); font-size: 14px; }
+.page-connections .awgd-title small { display: block; margin-top: 4px; color: var(--sg-muted); font-size: 9px; line-height: 1.45; }
+.page-connections .awgd-card .cnv1-endpoint-card { margin: 0 16px; }
+.page-connections .awgd-card .cnv1-engine-form { padding-top: 14px; }
+.page-connections .awgd-runtime-note { margin: 0 16px 2px; border: 1px solid var(--sg-line-soft); border-radius: 10px; background: var(--sg-panel-soft); padding: 10px 12px; color: var(--sg-muted); font-size: 9px; line-height: 1.45; }
+.page-connections .awgd-runtime-note strong { color: var(--sg-text); }
+.page-connections .awgd-footer { display: flex; gap: 8px; flex-wrap: wrap; padding: 0 18px 16px; color: var(--sg-muted); font-size: 9px; }
+.page-connections .awgd-footer span { border: 1px solid var(--sg-line-soft); border-radius: 999px; background: var(--sg-panel-soft); padding: 6px 9px; }
+@media (max-width: 980px) { .page-connections .awgd-grid { grid-template-columns: 1fr; } }
+@media (max-width: 620px) { .page-connections .awgd-grid { padding-inline: 12px; } .page-connections .awgd-head { padding-inline: 12px; } }
+''')
+
+          # Connections template: preserve Xray/Mihomo and replace only the AWG article.
+          conn=read('app/web/templates/connections.html')
+          conn=conn.replace("  <link rel=\"stylesheet\" href=\"{{ url_for('static', filename='sg-xmux-settings-v1.css') }}\">\n",
+                            "  <link rel=\"stylesheet\" href=\"{{ url_for('static', filename='sg-xmux-settings-v1.css') }}\">\n  <link rel=\"stylesheet\" href=\"{{ url_for('static', filename='sg-awg-dual-v1.css') }}?v={{ app_version }}\">\n",1)
+          conn=conn.replace("{% set awg_key_ready = awg_settings.enabled and awg_settings.config.get('server_public_key', '') and 'PLACEHOLDER' not in awg_settings.config.get('server_public_key', '') %}\n",
+                            "{% set awg_key_ready = awg_settings.enabled and awg_settings.config.get('server_public_key', '') and 'PLACEHOLDER' not in awg_settings.config.get('server_public_key', '') %}\n{% set awg3_key_ready = awg3_settings.enabled and awg3_settings.config.get('server_public_key', '') and 'PLACEHOLDER' not in awg3_settings.config.get('server_public_key', '') %}\n",1)
+          conn=conn.replace("{% set mihomo_public_host = connections[2].public_host if connections | length > 2 else mihomo.settings.host %}\n",
+                            "{% set mihomo_public_host = connections[2].public_host if connections | length > 2 else mihomo.settings.host %}\n{% set awg3_country = connections[3].country_code if connections | length > 3 else awg_country %}\n{% set awg3_public_host = connections[3].public_host if connections | length > 3 else awg3_settings.host %}\n",1)
+          conn=conn.replace('<p>AmneziaWG, четыре независимых Xray-профиля и Mihomo.</p>',
+                            '<p>AmneziaWG 2 / 3, четыре независимых Xray-профиля и Mihomo.</p>',1)
+          start=conn.find('  <section class="cnv1-engine-pair">\n    <article class="cnv1-engine-card cnv1-engine-awg')
+          end=conn.find('\n\n    {% include "_mihomo_panel.html" %}', start)
+          if start < 0 or end < 0:
+              raise SystemExit('AWG Connections block anchors missing')
+          dual=r'''  <section class="cnv1-engine-pair">
+    <article class="cnv1-engine-card cnv1-engine-awg awgd-shell sg-ljd-card">
+      <header class="cnv1-engine-head">
+        <div class="cnv1-engine-title">
+          <div class="cnv1-engine-logo awg"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l2-7 4 14 2-7h6"/></svg></div>
+          <div>
+            <div class="cnv1-card-kicker">UDP VPN · ДВА ПОКОЛЕНИЯ</div>
+            <h2>AmneziaWG</h2>
+            <p>AWG2 и AWG3 работают независимо: отдельные профили, ключи, адреса и runtime.</p>
+          </div>
+        </div>
+        <div class="awgd-footer"><span>AWG2 · kernel</span><span>AWG3 · userspace</span></div>
+      </header>
+
+      <div class="awgd-grid">
+        <section class="awgd-card awgd-card-v2">
+          <header class="awgd-head">
+            <div class="awgd-title"><span class="awgd-generation">AWG2</span><div><strong>AmneziaWG 2</strong><small>Проверенная kernel-линия 1.x · существующие профили не меняются.</small></div></div>
+            <span class="cnv1-engine-status {{ 'success' if awg_key_ready else 'warning' }}"><span></span>{{ 'Настроено' if awg_key_ready else 'Требует настройки' }}</span>
+          </header>
+          <section class="cnv1-endpoint-card sg-ljd-nested">
+            <div class="cnv1-endpoint-main"><img src="{{ country_flag_url(awg_country) }}" alt="{{ country_name(awg_country) }}" width="30" height="20"><div><span>ВНЕШНЯЯ ТОЧКА</span><strong>{{ awg_public_host }}</strong><small>UDP {{ awg_settings.port }} · {{ country_name(awg_country) }}</small></div></div>
+            <span class="cnv1-port-chip">UDP {{ awg_settings.port }}</span>
+          </section>
+          <form method="post" action="{{ url_for('update_amneziawg') }}" class="cnv1-engine-form cnv1-engine-form-compact">
+            <input type="hidden" name="host" value="{{ awg_public_host }}"><input type="hidden" name="country_code" value="{{ awg_country }}">
+            <div class="cnv1-compact-fields"><label><span>UDP-порт</span><input type="number" name="port" min="585" max="585" value="{{ awg_settings.port }}" readonly required></label><label><span>DNS</span><input type="text" name="dns" value="{{ awg_settings.config.get('dns', '1.1.1.1') }}"></label></div>
+            <details class="cnv1-advanced sg-ljd-nested"><summary><span>Дополнительно · ключ сервера</span><span>{{ 'Настроен' if awg_key_ready else 'Требует настройки' }}</span></summary><div class="cnv1-advanced-body"><label><span>Server public key</span><textarea name="server_public_key" rows="3">{{ awg_settings.config.get('server_public_key', '') }}</textarea><small>Публичный ключ AWG2 для новых клиентских файлов.</small></label></div></details>
+            <footer class="cnv1-form-actions"><span>Адрес подключения: {{ awg_public_host }}:{{ awg_settings.port }}</span><button class="button primary" type="submit">Сохранить</button></footer>
+          </form>
+        </section>
+
+        <section class="awgd-card awgd-card-v3">
+          <header class="awgd-head">
+            <div class="awgd-title"><span class="awgd-generation">AWG3</span><div><strong>AmneziaWG 3</strong><small>Изолированный userspace runtime 3.0 · AWG2 kernel и tools не заменяются.</small></div></div>
+            <span class="cnv1-engine-status {{ 'success' if awg3_key_ready else 'warning' }}"><span></span>{{ 'Настроено' if awg3_key_ready else 'Готов к первому запуску' }}</span>
+          </header>
+          <section class="cnv1-endpoint-card sg-ljd-nested">
+            <div class="cnv1-endpoint-main"><img src="{{ country_flag_url(awg3_country) }}" alt="{{ country_name(awg3_country) }}" width="30" height="20"><div><span>ВНЕШНЯЯ ТОЧКА</span><strong>{{ awg3_public_host }}</strong><small>UDP {{ awg3_settings.port }} · {{ country_name(awg3_country) }}</small></div></div>
+            <span class="cnv1-port-chip">UDP {{ awg3_settings.port }}</span>
+          </section>
+          <p class="awgd-runtime-note"><strong>Отдельный runtime.</strong> Интерфейс <code>awg3</code>, собственные ключи и сеть 10.67.0.0/16. Глобальный AWG2 runtime не изменяется.</p>
+          <form method="post" action="{{ url_for('update_amneziawg3') }}" class="cnv1-engine-form cnv1-engine-form-compact">
+            <input type="hidden" name="host" value="{{ awg3_public_host }}"><input type="hidden" name="country_code" value="{{ awg3_country }}">
+            <div class="cnv1-compact-fields"><label><span>UDP-порт</span><input type="number" name="port" min="586" max="586" value="{{ awg3_settings.port }}" readonly required></label><label><span>DNS</span><input type="text" name="dns" value="{{ awg3_settings.config.get('dns', '1.1.1.1') }}"></label></div>
+            <details class="cnv1-advanced sg-ljd-nested"><summary><span>Дополнительно · ключ сервера</span><span>{{ 'Настроен' if awg3_key_ready else 'Создастся автоматически' }}</span></summary><div class="cnv1-advanced-body"><label><span>Server public key</span><textarea name="server_public_key" rows="3">{{ awg3_settings.config.get('server_public_key', '') }}</textarea><small>AWG3 создаёт собственный ключ и синхронизирует его после успешного runtime apply.</small></label></div></details>
+            <footer class="cnv1-form-actions"><span>Адрес подключения: {{ awg3_public_host }}:{{ awg3_settings.port }}</span><button class="button primary" type="submit">Сохранить</button></footer>
+          </form>
+        </section>
+      </div>
+    </article>'''
+          conn=conn[:start]+dual+conn[end:]
+          conn=conn.replace('    <span>AmneziaWG: {{ awg_public_host }}:{{ awg_settings.port }}</span>\n',
+                            '    <span>AWG2: {{ awg_public_host }}:{{ awg_settings.port }}</span>\n    <span>AWG3: {{ awg3_public_host }}:{{ awg3_settings.port }}</span>\n',1)
+          write('app/web/templates/connections.html',conn)
+
+          replace('app/web/templates/base.html','<small>AWG · Xray · Mihomo</small>','<small>AWG2/3 · Xray · Mihomo</small>')
+
+          # Client create/edit/device forms: AWG2 and AWG3 are separate checkboxes.
+          replace('app/web/templates/clients.html',
+                  '<label class="cv10-protocol"><input type="checkbox" name="protocols" value="amneziawg"><span><strong>AmneziaWG</strong><small>Полная конфигурация и QR</small></span></label>',
+                  '<label class="cv10-protocol"><input type="checkbox" name="protocols" value="amneziawg"><span><strong>AmneziaWG 2</strong><small>AWG2 · отдельная конфигурация и QR</small></span></label>\n      <label class="cv10-protocol"><input type="checkbox" name="protocols" value="amneziawg3"><span><strong>AmneziaWG 3</strong><small>AWG3 userspace · отдельная конфигурация и QR</small></span></label>')
+
+          edit=read('app/web/templates/_client_edit_dialogs.html')
+          edit=edit.replace('<label class="dv16-protocol"><input type="checkbox" name="protocols" value="amneziawg" {% if \'amneziawg\' in primary_tokens %}checked{% endif %}><span><strong>AmneziaWG</strong><small>Полная конфигурация и QR</small></span></label>',
+                            '<label class="dv16-protocol"><input type="checkbox" name="protocols" value="amneziawg" {% if \'amneziawg\' in primary_tokens %}checked{% endif %}><span><strong>AmneziaWG 2</strong><small>AWG2 · конфигурация и QR</small></span></label>\n      <label class="dv16-protocol"><input type="checkbox" name="protocols" value="amneziawg3" {% if \'amneziawg3\' in primary_tokens %}checked{% endif %}><span><strong>AmneziaWG 3</strong><small>AWG3 userspace · конфигурация и QR</small></span></label>',1)
+          edit=edit.replace('<label class="dv16-protocol"><input type="checkbox" name="protocols" value="amneziawg" {% if \'amneziawg\' in selected_tokens %}checked{% endif %}><span><strong>AmneziaWG</strong><small>Конфигурация и QR</small></span></label>',
+                            '<label class="dv16-protocol"><input type="checkbox" name="protocols" value="amneziawg" {% if \'amneziawg\' in selected_tokens %}checked{% endif %}><span><strong>AmneziaWG 2</strong><small>AWG2 · конфигурация и QR</small></span></label>\n      <label class="dv16-protocol"><input type="checkbox" name="protocols" value="amneziawg3" {% if \'amneziawg3\' in selected_tokens %}checked{% endif %}><span><strong>AmneziaWG 3</strong><small>AWG3 userspace · конфигурация и QR</small></span></label>',1)
+          if edit.count('value="amneziawg3"') != 2:
+              raise SystemExit('edit dialogs did not receive exactly two AWG3 selectors')
+          write('app/web/templates/_client_edit_dialogs.html',edit)
+
+          detail=read('app/web/templates/client_detail.html')
+          old='''        <label class="dv16-protocol">
+          <input type="checkbox" name="protocols" value="amneziawg">
+          <span><strong>AmneziaWG</strong><small>Отдельная конфигурация и QR</small></span>
+        </label>'''
+          new='''        <label class="dv16-protocol">
+          <input type="checkbox" name="protocols" value="amneziawg">
+          <span><strong>AmneziaWG 2</strong><small>AWG2 · отдельная конфигурация и QR</small></span>
+        </label>
+        <label class="dv16-protocol">
+          <input type="checkbox" name="protocols" value="amneziawg3">
+          <span><strong>AmneziaWG 3</strong><small>AWG3 userspace · отдельная конфигурация и QR</small></span>
+        </label>'''
+          if old not in detail:
+              raise SystemExit('client detail AWG selector marker missing')
+          detail=detail.replace(old,new,1)
+          write('app/web/templates/client_detail.html',detail)
+
+          # DEV manifest describes the rebuilt feature but does not publish LIVE identity.
+          manifest=json.loads(read('release-manifest.json'))
+          manifest.setdefault('rebuild_policy',{})['awg3']=True
+          manifest.setdefault('client_access_model',{})['awg2_awg3_independent_selection']=True
+          manifest.setdefault('installer_update',{})['awg2_runtime_line']='frozen-1.x-kernel'
+          manifest['installer_update']['awg3_runtime_line']='isolated-3.x-userspace-no-kernel-module'
+          manifest.setdefault('clients_ui',{})['awg_generations']=['AWG2','AWG3']
+          write('release-manifest.json',json.dumps(manifest,ensure_ascii=False,indent=2)+"\n")
+          replace('.github/workflows/ci.yml',"manifest['rebuild_policy']['awg3'] is False","manifest['rebuild_policy']['awg3'] is True")
+
+          # Contract tests for independence, UI scope and installer isolation.
+          write('tests/test_sg_gateway_v22_awg3_dual_contract.py', r'''from __future__ import annotations
+
+import json
+from pathlib import Path
+
+from app.clients import repository
+from app.clients.exports import build_awg3_config
+from app.connections.settings import get_connection_settings, update_connection_settings
+from app.db import connect, init_db
+
+
+def test_awg2_and_awg3_are_independent_device_credentials(tmp_path, monkeypatch):
+    monkeypatch.setenv("SG_GATEWAY_DATA_DIR", str(tmp_path))
+    monkeypatch.setattr("app.engines.provisioning._awg_keypair", lambda: ("awg2-private", "awg2-public"))
+    monkeypatch.setattr("app.engines.provisioning._awg3_keypair", lambda: ("awg3-private", "awg3-public"))
+    init_db()
+    assert update_connection_settings("amneziawg", "198.51.100.10", 9999, get_connection_settings("amneziawg").config)
+    assert update_connection_settings("amneziawg3", "198.51.100.10", 9999, get_connection_settings("amneziawg3").config)
+    assert get_connection_settings("amneziawg").port == 585
+    assert get_connection_settings("amneziawg3").port == 586
+
+    client_id = repository.create_client("Dual AWG", "amneziawg,amneziawg3")
+    assert client_id
+    device = repository.get_primary_device(client_id)
+    assert device is not None
+    creds = {item.engine: json.loads(item.config_json or "{}") for item in repository.list_device_credentials(device.id)}
+    assert set(creds) == {"amneziawg", "amneziawg3"}
+    assert creds["amneziawg"]["address"].startswith("10.66.")
+    assert creds["amneziawg3"]["address"].startswith("10.67.")
+    assert creds["amneziawg"]["private_key"] != creds["amneziawg3"]["private_key"]
+
+
+def test_awg3_export_has_generation3_fields(tmp_path, monkeypatch):
+    monkeypatch.setenv("SG_GATEWAY_DATA_DIR", str(tmp_path))
+    monkeypatch.setattr("app.engines.provisioning._awg3_keypair", lambda: ("private-3", "public-3"))
+    init_db()
+    settings = get_connection_settings("amneziawg3")
+    cfg = dict(settings.config)
+    cfg["server_public_key"] = "server-3"
+    assert update_connection_settings("amneziawg3", "203.0.113.8", 586, cfg)
+    client_id = repository.create_client("Only AWG3", "amneziawg3")
+    assert client_id
+    client = repository.get_client(client_id)
+    device = repository.get_primary_device(client_id)
+    assert client and device
+    with connect() as connection:
+        payload = json.loads(connection.execute("SELECT config_json FROM device_credentials WHERE device_id=? AND engine='amneziawg3'", (device.id,)).fetchone()[0])
+        payload.update({"jc":4,"jmin":10,"jmax":50,"s1":64,"s2":96,"s3":48,"s4":12,"h1":"101","h2":"102","h3":"103","h4":"104","header_protection_key":"header-key","content_padding_addition":"10-100","rekey_after_time":"100-120","rekey_timeout":"3-7","reject_after_time":"150-180","keepalive_timeout":"5-15","max_handshake_attempts":"15-20","server_public_key":"server-3"})
+        connection.execute("UPDATE device_credentials SET status='applied', config_json=? WHERE device_id=? AND engine='amneziawg3'", (json.dumps(payload), device.id))
+    body = build_awg3_config(client, device).body
+    for marker in ("S3 = 48", "S4 = 12", "HeaderProtectionKey = header-key", "ContentPaddingAddition = 10-100", "Endpoint = 203.0.113.8:586"):
+        assert marker in body
+
+
+def test_awg3_installer_is_userspace_only_and_awg2_stays_frozen():
+    text = Path("install.sh").read_text(encoding="utf-8")
+    assert 'AMNEZIAWG_TOOLS_VERSION="1.0.20260618-2"' in text
+    assert 'AMNEZIAWG_KMOD_VERSION="1.0.20260329-2"' in text
+    assert 'AWG3_TOOLS_VERSION="3.0.20260805"' in text
+    assert 'PREFIX="$PREFIX/awg3" install' in text
+    assert 'amneziawg-go-linux-amd64-v3.0.0' in text
+    assert 'amneziawg-linux-kernel-module-3.0' not in text
+    assert 'AMNEZIAWG_KMOD_VERSION="3.' not in text
+
+
+def test_awg3_runtime_does_not_auto_clone_awg2_credentials():
+    text = Path("hostd/sg_hostd/awg3_runtime.py").read_text(encoding="utf-8")
+    assert "_ensure_credentials" not in text
+    assert 'ENGINE = "amneziawg3"' in text
+    assert 'cr.get_connection_settings("amneziawg3")' in text
+    assert 'AWG3_ROOT / "bin/awg"' in text
+    assert "modprobe" not in text
+    assert "dkms" not in text.lower()
+
+
+def test_dual_awg_ui_is_scoped_and_keeps_button_palette():
+    html = Path("app/web/templates/connections.html").read_text(encoding="utf-8")
+    css = Path("app/web/static/sg-awg-dual-v1.css").read_text(encoding="utf-8")
+    assert "AWG2" in html and "AWG3" in html
+    assert "update_amneziawg3" in html
+    assert 'class="button primary"' in html
+    assert ".button" not in css
+    assert ".page-connections .awgd-" in css
+''')
+
+          # Static source contract: historical 3.x kernel media is forbidden.
+          for path in Path('.').rglob('*'):
+              if path.is_file() and '.git' not in path.parts:
+                  name=path.name.lower()
+                  if 'amneziawg-linux-kernel-module-3.0' in name:
+                      raise SystemExit(f'forbidden AWG3 kernel media: {path}')
+          PY
+
+          chmod 0755 deploy/sg-gateway-awg3-userspace.sh vendor/cores/amneziawg-go-linux-amd64-v3.0.0
+
+      - name: Static product invariants before tests
+        run: |
+          bash -n install.sh
+          bash -n deploy/sg-gateway-awg3-userspace.sh
+          grep -F 'AMNEZIAWG_TOOLS_VERSION="1.0.20260618-2"' install.sh
+          grep -F 'AMNEZIAWG_KMOD_VERSION="1.0.20260329-2"' install.sh
+          grep -F 'AWG3_TOOLS_VERSION="3.0.20260805"' install.sh
+          grep -F 'PREFIX="$PREFIX/awg3" install' install.sh
+          ! grep -RIn --exclude-dir=.git 'amneziawg-linux-kernel-module-3\.0' .
+          ! grep -RIn --exclude-dir=.git 'AMNEZIAWG_KMOD_VERSION="3\.' .
+          grep -F 'export PATH="$BASE_DIR/bin:$PATH"' deploy/sg-gateway-awg3-userspace.sh
+          grep -F 'WG_QUICK_USERSPACE_IMPLEMENTATION="$AWG_GO"' deploy/sg-gateway-awg3-userspace.sh
+
+      - name: Install test dependencies
+        run: |
+          python3 -m pip install -q -r requirements-dev.txt
+
+      - name: Run focused dual-AWG contracts
+        env:
+          PYTHONPATH: .:hostd
+        run: |
+          python3 -m pytest -q \
+            tests/test_sg_gateway_v22_awg3_dual_contract.py \
+            tests/test_awg_style_ui.py
+
+      - name: Run full test suite
+        env:
+          PYTHONPATH: .:hostd
+        run: python3 -m pytest -q tests
+
+      - name: Validate template and script syntax
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from jinja2 import Environment
+          env=Environment()
+          for p in Path('app/web/templates').rglob('*.html'):
+              env.parse(p.read_text(encoding='utf-8'))
+          print('JINJA_OK')
+          PY
+          while IFS= read -r -d '' f; do bash -n "$f"; done < <(find . -type f -name '*.sh' -not -path './.git/*' -print0)
+          while IFS= read -r -d '' f; do node --check "$f" >/dev/null; done < <(find app/web/static -type f -name '*.js' -print0)
+
+      - name: Regenerate exact source integrity inventory
+        run: |
+          git add -A
+          python3 - <<'PY'
+          import hashlib, subprocess
+          from pathlib import Path
+          files=subprocess.check_output(['git','ls-files'],text=True,encoding='utf-8').splitlines()
+          rows=[]
+          for rel in sorted(files):
+              if rel == 'SOURCE-SHA256SUMS':
+                  continue
+              rows.append(f"{hashlib.sha256(Path(rel).read_bytes()).hexdigest()}  {rel}")
+          Path('SOURCE-SHA256SUMS').write_text('\n'.join(rows)+'\n',encoding='utf-8',newline='\n')
+          print(f'SOURCE_INVENTORY={len(rows)}')
+          PY
+          git add SOURCE-SHA256SUMS
+          git diff --cached --check
+
+      - name: Verify vendor and build FULL candidate
+        run: |
+          (cd vendor/cores && sha256sum -c SHA256SUMS)
+          OUT=/tmp/SG-Gateway-0.1.0-021.12-DEV-v22-Fix29-AWG3-DUAL-FULL.run
+          bash build-run.sh "$OUT"
+          bash "$OUT" --verify-only
+
+      - name: Commit and verify exact git-blob integrity
+        run: |
+          git config user.name 'Ser.Gor'
+          git config user.email 'infosec.co.il@gmail.com'
+          git commit -m 'Fix 29: add isolated AWG3 userspace alongside frozen AWG2'
+          python3 - <<'PY'
+          import hashlib,re,subprocess
+          from pathlib import Path
+          expected={}
+          for raw in Path('SOURCE-SHA256SUMS').read_text(encoding='utf-8').splitlines():
+              m=re.fullmatch(r'([0-9a-f]{64})  (.+)',raw)
+              assert m, raw
+              expected[m.group(2)]=m.group(1)
+          tracked=set(subprocess.check_output(['git','ls-files'],text=True).splitlines())
+          tracked.discard('SOURCE-SHA256SUMS')
+          assert tracked == set(expected), (sorted(tracked-set(expected))[:10], sorted(set(expected)-tracked)[:10])
+          for path in sorted(tracked):
+              data=subprocess.check_output(['git','show',f'HEAD:{path}'])
+              actual=hashlib.sha256(data).hexdigest()
+              assert actual == expected[path], (path,actual,expected[path])
+          print(f'GIT_BLOB_INTEGRITY_OK={len(tracked)}')
+          PY
+          git push origin HEAD:fix29-awg3-dual
+          echo "FIX29_COMMIT=$(git rev-parse HEAD)"
