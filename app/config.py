@@ -5,6 +5,23 @@ import secrets
 from dataclasses import dataclass
 from pathlib import Path
 
+from app.net import detect_global_ipv6, global_ip
+
+
+RUNTIME_ENV = Path("/etc/sg-gateway/runtime.env")
+
+
+def _runtime_env_value(name: str) -> str:
+    try:
+        lines = RUNTIME_ENV.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return ""
+    prefix = f"{name}="
+    for line in lines:
+        if line.startswith(prefix):
+            return line[len(prefix):].strip().strip('"\'')
+    return ""
+
 
 @dataclass(frozen=True)
 class AppConfig:
@@ -25,12 +42,20 @@ class AppConfig:
     @property
     def public_ipv4(self) -> str:
         """Return the detected public IPv4 without changing the legacy contract."""
-        return os.getenv("SG_GATEWAY_PUBLIC_IPV4", "").strip()
+        explicit = (
+            os.getenv("SG_GATEWAY_PUBLIC_IPV4", "").strip()
+            or _runtime_env_value("SG_GATEWAY_PUBLIC_IPV4")
+        )
+        return global_ip(explicit, 4) or global_ip(self.public_address, 4)
 
     @property
     def public_ipv6(self) -> str:
         """Return the detected public IPv6 when the host has one."""
-        return os.getenv("SG_GATEWAY_PUBLIC_IPV6", "").strip()
+        explicit = (
+            os.getenv("SG_GATEWAY_PUBLIC_IPV6", "").strip()
+            or _runtime_env_value("SG_GATEWAY_PUBLIC_IPV6")
+        )
+        return global_ip(explicit, 6) or detect_global_ipv6()
 
 
 def load_config() -> AppConfig:
