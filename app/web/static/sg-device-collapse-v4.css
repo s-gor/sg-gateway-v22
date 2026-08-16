@@ -1,17 +1,17 @@
 /* SG-Gateway 0.1.0-021.9 — collapsed device cards V4
    Loaded LAST, after the complete theme cascade. */
 
-html body.page-clients .dv16-device.sg-device-collapsed {
+html body.page-clients .dv16-device:not(.sg-device-expanded) {
   gap: 0 !important;
   padding: 15px 17px !important;
   border-radius: 14px !important;
 }
 
-html body.page-clients .dv16-device.sg-device-collapsed > :not(.dv16-device-head) {
+html body.page-clients .dv16-device:not(.sg-device-expanded) > :not(.dv16-device-head) {
   display: none !important;
 }
 
-html body.page-clients .dv16-device.sg-device-collapsed > .dv16-device-head {
+html body.page-clients .dv16-device:not(.sg-device-expanded) > .dv16-device-head {
   display: flex !important;
   align-items: center !important;
   justify-content: space-between !important;
@@ -32,7 +32,7 @@ html body.page-clients .dv16-device.sg-device-collapsed > .dv16-device-head {
   backdrop-filter: none !important;
 }
 
-html body.page-clients .dv16-device.sg-device-collapsed > .dv16-device-head > .dv16-device-title {
+html body.page-clients .dv16-device:not(.sg-device-expanded) > .dv16-device-head > .dv16-device-title {
   display: flex !important;
   flex: 1 1 auto !important;
   align-items: flex-start !important;
@@ -53,7 +53,7 @@ html body.page-clients .dv16-device.sg-device-collapsed > .dv16-device-head > .d
   backdrop-filter: none !important;
 }
 
-html body.page-clients .dv16-device.sg-device-collapsed > .dv16-device-head > .dv16-device-title > div {
+html body.page-clients .dv16-device:not(.sg-device-expanded) > .dv16-device-head > .dv16-device-title > div {
   min-width: 0 !important;
   width: auto !important;
   max-width: none !important;
@@ -70,12 +70,12 @@ html body.page-clients .dv16-device.sg-device-collapsed > .dv16-device-head > .d
   backdrop-filter: none !important;
 }
 
-html body.page-clients .dv16-device.sg-device-collapsed > .dv16-device-head::before,
-html body.page-clients .dv16-device.sg-device-collapsed > .dv16-device-head::after,
-html body.page-clients .dv16-device.sg-device-collapsed .dv16-device-title::before,
-html body.page-clients .dv16-device.sg-device-collapsed .dv16-device-title::after,
-html body.page-clients .dv16-device.sg-device-collapsed .dv16-device-title > div::before,
-html body.page-clients .dv16-device.sg-device-collapsed .dv16-device-title > div::after {
+html body.page-clients .dv16-device:not(.sg-device-expanded) > .dv16-device-head::before,
+html body.page-clients .dv16-device:not(.sg-device-expanded) > .dv16-device-head::after,
+html body.page-clients .dv16-device:not(.sg-device-expanded) .dv16-device-title::before,
+html body.page-clients .dv16-device:not(.sg-device-expanded) .dv16-device-title::after,
+html body.page-clients .dv16-device:not(.sg-device-expanded) .dv16-device-title > div::before,
+html body.page-clients .dv16-device:not(.sg-device-expanded) .dv16-device-title > div::after {
   content: none !important;
   display: none !important;
   border: 0 !important;
@@ -83,23 +83,23 @@ html body.page-clients .dv16-device.sg-device-collapsed .dv16-device-title > div
   box-shadow: none !important;
 }
 
-html body.page-clients .dv16-device.sg-device-collapsed .dv16-device-title h2 {
+html body.page-clients .dv16-device:not(.sg-device-expanded) .dv16-device-title h2 {
   margin: 2px 0 6px !important;
   font-size: 21px !important;
   line-height: 1.08 !important;
   letter-spacing: -.015em !important;
 }
 
-html body.page-clients .dv16-device.sg-device-collapsed .dv16-device-kind {
+html body.page-clients .dv16-device:not(.sg-device-expanded) .dv16-device-kind {
   font-size: 9px !important;
   letter-spacing: .11em !important;
 }
 
-html body.page-clients .dv16-device.sg-device-collapsed .dv16-profile-tags {
+html body.page-clients .dv16-device:not(.sg-device-expanded) .dv16-profile-tags {
   gap: 5px !important;
 }
 
-html body.page-clients .dv16-device.sg-device-collapsed .dv16-profile-tags span {
+html body.page-clients .dv16-device:not(.sg-device-expanded) .dv16-profile-tags span {
   min-height: 23px !important;
   padding: 3px 8px !important;
   border-radius: 999px !important;
@@ -107,9 +107,20 @@ html body.page-clients .dv16-device.sg-device-collapsed .dv16-profile-tags span 
   line-height: 1.15 !important;
 }
 
-html body.page-clients .dv16-device.sg-device-collapsed .dv16-device-controls {
+html body.page-clients .dv16-device:not(.sg-device-expanded) .dv16-device-controls {
   flex: 0 0 auto !important;
   gap: 8px !important;
+}
+
+/* Reserve the toggle slot before deferred JS runs, so the header does not shift. */
+html body.page-clients .dv16-device:not([data-sg-collapse-ready="1"]) .dv16-device-controls::after {
+  content: '';
+  display: block;
+  flex: 0 0 42px;
+  width: 42px;
+  min-width: 42px;
+  height: 42px;
+  min-height: 42px;
 }
 
 html body.page-clients .sg-device-collapse-toggle {
@@ -137,12 +148,12 @@ html body.page-clients .sg-device-collapse-toggle > span {
   transition: transform .18s ease;
 }
 
-html body.page-clients .dv16-device.sg-device-collapsed .sg-device-collapse-toggle > span {
+html body.page-clients .dv16-device:not(.sg-device-expanded) .sg-device-collapse-toggle > span {
   transform: rotate(45deg);
 }
 
 @media (max-width: 900px) {
-  html body.page-clients .dv16-device.sg-device-collapsed > .dv16-device-head {
+  html body.page-clients .dv16-device:not(.sg-device-expanded) > .dv16-device-head {
     align-items: flex-start !important;
   }
 }
