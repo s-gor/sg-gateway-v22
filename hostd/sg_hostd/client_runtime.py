@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import fcntl
+import hashlib
 import ipaddress
 import json
 import os
@@ -17,6 +18,7 @@ from typing import Any
 from app.connections.settings import get_connection_settings, update_connection_settings
 from app.db import connect, init_db
 from app.maintenance.operations import log_operation
+from app.net import format_host_port
 from app.security.tls import overview as tls_overview
 from app.xray.encryption import VlessEncryptionError, normalize_pair
 from app.xray.profiles import REALITY_TCP_FLOW, XRAY_MINIMUM_VERSION, overview as xray_profiles_overview
@@ -49,6 +51,7 @@ XRAY_TLS_KEY = XRAY_TLS_DIR / "privkey.pem"
 LETSENCRYPT_LIVE_ROOT = Path("/etc/letsencrypt/live")
 AWG_CONFIG = Path("/etc/amnezia/amneziawg/awg0.conf")
 AWG_SERVICE = "sg-gateway-awg.service"
+AWG_IPV6_SUBNET_ID = 2
 
 ENGINE_SECRETS = CONFIG_DIR / "engine-secrets.env"
 RUNTIME_ENV = CONFIG_DIR / "runtime.env"
@@ -456,20 +459,86 @@ def _derive_awg_public(private_key: str) -> str:
     ).stdout.strip()
 
 
+def _address_values(value: str) -> list[str]:
+    return [part.strip() for part in str(value or "").split(",") if part.strip()]
+
+
 def _normalise_awg_address(client_id: int, value: str) -> str:
-    raw = (value or "").strip()
-    try:
-        interface = ipaddress.ip_interface(raw)
-        if interface.version == 4:
-            return str(interface)
-    except ValueError:
-        pass
+    for raw in _address_values(value):
+        try:
+            interface = ipaddress.ip_interface(raw)
+            if interface.version == 4:
+                return str(interface)
+        except ValueError:
+            continue
 
     # Deterministic address inside 10.66.0.0/16.
     slot = max(1, int(client_id))
     third = min(254, slot // 250)
     fourth = 2 + (slot % 250)
     return f"10.66.{third}.{fourth}/32"
+
+
+def _dual_stack_enabled(runtime: dict[str, str] | None = None) -> bool:
+    values = runtime if runtime is not None else _read_env(RUNTIME_ENV)
+    raw = str(values.get("SG_GATEWAY_PUBLIC_IPV6") or "").strip()
+    try:
+        address = ipaddress.ip_address(raw)
+    except ValueError:
+        return False
+    return address.version == 6 and address.is_global
+
+
+def _awg_ipv6_network(server_public_key: str) -> ipaddress.IPv6Network:
+    material = f"SG-Gateway:amneziawg:{server_public_key}".encode("utf-8")
+    global_id = int.from_bytes(hashlib.sha256(material).digest()[:5], "big")
+    network_value = (
+        (0xFD << 120)
+        | (global_id << 80)
+        | (AWG_IPV6_SUBNET_ID << 64)
+    )
+    return ipaddress.IPv6Network((network_value, 64))
+
+
+def _normalise_awg_ipv6_address(
+    client_id: int,
+    value: str,
+    network: ipaddress.IPv6Network,
+) -> str:
+    for raw in _address_values(value):
+        try:
+            interface = ipaddress.ip_interface(raw)
+            if interface.version == 6 and interface.ip in network:
+                return f"{interface.ip}/128"
+        except ValueError:
+            continue
+    slot = max(1, int(client_id))
+    address = ipaddress.IPv6Address(int(network.network_address) + slot + 1)
+    return f"{address}/128"
+
+
+def _normalise_awg_addresses(
+    client_id: int,
+    value: str,
+    network: ipaddress.IPv6Network | None,
+) -> str:
+    ipv4 = _normalise_awg_address(client_id, value)
+    if network is None:
+        return ipv4
+    ipv6 = _normalise_awg_ipv6_address(client_id, value, network)
+    return f"{ipv4}, {ipv6}"
+
+
+def _peer_allowed_ips(value: str) -> str:
+    result: list[str] = []
+    for raw in _address_values(value):
+        try:
+            interface = ipaddress.ip_interface(raw)
+        except ValueError:
+            continue
+        suffix = 32 if interface.version == 4 else 128
+        result.append(f"{interface.ip}/{suffix}")
+    return ", ".join(result)
 
 
 def _repair_deployment_configs() -> None:
@@ -483,6 +552,14 @@ def _repair_deployment_configs() -> None:
     awg_obfuscation = _awg_obfuscation(secrets)
 
     awg_settings = get_connection_settings("amneziawg")
+    awg_server_identity = awg_server_public or str(
+        awg_settings.config.get("server_public_key") or ""
+    ).strip()
+    awg_ipv6_network = (
+        _awg_ipv6_network(awg_server_identity)
+        if awg_server_identity and _dual_stack_enabled(runtime)
+        else None
+    )
     xray_settings = get_connection_settings("xray")
     vless_encryption = (
         secrets.get("SG_GATEWAY_VLESS_ENCRYPTION", "").strip()
@@ -515,9 +592,10 @@ def _repair_deployment_configs() -> None:
             if engine == "amneziawg":
                 private_key = str(config.get("private_key") or "").strip()
                 public_key = _derive_awg_public(private_key)
-                address = _normalise_awg_address(
+                address = _normalise_awg_addresses(
                     client_id,
                     str(config.get("address") or ""),
+                    awg_ipv6_network,
                 )
                 config.update(
                     {
@@ -526,11 +604,10 @@ def _repair_deployment_configs() -> None:
                         "public_key": public_key,
                         "address": address,
                         "dns": awg_settings.config.get("dns", "1.1.1.1"),
-                        "server_public_key": awg_server_public
-                        or awg_settings.config.get("server_public_key", ""),
-                        "endpoint": (
-                            f"{awg_settings.host or public_address}:"
-                            f"{int(awg_settings.port)}"
+                        "server_public_key": awg_server_identity,
+                        "endpoint": format_host_port(
+                            awg_settings.host or public_address,
+                            int(awg_settings.port),
                         ),
                         "allowed_ips": awg_settings.config.get(
                             "allowed_ips",
@@ -538,6 +615,12 @@ def _repair_deployment_configs() -> None:
                         ),
                         "persistent_keepalive": int(
                             awg_settings.config.get("persistent_keepalive", 25)
+                        ),
+                        "dual_stack": awg_ipv6_network is not None,
+                        "ipv6_network": (
+                            str(awg_ipv6_network)
+                            if awg_ipv6_network is not None
+                            else ""
                         ),
                         **awg_obfuscation,
                     }
@@ -610,17 +693,59 @@ def _default_interface() -> str:
 
 def _render_awg_config(rows) -> str:
     secrets = _read_env(ENGINE_SECRETS)
+    runtime = _read_env(RUNTIME_ENV)
     server_private = secrets.get("SG_GATEWAY_AWG_PRIVATE_KEY", "").strip()
+    server_public = secrets.get("SG_GATEWAY_AWG_PUBLIC_KEY", "").strip()
     if not server_private:
         raise ClientRuntimeError("Не найден серверный приватный ключ AmneziaWG")
 
     settings = get_connection_settings("amneziawg")
     obfuscation = _awg_obfuscation(secrets)
     external_interface = _default_interface()
+    server_identity = server_public or str(
+        settings.config.get("server_public_key") or ""
+    ).strip()
+    ipv6_network = (
+        _awg_ipv6_network(server_identity)
+        if server_identity and _dual_stack_enabled(runtime)
+        else None
+    )
+    server_address = "10.66.0.1/16"
+    if ipv6_network is not None:
+        server_ipv6 = ipaddress.IPv6Address(int(ipv6_network.network_address) + 1)
+        server_address = f"{server_address}, {server_ipv6}/64"
+
+    post_up = (
+        "PostUp = "
+        "nft delete table ip sg_gateway_awg 2>/dev/null || true; "
+        "nft add table ip sg_gateway_awg; "
+        "nft 'add chain ip sg_gateway_awg forward "
+        "{ type filter hook forward priority filter; policy accept; }'; "
+        "nft 'add chain ip sg_gateway_awg postrouting "
+        "{ type nat hook postrouting priority srcnat; policy accept; }'; "
+        f'nft add rule ip sg_gateway_awg postrouting '
+        f'oifname "{external_interface}" ip saddr 10.66.0.0/16 masquerade'
+    )
+    post_down = (
+        "PostDown = "
+        "nft delete table ip sg_gateway_awg 2>/dev/null || true"
+    )
+    if ipv6_network is not None:
+        post_up += (
+            "; nft delete table ip6 sg_gateway_awg 2>/dev/null || true; "
+            "nft add table ip6 sg_gateway_awg; "
+            "nft 'add chain ip6 sg_gateway_awg forward "
+            "{ type filter hook forward priority filter; policy accept; }'; "
+            "nft 'add chain ip6 sg_gateway_awg postrouting "
+            "{ type nat hook postrouting priority srcnat; policy accept; }'; "
+            f'nft add rule ip6 sg_gateway_awg postrouting '
+            f'oifname "{external_interface}" ip6 saddr {ipv6_network} masquerade'
+        )
+        post_down += "; nft delete table ip6 sg_gateway_awg 2>/dev/null || true"
 
     lines = [
         "[Interface]",
-        "Address = 10.66.0.1/16",
+        f"Address = {server_address}",
         f"ListenPort = {int(settings.port)}",
         f"PrivateKey = {server_private}",
         f"Jc = {obfuscation['jc']}",
@@ -632,32 +757,20 @@ def _render_awg_config(rows) -> str:
         f"H2 = {obfuscation['h2']}",
         f"H3 = {obfuscation['h3']}",
         f"H4 = {obfuscation['h4']}",
-        (
-            "PostUp = "
-            "nft delete table ip sg_gateway_awg 2>/dev/null || true; "
-            "nft add table ip sg_gateway_awg; "
-            "nft 'add chain ip sg_gateway_awg forward "
-            "{ type filter hook forward priority filter; policy accept; }'; "
-            "nft 'add chain ip sg_gateway_awg postrouting "
-            "{ type nat hook postrouting priority srcnat; policy accept; }'; "
-            f'nft add rule ip sg_gateway_awg postrouting '
-            f'oifname "{external_interface}" ip saddr 10.66.0.0/16 masquerade'
-        ),
-        (
-            "PostDown = "
-            "nft delete table ip sg_gateway_awg 2>/dev/null || true"
-        ),
+        post_up,
+        post_down,
         "",
     ]
 
     for row in rows:
         config = _json(row["config_json"])
         public_key = str(config.get("public_key") or "").strip()
-        address = _normalise_awg_address(
+        address = _normalise_awg_addresses(
             int(row["client_id"]),
             str(config.get("address") or ""),
+            ipv6_network,
         )
-        peer_ip = str(ipaddress.ip_interface(address).ip)
+        allowed_ips = _peer_allowed_ips(address)
         if not public_key:
             raise ClientRuntimeError(
                 f"AmneziaWG: отсутствует public key клиента {row['client_name']}"
@@ -667,7 +780,7 @@ def _render_awg_config(rows) -> str:
                 "[Peer]",
                 f"# {row['client_name']} · client {row['client_id']}",
                 f"PublicKey = {public_key}",
-                f"AllowedIPs = {peer_ip}/32",
+                f"AllowedIPs = {allowed_ips}",
                 "",
             ]
         )
@@ -899,6 +1012,7 @@ def _render_xray_config(rows) -> str:
         or runtime.get("SG_GATEWAY_REALITY_TARGET")
         or "bing.com:443"
     ).strip()
+    public_listen = "::" if _dual_stack_enabled(runtime) else "0.0.0.0"
 
     grouped: dict[str, list[dict[str, Any]]] = {
         "reality_tcp": [],
@@ -974,6 +1088,7 @@ def _render_xray_config(rows) -> str:
             server_name=server_name,
             private_key=private_key,
             short_id=short_id,
+            listen=public_listen,
         )
         inbound["sniffing"] = sniffing
         inbounds.append(inbound)
@@ -998,7 +1113,7 @@ def _render_xray_config(rows) -> str:
             profile = by_id["xhttp_tls"]
             inbounds.append({
                 "tag": "sg-vless-xhttp-tls",
-                "listen": "0.0.0.0",
+                "listen": public_listen,
                 "port": profile.port,
                 "protocol": "vless",
                 "settings": {
@@ -1038,7 +1153,7 @@ def _render_xray_config(rows) -> str:
                 hysteria_stream["finalmask"] = finalmask
             inbounds.append({
                 "tag": "sg-hysteria2",
-                "listen": "0.0.0.0",
+                "listen": public_listen,
                 "port": profile.port,
                 "protocol": "hysteria",
                 "settings": {
