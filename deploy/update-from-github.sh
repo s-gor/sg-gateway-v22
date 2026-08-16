@@ -528,7 +528,7 @@ validate_deployed_panel() {
   runuser -u sg-gateway -- "$PREFIX/.venv/bin/python" -B -c \
     'from pathlib import Path; from jinja2 import Environment; env=Environment(); [env.parse(p.read_text(encoding="utf-8")) for p in Path("/opt/sg-gateway/app/web/templates").rglob("*.html")]; print("Templates: OK")'
 
-  local target validation_root
+  local target validation_root validation_env
   target="$(panel_wsgi_target)"
   validation_root="$TEMP_DIR/wsgi-validation"
   rm -rf "$validation_root"
@@ -538,9 +538,11 @@ validate_deployed_panel() {
   chmod 0711 "$TEMP_DIR"
   install -d -m 0750 -o sg-gateway -g sg-gateway \
     "$validation_root" "$validation_root/data" "$validation_root/log"
+  validation_env="$validation_root/sg-gateway.env"
+  install -m 0600 -o sg-gateway -g sg-gateway "$CONFIG_DIR/sg-gateway.env" "$validation_env"
 
   runuser -u sg-gateway -- "$PREFIX/.venv/bin/python" -B - \
-    "$PREFIX" "$CONFIG_DIR/sg-gateway.env" "$target" "$validation_root" <<'PYDEPLOYEDWSGI'
+    "$PREFIX" "$validation_env" "$target" "$validation_root" <<'PYDEPLOYEDWSGI'
 import importlib
 import os
 import shlex
