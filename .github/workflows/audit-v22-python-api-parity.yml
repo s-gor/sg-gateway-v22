@@ -1,0 +1,124 @@
+name: audit v22 python API parity
+
+on:
+  push:
+    branches: [audit-v22-prepublish]
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: audit-v22-prepublish
+          fetch-depth: 0
+
+      - name: Guard audit branch over clean Fix28
+        run: git merge-base --is-ancestor 04345198231bbe3eb75d9061b879887a0f9cecfd HEAD
+
+      - name: Fetch historical AWG3-free 022.05
+        run: |
+          git clone -q --no-checkout https://github.com/s-gor/sg-gateway.git /tmp/old
+          git -C /tmp/old fetch -q --depth=1 origin a0c2537b6c55d1fd974afe3aab586a7d41777cd8
+          git -C /tmp/old checkout -q --detach FETCH_HEAD
+
+      - name: Compare Python symbols in common runtime modules
+        run: |
+          python3 - <<'PY'
+          import ast, hashlib
+          from pathlib import Path
+
+          old=Path('/tmp/old'); new=Path('.')
+          roots=('app','hostd','engines')
+
+          def runtime_py(root):
+              out={}
+              for prefix in roots:
+                  base=root/prefix
+                  if not base.exists():
+                      continue
+                  for p in base.rglob('*.py'):
+                      if '__pycache__' in p.parts:
+                          continue
+                      out[p.relative_to(root).as_posix()]=p
+              return out
+
+          def symbols(path):
+              tree=ast.parse(path.read_text(encoding='utf-8'))
+              out={}
+              for node in tree.body:
+                  if isinstance(node,(ast.FunctionDef,ast.AsyncFunctionDef)):
+                      out[node.name]='function'
+                  elif isinstance(node,ast.ClassDef):
+                      out[node.name]='class'
+                      for item in node.body:
+                          if isinstance(item,(ast.FunctionDef,ast.AsyncFunctionDef)):
+                              out[f'{node.name}.{item.name}']='method'
+              return out
+
+          a=runtime_py(old); b=runtime_py(new)
+          common=sorted(set(a)&set(b))
+          missing=[]; added=[]
+          for rel in common:
+              if hashlib.sha256(a[rel].read_bytes()).digest()==hashlib.sha256(b[rel].read_bytes()).digest():
+                  continue
+              sa=symbols(a[rel]); sb=symbols(b[rel])
+              for name in sorted(set(sa)-set(sb)):
+                  missing.append((rel,name,sa[name]))
+              for name in sorted(set(sb)-set(sa)):
+                  added.append((rel,name,sb[name]))
+
+          print(f'COMMON_PY={len(common)} MISSING_SYMBOLS={len(missing)} ADDED_SYMBOLS={len(added)}')
+          print('=== HISTORICAL SYMBOLS ABSENT CURRENT ===')
+          for row in missing: print(' :: '.join(row))
+          print('=== CURRENT-ONLY SYMBOLS ===')
+          for row in added: print(' :: '.join(row))
+          PY
+
+      - name: Compare Flask route patterns declared in common Python modules
+        run: |
+          python3 - <<'PY'
+          import ast
+          from pathlib import Path
+
+          old=Path('/tmp/old'); new=Path('.')
+          roots=('app','hostd','engines')
+
+          def routes(root):
+              out={}
+              for prefix in roots:
+                  base=root/prefix
+                  if not base.exists(): continue
+                  for p in base.rglob('*.py'):
+                      rel=p.relative_to(root).as_posix()
+                      try: tree=ast.parse(p.read_text(encoding='utf-8'))
+                      except Exception: continue
+                      vals=set()
+                      for node in ast.walk(tree):
+                          if not isinstance(node,ast.Call): continue
+                          f=node.func
+                          attr=f.attr if isinstance(f,ast.Attribute) else ''
+                          if attr not in {'route','get','post','put','delete','patch'}: continue
+                          if not node.args: continue
+                          arg=node.args[0]
+                          if isinstance(arg,ast.Constant) and isinstance(arg.value,str) and arg.value.startswith('/'):
+                              vals.add((attr,arg.value))
+                      if vals: out[rel]=vals
+              return out
+
+          a=routes(old); b=routes(new)
+          old_all={(rel,m,r) for rel,vals in a.items() for m,r in vals}
+          new_all={(rel,m,r) for rel,vals in b.items() for m,r in vals}
+          missing=sorted(old_all-new_all)
+          added=sorted(new_all-old_all)
+          print(f'MISSING_DECLARED_ROUTES={len(missing)} ADDED_DECLARED_ROUTES={len(added)}')
+          print('=== HISTORICAL DECLARED ROUTES ABSENT CURRENT ===')
+          for rel,m,r in missing: print(f'{rel} :: {m.upper()} {r}')
+          print('=== CURRENT-ONLY DECLARED ROUTES ===')
+          for rel,m,r in added: print(f'{rel} :: {m.upper()} {r}')
+          PY
+
+      - name: Confirm no AWG3 active markers
+        run: |
+          ! grep -RInE --exclude-dir=.git 'amneziawg3|AWG3|awg3' app hostd engines deploy install.sh
+          echo AWG3_ACTIVE_REFERENCES=0
