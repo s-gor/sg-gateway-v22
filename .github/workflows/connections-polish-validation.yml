@@ -1,0 +1,134 @@
+name: Validate Connections protocol-card polish
+
+on:
+  push:
+    branches:
+      - scratch/connections-polish-v1
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout visual patch source
+        uses: actions/checkout@v4
+
+      - name: Checkout exact green 022.04 product
+        uses: actions/checkout@v4
+        with:
+          ref: e172a662643574155f60189e57a990fbfc6dbf2c
+          path: product
+          fetch-depth: 0
+
+      - name: Assemble isolated product candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C product rev-parse HEAD)" = "e172a662643574155f60189e57a990fbfc6dbf2c"
+          cp app/web/static/sg-xmux-settings-v1.css product/app/web/static/sg-xmux-settings-v1.css
+          cp tests/test_ui_connections_visual_v1.py product/tests/test_ui_connections_visual_v1.py
+          cd product
+          python3 -B - <<'PY'
+          import hashlib
+          import subprocess
+          from pathlib import Path
+
+          paths = subprocess.check_output(['git', 'ls-files'], text=True, encoding='utf-8').splitlines()
+          paths = [path for path in paths if path != 'SOURCE-SHA256SUMS']
+          Path('SOURCE-SHA256SUMS').write_text(
+              '\n'.join(f'{hashlib.sha256(Path(path).read_bytes()).hexdigest()}  {path}' for path in paths) + '\n',
+              encoding='utf-8',
+          )
+          print(f'Rebuilt SOURCE-SHA256SUMS: {len(paths)} files')
+          PY
+          mapfile -t changed < <(git diff --name-only | sort)
+          expected=(
+            SOURCE-SHA256SUMS
+            app/web/static/sg-xmux-settings-v1.css
+            tests/test_ui_connections_visual_v1.py
+          )
+          mapfile -t wanted < <(printf '%s\n' "${expected[@]}" | sort)
+          test "$(printf '%s\n' "${changed[@]}")" = "$(printf '%s\n' "${wanted[@]}")"
+          git diff --check
+          python3 -B - <<'PY'
+          from pathlib import Path
+          css = Path('app/web/static/sg-xmux-settings-v1.css').read_text(encoding='utf-8')
+          polish = css.split('SG-Gateway 022.04 · Connections protocol-card polish', 1)[1]
+          assert css.count('{') == css.count('}')
+          assert 'display: none' not in polish
+          for profile in ('reality_tcp', 'xhttp_reality', 'xhttp_tls', 'hysteria2'):
+              assert f'data-profile-panel="{profile}"' in polish
+          for viewport in ('max-width: 1366px', 'max-height: 820px', 'max-width: 1050px', 'max-width: 760px'):
+              assert viewport in polish
+          print('visual CSS structural contract: OK')
+          PY
+          git add SOURCE-SHA256SUMS app/web/static/sg-xmux-settings-v1.css tests/test_ui_connections_visual_v1.py
+          git config user.name "Ser.Gor"
+          git config user.email "infosec.co.il@gmail.com"
+          git commit -m "UI: polish Connections protocol cards"
+          echo "CANDIDATE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+          test -z "$(git status --porcelain)"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r product/requirements-dev.txt
+
+      - name: Verify source integrity and syntax
+        working-directory: product
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B - <<'PY'
+          import hashlib, re, subprocess
+          from pathlib import Path
+          expected = {}
+          for raw in Path('SOURCE-SHA256SUMS').read_text(encoding='utf-8').splitlines():
+              if not raw.strip():
+                  continue
+              match = re.fullmatch(r'([0-9a-f]{64})  (.+)', raw)
+              if match is None:
+                  raise SystemExit(f'invalid checksum row: {raw!r}')
+              expected[match.group(2)] = match.group(1)
+          tracked = set(subprocess.check_output(['git', 'ls-files'], text=True).splitlines())
+          tracked.discard('SOURCE-SHA256SUMS')
+          assert set(expected) == tracked
+          for path in sorted(tracked):
+              data = subprocess.check_output(['git', 'show', f'HEAD:{path}'])
+              assert hashlib.sha256(data).hexdigest() == expected[path], path
+          print(f'Git-blob source integrity ok: {len(tracked)} files')
+          PY
+          python -B -c "from pathlib import Path; files=list(Path('app').rglob('*.py'))+list(Path('engines').rglob('*.py'))+list(Path('tests').rglob('*.py')); [compile(p.read_text(encoding='utf-8'), str(p), 'exec') for p in files]; print(f'syntax ok: {len(files)} files')"
+
+      - name: Run targeted visual regression
+        working-directory: product
+        run: python -m pytest tests/test_ui_connections_visual_v1.py tests/test_sg_gateway_v22_low_resolution.py tests/test_connections_layout_v24.py
+
+      - name: Run full tests
+        working-directory: product
+        run: python -m pytest tests
+
+      - name: Build and verify FULL package
+        working-directory: product
+        run: |
+          VERSION="$(tr -d '[:space:]' < VERSION)"
+          test "$VERSION" = "0.1.0-022.04"
+          OUT="/tmp/SG-Gateway-${VERSION}-FULL.run"
+          bash build-run.sh "$OUT"
+          bash "$OUT" --verify-only
+
+      - name: Publish isolated green candidate
+        working-directory: product
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"
+          git push --force origin HEAD:refs/heads/scratch/connections-polish-candidate
+          echo "GREEN_CANDIDATE=$CANDIDATE_SHA"
