@@ -335,7 +335,6 @@
             <div class="cnv1-endpoint-main"><img src="{{ country_flag_url(awg3_country) }}" alt="{{ country_name(awg3_country) }}" width="30" height="20"><div><span>ВНЕШНЯЯ ТОЧКА</span><strong>{{ awg3_public_host }}</strong><small>UDP {{ awg3_settings.port }} · {{ country_name(awg3_country) }}</small></div></div>
             <span class="cnv1-port-chip">UDP {{ awg3_settings.port }}</span>
           </section>
-          <p class="awgd-runtime-note"><strong>Отдельный runtime.</strong> Интерфейс <code>awg3</code>, собственные ключи и сеть 10.67.0.0/16. Глобальный AWG2 runtime не изменяется.</p>
           <form method="post" action="{{ url_for('update_amneziawg3') }}" class="cnv1-engine-form cnv1-engine-form-compact">
             <input type="hidden" name="host" value="{{ awg3_public_host }}"><input type="hidden" name="country_code" value="{{ awg3_country }}">
             <div class="cnv1-compact-fields"><label><span>UDP-порт</span><input type="number" name="port" min="586" max="586" value="{{ awg3_settings.port }}" readonly required></label><label><span>DNS</span><input type="text" name="dns" value="{{ awg3_settings.config.get('dns', '1.1.1.1') }}"></label></div>
