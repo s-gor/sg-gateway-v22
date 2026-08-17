@@ -61,3 +61,22 @@ def test_shell_syntax() -> None:
             check=False,
         )
         assert result.returncode == 0, f"{script}: {result.stderr}"
+
+def test_safety_backup_disk_guard_retention_and_failed_archive_cleanup() -> None:
+    text = _text(UPDATER)
+    assert "SG_GATEWAY_02205_SAFETY_BACKUP_DISK_GUARD_V1" in text
+    assert 'SG_GATEWAY_UPDATE_BACKUP_KEEP:-2' in text
+    assert 'SG_GATEWAY_UPDATE_BACKUP_HEADROOM_MB:-256' in text
+    assert "cleanup_incomplete_safety_backups()" in text
+    assert "prune_safety_backups()" in text
+    assert "ensure_safety_backup_space()" in text
+    assert "remove_current_incomplete_backup()" in text
+    assert "du -sk --apparent-size" in text
+    assert 'df -Pk "$BACKUP_ROOT"' in text
+    assert "not enough free disk space for Safety Backup" in text
+    assert 'remove_current_incomplete_backup || true' in text
+    assert 'prune_safety_backups "$BACKUP_KEEP"' in text
+    create = text[text.index("create_safety_backup() {"):text.index("\nrollback_update() {")]
+    assert create.index("ensure_safety_backup_space") < create.index('systemctl stop "$PANEL_SERVICE" "$HOSTD_SERVICE"')
+    assert '[[ "$item" == "$kept_path" || "$item" == "$kept_path/"* ]]' in create
+

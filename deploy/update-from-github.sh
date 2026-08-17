@@ -10,6 +10,8 @@ PREFIX="/opt/sg-gateway"
 CONFIG_DIR="/etc/sg-gateway"
 DATA_DIR="/var/lib/sg-gateway"
 BACKUP_ROOT="/root/sg-gateway-update-safety"
+BACKUP_KEEP="${SG_GATEWAY_UPDATE_BACKUP_KEEP:-2}"
+BACKUP_HEADROOM_MB="${SG_GATEWAY_UPDATE_BACKUP_HEADROOM_MB:-256}"
 PANEL_SERVICE="sg-gateway.service"
 HOSTD_SERVICE="sg-hostd.service"
 AWG3_SERVICE="sg-gateway-awg3.service"
@@ -43,6 +45,138 @@ cleanup() {
   if [[ -n "$TEMP_DIR" && -d "$TEMP_DIR" ]]; then
     rm -rf "$TEMP_DIR"
   fi
+}
+
+
+# SG_GATEWAY_02205_SAFETY_BACKUP_DISK_GUARD_V1
+validate_backup_policy() {
+  [[ "$BACKUP_KEEP" =~ ^[0-9]+$ ]] || fail "SG_GATEWAY_UPDATE_BACKUP_KEEP must be an integer"
+  (( BACKUP_KEEP >= 1 )) || fail "SG_GATEWAY_UPDATE_BACKUP_KEEP must be at least 1"
+  [[ "$BACKUP_HEADROOM_MB" =~ ^[0-9]+$ ]] || fail "SG_GATEWAY_UPDATE_BACKUP_HEADROOM_MB must be a non-negative integer"
+}
+
+backup_is_complete() {
+  local dir="$1"
+  [[ -d "$dir" ]] || return 1
+  [[ -f "$dir/state.tar" && -f "$dir/existing-paths.txt" && -f "$dir/service-state.tsv" ]] || return 1
+  tar -tf "$dir/state.tar" >/dev/null 2>&1
+}
+
+cleanup_incomplete_safety_backups() {
+  local dir
+  [[ -d "$BACKUP_ROOT" ]] || return 0
+  while IFS= read -r dir; do
+    [[ -n "$dir" ]] || continue
+    [[ -n "$BACKUP_DIR" && "$dir" == "$BACKUP_DIR" ]] && continue
+    if ! backup_is_complete "$dir"; then
+      printf '[SG-Gateway Update] Removing incomplete Safety Backup: %s\n' "$(basename "$dir")"
+      rm -rf -- "$dir"
+    fi
+  done < <(find "$BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d -name '*-before-update' -print 2>/dev/null | sort)
+}
+
+prune_safety_backups() {
+  local keep="$1" kept=0 dir
+  [[ "$keep" =~ ^[0-9]+$ ]] || return 1
+  [[ -d "$BACKUP_ROOT" ]] || return 0
+  while IFS= read -r dir; do
+    [[ -n "$dir" ]] || continue
+    backup_is_complete "$dir" || continue
+    if (( kept < keep )); then
+      ((kept += 1))
+      continue
+    fi
+    printf '[SG-Gateway Update] Pruning old Safety Backup: %s\n' "$(basename "$dir")"
+    rm -rf -- "$dir" || return 1
+  done < <(find "$BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d -name '*-before-update' -print 2>/dev/null | sort -r)
+}
+
+remove_current_incomplete_backup() {
+  (( BACKUP_READY == 0 )) || return 0
+  [[ -n "$BACKUP_DIR" && -d "$BACKUP_DIR" ]] || return 0
+  case "$BACKUP_DIR" in
+    "$BACKUP_ROOT"/*-before-update)
+      printf '[SG-Gateway Update] Removing failed partial Safety Backup: %s\n' "$(basename "$BACKUP_DIR")" >&2
+      rm -rf -- "$BACKUP_DIR"
+      ;;
+    *)
+      printf '[SG-Gateway Update] Refusing unsafe partial-backup cleanup path: %s\n' "$BACKUP_DIR" >&2
+      return 1
+      ;;
+  esac
+}
+
+ensure_safety_backup_space() {
+  local probe_env="$BACKUP_DIR/space-preflight-https.env"
+  local probe_paths="$BACKUP_DIR/space-preflight-protected.txt"
+  local candidate kept_path covered size_kb available_kb
+  local payload_kb=0
+  local candidates=()
+  local unique=()
+  local filtered=()
+
+  https_state > "$probe_env"
+  protected_runtime_paths "$probe_env" "$probe_paths"
+
+  candidates+=(
+    "$PREFIX"
+    "$CONFIG_DIR"
+    "$DATA_DIR"
+    /etc/letsencrypt
+    "$AWG3_CONFIG"
+    "$AWG3_UNIT"
+    /etc/nginx/nginx.conf
+    /etc/nginx/sites-available/sg-gateway
+    /etc/nginx/sites-enabled/sg-gateway
+    /etc/nginx/stream-conf.d/sg-gateway-443.conf
+    /etc/systemd/system/sg-gateway.service
+    /etc/systemd/system/sg-hostd.service
+  )
+  while IFS= read -r candidate; do
+    [[ -n "$candidate" ]] && candidates+=("$candidate")
+  done < "$probe_paths"
+
+  for candidate in "${candidates[@]}"; do
+    [[ "$candidate" == /* ]] || continue
+    candidate="${candidate%/}"
+    [[ -e "$candidate" || -L "$candidate" ]] || continue
+    covered=0
+    for kept_path in "${unique[@]}"; do
+      if [[ "$candidate" == "$kept_path" || "$candidate" == "$kept_path/"* ]]; then
+        covered=1
+        break
+      fi
+    done
+    (( covered == 1 )) && continue
+    filtered=()
+    for kept_path in "${unique[@]}"; do
+      [[ "$kept_path" == "$candidate/"* ]] && continue
+      filtered+=("$kept_path")
+    done
+    unique=("${filtered[@]}" "$candidate")
+  done
+
+  for candidate in "${unique[@]}"; do
+    size_kb="$(du -sk --apparent-size -- "$candidate" 2>/dev/null | awk 'NR==1 {print $1}')"
+    [[ "$size_kb" =~ ^[0-9]+$ ]] || fail "cannot estimate Safety Backup size for $candidate"
+    ((payload_kb += size_kb))
+  done
+
+  available_kb="$(df -Pk "$BACKUP_ROOT" | awk 'NR==2 {print $4}')"
+  [[ "$available_kb" =~ ^[0-9]+$ ]] || fail "cannot determine free disk space for Safety Backup"
+
+  local headroom_kb=$(( BACKUP_HEADROOM_MB * 1024 ))
+  local required_kb=$(( payload_kb + headroom_kb ))
+  local payload_mb=$(( (payload_kb + 1023) / 1024 ))
+  local available_mb=$(( available_kb / 1024 ))
+  local required_mb=$(( (required_kb + 1023) / 1024 ))
+
+  printf '[SG-Gateway Update] Safety Backup disk preflight: payload ~%s MiB; free %s MiB; required with reserve %s MiB.\n' \
+    "$payload_mb" "$available_mb" "$required_mb"
+  (( available_kb >= required_kb )) || \
+    fail "not enough free disk space for Safety Backup: need about ${required_mb} MiB, free ${available_mb} MiB"
+
+  rm -f -- "$probe_env" "$probe_paths"
 }
 
 env_value() {
@@ -336,9 +470,21 @@ PYPROTECTED
 create_safety_backup() {
   mkdir -p "$BACKUP_ROOT"
   chmod 0700 "$BACKUP_ROOT"
+
+  cleanup_incomplete_safety_backups
+  local pre_keep=1
+  if (( BACKUP_KEEP > 1 )); then
+    pre_keep=$(( BACKUP_KEEP - 1 ))
+  fi
+  prune_safety_backups "$pre_keep"
+
   BACKUP_DIR="$BACKUP_ROOT/$(date -u +%Y%m%d-%H%M%S)-before-update"
   mkdir -p "$BACKUP_DIR"
   chmod 0700 "$BACKUP_DIR"
+
+  # Refuse the update before stopping services when the rollback archive
+  # cannot fit on disk. The reserve also covers tar metadata and update work.
+  ensure_safety_backup_space
 
   capture_service_states "$BACKUP_DIR/service-state.tsv"
   systemctl stop "$PANEL_SERVICE" "$HOSTD_SERVICE"
@@ -385,13 +531,25 @@ create_safety_backup() {
     fi
   done < "$BACKUP_DIR/protected-runtime-paths.txt"
 
-  local unique=() item
-  declare -A seen=()
+  local unique=() filtered=() item kept_path covered
   for item in "${existing[@]}"; do
+    item="${item#/}"
+    item="${item%/}"
     [[ -n "$item" ]] || continue
-    [[ -n "${seen[$item]+x}" ]] && continue
-    seen[$item]=1
-    unique+=("$item")
+    covered=0
+    for kept_path in "${unique[@]}"; do
+      if [[ "$item" == "$kept_path" || "$item" == "$kept_path/"* ]]; then
+        covered=1
+        break
+      fi
+    done
+    (( covered == 1 )) && continue
+    filtered=()
+    for kept_path in "${unique[@]}"; do
+      [[ "$kept_path" == "$item/"* ]] && continue
+      filtered+=("$kept_path")
+    done
+    unique=("${filtered[@]}" "$item")
   done
   existing=("${unique[@]}")
 
@@ -469,6 +627,9 @@ on_error() {
       systemctl start "$HOSTD_SERVICE" >/dev/null 2>&1 || true
       systemctl start "$PANEL_SERVICE" >/dev/null 2>&1 || true
     fi
+  fi
+  if (( BACKUP_READY == 0 )); then
+    remove_current_incomplete_backup || true
   fi
   cleanup
   printf '%s[SG-Gateway Update] Update failed.%s\n' "$RED" "$RESET" >&2
@@ -589,8 +750,10 @@ preflight() {
     fail "SG-Gateway is not installed. Use the Clean Install command instead."
   }
 
+  validate_backup_policy
+
   local command
-  for command in curl tar gzip python3 sha256sum systemctl; do
+  for command in curl tar gzip python3 sha256sum systemctl du df find sort; do
     command -v "$command" >/dev/null 2>&1 || fail "required command is missing: $command"
   done
 
@@ -982,6 +1145,11 @@ main() {
   run_stage 5 "Перезапуск только panel + hostd" restart_panel
   run_stage 6 "Проверка HTTPS, Clients, Nginx и runtime" verify_final
   bind_panel_update_state
+
+  if ! prune_safety_backups "$BACKUP_KEEP"; then
+    printf '%s[SG-Gateway Update] WARNING:%s old Safety Backup retention cleanup failed; update itself is already verified.
+'       "$YELLOW" "$RESET" >&2
+  fi
 
   UPDATE_FINISHED=1
   trap - ERR INT TERM
