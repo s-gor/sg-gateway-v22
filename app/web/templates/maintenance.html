@@ -23,6 +23,7 @@
 {% set operation_titles = {
   'connection.update': 'Обновлены настройки подключения',
   'backup.create': 'Создана резервная копия',
+  'backup.cleanup': 'Удалены старые резервные копии',
   'backup.restore': 'Восстановлена резервная копия',
   'backup.full.verify': 'Проверен полный backup',
   'diagnostics.download': 'Скачана диагностика',
@@ -387,10 +388,30 @@
         <h2>Последняя копия базы данных</h2>
         <p>Ручная SQLite-копия и страховочная копия перед восстановлением.</p>
       </div>
-      <form method="post" action="{{ url_for('create_backup_route') }}">
-        <button class="button primary" type="submit">Создать сейчас</button>
-      </form>
+      <div class="mtv2-backup-head-actions">
+        {% if backup_cleanup.delete_count %}
+        <form method="post" action="{{ url_for('delete_old_backups_route') }}"
+              data-sg-confirm="Будут удалены {{ backup_cleanup.delete_count }} старые копии базы данных и освобождено примерно {{ backup_cleanup.delete_size_label }}. Две последние копии останутся. Full Backup и Safety Backup обновления не затрагиваются."
+              data-sg-confirm-title="Удалить старые резервные копии"
+              data-sg-confirm-button="Удалить старые"
+              data-sg-confirm-tone="danger">
+          <button class="button" type="submit">Удалить старые</button>
+        </form>
+        {% endif %}
+        <form method="post" action="{{ url_for('create_backup_route') }}">
+          <button class="button primary" type="submit">Создать сейчас</button>
+        </form>
+      </div>
     </header>
+
+    {% if backups %}
+    <p class="mtv2-backup-storage-summary">
+      Хранится: {{ backup_cleanup.total_count }} копий ·
+      {{ backup_cleanup.total_size_label }}
+      {% if backup_cleanup.delete_count %}· к удалению {{ backup_cleanup.delete_count }} копий,
+      {{ backup_cleanup.delete_size_label }}{% endif %}
+    </p>
+    {% endif %}
 
     {% if backups %}
       {% set backup = backups[0] %}

@@ -1,4 +1,5 @@
 from app.clients.repository import create_client
+from app.maintenance.backups import list_backups
 from app.maintenance.service import collect_diagnostics
 
 
@@ -65,3 +66,28 @@ def test_maintenance_page_shows_backup_kind(tmp_path, monkeypatch):
     assert response.status_code == 200
     assert "ПОСЛЕДНЯЯ КОПИЯ" in body
     assert "Ручная резервная копия" in body
+
+
+def test_maintenance_can_delete_old_database_backups(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("SG_GATEWAY_ADMIN_PASSWORD", "secret")
+    from app.main import create_app
+
+    app = create_app()
+    client = app.test_client()
+    client.post("/login", data={"password": "secret"})
+    for _ in range(4):
+        client.post("/maintenance/backups")
+
+    page = client.get("/maintenance")
+    body = page.get_data(as_text=True)
+    assert "Удалить старые" in body
+    assert "к удалению 2 копий" in body
+
+    response = client.post("/maintenance/backups/delete-old", follow_redirects=True)
+    body = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert "Удалены 2 старые копии" in body
+    assert len(list_backups()) == 2
+    assert "Удалить старые" not in body

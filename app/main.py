@@ -49,8 +49,10 @@ from app.connections.settings import get_connection_settings, update_connection_
 from app.db import init_db
 from app.help.content import get_topic, list_topics
 from app.maintenance.backups import (
+    backup_cleanup_preview,
     confirm_restore_runtime,
     create_backup,
+    delete_old_backups,
     get_backup,
     list_backups,
     restore_backup_transaction,
@@ -1621,6 +1623,7 @@ def create_app() -> Flask:
             panel_updates = panel_update_overview(refresh=refresh_updates)
             core_updates = core_update_overview(refresh=refresh_updates)
             geofiles_updates = geofiles_overview()
+        backups = list_backups()
         return render_template(
             "maintenance.html",
             active_page="maintenance",
@@ -1631,7 +1634,8 @@ def create_app() -> Flask:
             geofiles_updates=geofiles_updates,
             diagnostics=collect_diagnostics(),
             health_checks=collect_health_checks(),
-            backups=list_backups(),
+            backups=backups,
+            backup_cleanup=backup_cleanup_preview(backups),
             full_backups=list_full_backups(),
             operations=list_operations(),
             release=get_release_manifest(),
@@ -1758,6 +1762,26 @@ def create_app() -> Flask:
         backup = create_backup()
         flash(f"Резервная копия создана: {backup.name}", "success")
         return redirect(url_for("maintenance"))
+
+    @app.post("/maintenance/backups/delete-old")
+    def delete_old_backups_route():
+        result = delete_old_backups()
+        freed = _format_bytes(result.freed_bytes)
+        if result.failed_names:
+            flash(
+                f"Удалены {result.deleted_count} старые копии, освобождено {freed}. "
+                f"Не удалось удалить: {', '.join(result.failed_names)}",
+                "error",
+            )
+        elif result.deleted_count:
+            flash(
+                f"Удалены {result.deleted_count} старые копии, освобождено {freed}. "
+                f"Сохранены {result.kept_count} последние копии.",
+                "success",
+            )
+        else:
+            flash("Старых резервных копий для удаления нет.", "success")
+        return redirect(url_for("maintenance", tab="backups"))
 
     def _restore_backup_response(name: str, destination_endpoint: str):
         restored = restore_backup_transaction(name)
