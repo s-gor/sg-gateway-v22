@@ -188,3 +188,20 @@ def test_compact_xmux_uses_mode_dialog_instead_of_permanent_contract_row() -> No
     assert "bounded history (two by default)" in publication
     assert "parameter dialog with the exact preset values before save" in publication
 
+
+def test_xmux_modes_render_as_visible_buttons_and_manual_extra_starts_closed() -> None:
+    partial = (ROOT / "app/web/templates/_xray_xmux_settings.html").read_text(encoding="utf-8")
+    css = (ROOT / "app/web/static/sg-xmux-settings-v1.css").read_text(encoding="utf-8")
+    js = (ROOT / "app/web/static/sg-xmux-settings-v1.js").read_text(encoding="utf-8")
+
+    assert "#xray-xmux .xmux1-mode > span {" in partial
+    assert "border: 1px solid var(--sg-line" in partial
+    assert "#xray-xmux .xmux1-mode:hover > span {" in partial
+    assert "#xray-xmux .xmux1-mode input:checked + span {" in partial
+    assert '<details class="xmux1-extra" data-xmux-extra>' in partial
+    assert "{% if xmux_mode == 'expert' %}open{% endif %}" not in partial
+    assert "details.open = true" not in js
+    assert "if (details) details.open = false;" in js
+    assert ".xmux1-contract" not in partial
+    assert ".xmux1-contract" not in css
+

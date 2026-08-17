@@ -39,15 +39,12 @@
 #xray-xmux .xmux1-modes {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 3px;
-  padding: 3px;
-  border: 1px solid var(--sg-line, rgba(120, 145, 135, .35));
-  border-radius: 11px;
-  background: color-mix(in srgb, var(--sg-panel, #f5f3ed) 88%, transparent);
+  gap: 10px;
 }
 
 #xray-xmux .xmux1-mode {
   min-width: 0;
+  cursor: pointer;
 }
 
 #xray-xmux .xmux1-mode > span {
@@ -55,12 +52,22 @@
   min-height: 44px;
   align-items: center;
   justify-content: center;
-  padding: 8px 10px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  box-shadow: none;
+  padding: 8px 12px;
+  border: 1px solid var(--sg-line, rgba(120, 145, 135, .35));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--sg-panel, #f5f3ed) 82%, transparent);
+  box-shadow: 0 1px 2px rgba(10, 18, 15, .06);
   text-align: center;
+  transition: border-color .16s ease, background .16s ease, box-shadow .16s ease, transform .16s ease;
+}
+
+#xray-xmux .xmux1-mode:hover > span {
+  border-color: color-mix(in srgb, var(--sg-green, #4f8f75) 52%, var(--sg-line, rgba(120, 145, 135, .35)));
+  background: color-mix(in srgb, var(--sg-green, #4f8f75) 7%, var(--sg-panel, #f5f3ed));
+}
+
+#xray-xmux .xmux1-mode:active > span {
+  transform: translateY(1px);
 }
 
 #xray-xmux .xmux1-mode strong {
@@ -73,54 +80,16 @@
 }
 
 #xray-xmux .xmux1-mode input:checked + span {
-  border: 0;
-  background: color-mix(in srgb, var(--sg-green, #4f8f75) 14%, var(--sg-panel, #f5f3ed));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sg-green, #4f8f75) 62%, transparent);
+  border-color: color-mix(in srgb, var(--sg-green, #4f8f75) 78%, var(--sg-line, rgba(120, 145, 135, .35)));
+  background: color-mix(in srgb, var(--sg-green, #4f8f75) 16%, var(--sg-panel, #f5f3ed));
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--sg-green, #4f8f75) 28%, transparent),
+    0 2px 6px rgba(10, 18, 15, .08);
 }
 
 #xray-xmux .xmux1-mode input:focus-visible + span {
   outline: 2px solid color-mix(in srgb, var(--sg-green, #4f8f75) 64%, transparent);
-  outline-offset: 1px;
-}
-
-#xray-xmux .xmux1-contract {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0;
-  margin-top: 8px;
-  border: 1px solid var(--sg-line, rgba(120, 145, 135, .28));
-  border-radius: 10px;
-  overflow: hidden;
-  background: color-mix(in srgb, var(--sg-panel, #f5f3ed) 68%, transparent);
-}
-
-#xray-xmux .xmux1-contract > div {
-  display: flex;
-  min-width: 0;
-  min-height: 58px;
-  justify-content: center;
-  padding: 9px 12px;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-}
-
-#xray-xmux .xmux1-contract > div + div {
-  border-left: 1px solid var(--sg-line, rgba(120, 145, 135, .28));
-}
-
-#xray-xmux .xmux1-contract span {
-  font-size: 9.5px;
-  line-height: 1.2;
-}
-
-#xray-xmux .xmux1-contract strong {
-  font-size: 13.5px;
-  line-height: 1.25;
-}
-
-#xray-xmux .xmux1-contract small {
-  display: none;
+  outline-offset: 2px;
 }
 
 #xray-xmux .xmux1-extra {
@@ -305,10 +274,6 @@
     padding: 6px 9px;
   }
 
-  #xray-xmux .xmux1-contract > div {
-    min-height: 52px;
-    padding: 7px 10px;
-  }
 
   #xray-xmux .xmux1-extra {
     margin-top: 7px;
@@ -375,7 +340,7 @@
         </label>
       </div>
 
-      <details class="xmux1-extra" data-xmux-extra {% if xmux_mode == 'expert' %}open{% endif %}>
+      <details class="xmux1-extra" data-xmux-extra>
         <summary>Client Extra JSON</summary>
         <label>
           <span>Дополнительные клиентские поля</span>

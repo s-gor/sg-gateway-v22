@@ -81,30 +81,6 @@
   line-height: 1.45;
 }
 
-.xmux1-contract {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 14px;
-}
-
-.xmux1-contract > div {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 5px;
-  padding: 13px 14px;
-  border: 1px solid var(--sg-line, rgba(120, 145, 135, .28));
-  border-radius: 10px;
-}
-
-.xmux1-contract span {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: .06em;
-  opacity: .72;
-}
-
 .xmux1-extra {
   margin-top: 14px;
   border: 1px solid var(--sg-line, rgba(120, 145, 135, .28));
@@ -149,8 +125,7 @@
 }
 
 @media (max-width: 980px) {
-  .xmux1-modes,
-  .xmux1-contract {
+  .xmux1-modes {
     grid-template-columns: 1fr;
   }
 

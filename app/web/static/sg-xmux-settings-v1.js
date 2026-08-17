@@ -14,12 +14,7 @@
         expert: 'Ручной',
       };
 
-      const sync = () => {
-        const selected = form.querySelector('input[name="xhttp_xmux_mode"]:checked');
-        if (details && selected && selected.value === 'expert') {
-          details.open = true;
-        }
-      };
+      if (details) details.open = false;
 
       const closeDialog = () => {
         if (!dialog) return;
@@ -56,7 +51,6 @@
 
       form.querySelectorAll('input[name="xhttp_xmux_mode"]').forEach((input) => {
         input.addEventListener('change', () => {
-          sync();
           showModeDetails(input.value);
         });
         input.closest('.xmux1-mode')?.addEventListener('click', () => {
@@ -73,7 +67,6 @@
         if (event.target === dialog) closeDialog();
       });
       jsonInput?.addEventListener('input', syncManualPreview);
-      sync();
     }
 
     // Reality XHTTP mode is rendered by the main form as a hidden stream-one
