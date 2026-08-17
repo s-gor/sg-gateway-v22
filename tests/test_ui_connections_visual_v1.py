@@ -106,18 +106,16 @@ def test_connections_protocol_cards_show_only_real_controls_as_fields():
     css = (ROOT / "app/web/static/sg-xmux-settings-v1.css").read_text(encoding="utf-8")
     polish = css.split("SG-Gateway 022.04 · Connections controls-only polish", 1)[1]
     assert "Здесь только то, что можно изменить" in template
-    for field_class in ("xps2-field-port", "xps2-field-mode", "xps2-field-path"):
-        assert field_class in template
-    for meta in ("xps2-profile-meta", "Vision · {{ profile.flow }}", "XHTTP client · stream-one", "VLESS Encryption ·"):
-        assert meta in template
-    assert "Без дополнительного Path" not in template
-    assert "Обязательный XTLS Vision для выбранного VLESS-профиля" not in template
-    assert "Ключ клиента хранится в защищённых настройках" not in template
-    assert ".xps2-profile-meta" in polish
+    assert "Public Path" not in template
+    assert "Vision · {{ profile.flow }}" not in template
+    assert "XHTTP client · stream-one" not in template
+    assert "VLESS Encryption ·" not in template
+    assert "xps2-field-path" not in template
+    assert '<input type="hidden" name="{{ profile.id }}_path" value="{{ profile.path }}">' in template
+    assert "xps2-field-port" in template
+    assert "xps2-field-mode" in template
     assert ".xps2-field-port" in polish
     assert ".xps2-field-mode" in polish
-    assert ".xps2-field-path" in polish
-    assert "display: none" not in polish
 
 
 def test_reality_xhttp_fixed_mode_is_native_hidden_form_value_not_fake_control():
@@ -147,38 +145,25 @@ def test_connections_protocol_cards_keep_all_mutable_form_contracts():
     assert "Сохранить и применить" in template
 
 
-def test_connections_protocol_cards_have_compact_profile_specific_grids():
+def test_connections_protocol_cards_have_minimal_profile_specific_grids():
     css = (ROOT / "app/web/static/sg-xmux-settings-v1.css").read_text(encoding="utf-8")
     polish = css.split("SG-Gateway 022.04 · Connections controls-only polish", 1)[1]
     for profile_id in ("reality_tcp", "xhttp_reality", "xhttp_tls", "hysteria2"):
         assert f'data-profile-panel="{profile_id}"' in polish
-    assert 'grid-template-areas: "title port";' in polish
-    assert 'grid-template-areas: "title title path port";' in polish
-    assert 'grid-template-areas: "title mode path port";' in polish
+    assert polish.count('grid-template-areas: "title port";') >= 2
+    assert 'grid-template-areas: "title mode port";' in polish
     assert '"obfs obfs"' in polish
+    assert "path port" not in polish
+    assert ".xps2-field-path" not in polish
     assert "box-shadow: none" in polish
 
 
-def test_xhttp_reality_and_tls_share_path_and_port_columns():
-    css = (ROOT / "app/web/static/sg-xmux-settings-v1.css").read_text(encoding="utf-8")
-    polish = css.split("SG-Gateway 022.04 · Connections controls-only polish", 1)[1]
-    desktop_columns = "grid-template-columns: minmax(250px, .75fr) minmax(245px, 1fr) minmax(300px, 1.2fr) minmax(150px, 210px);"
-    compact_columns = "grid-template-columns: minmax(220px, .75fr) minmax(220px, 1fr) minmax(250px, 1.1fr) minmax(135px, 180px);"
-    assert polish.count(desktop_columns) >= 2
-    assert polish.count(compact_columns) >= 2
-    assert 'grid-template-areas: "title title path port";' in polish
-    assert 'grid-template-areas: "title mode path port";' in polish
-
-
-def test_xhttp_paths_are_narrowed_symmetrically_and_ports_match_reality_tcp():
+def test_first_three_xray_cards_keep_ports_aligned_and_tls_mode_only():
     css = (ROOT / "app/web/static/sg-xmux-settings-v1.css").read_text(encoding="utf-8")
     polish = css.split("SG-Gateway 022.04 · Connections controls-only polish", 1)[1]
     assert polish.count("minmax(150px, 210px)") >= 3
     assert polish.count("minmax(135px, 180px)") >= 3
-    assert 'width: calc(100% - 56px);' in polish
-    assert 'justify-self: center;' in polish
-    assert 'data-profile-panel="xhttp_reality"] .xps2-field-path' in polish
-    assert 'data-profile-panel="xhttp_tls"] .xps2-field-path' in polish
+    assert 'grid-template-areas: "title mode port";' in polish
 
 
 def test_connections_protocol_cards_cover_low_resolution_and_mobile():
@@ -188,4 +173,4 @@ def test_connections_protocol_cards_cover_low_resolution_and_mobile():
     assert "(min-width: 981px) and (max-height: 820px)" in polish
     assert "@media (max-width: 1050px)" in polish
     assert "@media (max-width: 760px)" in polish
-    assert 'grid-template-areas: "title" "port" "mode" "path";' in polish
+    assert 'grid-template-areas: "title" "port" "mode";' in polish

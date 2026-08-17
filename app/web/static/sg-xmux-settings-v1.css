@@ -256,7 +256,6 @@
 
 .xps2-field-port { grid-area: port; }
 .xps2-field-mode { grid-area: mode; }
-.xps2-field-path { grid-area: path; }
 .xps2-parameter-title { grid-area: title; }
 .xps2-salamander { grid-area: obfs; }
 
@@ -266,21 +265,13 @@
 }
 
 .xps2-parameter-row[data-profile-panel="xhttp_reality"] {
-  grid-template-columns: minmax(250px, .75fr) minmax(245px, 1fr) minmax(300px, 1.2fr) minmax(150px, 210px);
-  grid-template-areas: "title title path port";
+  grid-template-columns: minmax(300px, 1fr) minmax(150px, 210px);
+  grid-template-areas: "title port";
 }
 
 .xps2-parameter-row[data-profile-panel="xhttp_tls"] {
-  grid-template-columns: minmax(250px, .75fr) minmax(245px, 1fr) minmax(300px, 1.2fr) minmax(150px, 210px);
-  grid-template-areas: "title mode path port";
-}
-
-@media (min-width: 1051px) {
-  .xps2-parameter-row[data-profile-panel="xhttp_reality"] .xps2-field-path,
-  .xps2-parameter-row[data-profile-panel="xhttp_tls"] .xps2-field-path {
-    width: calc(100% - 56px);
-    justify-self: center;
-  }
+  grid-template-columns: minmax(250px, .8fr) minmax(320px, 1.2fr) minmax(150px, 210px);
+  grid-template-areas: "title mode port";
 }
 
 .xps2-parameter-row[data-profile-panel="hysteria2"] {
@@ -383,11 +374,11 @@ html[data-theme="light"] .xps2-salamander {
   }
 
   .xps2-parameter-row[data-profile-panel="xhttp_reality"] {
-    grid-template-columns: minmax(220px, .75fr) minmax(220px, 1fr) minmax(250px, 1.1fr) minmax(135px, 180px);
+    grid-template-columns: minmax(230px, 1fr) minmax(135px, 180px);
   }
 
   .xps2-parameter-row[data-profile-panel="xhttp_tls"] {
-    grid-template-columns: minmax(220px, .75fr) minmax(220px, 1fr) minmax(250px, 1.1fr) minmax(135px, 180px);
+    grid-template-columns: minmax(210px, .8fr) minmax(260px, 1.2fr) minmax(135px, 180px);
   }
 
   .xps2-parameter-row[data-profile-panel="hysteria2"] {
@@ -426,14 +417,13 @@ html[data-theme="light"] .xps2-salamander {
 
   .xps2-parameter-row[data-profile-panel="xhttp_reality"] {
     grid-template-areas:
-      "title port"
-      "path path";
+      "title port";
   }
 
   .xps2-parameter-row[data-profile-panel="xhttp_tls"] {
     grid-template-areas:
       "title port"
-      "mode path";
+      "mode mode";
   }
 
   .xps2-parameter-row[data-profile-panel="hysteria2"] {
@@ -456,11 +446,11 @@ html[data-theme="light"] .xps2-salamander {
   }
 
   .xps2-parameter-row[data-profile-panel="xhttp_reality"] {
-    grid-template-areas: "title" "port" "path";
+    grid-template-areas: "title" "port";
   }
 
   .xps2-parameter-row[data-profile-panel="xhttp_tls"] {
-    grid-template-areas: "title" "port" "mode" "path";
+    grid-template-areas: "title" "port" "mode";
   }
 
   .xps2-parameter-row[data-profile-panel="hysteria2"] {

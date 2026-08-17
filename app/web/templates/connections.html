@@ -123,7 +123,7 @@
               <div>
                 <div class="cnv1-card-kicker">ПАРАМЕТРЫ</div>
                 <h3>Параметры выбранных профилей</h3>
-                <p>Здесь только то, что можно изменить. Фиксированные параметры показаны компактно рядом с названием профиля.</p>
+                <p>Здесь только то, что можно изменить.</p>
               </div>
             </header>
 
@@ -137,12 +137,11 @@
                 <div class="xps2-parameter-title">
                   <strong>{{ profile.title }}</strong>
                   <span>{{ profile.transport }} · {{ profile.security }}</span>
+                  {% if profile.id == 'hysteria2' %}
                   <div class="xps2-profile-meta">
-                    {% if profile.flow %}<span>Vision · {{ profile.flow }}</span>{% endif %}
-                    {% if profile.id == 'xhttp_reality' %}<span>XHTTP client · stream-one</span>{% endif %}
-                    {% if profile.encryption_required %}<span class="{{ 'is-ready' if profile.encryption_ready else 'is-warning' }}">VLESS Encryption · {{ 'готово' if profile.encryption_ready else 'не создано' }}</span>{% endif %}
                     {% if not profile.path %}<span>Path · —</span>{% endif %}
                   </div>
+                  {% endif %}
                 </div>
                 <label class="xps2-field-port">
                   <span>{{ 'UDP-порт' if profile.id == 'hysteria2' else 'TCP-порт' }}</span>
@@ -191,11 +190,7 @@
                 </section>
                 {% endif %}
                 {% if profile.path %}
-                <label class="xps2-field-path">
-                  <span>Public Path</span>
-                  <input type="text" name="{{ profile.id }}_path" value="{{ profile.path }}"
-                         {% if locked %}disabled{% endif %}>
-                </label>
+                <input type="hidden" name="{{ profile.id }}_path" value="{{ profile.path }}">
                 {% endif %}
 
                 {% if profile.id == 'hysteria2' %}
