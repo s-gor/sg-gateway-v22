@@ -1,0 +1,129 @@
+name: Validate equal-height Xray strips
+
+on:
+  push:
+    branches:
+      - scratch/xray-equal-height-v1
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout validation tools
+        uses: actions/checkout@v4
+
+      - name: Checkout exact green 022.04 product
+        uses: actions/checkout@v4
+        with:
+          ref: 2792ead2b403d179a5d60b194d0a68b7f0af613a
+          path: product
+          fetch-depth: 0
+
+      - name: Assemble equal-height candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C product rev-parse HEAD)" = "2792ead2b403d179a5d60b194d0a68b7f0af613a"
+          python3 -B tools/xray_equal_height_v1.py product
+          cd product
+          git add app/web/static/sg-xmux-settings-v1.css tests/test_ui_connections_visual_v1.py
+          python3 -B - <<'PY'
+          import hashlib
+          from pathlib import Path
+          sums = Path('SOURCE-SHA256SUMS')
+          lines = sums.read_text(encoding='utf-8').splitlines()
+          changed = {
+              'app/web/static/sg-xmux-settings-v1.css',
+              'tests/test_ui_connections_visual_v1.py',
+          }
+          out = []
+          seen = set()
+          for line in lines:
+              digest, path = line.split('  ', 1)
+              if path in changed:
+                  digest = hashlib.sha256(Path(path).read_bytes()).hexdigest()
+                  seen.add(path)
+              out.append(f'{digest}  {path}')
+          if seen != changed:
+              raise SystemExit(f'checksum paths missing: {sorted(changed-seen)}')
+          sums.write_text('\n'.join(out) + '\n', encoding='utf-8')
+          PY
+          git add SOURCE-SHA256SUMS
+          git diff --cached --check
+          git config user.name "Ser.Gor"
+          git config user.email "infosec.co.il@gmail.com"
+          git commit -m "UI: equalize VLESS parameter strip heights"
+          test -z "$(git status --porcelain)"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        working-directory: product
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+
+      - name: Verify source integrity and syntax
+        working-directory: product
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B - <<'PY'
+          import hashlib, re, subprocess
+          from pathlib import Path
+          rows = Path('SOURCE-SHA256SUMS').read_text(encoding='utf-8').splitlines()
+          expected = {}
+          for n, raw in enumerate(rows, 1):
+              if not raw.strip():
+                  continue
+              m = re.fullmatch(r'([0-9a-f]{64})  (.+)', raw)
+              if m is None:
+                  raise SystemExit(f'invalid SOURCE-SHA256SUMS line {n}: {raw!r}')
+              digest, path = m.groups()
+              expected[path] = digest
+          tracked = set(subprocess.check_output(['git','ls-files'], text=True, encoding='utf-8').splitlines())
+          tracked.discard('SOURCE-SHA256SUMS')
+          if set(expected) != tracked:
+              raise SystemExit('checksum inventory mismatch')
+          for path in sorted(tracked):
+              actual = hashlib.sha256(Path(path).read_bytes()).hexdigest()
+              if actual != expected[path]:
+                  raise SystemExit(f'source hash mismatch: {path}')
+          print(f'source integrity ok: {len(tracked)} files')
+          PY
+          python -B -c "from pathlib import Path; files=list(Path('app').rglob('*.py'))+list(Path('engines').rglob('*.py'))+list(Path('tests').rglob('*.py')); [compile(p.read_text(encoding='utf-8'), str(p), 'exec') for p in files]; print(f'syntax ok: {len(files)} files')"
+
+      - name: Run targeted Connections regressions
+        working-directory: product
+        run: >-
+          python -m pytest -q
+          tests/test_ui_connections_visual_v1.py
+          tests/test_sg_gateway_v22_low_resolution.py
+          tests/test_preview27_layout_and_vision.py
+
+      - name: Run full tests
+        working-directory: product
+        run: python -m pytest tests
+
+      - name: Build and verify FULL package
+        working-directory: product
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(tr -d '[:space:]' < VERSION)"
+          OUT="/tmp/SG-Gateway-${VERSION}-FULL.run"
+          bash build-run.sh "$OUT"
+          bash "$OUT" --verify-only
+
+      - name: Publish isolated green candidate
+        working-directory: product
+        shell: bash
+        run: |
+          set -euo pipefail
+          git push --force origin HEAD:refs/heads/scratch/xray-equal-height-candidate
