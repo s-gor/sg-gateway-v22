@@ -69,6 +69,15 @@ if block(original, hysteria_start, hysteria_end) != block(css, hysteria_start, h
 css_path.write_text(css, encoding="utf-8")
 
 tests = test_path.read_text(encoding="utf-8")
+old_desktop = '    desktop_columns = "grid-template-columns: minmax(250px, .75fr) minmax(245px, 1fr) minmax(300px, 1.2fr) minmax(145px, 190px);"\n'
+new_desktop = '    desktop_columns = "grid-template-columns: minmax(250px, .75fr) minmax(245px, 1fr) minmax(300px, 1.2fr) minmax(150px, 210px);"\n'
+old_compact = '    compact_columns = "grid-template-columns: minmax(220px, .75fr) minmax(220px, 1fr) minmax(250px, 1.1fr) minmax(130px, 175px);"\n'
+new_compact = '    compact_columns = "grid-template-columns: minmax(220px, .75fr) minmax(220px, 1fr) minmax(250px, 1.1fr) minmax(135px, 180px);"\n'
+for old, new in ((old_desktop, new_desktop), (old_compact, new_compact)):
+    if old not in tests:
+        raise SystemExit(f"expected old test contract not found: {old.strip()}")
+    tests = tests.replace(old, new, 1)
+
 anchor_test = '''def test_connections_protocol_cards_cover_low_resolution_and_mobile():\n'''
 extra = '''def test_xhttp_paths_are_narrowed_symmetrically_and_ports_match_reality_tcp():\n    css = (ROOT / "app/web/static/sg-xmux-settings-v1.css").read_text(encoding="utf-8")\n    polish = css.split("SG-Gateway 022.04 · Connections controls-only polish", 1)[1]\n    assert polish.count("minmax(150px, 210px)") >= 3\n    assert polish.count("minmax(135px, 180px)") >= 3\n    assert 'width: calc(100% - 56px);' in polish\n    assert 'justify-self: center;' in polish\n    assert 'data-profile-panel="xhttp_reality"] .xps2-field-path' in polish\n    assert 'data-profile-panel="xhttp_tls"] .xps2-field-path' in polish\n\n\n'''
 if extra.strip() not in tests:
