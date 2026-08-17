@@ -28,8 +28,9 @@ jobs:
           set -euo pipefail
           test "$(git -C product rev-parse HEAD)" = "fbc300cdcba1ccb2d66ff9cabafcd228990d01d2"
           python3 -B tools/xray_controls_minimal_v1.py product
+          python3 -B tools/xray_controls_minimal_testfix.py product
           cd product
-          git add app/web/templates/connections.html app/web/static/sg-xmux-settings-v1.css tests/test_ui_connections_visual_v1.py
+          git add app/web/templates/connections.html app/web/static/sg-xmux-settings-v1.css tests/test_ui_connections_visual_v1.py tests/test_preview27_layout_and_vision.py
           python3 -B - <<'PY'
           import hashlib
           from pathlib import Path
@@ -39,6 +40,7 @@ jobs:
               'app/web/templates/connections.html',
               'app/web/static/sg-xmux-settings-v1.css',
               'tests/test_ui_connections_visual_v1.py',
+              'tests/test_preview27_layout_and_vision.py',
           }
           out = []
           seen = set()
