@@ -2,6 +2,10 @@
 
 ## 0.1.0-022.04 — 2026-08-16
 
+- Finalized the Fix30 Connections UI: aligned the three VLESS parameter cards to the same compact height, kept XHTTP TLS mode and TCP port on one level, moved protocol paths out of the editable-control grid, and preserved the accepted dark blue-glass hierarchy.
+- Simplified Hysteria 2 controls and removed the internal divider above Obfuscation without changing Hysteria runtime behavior.
+- Reworked XMUX preset controls into visible mode buttons with an exact-values dialog while preserving the accepted SG-Panel preset labels and client-only contract.
+- Added a Safety Backup free-space guard, bounded successful backup history, and cleanup for incomplete archives before an update can stop panel services.
 - Added optional Dual Stack IPv4 + IPv6 across public metadata, Xray listeners, exports, AWG2 and AWG3.
 - Added isolated AWG3 3.x userspace runtime with independent IPv6 ULA space and lifecycle handling.
 - Made WARP opt-in on clean install and added independent IPv4/IPv6 health with shared-core family gates.
