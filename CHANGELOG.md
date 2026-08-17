@@ -2,23 +2,23 @@
 
 ## 0.1.0-022.04 — 2026-08-16
 
-- Finalized the Fix30 Connections UI: aligned the three VLESS parameter cards to the same compact height, kept XHTTP TLS mode and TCP port on one level, moved protocol paths out of the editable-control grid, and preserved the accepted dark blue-glass hierarchy.
-- Simplified Hysteria 2 controls and removed the internal divider above Obfuscation without changing Hysteria runtime behavior.
-- Reworked XMUX preset controls into visible mode buttons with an exact-values dialog while preserving the accepted SG-Panel preset labels and client-only contract.
-- Added a Safety Backup free-space guard, bounded successful backup history, and cleanup for incomplete archives before an update can stop panel services.
-- Added optional Dual Stack IPv4 + IPv6 across public metadata, Xray listeners, exports, AWG2 and AWG3.
-- Added isolated AWG3 3.x userspace runtime with independent IPv6 ULA space and lifecycle handling.
-- Made WARP opt-in on clean install and added independent IPv4/IPv6 health with shared-core family gates.
-- Added fail-closed Family Routing: SG-Gateway IPv4/IPv6, WARP IPv4/IPv6 and Block, with legacy IPv4 migration.
-- Fixed default-traffic Block UI/backend mismatch.
-- Hardened the updater to preserve TLS/HTTPS, AWG3 and runtime state with safety backup and rollback validation.
-- Added SG subscription/device compatibility pipeline and accumulated client/device UX fixes.
-- Added Hysteria2 Off/Salamander/Gecko cleanup and canonical URI handling.
-- Added XHTTP XMUX presets/expert mode while keeping XMUX out of server inbound configuration.
-- Expanded Full Backup verification/restore safety and panel-update state preservation.
-- Added production WSGI/systemd contract and accumulated installer/diagnostic hardening.
-- Added low-resolution desktop support that compacts without hiding actions.
-- Added AWG3-aware full uninstall and 022.04 release-contract regression coverage.
+- Завершён интерфейс Connections Fix30: три карточки VLESS приведены к одной компактной высоте, mode XHTTP TLS и TCP-порт выровнены, а неизменяемые Path убраны из сетки настроек.
+- Упрощён блок Hysteria 2 и удалён разделитель над Obfuscation без изменения runtime.
+- XMUX-пресеты оформлены как видимые кнопки с окном точных значений; сохранены названия SG-Panel и клиентский контракт.
+- В Safety Backup добавлены проверка свободного места, ограничение истории и удаление незавершённых архивов.
+- Добавлен Dual Stack IPv4 + IPv6 для metadata, Xray, экспортов, AWG2 и AWG3.
+- Добавлен изолированный AWG3 userspace 3.x с отдельной IPv6 ULA-подсетью.
+- WARP убран из автоматического clean install; IPv4 и IPv6 проверяются независимо.
+- Добавлен fail-closed Family Routing: SG-Gateway IPv4/IPv6, WARP IPv4/IPv6 и Block.
+- Исправлено действие Block для остального трафика в UI и backend.
+- Updater сохраняет TLS/HTTPS, AWG3 и runtime с Safety Backup и проверяемым rollback.
+- Добавлен полный конвейер SG Subscription и улучшения Clients/Devices.
+- Завершены режимы Hysteria 2 Off/Salamander/Gecko и корректные URI.
+- Добавлены XHTTP XMUX preset/expert без изменения серверного inbound.
+- Расширены проверка Full Backup, безопасность Restore и сохранение состояния Panel Update.
+- Добавлен production-контракт WSGI/systemd и усилена диагностика установки.
+- Добавлена компактная раскладка для низких разрешений без скрытия действий.
+- Полное удаление учитывает AWG3; добавлено регрессионное покрытие контракта 022.04.
 
 # SG-Gateway 0.1.0-021.12 — Full Backup / Full Restore / Recovery
 
