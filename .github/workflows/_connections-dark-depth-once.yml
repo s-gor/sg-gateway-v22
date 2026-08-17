@@ -21,200 +21,30 @@ jobs:
 
       - name: Restore classic dark depth
         shell: bash
+        env:
+          CSS_B64: Ci8qIFNHLUdhdGV3YXkgMDIyLjA0IMK3IENvbm5lY3Rpb25zIGNsYXNzaWMgZGFyayBkZXB0aCBwYXNzIDIuCiAgIFJlc3RvcmUgdGhlIG9sZCBibHVlLWdsYXNzIGhpZXJhcmNoeTogZGFyayBiZWQsIGJsdWUgY2FyZCBzdXJmYWNlcywgZGVlcCBpbnB1dHMuICovCmh0bWxbZGF0YS10aGVtZT0iZGFyayJdIGJvZHkucGFnZS1jb25uZWN0aW9ucyAuY252MS1lbmdpbmUtY2FyZCwKaHRtbFtkYXRhLXRoZW1lPSJkYXJrIl0gYm9keS5wYWdlLWNvbm5lY3Rpb25zICN4cmF5LXhtdXggLnhtdXgxLWNhcmQgewogIGJvcmRlci1jb2xvcjogIzM1NWE3YyAhaW1wb3J0YW50OwogIGJhY2tncm91bmQ6CiAgICByYWRpYWwtZ3JhZGllbnQoY2lyY2xlIGF0IDk0JSAtMTglLCByZ2JhKDEwMSwgMTY5LCAyNDMsIC4xMyksIHRyYW5zcGFyZW50IDM4JSksCiAgICBsaW5lYXItZ3JhZGllbnQoMTgwZGVnLCAjMWEyZTQzIDAlLCAjMTUyNjNhIDEwMCUpICFpbXBvcnRhbnQ7CiAgYm94LXNoYWRvdzoKICAgIGluc2V0IDAgMXB4IDAgcmdiYSgxNzMsIDIxMSwgMjQ3LCAuMDcpLAogICAgMCAxNXB4IDM2cHggcmdiYSgwLCAwLCAwLCAuMTgpICFpbXBvcnRhbnQ7Cn0KCmh0bWxbZGF0YS10aGVtZT0iZGFyayJdIGJvZHkucGFnZS1jb25uZWN0aW9ucyA6aXMoCiAgLnhwczItc2VsZWN0aW9uLAogIC54cHMyLXBhcmFtZXRlcnMsCiAgLmNudjEtZW5kcG9pbnQtY2FyZCwKICAuY252MS1hZHZhbmNlZAopIHsKICBib3JkZXItY29sb3I6ICMyZjUwNmYgIWltcG9ydGFudDsKICBiYWNrZ3JvdW5kOgogICAgcmFkaWFsLWdyYWRpZW50KGNpcmNsZSBhdCA5NiUgLTIyJSwgcmdiYSgxMDEsIDE2OSwgMjQzLCAuMDgpLCB0cmFuc3BhcmVudCA0MCUpLAogICAgbGluZWFyLWdyYWRpZW50KDE4MGRlZywgIzEyMjQzYSAwJSwgIzBlMWQyZCAxMDAlKSAhaW1wb3J0YW50OwogIGJveC1zaGFkb3c6CiAgICBpbnNldCAwIDFweCAwIHJnYmEoMTczLCAyMTEsIDI0NywgLjA0NSksCiAgICAwIDhweCAyNHB4IHJnYmEoMCwgMCwgMCwgLjEwKSAhaW1wb3J0YW50Owp9CgpodG1sW2RhdGEtdGhlbWU9ImRhcmsiXSBib2R5LnBhZ2UtY29ubmVjdGlvbnMgLnhwczItcGFyYW1ldGVyLXJvdyB7CiAgYm9yZGVyLWNvbG9yOiAjM2E2MDgzICFpbXBvcnRhbnQ7CiAgYmFja2dyb3VuZDoKICAgIHJhZGlhbC1ncmFkaWVudChjaXJjbGUgYXQgMTAwJSAtMTIlLCByZ2JhKDEwMSwgMTY5LCAyNDMsIC4xMiksIHRyYW5zcGFyZW50IDM0JSksCiAgICBsaW5lYXItZ3JhZGllbnQoMTgwZGVnLCAjMWMzMjQ5IDAlLCAjMTcyYTNmIDEwMCUpICFpbXBvcnRhbnQ7CiAgYm94LXNoYWRvdzoKICAgIGluc2V0IDAgMXB4IDAgcmdiYSgxNzMsIDIxMSwgMjQ3LCAuMDc1KSwKICAgIDAgNXB4IDE0cHggcmdiYSgwLCAwLCAwLCAuMTIpICFpbXBvcnRhbnQ7CiAgdHJhbnNpdGlvbjogYm9yZGVyLWNvbG9yIC4xNnMgZWFzZSwgYmFja2dyb3VuZCAuMTZzIGVhc2UsIGJveC1zaGFkb3cgLjE2cyBlYXNlOwp9CgpodG1sW2RhdGEtdGhlbWU9ImRhcmsiXSBib2R5LnBhZ2UtY29ubmVjdGlvbnMgLnhwczItcGFyYW1ldGVyLXJvdzpob3ZlciB7CiAgYm9yZGVyLWNvbG9yOiAjNDk3OWE1ICFpbXBvcnRhbnQ7CiAgYmFja2dyb3VuZDoKICAgIHJhZGlhbC1ncmFkaWVudChjaXJjbGUgYXQgMTAwJSAtMTIlLCByZ2JhKDEwMSwgMTY5LCAyNDMsIC4xNiksIHRyYW5zcGFyZW50IDM2JSksCiAgICBsaW5lYXItZ3JhZGllbnQoMTgwZGVnLCAjMjAzODUxIDAlLCAjMTkyZTQ1IDEwMCUpICFpbXBvcnRhbnQ7Cn0KCmh0bWxbZGF0YS10aGVtZT0iZGFyayJdIGJvZHkucGFnZS1jb25uZWN0aW9ucyAueHBzMi1wYXJhbWV0ZXItdGl0bGUgPiBzdHJvbmcgewogIGNvbG9yOiAjZjZmOWZjICFpbXBvcnRhbnQ7Cn0KCmh0bWxbZGF0YS10aGVtZT0iZGFyayJdIGJvZHkucGFnZS1jb25uZWN0aW9ucyAueHBzMi1wYXJhbWV0ZXItdGl0bGUgPiBzcGFuIHsKICBjb2xvcjogIzhmYjJkMiAhaW1wb3J0YW50Owp9CgpodG1sW2RhdGEtdGhlbWU9ImRhcmsiXSBib2R5LnBhZ2UtY29ubmVjdGlvbnMgLnhwczItcGFyYW1ldGVyLXJvdyA+IGxhYmVsID4gc3BhbiwKaHRtbFtkYXRhLXRoZW1lPSJkYXJrIl0gYm9keS5wYWdlLWNvbm5lY3Rpb25zIC54cHMyLXNhbGFtYW5kZXItc2VjcmV0ID4gbGFiZWwgPiBzcGFuIHsKICBjb2xvcjogI2E2YmZkNyAhaW1wb3J0YW50Owp9CgpodG1sW2RhdGEtdGhlbWU9ImRhcmsiXSBib2R5LnBhZ2UtY29ubmVjdGlvbnMgOmlzKAogIC54cHMyLXBhcmFtZXRlci1yb3cgaW5wdXQsCiAgLnhwczItcGFyYW1ldGVyLXJvdyBzZWxlY3QsCiAgLnhwczItc2FsYW1hbmRlci1zZWNyZXQgaW5wdXQsCiAgI3hyYXkteG11eCB0ZXh0YXJlYQopIHsKICBib3JkZXItY29sb3I6ICMzYzYzODggIWltcG9ydGFudDsKICBiYWNrZ3JvdW5kOiBsaW5lYXItZ3JhZGllbnQoMTgwZGVnLCAjMGYyMDMyIDAlLCAjMGIxODI2IDEwMCUpICFpbXBvcnRhbnQ7CiAgY29sb3I6ICNmNWY4ZmIgIWltcG9ydGFudDsKICBib3gtc2hhZG93OgogICAgaW5zZXQgMCAxcHggMnB4IHJnYmEoMCwgMCwgMCwgLjI4KSwKICAgIGluc2V0IDAgMCAwIDFweCByZ2JhKDEyNiwgMTgxLCAyMzEsIC4wMjUpICFpbXBvcnRhbnQ7Cn0KCmh0bWxbZGF0YS10aGVtZT0iZGFyayJdIGJvZHkucGFnZS1jb25uZWN0aW9ucyA6aXMoCiAgLnhwczItcGFyYW1ldGVyLXJvdyBpbnB1dCwKICAueHBzMi1wYXJhbWV0ZXItcm93IHNlbGVjdCwKICAueHBzMi1zYWxhbWFuZGVyLXNlY3JldCBpbnB1dCwKICAjeHJheS14bXV4IHRleHRhcmVhCik6aG92ZXIgewogIGJvcmRlci1jb2xvcjogIzRhNzlhNSAhaW1wb3J0YW50Owp9CgpodG1sW2RhdGEtdGhlbWU9ImRhcmsiXSBib2R5LnBhZ2UtY29ubmVjdGlvbnMgOmlzKAogIC54cHMyLXBhcmFtZXRlci1yb3cgaW5wdXQsCiAgLnhwczItcGFyYW1ldGVyLXJvdyBzZWxlY3QsCiAgLnhwczItc2FsYW1hbmRlci1zZWNyZXQgaW5wdXQsCiAgI3hyYXkteG11eCB0ZXh0YXJlYQopOmZvY3VzIHsKICBib3JkZXItY29sb3I6ICM2OWIxZjQgIWltcG9ydGFudDsKICBib3gtc2hhZG93OgogICAgMCAwIDAgMnB4IHJnYmEoMTAxLCAxNjksIDI0MywgLjIwKSwKICAgIDAgMCAxOHB4IHJnYmEoNzMsIDEzNywgMTk5LCAuMDgpLAogICAgaW5zZXQgMCAxcHggMnB4IHJnYmEoMCwgMCwgMCwgLjI1KSAhaW1wb3J0YW50Owp9CgpodG1sW2RhdGEtdGhlbWU9ImRhcmsiXSBib2R5LnBhZ2UtY29ubmVjdGlvbnMgLnhwczItc2FsYW1hbmRlciB7CiAgYm9yZGVyLXRvcC1jb2xvcjogIzM1NWE3YyAhaW1wb3J0YW50Owp9CgpodG1sW2RhdGEtdGhlbWU9ImRhcmsiXSBib2R5LnBhZ2UtY29ubmVjdGlvbnMgLnhwczItc2FsYW1hbmRlci1tb2RlcyBzcGFuIHsKICBib3JkZXItY29sb3I6ICMzYTYwODMgIWltcG9ydGFudDsKICBiYWNrZ3JvdW5kOiBsaW5lYXItZ3JhZGllbnQoMTgwZGVnLCAjMTkzMDQ5IDAlLCAjMTEyMzM4IDEwMCUpICFpbXBvcnRhbnQ7CiAgY29sb3I6ICNhNWJkZDQgIWltcG9ydGFudDsKfQoKaHRtbFtkYXRhLXRoZW1lPSJkYXJrIl0gYm9keS5wYWdlLWNvbm5lY3Rpb25zIC54cHMyLXNhbGFtYW5kZXItbW9kZXMgbGFiZWw6aG92ZXIgc3BhbiB7CiAgYm9yZGVyLWNvbG9yOiAjNTY4ZmMzICFpbXBvcnRhbnQ7CiAgYmFja2dyb3VuZDogbGluZWFyLWdyYWRpZW50KDE4MGRlZywgIzIxM2Q1OSAwJSwgIzE3MzA0YSAxMDAlKSAhaW1wb3J0YW50OwogIGNvbG9yOiAjZjNmN2ZiICFpbXBvcnRhbnQ7Cn0KCmh0bWxbZGF0YS10aGVtZT0iZGFyayJdIGJvZHkucGFnZS1jb25uZWN0aW9ucyAueHBzMi1zYWxhbWFuZGVyLW1vZGVzIGlucHV0OmNoZWNrZWQgKyBzcGFuIHsKICBib3JkZXItY29sb3I6ICM2OWIxZjQgIWltcG9ydGFudDsKICBiYWNrZ3JvdW5kOiBsaW5lYXItZ3JhZGllbnQoMTgwZGVnLCAjMjg1MjdhIDAlLCAjMWQzZjYxIDEwMCUpICFpbXBvcnRhbnQ7CiAgY29sb3I6ICNmZmZmZmYgIWltcG9ydGFudDsKICBib3gtc2hhZG93OgogICAgaW5zZXQgMCAwIDAgMXB4IHJnYmEoMTMyLCAxOTQsIDI0OSwgLjc1KSwKICAgIDAgNXB4IDE2cHggcmdiYSgwLCAwLCAwLCAuMTgpICFpbXBvcnRhbnQ7Cn0KCmh0bWxbZGF0YS10aGVtZT0iZGFyayJdIGJvZHkucGFnZS1jb25uZWN0aW9ucyA6aXMoCiAgLnhwczItc2FsYW1hbmRlci1idXR0b25zIC5idXR0b246bm90KC5wcmltYXJ5KSwKICAueHBzMi1hY3Rpb25zIC5idXR0b246bm90KC5wcmltYXJ5KQopIHsKICBib3JkZXItY29sb3I6ICMzYTYwODMgIWltcG9ydGFudDsKICBiYWNrZ3JvdW5kOiBsaW5lYXItZ3JhZGllbnQoMTgwZGVnLCAjMTkzMDQ5IDAlLCAjMTEyMzM4IDEwMCUpICFpbXBvcnRhbnQ7CiAgY29sb3I6ICNlZWY1ZmIgIWltcG9ydGFudDsKfQoKaHRtbFtkYXRhLXRoZW1lPSJkYXJrIl0gYm9keS5wYWdlLWNvbm5lY3Rpb25zIDppcygKICAueHBzMi1zYWxhbWFuZGVyLWJ1dHRvbnMgLmJ1dHRvbjpub3QoLnByaW1hcnkpLAogIC54cHMyLWFjdGlvbnMgLmJ1dHRvbjpub3QoLnByaW1hcnkpCik6aG92ZXI6bm90KDpkaXNhYmxlZCkgewogIGJvcmRlci1jb2xvcjogIzU2OGZjMyAhaW1wb3J0YW50OwogIGJhY2tncm91bmQ6IGxpbmVhci1ncmFkaWVudCgxODBkZWcsICMyMTNkNTkgMCUsICMxNzMwNGEgMTAwJSkgIWltcG9ydGFudDsKfQoKaHRtbFtkYXRhLXRoZW1lPSJkYXJrIl0gYm9keS5wYWdlLWNvbm5lY3Rpb25zIC54cHMyLWFjdGlvbnMgLmJ1dHRvbi5wcmltYXJ5IHsKICBib3JkZXItY29sb3I6ICM3MmI4ZjcgIWltcG9ydGFudDsKICBiYWNrZ3JvdW5kOiBsaW5lYXItZ3JhZGllbnQoMTgwZGVnLCAjNWM5YmQyIDAlLCAjM2Y3ZGI1IDEwMCUpICFpbXBvcnRhbnQ7CiAgYm94LXNoYWRvdzoKICAgIGluc2V0IDAgMXB4IDAgcmdiYSgyNTUsIDI1NSwgMjU1LCAuMTYpLAogICAgMCA3cHggMThweCByZ2JhKDAsIDAsIDAsIC4yMikgIWltcG9ydGFudDsKfQoKaHRtbFtkYXRhLXRoZW1lPSJkYXJrIl0gYm9keS5wYWdlLWNvbm5lY3Rpb25zICN4cmF5LXhtdXggLnhtdXgxLW1vZGUgPiBzcGFuIHsKICBib3JkZXItY29sb3I6ICMzYTYwODMgIWltcG9ydGFudDsKICBiYWNrZ3JvdW5kOgogICAgcmFkaWFsLWdyYWRpZW50KGNpcmNsZSBhdCAxMDAlIDAsIHJnYmEoMTAxLCAxNjksIDI0MywgLjA3KSwgdHJhbnNwYXJlbnQgNDIlKSwKICAgIGxpbmVhci1ncmFkaWVudCgxODBkZWcsICMxOTMwNDkgMCUsICMxMTIzMzggMTAwJSkgIWltcG9ydGFudDsKfQoKaHRtbFtkYXRhLXRoZW1lPSJkYXJrIl0gYm9keS5wYWdlLWNvbm5lY3Rpb25zICN4cmF5LXhtdXggLnhtdXgxLW1vZGUgaW5wdXQ6Y2hlY2tlZCArIHNwYW4gewogIGJvcmRlci1jb2xvcjogIzY5YjFmNCAhaW1wb3J0YW50OwogIGJhY2tncm91bmQ6CiAgICByYWRpYWwtZ3JhZGllbnQoY2lyY2xlIGF0IDEwMCUgMCwgcmdiYSgxMDEsIDE2OSwgMjQzLCAuMTYpLCB0cmFuc3BhcmVudCA0NCUpLAogICAgbGluZWFyLWdyYWRpZW50KDE4MGRlZywgIzI4NTI3YSAwJSwgIzFkM2Y2MSAxMDAlKSAhaW1wb3J0YW50OwogIGNvbG9yOiAjZmZmZmZmICFpbXBvcnRhbnQ7Cn0K
+          TEST_B64: CgpkZWYgdGVzdF9jb25uZWN0aW9uc19kYXJrX2NsYXNzaWNfZGVwdGhfcGFzc19yZXN0b3Jlc19ibHVlX2dsYXNzX2hpZXJhcmNoeSgpOgogICAgY3NzID0gKFJPT1QgLyAiYXBwL3dlYi9zdGF0aWMvc2ctY29ubmVjdGlvbnMtZGFyay1jbGFzc2ljLXYxLmNzcyIpLnJlYWRfdGV4dChlbmNvZGluZz0idXRmLTgiKQogICAgYXNzZXJ0ICJDb25uZWN0aW9ucyBjbGFzc2ljIGRhcmsgZGVwdGggcGFzcyAyIiBpbiBjc3MKICAgIGFzc2VydCAncmFkaWFsLWdyYWRpZW50KGNpcmNsZSBhdCAxMDAlIC0xMiUsIHJnYmEoMTAxLCAxNjksIDI0MywgLjEyKScgaW4gY3NzCiAgICBhc3NlcnQgJ2JvcmRlci1jb2xvcjogIzNhNjA4MyAhaW1wb3J0YW50OycgaW4gY3NzCiAgICBhc3NlcnQgJ2JhY2tncm91bmQ6IGxpbmVhci1ncmFkaWVudCgxODBkZWcsICMwZjIwMzIgMCUsICMwYjE4MjYgMTAwJSkgIWltcG9ydGFudDsnIGluIGNzcwogICAgYXNzZXJ0ICcueHBzMi1wYXJhbWV0ZXItcm93OmhvdmVyJyBpbiBjc3MKICAgIGFzc2VydCAnLnhwczItc2FsYW1hbmRlci1tb2RlcyBpbnB1dDpjaGVja2VkICsgc3BhbicgaW4gY3NzCiAgICBhc3NlcnQgJy54cHMyLWFjdGlvbnMgLmJ1dHRvbi5wcmltYXJ5JyBpbiBjc3MKICAgIGFzc2VydCAnaHRtbFtkYXRhLXRoZW1lPSJsaWdodCJdJyBub3QgaW4gY3NzCg==
         run: |
           python3 - <<'PY'
+          import base64
+          import os
           from pathlib import Path
 
-          path = Path('app/web/static/sg-connections-dark-classic-v1.css')
-          css = path.read_text(encoding='utf-8')
+          css_path = Path('app/web/static/sg-connections-dark-classic-v1.css')
+          css = css_path.read_text(encoding='utf-8')
           marker = 'SG-Gateway 022.04 · Connections classic dark depth pass 2'
           if marker in css:
               raise SystemExit('depth pass already present')
-
-          extra = r'''
-
-/* SG-Gateway 022.04 · Connections classic dark depth pass 2.
-   Restore the old blue-glass hierarchy: dark bed, blue card surfaces, deep inputs. */
-html[data-theme="dark"] body.page-connections .cnv1-engine-card,
-html[data-theme="dark"] body.page-connections #xray-xmux .xmux1-card {
-  border-color: #355a7c !important;
-  background:
-    radial-gradient(circle at 94% -18%, rgba(101, 169, 243, .13), transparent 38%),
-    linear-gradient(180deg, #1a2e43 0%, #15263a 100%) !important;
-  box-shadow:
-    inset 0 1px 0 rgba(173, 211, 247, .07),
-    0 15px 36px rgba(0, 0, 0, .18) !important;
-}
-
-html[data-theme="dark"] body.page-connections :is(
-  .xps2-selection,
-  .xps2-parameters,
-  .cnv1-endpoint-card,
-  .cnv1-advanced
-) {
-  border-color: #2f506f !important;
-  background:
-    radial-gradient(circle at 96% -22%, rgba(101, 169, 243, .08), transparent 40%),
-    linear-gradient(180deg, #12243a 0%, #0e1d2d 100%) !important;
-  box-shadow:
-    inset 0 1px 0 rgba(173, 211, 247, .045),
-    0 8px 24px rgba(0, 0, 0, .10) !important;
-}
-
-html[data-theme="dark"] body.page-connections .xps2-parameter-row {
-  border-color: #3a6083 !important;
-  background:
-    radial-gradient(circle at 100% -12%, rgba(101, 169, 243, .12), transparent 34%),
-    linear-gradient(180deg, #1c3249 0%, #172a3f 100%) !important;
-  box-shadow:
-    inset 0 1px 0 rgba(173, 211, 247, .075),
-    0 5px 14px rgba(0, 0, 0, .12) !important;
-  transition: border-color .16s ease, background .16s ease, box-shadow .16s ease;
-}
-
-html[data-theme="dark"] body.page-connections .xps2-parameter-row:hover {
-  border-color: #4979a5 !important;
-  background:
-    radial-gradient(circle at 100% -12%, rgba(101, 169, 243, .16), transparent 36%),
-    linear-gradient(180deg, #203851 0%, #192e45 100%) !important;
-}
-
-html[data-theme="dark"] body.page-connections .xps2-parameter-title > strong {
-  color: #f6f9fc !important;
-}
-
-html[data-theme="dark"] body.page-connections .xps2-parameter-title > span {
-  color: #8fb2d2 !important;
-}
-
-html[data-theme="dark"] body.page-connections .xps2-parameter-row > label > span,
-html[data-theme="dark"] body.page-connections .xps2-salamander-secret > label > span {
-  color: #a6bfd7 !important;
-}
-
-html[data-theme="dark"] body.page-connections :is(
-  .xps2-parameter-row input,
-  .xps2-parameter-row select,
-  .xps2-salamander-secret input,
-  #xray-xmux textarea
-) {
-  border-color: #3c6388 !important;
-  background: linear-gradient(180deg, #0f2032 0%, #0b1826 100%) !important;
-  color: #f5f8fb !important;
-  box-shadow:
-    inset 0 1px 2px rgba(0, 0, 0, .28),
-    inset 0 0 0 1px rgba(126, 181, 231, .025) !important;
-}
-
-html[data-theme="dark"] body.page-connections :is(
-  .xps2-parameter-row input,
-  .xps2-parameter-row select,
-  .xps2-salamander-secret input,
-  #xray-xmux textarea
-):hover {
-  border-color: #4a79a5 !important;
-}
-
-html[data-theme="dark"] body.page-connections :is(
-  .xps2-parameter-row input,
-  .xps2-parameter-row select,
-  .xps2-salamander-secret input,
-  #xray-xmux textarea
-):focus {
-  border-color: #69b1f4 !important;
-  box-shadow:
-    0 0 0 2px rgba(101, 169, 243, .20),
-    0 0 18px rgba(73, 137, 199, .08),
-    inset 0 1px 2px rgba(0, 0, 0, .25) !important;
-}
-
-html[data-theme="dark"] body.page-connections .xps2-salamander {
-  border-top-color: #355a7c !important;
-}
-
-html[data-theme="dark"] body.page-connections .xps2-salamander-modes span {
-  border-color: #3a6083 !important;
-  background: linear-gradient(180deg, #193049 0%, #112338 100%) !important;
-  color: #a5bdd4 !important;
-}
-
-html[data-theme="dark"] body.page-connections .xps2-salamander-modes label:hover span {
-  border-color: #568fc3 !important;
-  background: linear-gradient(180deg, #213d59 0%, #17304a 100%) !important;
-  color: #f3f7fb !important;
-}
-
-html[data-theme="dark"] body.page-connections .xps2-salamander-modes input:checked + span {
-  border-color: #69b1f4 !important;
-  background: linear-gradient(180deg, #28527a 0%, #1d3f61 100%) !important;
-  color: #ffffff !important;
-  box-shadow:
-    inset 0 0 0 1px rgba(132, 194, 249, .75),
-    0 5px 16px rgba(0, 0, 0, .18) !important;
-}
-
-html[data-theme="dark"] body.page-connections :is(
-  .xps2-salamander-buttons .button:not(.primary),
-  .xps2-actions .button:not(.primary)
-) {
-  border-color: #3a6083 !important;
-  background: linear-gradient(180deg, #193049 0%, #112338 100%) !important;
-  color: #eef5fb !important;
-}
-
-html[data-theme="dark"] body.page-connections :is(
-  .xps2-salamander-buttons .button:not(.primary),
-  .xps2-actions .button:not(.primary)
-):hover:not(:disabled) {
-  border-color: #568fc3 !important;
-  background: linear-gradient(180deg, #213d59 0%, #17304a 100%) !important;
-}
-
-html[data-theme="dark"] body.page-connections .xps2-actions .button.primary {
-  border-color: #72b8f7 !important;
-  background: linear-gradient(180deg, #5c9bd2 0%, #3f7db5 100%) !important;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, .16),
-    0 7px 18px rgba(0, 0, 0, .22) !important;
-}
-
-html[data-theme="dark"] body.page-connections #xray-xmux .xmux1-mode > span {
-  border-color: #3a6083 !important;
-  background:
-    radial-gradient(circle at 100% 0, rgba(101, 169, 243, .07), transparent 42%),
-    linear-gradient(180deg, #193049 0%, #112338 100%) !important;
-}
-
-html[data-theme="dark"] body.page-connections #xray-xmux .xmux1-mode input:checked + span {
-  border-color: #69b1f4 !important;
-  background:
-    radial-gradient(circle at 100% 0, rgba(101, 169, 243, .16), transparent 44%),
-    linear-gradient(180deg, #28527a 0%, #1d3f61 100%) !important;
-  color: #ffffff !important;
-}
-'''
-          path.write_text(css.rstrip() + extra + '\n', encoding='utf-8')
+          css_extra = base64.b64decode(os.environ['CSS_B64']).decode('utf-8')
+          css_path.write_text(css.rstrip() + '\n' + css_extra.lstrip() + '\n', encoding='utf-8')
 
           tests_path = Path('tests/test_ui_connections_visual_v1.py')
           tests = tests_path.read_text(encoding='utf-8')
           test_marker = 'def test_connections_dark_classic_depth_pass_restores_blue_glass_hierarchy():'
           if test_marker in tests:
               raise SystemExit('depth regression test already present')
-          tests += r'''
-
-
-def test_connections_dark_classic_depth_pass_restores_blue_glass_hierarchy():
-    css = (ROOT / "app/web/static/sg-connections-dark-classic-v1.css").read_text(encoding="utf-8")
-    assert "Connections classic dark depth pass 2" in css
-    assert 'radial-gradient(circle at 100% -12%, rgba(101, 169, 243, .12)' in css
-    assert 'border-color: #3a6083 !important;' in css
-    assert 'background: linear-gradient(180deg, #0f2032 0%, #0b1826 100%) !important;' in css
-    assert '.xps2-parameter-row:hover' in css
-    assert '.xps2-salamander-modes input:checked + span' in css
-    assert '.xps2-actions .button.primary' in css
-    assert 'html[data-theme="light"]' not in css
-'''
-          tests_path.write_text(tests, encoding='utf-8')
+          test_extra = base64.b64decode(os.environ['TEST_B64']).decode('utf-8')
+          tests_path.write_text(tests.rstrip() + '\n' + test_extra.lstrip() + '\n', encoding='utf-8')
           PY
 
       - name: Refresh source integrity and commit
@@ -226,10 +56,7 @@ def test_connections_dark_classic_depth_pass_restores_blue_glass_hierarchy():
           import subprocess
           from pathlib import Path
 
-          skip = {
-              'SOURCE-SHA256SUMS',
-              '.github/workflows/_connections-dark-depth-once.yml',
-          }
+          skip = {'SOURCE-SHA256SUMS', '.github/workflows/_connections-dark-depth-once.yml'}
           tracked = subprocess.check_output(['git', 'ls-files'], text=True, encoding='utf-8').splitlines()
           rows = []
           for path in tracked:
