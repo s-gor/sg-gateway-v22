@@ -1,0 +1,427 @@
+name: One-shot XMUX preset details dialog
+
+on:
+  push:
+    branches:
+      - fix30-ipv6-dual-stack
+    paths:
+      - .github/workflows/_fix-xmux-mode-dialog-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix30-ipv6-dual-stack
+          fetch-depth: 0
+
+      - name: Patch XMUX UI and release notes
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          partial_path = Path('app/web/templates/_xray_xmux_settings.html')
+          partial = partial_path.read_text(encoding='utf-8')
+
+          old_contract = '''      <div class="xmux1-contract">
+            <div title="Для VLESS XHTTP Reality клиентский mode фиксирован в stream-one; серверный mode остаётся auto.">
+              <span>VLESS XHTTP Reality</span>
+              <strong>stream-one</strong>
+            </div>
+            <div title="Для VLESS XHTTP TLS клиентский mode берётся из карточки профиля; серверный mode остаётся auto.">
+              <span>VLESS XHTTP TLS</span>
+              <strong>Из карточки профиля</strong>
+            </div>
+            <div title="extra.xmux используется только на клиенте и не добавляется в server inbound.">
+              <span>Scope</span>
+              <strong>Только клиент</strong>
+            </div>
+          </div>
+
+'''
+          if partial.count(old_contract) != 1:
+              raise SystemExit('XMUX contract row marker not found exactly once')
+          partial = partial.replace(old_contract, '')
+
+          dialog_markup = '''
+
+    <dialog class="xmux1-dialog" data-xmux-dialog aria-labelledby="xmux1-dialog-title">
+      <div class="xmux1-dialog-shell">
+        <header class="xmux1-dialog-head">
+          <div>
+            <span>ПАРАМЕТРЫ XMUX</span>
+            <h3 id="xmux1-dialog-title" data-xmux-dialog-title>XMUX</h3>
+          </div>
+          <button type="button" class="xmux1-dialog-close" data-xmux-dialog-close aria-label="Закрыть">×</button>
+        </header>
+
+        <section class="xmux1-dialog-panel" data-xmux-dialog-panel="auto" hidden>
+          <p>После сохранения будет установлен стандартный клиентский XMUX-пресет:</p>
+          <div class="xmux1-dialog-grid">
+            <div><code>maxConnections</code><strong>2-4</strong></div>
+            <div><code>cMaxReuseTimes</code><strong>300-600</strong></div>
+            <div><code>hMaxRequestTimes</code><strong>1000-2000</strong></div>
+            <div><code>hMaxReusableSecs</code><strong>1200-2400</strong></div>
+            <div><code>hKeepAlivePeriod</code><strong>600</strong></div>
+          </div>
+          <small>Остальные поля Client Extra сохраняются; объект <code>xmux</code> заменяется этим пресетом.</small>
+        </section>
+
+        <section class="xmux1-dialog-panel" data-xmux-dialog-panel="reduced" hidden>
+          <p>После сохранения будет установлен уменьшенный клиентский XMUX-пресет:</p>
+          <div class="xmux1-dialog-grid">
+            <div><code>maxConcurrency</code><strong>0</strong></div>
+            <div><code>maxConnections</code><strong>6</strong></div>
+            <div><code>cMaxReuseTimes</code><strong>0</strong></div>
+            <div><code>hMaxRequestTimes</code><strong>600-900</strong></div>
+            <div><code>hMaxReusableSecs</code><strong>1800-3000</strong></div>
+            <div><code>hKeepAlivePeriod</code><strong>0</strong></div>
+          </div>
+          <small>Остальные поля Client Extra сохраняются; объект <code>xmux</code> заменяется этим пресетом.</small>
+        </section>
+
+        <section class="xmux1-dialog-panel" data-xmux-dialog-panel="expert" hidden>
+          <p>В ручном режиме после сохранения используется весь Client Extra JSON как есть. Объект <code>xmux</code> обязателен.</p>
+          <pre class="xmux1-dialog-json" data-xmux-manual-preview>{}</pre>
+          <small>Проверка не позволит одновременно задать положительные <code>maxConnections</code> и <code>maxConcurrency</code>.</small>
+        </section>
+
+        <footer class="xmux1-dialog-foot">
+          <span>Выбор режима ещё ничего не применяет. Параметры сохранятся только по кнопке «Сохранить XMUX».</span>
+          <button class="button primary" type="button" data-xmux-dialog-close>Закрыть</button>
+        </footer>
+      </div>
+    </dialog>'''
+          form_end = '''      <div class="xmux1-actions">
+        <button class="button primary" type="submit">Сохранить XMUX</button>
+      </div>
+    </form>'''
+          if partial.count(form_end) != 1:
+              raise SystemExit('XMUX form end marker not found exactly once')
+          partial = partial.replace(form_end, form_end + dialog_markup)
+
+          css_marker = '''#xray-xmux .xmux1-actions .button {
+  min-height: 38px;
+  padding-top: 7px;
+  padding-bottom: 7px;
+}
+'''
+          dialog_css = '''#xray-xmux .xmux1-actions .button {
+  min-height: 38px;
+  padding-top: 7px;
+  padding-bottom: 7px;
+}
+
+#xray-xmux .xmux1-dialog {
+  width: min(620px, calc(100vw - 28px));
+  max-height: min(82vh, 720px);
+  padding: 0;
+  border: 1px solid var(--sg-line, rgba(120, 145, 135, .4));
+  border-radius: 16px;
+  color: inherit;
+  background: var(--sg-panel, #f5f3ed);
+  box-shadow: 0 24px 70px rgba(10, 18, 15, .28);
+}
+
+#xray-xmux .xmux1-dialog::backdrop {
+  background: rgba(10, 18, 15, .46);
+  backdrop-filter: blur(2px);
+}
+
+#xray-xmux .xmux1-dialog-shell {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+}
+
+#xray-xmux .xmux1-dialog-head,
+#xray-xmux .xmux1-dialog-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+#xray-xmux .xmux1-dialog-head span {
+  color: var(--sg-muted);
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: .08em;
+}
+
+#xray-xmux .xmux1-dialog-head h3 {
+  margin: 2px 0 0;
+  font-size: 20px;
+}
+
+#xray-xmux .xmux1-dialog-close {
+  display: inline-grid;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--sg-line, rgba(120, 145, 135, .35));
+  border-radius: 999px;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+  font-size: 22px;
+  line-height: 1;
+}
+
+#xray-xmux .xmux1-dialog-panel {
+  display: grid;
+  gap: 12px;
+}
+
+#xray-xmux .xmux1-dialog-panel[hidden] {
+  display: none;
+}
+
+#xray-xmux .xmux1-dialog-panel p,
+#xray-xmux .xmux1-dialog-panel small,
+#xray-xmux .xmux1-dialog-foot span {
+  margin: 0;
+  color: var(--sg-muted);
+  line-height: 1.45;
+}
+
+#xray-xmux .xmux1-dialog-panel p {
+  color: inherit;
+  font-size: 13.5px;
+}
+
+#xray-xmux .xmux1-dialog-panel small,
+#xray-xmux .xmux1-dialog-foot span {
+  font-size: 10.5px;
+}
+
+#xray-xmux .xmux1-dialog-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+#xray-xmux .xmux1-dialog-grid > div {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 11px;
+  border: 1px solid var(--sg-line, rgba(120, 145, 135, .28));
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--sg-panel, #f5f3ed) 74%, transparent);
+}
+
+#xray-xmux .xmux1-dialog-grid code {
+  overflow-wrap: anywhere;
+  font-size: 10.5px;
+}
+
+#xray-xmux .xmux1-dialog-grid strong {
+  flex: 0 0 auto;
+  font-size: 13px;
+}
+
+#xray-xmux .xmux1-dialog-json {
+  max-height: 220px;
+  margin: 0;
+  overflow: auto;
+  padding: 11px 12px;
+  border: 1px solid var(--sg-line, rgba(120, 145, 135, .28));
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--sg-panel, #f5f3ed) 74%, transparent);
+  font: 11px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+#xray-xmux .xmux1-dialog-foot {
+  padding-top: 2px;
+}
+'''
+          if partial.count(css_marker) != 1:
+              raise SystemExit('XMUX CSS insertion marker not found exactly once')
+          partial = partial.replace(css_marker, dialog_css)
+          partial_path.write_text(partial, encoding='utf-8')
+
+          js_path = Path('app/web/static/sg-xmux-settings-v1.js')
+          js_path.write_text(r'''(() => {
+  const ready = () => {
+    const form = document.querySelector('[data-xmux-form]');
+    if (form) {
+      const details = form.querySelector('[data-xmux-extra]');
+      const jsonInput = form.querySelector('[data-xmux-json]');
+      const dialog = document.querySelector('[data-xmux-dialog]');
+      const dialogTitle = dialog?.querySelector('[data-xmux-dialog-title]');
+      const dialogPanels = dialog ? [...dialog.querySelectorAll('[data-xmux-dialog-panel]')] : [];
+      const manualPreview = dialog?.querySelector('[data-xmux-manual-preview]');
+      const modeTitles = {
+        auto: 'Стандартный',
+        reduced: 'Для РФ — уменьшенный',
+        expert: 'Ручной',
+      };
+
+      const sync = () => {
+        const selected = form.querySelector('input[name="xhttp_xmux_mode"]:checked');
+        if (details && selected && selected.value === 'expert') {
+          details.open = true;
+        }
+      };
+
+      const closeDialog = () => {
+        if (!dialog) return;
+        if (typeof dialog.close === 'function' && dialog.open) {
+          dialog.close();
+        } else {
+          dialog.removeAttribute('open');
+        }
+      };
+
+      const syncManualPreview = () => {
+        if (!manualPreview || !jsonInput) return;
+        const raw = jsonInput.value.trim() || '{}';
+        try {
+          manualPreview.textContent = JSON.stringify(JSON.parse(raw), null, 2);
+        } catch (_error) {
+          manualPreview.textContent = raw;
+        }
+      };
+
+      const showModeDetails = (mode) => {
+        if (!dialog) return;
+        dialogPanels.forEach((panel) => {
+          panel.hidden = panel.dataset.xmuxDialogPanel !== mode;
+        });
+        if (dialogTitle) dialogTitle.textContent = modeTitles[mode] || 'XMUX';
+        if (mode === 'expert') syncManualPreview();
+        if (typeof dialog.showModal === 'function') {
+          if (!dialog.open) dialog.showModal();
+        } else {
+          dialog.setAttribute('open', '');
+        }
+      };
+
+      form.querySelectorAll('input[name="xhttp_xmux_mode"]').forEach((input) => {
+        input.addEventListener('change', () => {
+          sync();
+          showModeDetails(input.value);
+        });
+        input.closest('.xmux1-mode')?.addEventListener('click', () => {
+          // A checked radio does not emit change when its label is clicked again.
+          // Still show its parameter window every time the user presses the mode.
+          if (input.checked) showModeDetails(input.value);
+        });
+      });
+
+      dialog?.querySelectorAll('[data-xmux-dialog-close]').forEach((button) => {
+        button.addEventListener('click', closeDialog);
+      });
+      dialog?.addEventListener('click', (event) => {
+        if (event.target === dialog) closeDialog();
+      });
+      jsonInput?.addEventListener('input', syncManualPreview);
+      sync();
+    }
+
+    // Reality XHTTP mode is rendered by the main form as a hidden stream-one
+    // value. TLS keeps its visible four-mode selector.
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', ready, { once: true });
+  } else {
+    ready();
+  }
+})();
+''', encoding='utf-8')
+
+          test_path = Path('tests/test_sg_gateway_02204_xmux_sgpanel_contract.py')
+          tests = test_path.read_text(encoding='utf-8')
+          addition = r'''
+
+
+def test_compact_xmux_uses_mode_dialog_instead_of_permanent_contract_row() -> None:
+    partial = (ROOT / "app/web/templates/_xray_xmux_settings.html").read_text(encoding="utf-8")
+    js = (ROOT / "app/web/static/sg-xmux-settings-v1.js").read_text(encoding="utf-8")
+    publication = (ROOT / "PUBLICATION-02204.md").read_text(encoding="utf-8")
+
+    assert 'class="xmux1-contract"' not in partial
+    assert 'data-xmux-dialog' in partial
+    assert 'data-xmux-dialog-panel="auto"' in partial
+    assert 'data-xmux-dialog-panel="reduced"' in partial
+    assert 'data-xmux-dialog-panel="expert"' in partial
+    assert '<code>maxConnections</code><strong>2-4</strong>' in partial
+    assert '<code>maxConcurrency</code><strong>0</strong>' in partial
+    assert 'Параметры сохранятся только по кнопке «Сохранить XMUX»' in partial
+    assert 'showModeDetails' in js
+    assert 'dialog.showModal' in js
+    assert 'if (input.checked) showModeDetails(input.value)' in js
+    assert 'Removing incomplete Safety Backup' not in publication
+    assert 'checks required disk space before stopping panel/HostD' in publication
+    assert 'bounded history (two by default)' in publication
+'''
+          if 'def test_compact_xmux_uses_mode_dialog_instead_of_permanent_contract_row' in tests:
+              raise SystemExit('XMUX dialog test already exists')
+          test_path.write_text(tests.rstrip() + addition + '\n', encoding='utf-8')
+
+          pub_path = Path('PUBLICATION-02204.md')
+          pub = pub_path.read_text(encoding='utf-8')
+          updater_marker = '- Safety backup captures service/runtime state required for rollback.\n'
+          updater_add = (
+              updater_marker
+              + '- Safety Backup now checks required disk space before stopping panel/HostD and refuses safely when free space is insufficient.\n'
+              + '- Incomplete Safety Backup directories are removed automatically after failed archive creation; successful update backups keep a bounded history (two by default) instead of accumulating indefinitely.\n'
+              + '- Safety Backup archive paths are de-duplicated so protected runtime paths already covered by a parent tree are not archived twice.\n'
+          )
+          if pub.count(updater_marker) != 1:
+              raise SystemExit('publication updater marker not found exactly once')
+          pub = pub.replace(updater_marker, updater_add)
+
+          xmux_marker = '- Old fixed-RF presentation is hidden in favor of the explicit XMUX selector.\n'
+          xmux_add = (
+              xmux_marker
+              + '- The compact XMUX selector no longer keeps a permanent protocol-contract row on screen; pressing a mode opens a parameter dialog with the exact preset values before save.\n'
+          )
+          if pub.count(xmux_marker) != 1:
+              raise SystemExit('publication XMUX marker not found exactly once')
+          pub = pub.replace(xmux_marker, xmux_add)
+          pub_path.write_text(pub, encoding='utf-8')
+          PY
+
+          node --check app/web/static/sg-xmux-settings-v1.js
+
+      - name: Refresh source integrity and commit
+        shell: bash
+        run: |
+          git rm .github/workflows/_fix-xmux-mode-dialog-once.yml
+          python3 - <<'PY'
+          import hashlib
+          import subprocess
+          from pathlib import Path
+
+          tracked = subprocess.check_output(['git', 'ls-files'], text=True, encoding='utf-8').splitlines()
+          tracked = sorted(path for path in tracked if path != 'SOURCE-SHA256SUMS')
+          rows = []
+          for path in tracked:
+              data = Path(path).read_bytes()
+              rows.append(f"{hashlib.sha256(data).hexdigest()}  {path}")
+          Path('SOURCE-SHA256SUMS').write_text('\n'.join(rows) + '\n', encoding='utf-8')
+          PY
+
+          git config user.name "SG-Gateway CI"
+          git config user.email "actions@users.noreply.github.com"
+          git add app/web/templates/_xray_xmux_settings.html \
+                  app/web/static/sg-xmux-settings-v1.js \
+                  tests/test_sg_gateway_02204_xmux_sgpanel_contract.py \
+                  PUBLICATION-02204.md \
+                  SOURCE-SHA256SUMS
+          git commit -m "UI: show XMUX preset details in dialog"
+          git push origin HEAD:fix30-ipv6-dual-stack
