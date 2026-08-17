@@ -48,7 +48,7 @@ jobs:
           mkdir -p dist
           bash build-run.sh "dist/$RUN_NAME"
           bash "dist/$RUN_NAME" --verify-only
-          sha256sum -c "dist/${RUN_NAME%.run}-SHA256.txt"
+          (cd dist && sha256sum -c "${RUN_NAME%.run}-SHA256.txt")
 
       - name: Publish GitHub prerelease
         env:
