@@ -1,0 +1,66 @@
+name: One-shot XMUX contract cleanup
+
+on:
+  push:
+    branches:
+      - fix30-ipv6-dual-stack
+    paths:
+      - .github/workflows/_cleanup-xmux-contract-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix30-ipv6-dual-stack
+          fetch-depth: 0
+
+      - name: Remove last dead XMUX contract selector
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('app/web/static/sg-xmux-settings-v1.css')
+          text = path.read_text(encoding='utf-8')
+          old = '.xmux1-mode small,\n.xmux1-contract small,\n.xmux1-extra small {'
+          new = '.xmux1-mode small,\n.xmux1-extra small {'
+          if text.count(old) != 1:
+              raise SystemExit('last XMUX contract selector marker mismatch')
+          path.write_text(text.replace(old, new), encoding='utf-8')
+          PY
+
+      - name: Refresh integrity and commit
+        shell: bash
+        run: |
+          rm -f .github/workflows/_cleanup-xmux-contract-once.yml
+          python3 - <<'PY'
+          import hashlib
+          import subprocess
+          from pathlib import Path
+          skip = {'SOURCE-SHA256SUMS', '.github/workflows/_cleanup-xmux-contract-once.yml'}
+          tracked = subprocess.check_output(['git', 'ls-files'], text=True, encoding='utf-8').splitlines()
+          rows = []
+          for item in tracked:
+              if item in skip:
+                  continue
+              p = Path(item)
+              if not p.is_file():
+                  raise SystemExit(f'tracked file missing: {item}')
+              rows.append(f'{hashlib.sha256(p.read_bytes()).hexdigest()}  {item}')
+          Path('SOURCE-SHA256SUMS').write_text('\n'.join(rows) + '\n', encoding='utf-8')
+          PY
+
+          changed="$(git diff --name-only | sort)"
+          expected="$(printf '%s\n' '.github/workflows/_cleanup-xmux-contract-once.yml' 'SOURCE-SHA256SUMS' 'app/web/static/sg-xmux-settings-v1.css' | sort)"
+          printf '%s\n' "$changed"
+          test "$changed" = "$expected"
+
+          git config user.name "SG-Gateway CI"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -m "UI: remove dead XMUX contract CSS"
+          git push origin HEAD:fix30-ipv6-dual-stack
