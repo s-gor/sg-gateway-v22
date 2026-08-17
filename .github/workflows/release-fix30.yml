@@ -16,6 +16,7 @@ concurrency:
 jobs:
   release:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     env:
       TAG: v0.1.0-022.04-fix30
       TITLE: SG-Gateway 0.1.0-022.04 Fix30
