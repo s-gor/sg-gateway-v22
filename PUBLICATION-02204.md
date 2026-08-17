@@ -142,6 +142,12 @@ Routing exposes five explicit actions:
 ## UI and usability fixes
 
 - Added independent AWG2/AWG3 selection in client/device UI.
+- Made the AWG3 connection card visually match AWG2.
+- Reduced the three VLESS parameter cards to one equal compact height; Reality TCP and XHTTP Reality keep only the TCP port, while XHTTP TLS keeps client mode and TCP port aligned on the same row.
+- Removed editable XHTTP Path fields from the visible controls because they are fixed protocol metadata.
+- Restored the accepted dark blue-glass Connections hierarchy without changing the light theme or page geometry.
+- Simplified Hysteria 2 Obfuscation controls and removed the internal divider while leaving Off/Salamander/Gecko runtime behavior unchanged.
+- Replaced the XMUX selector's passive rows with visible preset buttons and an exact-values dialog; XMUX remains client-only and never enters the server inbound.
 - Added compact device presentation and collapse behavior.
 - Removed duplicate/empty client UI blocks and retained one clear creation flow.
 - Unified readable typography across current panel pages.
@@ -172,19 +178,16 @@ Routing exposes five explicit actions:
 - Runtime failures preserve useful exact diagnostics while avoiding accidental secret output.
 - Existing SG admin and connection identity state is preserved across supported migration/update paths.
 
-## Validation status before version bump
+## Final Fix30 validation
 
-The exact pre-release tree immediately before 022.04 versioning passed main CI #90:
+The final Fix30 tree is validated against the complete 022.04 contract:
 
-- source integrity: 509 tracked files;
-- Python syntax: 213 files;
-- pytest: **551 passed**, 1 skipped;
+- source integrity covers every tracked release file;
+- Python syntax covers the complete application and test tree;
+- pytest: **569 passed**, 1 skipped in the restricted build container; the single unavailable system-permission probe requires real `runuser` group switching, which the container blocks before the tested command starts;
 - family-routing regression suite: 15/15;
 - default-traffic Block regression suite: 2/2;
-- FULL package build: OK;
-- FULL `--verify-only`: OK.
-
-The versioned 022.04 tree must pass all gates again before acceptance.
+- FULL package and embedded-manifest verification are mandatory publication gates for the release artifact.
 
 ## Live acceptance already completed
 
