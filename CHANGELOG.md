@@ -7,18 +7,21 @@
 - Упрощён блок Hysteria 2 и удалён разделитель над Obfuscation без изменения runtime.
 - XMUX-пресеты оформлены как видимые кнопки с окном точных значений; сохранены названия SG-Panel и клиентский контракт.
 - В Safety Backup добавлены проверка свободного места, ограничение истории и удаление незавершённых архивов.
-- Добавлен Dual Stack IPv4 + IPv6 для metadata, Xray, экспортов, AWG2 и AWG3.
-- Добавлен изолированный AWG3 userspace 3.x с отдельной IPv6 ULA-подсетью.
-- WARP убран из автоматического clean install; IPv4 и IPv6 проверяются независимо.
-- Добавлен fail-closed Family Routing: SG-Gateway IPv4/IPv6, WARP IPv4/IPv6 и Block.
+- Добавлен Dual Stack IPv4 + IPv6 для metadata, Xray, URI/экспортов, AWG2 и AWG3 с сохранением штатного IPv4-only режима при отсутствии IPv6.
+- Добавлен изолированный AWG3 userspace 3.x с отдельной IPv6 ULA-подсетью, службой и полным lifecycle.
+- WARP убран из автоматического clean install; IPv4 и IPv6 проверяются независимо, скрытый fallback на прямой выход запрещён.
+- Добавлен fail-closed Family Routing: SG-Gateway IPv4/IPv6, WARP IPv4/IPv6 и Block без автоматического перехода между семействами.
 - Исправлено действие Block для остального трафика в UI и backend.
-- Updater сохраняет TLS/HTTPS, AWG3 и runtime с Safety Backup и проверяемым rollback.
-- Добавлен полный конвейер SG Subscription и улучшения Clients/Devices.
+- Updater сохраняет Clients, TLS/HTTPS, assets, cores, AWG3 и runtime с Safety Backup, финальной проверкой и автоматическим rollback.
+- Добавлен полный конвейер SG Subscription: отдельные subscriptions, QR, Base64/compatibility-формат, credentials и доступ для каждого устройства.
+- В Clients/Devices добавлены независимый выбор AWG2/AWG3, компактные карточки и удаление дублирующихся/пустых блоков.
 - Завершены режимы Hysteria 2 Off/Salamander/Gecko и корректные URI.
-- Добавлены XHTTP XMUX preset/expert без изменения серверного inbound.
+- Добавлены XHTTP XMUX Standard/Reduced/Expert с проверкой конфликтов и без изменения серверного inbound.
 - Расширены проверка Full Backup, безопасность Restore и сохранение состояния Panel Update.
 - Добавлен production-контракт WSGI/systemd и усилена диагностика установки.
-- Добавлена компактная раскладка для низких разрешений без скрытия действий.
+- GeoIP/GeoSite обновляются парой через полный Xray candidate; Apply/rollback атомарен, пользовательские правила сохраняются.
+- Нативные browser confirm заменены внутренними диалогами; исправлены темы и визуальные регрессии System/Connections/Xray.
+- Добавлены раскладки для экранов до 1366×820 и 761–980 px: элементы уплотняются без скрытия действий.
 - Полное удаление учитывает AWG3; добавлено регрессионное покрытие контракта 022.04.
 
 # SG-Gateway 0.1.0-021.12 — Full Backup / Full Restore / Recovery
