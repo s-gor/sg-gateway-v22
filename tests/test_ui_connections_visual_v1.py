@@ -162,12 +162,23 @@ def test_connections_protocol_cards_have_compact_profile_specific_grids():
 def test_xhttp_reality_and_tls_share_path_and_port_columns():
     css = (ROOT / "app/web/static/sg-xmux-settings-v1.css").read_text(encoding="utf-8")
     polish = css.split("SG-Gateway 022.04 · Connections controls-only polish", 1)[1]
-    desktop_columns = "grid-template-columns: minmax(250px, .75fr) minmax(245px, 1fr) minmax(300px, 1.2fr) minmax(145px, 190px);"
-    compact_columns = "grid-template-columns: minmax(220px, .75fr) minmax(220px, 1fr) minmax(250px, 1.1fr) minmax(130px, 175px);"
+    desktop_columns = "grid-template-columns: minmax(250px, .75fr) minmax(245px, 1fr) minmax(300px, 1.2fr) minmax(150px, 210px);"
+    compact_columns = "grid-template-columns: minmax(220px, .75fr) minmax(220px, 1fr) minmax(250px, 1.1fr) minmax(135px, 180px);"
     assert polish.count(desktop_columns) >= 2
     assert polish.count(compact_columns) >= 2
     assert 'grid-template-areas: "title title path port";' in polish
     assert 'grid-template-areas: "title mode path port";' in polish
+
+
+def test_xhttp_paths_are_narrowed_symmetrically_and_ports_match_reality_tcp():
+    css = (ROOT / "app/web/static/sg-xmux-settings-v1.css").read_text(encoding="utf-8")
+    polish = css.split("SG-Gateway 022.04 · Connections controls-only polish", 1)[1]
+    assert polish.count("minmax(150px, 210px)") >= 3
+    assert polish.count("minmax(135px, 180px)") >= 3
+    assert 'width: calc(100% - 56px);' in polish
+    assert 'justify-self: center;' in polish
+    assert 'data-profile-panel="xhttp_reality"] .xps2-field-path' in polish
+    assert 'data-profile-panel="xhttp_tls"] .xps2-field-path' in polish
 
 
 def test_connections_protocol_cards_cover_low_resolution_and_mobile():

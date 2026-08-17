@@ -266,13 +266,21 @@
 }
 
 .xps2-parameter-row[data-profile-panel="xhttp_reality"] {
-  grid-template-columns: minmax(250px, .75fr) minmax(245px, 1fr) minmax(300px, 1.2fr) minmax(145px, 190px);
+  grid-template-columns: minmax(250px, .75fr) minmax(245px, 1fr) minmax(300px, 1.2fr) minmax(150px, 210px);
   grid-template-areas: "title title path port";
 }
 
 .xps2-parameter-row[data-profile-panel="xhttp_tls"] {
-  grid-template-columns: minmax(250px, .75fr) minmax(245px, 1fr) minmax(300px, 1.2fr) minmax(145px, 190px);
+  grid-template-columns: minmax(250px, .75fr) minmax(245px, 1fr) minmax(300px, 1.2fr) minmax(150px, 210px);
   grid-template-areas: "title mode path port";
+}
+
+@media (min-width: 1051px) {
+  .xps2-parameter-row[data-profile-panel="xhttp_reality"] .xps2-field-path,
+  .xps2-parameter-row[data-profile-panel="xhttp_tls"] .xps2-field-path {
+    width: calc(100% - 56px);
+    justify-self: center;
+  }
 }
 
 .xps2-parameter-row[data-profile-panel="hysteria2"] {
@@ -375,11 +383,11 @@ html[data-theme="light"] .xps2-salamander {
   }
 
   .xps2-parameter-row[data-profile-panel="xhttp_reality"] {
-    grid-template-columns: minmax(220px, .75fr) minmax(220px, 1fr) minmax(250px, 1.1fr) minmax(130px, 175px);
+    grid-template-columns: minmax(220px, .75fr) minmax(220px, 1fr) minmax(250px, 1.1fr) minmax(135px, 180px);
   }
 
   .xps2-parameter-row[data-profile-panel="xhttp_tls"] {
-    grid-template-columns: minmax(220px, .75fr) minmax(220px, 1fr) minmax(250px, 1.1fr) minmax(130px, 175px);
+    grid-template-columns: minmax(220px, .75fr) minmax(220px, 1fr) minmax(250px, 1.1fr) minmax(135px, 180px);
   }
 
   .xps2-parameter-row[data-profile-panel="hysteria2"] {
