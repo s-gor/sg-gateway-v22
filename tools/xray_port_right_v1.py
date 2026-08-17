@@ -1,6 +1,7 @@
+import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else Path(__file__).resolve().parents[1]
 css_path = ROOT / "app/web/static/sg-xmux-settings-v1.css"
 test_path = ROOT / "tests/test_ui_connections_visual_v1.py"
 
