@@ -167,3 +167,24 @@ def test_connections_ui_exposes_exact_sg_panel_modes_in_full_02204_template() ->
     assert '<input type="hidden" name="{{ profile.id }}_mode" value="stream-one">' in template
     assert "Reality XHTTP mode is rendered by the main form as a hidden stream-one" in js
     assert "label.replaceWith" not in js
+
+def test_compact_xmux_uses_mode_dialog_instead_of_permanent_contract_row() -> None:
+    partial = (ROOT / "app/web/templates/_xray_xmux_settings.html").read_text(encoding="utf-8")
+    js = (ROOT / "app/web/static/sg-xmux-settings-v1.js").read_text(encoding="utf-8")
+    publication = (ROOT / "PUBLICATION-02204.md").read_text(encoding="utf-8")
+
+    assert 'class="xmux1-contract"' not in partial
+    assert 'data-xmux-dialog' in partial
+    assert 'data-xmux-dialog-panel="auto"' in partial
+    assert 'data-xmux-dialog-panel="reduced"' in partial
+    assert 'data-xmux-dialog-panel="expert"' in partial
+    assert '<code>maxConnections</code><strong>2-4</strong>' in partial
+    assert '<code>maxConcurrency</code><strong>0</strong>' in partial
+    assert 'Параметры сохранятся только по кнопке «Сохранить XMUX»' in partial
+    assert "showModeDetails" in js
+    assert "dialog.showModal" in js
+    assert "if (input.checked) showModeDetails(input.value)" in js
+    assert "checks required disk space before stopping panel/HostD" in publication
+    assert "bounded history (two by default)" in publication
+    assert "parameter dialog with the exact preset values before save" in publication
+

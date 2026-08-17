@@ -76,6 +76,9 @@ Routing exposes five explicit actions:
 - Preserves SG TLS certificate material and current HTTPS state.
 - Preserves AWG3 configuration/unit/runtime material and validates state across update.
 - Safety backup captures service/runtime state required for rollback.
+- Safety Backup now checks required disk space before stopping panel/HostD and refuses safely when free space is insufficient.
+- Incomplete Safety Backup directories are removed automatically after failed archive creation; successful update backups keep a bounded history (two by default) instead of accumulating indefinitely.
+- Safety Backup archive paths are de-duplicated so protected runtime paths already covered by a parent tree are not archived twice.
 - Rollback restores protected runtime material rather than only application source.
 - Removed blanket ownership rewriting of the whole prefix.
 - Added final verification for clients, HTTPS/TLS state, AWG3 state and previously active services.
@@ -112,6 +115,7 @@ Routing exposes five explicit actions:
 - XMUX is never injected into the server XHTTP inbound.
 - TLS XHTTP keeps its independent client mode.
 - Old fixed-RF presentation is hidden in favor of the explicit XMUX selector.
+- The compact XMUX selector no longer keeps a permanent protocol-contract row on screen; pressing a mode opens a parameter dialog with the exact preset values before save.
 
 ## Full Backup / restore
 
