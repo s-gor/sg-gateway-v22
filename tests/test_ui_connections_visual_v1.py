@@ -214,3 +214,13 @@ def test_connections_dark_classic_theme_is_scoped_and_loaded_last():
     assert ".xps2-salamander-modes input:checked + span" in css
     assert "#xray-xmux .xmux1-mode input:checked + span" in css
 
+def test_connections_dark_classic_depth_pass_restores_blue_glass_hierarchy():
+    css = (ROOT / "app/web/static/sg-connections-dark-classic-v1.css").read_text(encoding="utf-8")
+    assert "Connections classic dark depth pass 2" in css
+    assert 'radial-gradient(circle at 100% -12%, rgba(101, 169, 243, .12)' in css
+    assert 'border-color: #3a6083 !important;' in css
+    assert 'background: linear-gradient(180deg, #0f2032 0%, #0b1826 100%) !important;' in css
+    assert '.xps2-parameter-row:hover' in css
+    assert '.xps2-salamander-modes input:checked + span' in css
+    assert '.xps2-actions .button.primary' in css
+    assert 'html[data-theme="light"]' not in css
