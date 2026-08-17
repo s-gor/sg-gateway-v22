@@ -259,6 +259,16 @@
 .xps2-parameter-title { grid-area: title; }
 .xps2-salamander { grid-area: obfs; }
 
+/* Keep the three VLESS parameter strips visually identical on one-row layouts. */
+@media (min-width: 1051px) {
+  .xps2-parameter-row[data-profile-panel="reality_tcp"],
+  .xps2-parameter-row[data-profile-panel="xhttp_reality"],
+  .xps2-parameter-row[data-profile-panel="xhttp_tls"] {
+    height: 120px;
+    align-items: center;
+  }
+}
+
 .xps2-parameter-row[data-profile-panel="reality_tcp"] {
   grid-template-columns: minmax(300px, 1fr) minmax(150px, 210px);
   grid-template-areas: "title port";
@@ -399,6 +409,17 @@ html[data-theme="light"] .xps2-salamander {
   .xps2-salamander {
     gap: 7px;
     padding-top: 9px;
+  }
+}
+
+/* Compact one-row desktop keeps the same geometry without leaking into stacked layouts. */
+@media (min-width: 1051px) and (max-width: 1366px),
+       (min-width: 1051px) and (max-height: 820px) {
+  .xps2-parameter-row[data-profile-panel="reality_tcp"],
+  .xps2-parameter-row[data-profile-panel="xhttp_reality"],
+  .xps2-parameter-row[data-profile-panel="xhttp_tls"] {
+    height: 112px;
+    align-items: center;
   }
 }
 

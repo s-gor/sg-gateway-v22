@@ -174,3 +174,27 @@ def test_connections_protocol_cards_cover_low_resolution_and_mobile():
     assert "@media (max-width: 1050px)" in polish
     assert "@media (max-width: 760px)" in polish
     assert 'grid-template-areas: "title" "port" "mode";' in polish
+
+def test_first_three_xray_parameter_cards_have_equal_height_and_centered_level():
+    css = (ROOT / "app/web/static/sg-xmux-settings-v1.css").read_text(encoding="utf-8")
+    polish = css.split("SG-Gateway 022.04 · Connections controls-only polish", 1)[1]
+    selector = '.xps2-parameter-row[data-profile-panel="reality_tcp"],\n  .xps2-parameter-row[data-profile-panel="xhttp_reality"],\n  .xps2-parameter-row[data-profile-panel="xhttp_tls"] {'
+    assert polish.count(selector) >= 2
+    assert "@media (min-width: 1051px) {" in polish
+    assert "@media (min-width: 1051px) and (max-width: 1366px)," in polish
+    assert "(min-width: 1051px) and (max-height: 820px)" in polish
+    assert "height: 120px;" in polish
+    assert "height: 112px;" in polish
+    assert polish.count("align-items: center;") >= 2
+    assert 'data-profile-panel="hysteria2"] {\n    height: 120px;' not in polish
+    assert 'data-profile-panel="hysteria2"] {\n    height: 112px;' not in polish
+
+
+def test_equal_height_rule_does_not_leak_into_stacked_981_1050_layout():
+    css = (ROOT / "app/web/static/sg-xmux-settings-v1.css").read_text(encoding="utf-8")
+    polish = css.split("SG-Gateway 022.04 · Connections controls-only polish", 1)[1]
+    stacked = polish.split("@media (max-width: 1050px)", 1)[1]
+    before_stacked = polish.split("@media (max-width: 1050px)", 1)[0]
+    assert "(min-width: 981px) and (max-width: 1366px)" in before_stacked
+    assert "(min-width: 1051px) and (max-width: 1366px)" in before_stacked
+    assert "height: 112px;" not in stacked.split("@media (max-width: 760px)", 1)[0]
