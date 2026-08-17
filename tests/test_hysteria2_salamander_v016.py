@@ -429,3 +429,13 @@ def test_pending_candidate_does_not_leak_into_client_uri(monkeypatch):
     link = exports.build_xray_profile_link(client, "hysteria2").body
     assert "obfs=gecko" not in link
     assert "obfs-password=" not in link
+
+
+def test_hysteria2_compact_ui_hides_display_only_metadata():
+    template = (ROOT / "app/web/templates/connections.html").read_text(encoding="utf-8")
+    assert "Path · —" not in template
+    assert "xps2-salamander-version" not in template
+    assert "xps2-salamander-warning" not in template
+    assert "Смена Off / Salamander / Gecko или замена пароля" not in template
+    assert "Gecko · рекомендуется" in template
+    assert "Сгенерировать новый" in template

@@ -137,11 +137,6 @@
                 <div class="xps2-parameter-title">
                   <strong>{{ profile.title }}</strong>
                   <span>{{ profile.transport }} · {{ profile.security }}</span>
-                  {% if profile.id == 'hysteria2' %}
-                  <div class="xps2-profile-meta">
-                    {% if not profile.path %}<span>Path · —</span>{% endif %}
-                  </div>
-                  {% endif %}
                 </div>
                 <label class="xps2-field-port">
                   <span>{{ 'UDP-порт' if profile.id == 'hysteria2' else 'TCP-порт' }}</span>
@@ -202,9 +197,6 @@
                       <strong>Obfuscation</strong>
                       <p>Off · Salamander · Gecko</p>
                     </div>
-                    <span class="xps2-salamander-version {{ 'ready' if xray_profiles.hysteria2_obfs.version_ready else 'blocked' }}">
-                      Salamander ≥ {{ xray_profiles.hysteria2_obfs.salamander_minimum_version }} · Gecko ≥ {{ xray_profiles.hysteria2_obfs.gecko_minimum_version }}
-                    </span>
                   </header>
 
                   <div class="xps2-salamander-modes" role="radiogroup" aria-label="Режим обфускации Hysteria2">
@@ -244,7 +236,6 @@
                   <p class="xps2-salamander-status" data-salamander-status>
                     {% if xray_profiles.hysteria2_obfs.password_configured %}Пароль настроен и не выводится в журналах.{% else %}Пароль ещё не создан.{% endif %}
                   </p>
-                  <p class="xps2-salamander-warning">Смена Off / Salamander / Gecko или замена пароля меняет Hysteria2-профили. Ссылки, QR и subscription обновляются после успешного применения Xray.</p>
                 </section>
                 {% endif %}
               </article>
