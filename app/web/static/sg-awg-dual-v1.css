@@ -19,3 +19,6 @@
 .page-connections .awgd-footer span { border: 1px solid var(--sg-line-soft); border-radius: 999px; background: var(--sg-panel-soft); padding: 6px 9px; }
 @media (max-width: 980px) { .page-connections .awgd-grid { grid-template-columns: 1fr; } }
 @media (max-width: 620px) { .page-connections .awgd-grid { padding-inline: 12px; } .page-connections .awgd-head { padding-inline: 12px; } }
+
+/* SG-Gateway 022.04 · AWG3 visual symmetry with AWG2. */
+.page-connections .awgd-runtime-note { display: none; }
