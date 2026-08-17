@@ -198,3 +198,19 @@ def test_xhttp_tls_mode_helper_is_hidden_without_affecting_responsive_layout():
     assert 'grid-template-areas: "title" "port" "mode";' in stacked
     assert "height: 120px;" not in stacked
     assert "height: 112px;" not in stacked
+
+def test_connections_dark_classic_theme_is_scoped_and_loaded_last():
+    base = (ROOT / "app/web/templates/base.html").read_text(encoding="utf-8")
+    css = (ROOT / "app/web/static/sg-connections-dark-classic-v1.css").read_text(encoding="utf-8")
+    assert "active_page|default('') == 'connections'" in base
+    assert "sg-connections-dark-classic-v1.css" in base
+    assert base.index("sg-controls-final-v1.css") < base.index("sg-connections-dark-classic-v1.css")
+    assert 'html[data-theme="dark"] body.page-connections' in css
+    assert 'html[data-theme="light"]' not in css
+    for colour in ("#0c1826", "#192738", "#65a9f3", "#31cf91"):
+        assert colour in css.lower()
+    assert ".xps2-selector:checked + .xps2-choice" in css
+    assert ".xps2-choice-status.active" in css
+    assert ".xps2-salamander-modes input:checked + span" in css
+    assert "#xray-xmux .xmux1-mode input:checked + span" in css
+
