@@ -1,0 +1,122 @@
+name: Validate AWG3 card alignment
+
+on:
+  push:
+    branches:
+      - scratch/awg3-align-v1
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout validation tools
+        uses: actions/checkout@v4
+
+      - name: Checkout exact green 022.04 product
+        uses: actions/checkout@v4
+        with:
+          ref: df4465e03e4958f2911315abc9b6d359477ee8bf
+          path: product
+          fetch-depth: 0
+
+      - name: Assemble isolated AWG3 alignment candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C product rev-parse HEAD)" = "df4465e03e4958f2911315abc9b6d359477ee8bf"
+          cd product
+          python3 -B - <<'PY'
+          from pathlib import Path
+          path = Path('app/web/static/sg-awg-dual-v1.css')
+          text = path.read_text(encoding='utf-8')
+          marker = '/* SG-Gateway 022.04 · AWG3 visual symmetry with AWG2. */'
+          assert marker not in text
+          text += '\n' + marker + '\n.page-connections .awgd-runtime-note { display: none; }\n'
+          path.write_text(text, encoding='utf-8')
+          PY
+          python3 -B - <<'PY'
+          import hashlib, subprocess
+          from pathlib import Path
+          paths = subprocess.check_output(['git','ls-files'], text=True, encoding='utf-8').splitlines()
+          paths = [p for p in paths if p != 'SOURCE-SHA256SUMS']
+          Path('SOURCE-SHA256SUMS').write_text(
+              '\n'.join(f'{hashlib.sha256(Path(p).read_bytes()).hexdigest()}  {p}' for p in paths) + '\n',
+              encoding='utf-8',
+          )
+          print(f'Rebuilt SOURCE-SHA256SUMS: {len(paths)} files')
+          PY
+          git add app/web/static/sg-awg-dual-v1.css SOURCE-SHA256SUMS
+          git diff --cached --check
+          git config user.name "Ser.Gor"
+          git config user.email "infosec.co.il@gmail.com"
+          git commit -m "UI: align AWG3 card with AWG2"
+          test -z "$(git status --porcelain)"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r product/requirements-dev.txt
+
+      - name: Verify source integrity and syntax
+        shell: bash
+        working-directory: product
+        run: |
+          set -euo pipefail
+          python3 -B - <<'PY'
+          import hashlib, re, subprocess
+          from pathlib import Path
+          expected = {}
+          for raw in Path('SOURCE-SHA256SUMS').read_text(encoding='utf-8').splitlines():
+              if not raw.strip():
+                  continue
+              match = re.fullmatch(r'([0-9a-f]{64})  (.+)', raw)
+              if match is None:
+                  raise SystemExit(f'invalid checksum row: {raw!r}')
+              expected[match.group(2)] = match.group(1)
+          tracked = set(subprocess.check_output(['git','ls-files'], text=True).splitlines())
+          tracked.discard('SOURCE-SHA256SUMS')
+          if set(expected) != tracked:
+              raise SystemExit(f'checksum inventory mismatch missing={sorted(tracked-set(expected))} extra={sorted(set(expected)-tracked)}')
+          for path in sorted(tracked):
+              data = subprocess.check_output(['git','show',f'HEAD:{path}'])
+              if hashlib.sha256(data).hexdigest() != expected[path]:
+                  raise SystemExit(f'Git-blob checksum mismatch: {path}')
+          print(f'Git-blob source integrity ok: {len(tracked)} files')
+          PY
+          python -B -c "from pathlib import Path; files=list(Path('app').rglob('*.py'))+list(Path('engines').rglob('*.py'))+list(Path('tests').rglob('*.py')); [compile(p.read_text(encoding='utf-8'), str(p), 'exec') for p in files]; print(f'syntax ok: {len(files)} files')"
+
+      - name: Run Connections and AWG regressions
+        working-directory: product
+        run: |
+          python -m pytest \
+            tests/test_awg_style_ui.py \
+            tests/test_sg_gateway_v22_awg3_dual_contract.py \
+            tests/test_ui_connections_visual_v1.py \
+            tests/test_sg_gateway_v22_low_resolution.py
+
+      - name: Run full tests
+        working-directory: product
+        run: python -m pytest tests
+
+      - name: Build and verify FULL package
+        working-directory: product
+        run: |
+          OUT="/tmp/SG-Gateway-0.1.0-022.04-FULL.run"
+          bash build-run.sh "$OUT"
+          bash "$OUT" --verify-only
+
+      - name: Publish isolated green candidate
+        shell: bash
+        working-directory: product
+        run: |
+          set -euo pipefail
+          git push --force origin HEAD:refs/heads/scratch/awg3-align-candidate
+          echo "GREEN_CANDIDATE=$(git rev-parse HEAD)"
