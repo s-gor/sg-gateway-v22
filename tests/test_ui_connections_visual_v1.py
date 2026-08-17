@@ -153,8 +153,8 @@ def test_connections_protocol_cards_have_compact_profile_specific_grids():
     for profile_id in ("reality_tcp", "xhttp_reality", "xhttp_tls", "hysteria2"):
         assert f'data-profile-panel="{profile_id}"' in polish
     assert 'grid-template-areas: "title port";' in polish
-    assert 'grid-template-areas: "title port path";' in polish
-    assert 'grid-template-areas: "title port mode path";' in polish
+    assert 'grid-template-areas: "title path port";' in polish
+    assert 'grid-template-areas: "title mode path port";' in polish
     assert '"obfs obfs"' in polish
     assert "box-shadow: none" in polish
 
