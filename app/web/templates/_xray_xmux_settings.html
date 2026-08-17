@@ -1,57 +1,258 @@
 {% set xmux_mode = xray_xmux.mode if xray_xmux is defined else 'auto' %}
 {% set xmux_stored_json = xray_xmux.stored_json if xray_xmux is defined else '{}' %}
 
+<style>
+/* XMUX compact panel: keep this UI dense and scoped to the XHTTP client-only block. */
+#xray-xmux.xmux1-wrap {
+  margin-top: 14px;
+}
+
+#xray-xmux .xmux1-card {
+  padding: 16px 18px 14px;
+}
+
+#xray-xmux .xmux1-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+#xray-xmux .xmux1-head h2 {
+  margin: 2px 0 3px;
+}
+
+#xray-xmux .xmux1-head p {
+  margin: 0;
+  max-width: 980px;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+#xray-xmux .xmux1-chip {
+  min-height: 28px;
+  padding: 4px 9px;
+  font-size: 11px;
+}
+
+#xray-xmux .xmux1-modes {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--sg-line, rgba(120, 145, 135, .35));
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--sg-panel, #f5f3ed) 88%, transparent);
+}
+
+#xray-xmux .xmux1-mode {
+  min-width: 0;
+}
+
+#xray-xmux .xmux1-mode > span {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  box-shadow: none;
+  text-align: center;
+}
+
+#xray-xmux .xmux1-mode strong {
+  font-size: 13.5px;
+  line-height: 1.2;
+}
+
+#xray-xmux .xmux1-mode small {
+  display: none;
+}
+
+#xray-xmux .xmux1-mode input:checked + span {
+  border: 0;
+  background: color-mix(in srgb, var(--sg-green, #4f8f75) 14%, var(--sg-panel, #f5f3ed));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sg-green, #4f8f75) 62%, transparent);
+}
+
+#xray-xmux .xmux1-mode input:focus-visible + span {
+  outline: 2px solid color-mix(in srgb, var(--sg-green, #4f8f75) 64%, transparent);
+  outline-offset: 1px;
+}
+
+#xray-xmux .xmux1-contract {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  margin-top: 8px;
+  border: 1px solid var(--sg-line, rgba(120, 145, 135, .28));
+  border-radius: 10px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--sg-panel, #f5f3ed) 68%, transparent);
+}
+
+#xray-xmux .xmux1-contract > div {
+  display: flex;
+  min-width: 0;
+  min-height: 58px;
+  justify-content: center;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+#xray-xmux .xmux1-contract > div + div {
+  border-left: 1px solid var(--sg-line, rgba(120, 145, 135, .28));
+}
+
+#xray-xmux .xmux1-contract span {
+  font-size: 9.5px;
+  line-height: 1.2;
+}
+
+#xray-xmux .xmux1-contract strong {
+  font-size: 13.5px;
+  line-height: 1.25;
+}
+
+#xray-xmux .xmux1-contract small {
+  display: none;
+}
+
+#xray-xmux .xmux1-extra {
+  margin-top: 8px;
+  border-radius: 10px;
+}
+
+#xray-xmux .xmux1-extra summary {
+  padding: 9px 11px;
+  font-size: 13.5px;
+}
+
+#xray-xmux .xmux1-extra label {
+  gap: 5px;
+  padding: 0 11px 10px;
+}
+
+#xray-xmux .xmux1-extra textarea {
+  min-height: 160px;
+}
+
+#xray-xmux .xmux1-extra small {
+  font-size: 10.5px;
+  line-height: 1.35;
+}
+
+#xray-xmux .xmux1-error {
+  margin-top: 8px;
+}
+
+#xray-xmux .xmux1-actions {
+  margin-top: 8px;
+}
+
+#xray-xmux .xmux1-actions .button {
+  min-height: 38px;
+  padding-top: 7px;
+  padding-bottom: 7px;
+}
+
+@media (min-width: 981px) and (max-height: 820px) {
+  #xray-xmux .xmux1-card {
+    padding: 13px 15px 12px;
+  }
+
+  #xray-xmux .xmux1-head {
+    margin-bottom: 9px;
+  }
+
+  #xray-xmux .xmux1-mode > span {
+    min-height: 40px;
+    padding: 6px 9px;
+  }
+
+  #xray-xmux .xmux1-contract > div {
+    min-height: 52px;
+    padding: 7px 10px;
+  }
+
+  #xray-xmux .xmux1-extra {
+    margin-top: 7px;
+  }
+
+  #xray-xmux .xmux1-actions {
+    margin-top: 7px;
+  }
+}
+
+@media (max-width: 760px) {
+  #xray-xmux .xmux1-head {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  #xray-xmux .xmux1-modes,
+  #xray-xmux .xmux1-contract {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  #xray-xmux .xmux1-contract > div + div {
+    border-left: 0;
+    border-top: 1px solid var(--sg-line, rgba(120, 145, 135, .28));
+  }
+}
+</style>
+
 <section id="xray-xmux" class="xmux1-wrap cnv1-page">
   <article class="xmux1-card sg-ljd-card">
     <header class="xmux1-head">
       <div>
         <div class="cnv1-card-kicker">XRAY · XHTTP · CLIENT EXTRA</div>
         <h2>XMUX для XHTTP</h2>
-        <p>Общие клиентские параметры VLESS XHTTP Reality и VLESS XHTTP TLS. Серверный Xray XMUX не получает.</p>
+        <p>Клиентские XMUX-параметры для VLESS XHTTP Reality и TLS. Серверный Xray не меняется.</p>
       </div>
       <span class="xmux1-chip">SG-Panel contract</span>
     </header>
 
     <form method="post" action="/connections/xmux" data-xmux-form>
       <div class="xmux1-modes" role="radiogroup" aria-label="Режим XMUX">
-        <label class="xmux1-mode">
+        <label class="xmux1-mode" title="Рекомендуется: maxConnections 2-4, reuse 300-600, requests 1000-2000, lifetime 1200-2400, keepalive 600.">
           <input type="radio" name="xhttp_xmux_mode" value="auto" {% if xmux_mode == 'auto' %}checked{% endif %}>
           <span>
             <strong>Стандартный</strong>
-            <small>Рекомендуется. maxConnections 2-4 · reuse 300-600 · requests 1000-2000 · lifetime 1200-2400 · keepalive 600.</small>
           </span>
         </label>
-        <label class="xmux1-mode">
+        <label class="xmux1-mode" title="Уменьшенный профиль: maxConcurrency 0, maxConnections 6, reuse 0, requests 600-900, lifetime 1800-3000, keepalive 0.">
           <input type="radio" name="xhttp_xmux_mode" value="reduced" {% if xmux_mode == 'reduced' %}checked{% endif %}>
           <span>
-            <strong>Для РФ — уменьшенный</strong>
-            <small>maxConcurrency 0 · maxConnections 6 · reuse 0 · requests 600-900 · lifetime 1800-3000 · keepalive 0.</small>
+            <strong>Для РФ</strong>
           </span>
         </label>
-        <label class="xmux1-mode">
+        <label class="xmux1-mode" title="Полный Client Extra JSON. Объект xmux обязателен; остальные поля сохраняются.">
           <input type="radio" name="xhttp_xmux_mode" value="expert" {% if xmux_mode == 'expert' %}checked{% endif %}>
           <span>
             <strong>Ручной</strong>
-            <small>Полный Client Extra JSON. Объект <code>xmux</code> обязателен; остальные поля сохраняются.</small>
           </span>
         </label>
       </div>
 
       <div class="xmux1-contract">
-        <div>
+        <div title="Для VLESS XHTTP Reality клиентский mode фиксирован в stream-one; серверный mode остаётся auto.">
           <span>VLESS XHTTP Reality</span>
-          <strong>Client mode: stream-one</strong>
-          <small>Серверный mode остаётся auto.</small>
+          <strong>stream-one</strong>
         </div>
-        <div>
+        <div title="Для VLESS XHTTP TLS клиентский mode берётся из карточки профиля; серверный mode остаётся auto.">
           <span>VLESS XHTTP TLS</span>
-          <strong>Client mode: из карточки профиля</strong>
-          <small>По умолчанию auto; серверный mode остаётся auto.</small>
+          <strong>Из карточки профиля</strong>
         </div>
-        <div>
+        <div title="extra.xmux используется только на клиенте и не добавляется в server inbound.">
           <span>Scope</span>
           <strong>Только клиент</strong>
-          <small>extra.xmux не добавляется в server inbound.</small>
         </div>
       </div>
 
@@ -59,7 +260,7 @@
         <summary>Client Extra JSON</summary>
         <label>
           <span>Дополнительные клиентские поля</span>
-          <textarea name="xhttp_extra_client_json" rows="12" spellcheck="false" data-xmux-json>{{ xmux_stored_json }}</textarea>
+          <textarea name="xhttp_extra_client_json" rows="10" spellcheck="false" data-xmux-json>{{ xmux_stored_json }}</textarea>
           <small>В Стандартном/РФ режимах дополнительные поля сохраняются, а <code>xmux</code> заменяется выбранным пресетом. В Ручном режиме JSON используется как есть после проверки конфликта maxConnections/maxConcurrency.</small>
         </label>
       </details>
