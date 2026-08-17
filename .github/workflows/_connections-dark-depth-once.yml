@@ -1,0 +1,251 @@
+name: One-shot Connections dark depth restoration
+
+on:
+  push:
+    branches:
+      - fix30-ipv6-dual-stack
+    paths:
+      - .github/workflows/_connections-dark-depth-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix30-ipv6-dual-stack
+          fetch-depth: 0
+
+      - name: Restore classic dark depth
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('app/web/static/sg-connections-dark-classic-v1.css')
+          css = path.read_text(encoding='utf-8')
+          marker = 'SG-Gateway 022.04 · Connections classic dark depth pass 2'
+          if marker in css:
+              raise SystemExit('depth pass already present')
+
+          extra = r'''
+
+/* SG-Gateway 022.04 · Connections classic dark depth pass 2.
+   Restore the old blue-glass hierarchy: dark bed, blue card surfaces, deep inputs. */
+html[data-theme="dark"] body.page-connections .cnv1-engine-card,
+html[data-theme="dark"] body.page-connections #xray-xmux .xmux1-card {
+  border-color: #355a7c !important;
+  background:
+    radial-gradient(circle at 94% -18%, rgba(101, 169, 243, .13), transparent 38%),
+    linear-gradient(180deg, #1a2e43 0%, #15263a 100%) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(173, 211, 247, .07),
+    0 15px 36px rgba(0, 0, 0, .18) !important;
+}
+
+html[data-theme="dark"] body.page-connections :is(
+  .xps2-selection,
+  .xps2-parameters,
+  .cnv1-endpoint-card,
+  .cnv1-advanced
+) {
+  border-color: #2f506f !important;
+  background:
+    radial-gradient(circle at 96% -22%, rgba(101, 169, 243, .08), transparent 40%),
+    linear-gradient(180deg, #12243a 0%, #0e1d2d 100%) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(173, 211, 247, .045),
+    0 8px 24px rgba(0, 0, 0, .10) !important;
+}
+
+html[data-theme="dark"] body.page-connections .xps2-parameter-row {
+  border-color: #3a6083 !important;
+  background:
+    radial-gradient(circle at 100% -12%, rgba(101, 169, 243, .12), transparent 34%),
+    linear-gradient(180deg, #1c3249 0%, #172a3f 100%) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(173, 211, 247, .075),
+    0 5px 14px rgba(0, 0, 0, .12) !important;
+  transition: border-color .16s ease, background .16s ease, box-shadow .16s ease;
+}
+
+html[data-theme="dark"] body.page-connections .xps2-parameter-row:hover {
+  border-color: #4979a5 !important;
+  background:
+    radial-gradient(circle at 100% -12%, rgba(101, 169, 243, .16), transparent 36%),
+    linear-gradient(180deg, #203851 0%, #192e45 100%) !important;
+}
+
+html[data-theme="dark"] body.page-connections .xps2-parameter-title > strong {
+  color: #f6f9fc !important;
+}
+
+html[data-theme="dark"] body.page-connections .xps2-parameter-title > span {
+  color: #8fb2d2 !important;
+}
+
+html[data-theme="dark"] body.page-connections .xps2-parameter-row > label > span,
+html[data-theme="dark"] body.page-connections .xps2-salamander-secret > label > span {
+  color: #a6bfd7 !important;
+}
+
+html[data-theme="dark"] body.page-connections :is(
+  .xps2-parameter-row input,
+  .xps2-parameter-row select,
+  .xps2-salamander-secret input,
+  #xray-xmux textarea
+) {
+  border-color: #3c6388 !important;
+  background: linear-gradient(180deg, #0f2032 0%, #0b1826 100%) !important;
+  color: #f5f8fb !important;
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, .28),
+    inset 0 0 0 1px rgba(126, 181, 231, .025) !important;
+}
+
+html[data-theme="dark"] body.page-connections :is(
+  .xps2-parameter-row input,
+  .xps2-parameter-row select,
+  .xps2-salamander-secret input,
+  #xray-xmux textarea
+):hover {
+  border-color: #4a79a5 !important;
+}
+
+html[data-theme="dark"] body.page-connections :is(
+  .xps2-parameter-row input,
+  .xps2-parameter-row select,
+  .xps2-salamander-secret input,
+  #xray-xmux textarea
+):focus {
+  border-color: #69b1f4 !important;
+  box-shadow:
+    0 0 0 2px rgba(101, 169, 243, .20),
+    0 0 18px rgba(73, 137, 199, .08),
+    inset 0 1px 2px rgba(0, 0, 0, .25) !important;
+}
+
+html[data-theme="dark"] body.page-connections .xps2-salamander {
+  border-top-color: #355a7c !important;
+}
+
+html[data-theme="dark"] body.page-connections .xps2-salamander-modes span {
+  border-color: #3a6083 !important;
+  background: linear-gradient(180deg, #193049 0%, #112338 100%) !important;
+  color: #a5bdd4 !important;
+}
+
+html[data-theme="dark"] body.page-connections .xps2-salamander-modes label:hover span {
+  border-color: #568fc3 !important;
+  background: linear-gradient(180deg, #213d59 0%, #17304a 100%) !important;
+  color: #f3f7fb !important;
+}
+
+html[data-theme="dark"] body.page-connections .xps2-salamander-modes input:checked + span {
+  border-color: #69b1f4 !important;
+  background: linear-gradient(180deg, #28527a 0%, #1d3f61 100%) !important;
+  color: #ffffff !important;
+  box-shadow:
+    inset 0 0 0 1px rgba(132, 194, 249, .75),
+    0 5px 16px rgba(0, 0, 0, .18) !important;
+}
+
+html[data-theme="dark"] body.page-connections :is(
+  .xps2-salamander-buttons .button:not(.primary),
+  .xps2-actions .button:not(.primary)
+) {
+  border-color: #3a6083 !important;
+  background: linear-gradient(180deg, #193049 0%, #112338 100%) !important;
+  color: #eef5fb !important;
+}
+
+html[data-theme="dark"] body.page-connections :is(
+  .xps2-salamander-buttons .button:not(.primary),
+  .xps2-actions .button:not(.primary)
+):hover:not(:disabled) {
+  border-color: #568fc3 !important;
+  background: linear-gradient(180deg, #213d59 0%, #17304a 100%) !important;
+}
+
+html[data-theme="dark"] body.page-connections .xps2-actions .button.primary {
+  border-color: #72b8f7 !important;
+  background: linear-gradient(180deg, #5c9bd2 0%, #3f7db5 100%) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .16),
+    0 7px 18px rgba(0, 0, 0, .22) !important;
+}
+
+html[data-theme="dark"] body.page-connections #xray-xmux .xmux1-mode > span {
+  border-color: #3a6083 !important;
+  background:
+    radial-gradient(circle at 100% 0, rgba(101, 169, 243, .07), transparent 42%),
+    linear-gradient(180deg, #193049 0%, #112338 100%) !important;
+}
+
+html[data-theme="dark"] body.page-connections #xray-xmux .xmux1-mode input:checked + span {
+  border-color: #69b1f4 !important;
+  background:
+    radial-gradient(circle at 100% 0, rgba(101, 169, 243, .16), transparent 44%),
+    linear-gradient(180deg, #28527a 0%, #1d3f61 100%) !important;
+  color: #ffffff !important;
+}
+'''
+          path.write_text(css.rstrip() + extra + '\n', encoding='utf-8')
+
+          tests_path = Path('tests/test_ui_connections_visual_v1.py')
+          tests = tests_path.read_text(encoding='utf-8')
+          test_marker = 'def test_connections_dark_classic_depth_pass_restores_blue_glass_hierarchy():'
+          if test_marker in tests:
+              raise SystemExit('depth regression test already present')
+          tests += r'''
+
+
+def test_connections_dark_classic_depth_pass_restores_blue_glass_hierarchy():
+    css = (ROOT / "app/web/static/sg-connections-dark-classic-v1.css").read_text(encoding="utf-8")
+    assert "Connections classic dark depth pass 2" in css
+    assert 'radial-gradient(circle at 100% -12%, rgba(101, 169, 243, .12)' in css
+    assert 'border-color: #3a6083 !important;' in css
+    assert 'background: linear-gradient(180deg, #0f2032 0%, #0b1826 100%) !important;' in css
+    assert '.xps2-parameter-row:hover' in css
+    assert '.xps2-salamander-modes input:checked + span' in css
+    assert '.xps2-actions .button.primary' in css
+    assert 'html[data-theme="light"]' not in css
+'''
+          tests_path.write_text(tests, encoding='utf-8')
+          PY
+
+      - name: Refresh source integrity and commit
+        shell: bash
+        run: |
+          rm -f .github/workflows/_connections-dark-depth-once.yml
+          python3 - <<'PY'
+          import hashlib
+          import subprocess
+          from pathlib import Path
+
+          skip = {
+              'SOURCE-SHA256SUMS',
+              '.github/workflows/_connections-dark-depth-once.yml',
+          }
+          tracked = subprocess.check_output(['git', 'ls-files'], text=True, encoding='utf-8').splitlines()
+          rows = []
+          for path in tracked:
+              if path in skip:
+                  continue
+              p = Path(path)
+              if not p.is_file():
+                  raise SystemExit(f'tracked file missing: {path}')
+              rows.append(f'{hashlib.sha256(p.read_bytes()).hexdigest()}  {path}')
+          Path('SOURCE-SHA256SUMS').write_text('\n'.join(rows) + '\n', encoding='utf-8')
+          PY
+
+          python3 -m pytest tests/test_ui_connections_visual_v1.py
+          git diff --check
+          git config user.name "SG-Gateway CI"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -m "UI: restore blue-glass depth on dark Connections"
+          git push origin HEAD:fix30-ipv6-dual-stack
