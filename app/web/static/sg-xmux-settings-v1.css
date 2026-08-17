@@ -283,7 +283,7 @@
 }
 
 .xps2-parameter-row[data-profile-panel="xhttp_tls"] {
-  grid-template-columns: minmax(250px, .8fr) minmax(320px, 1.2fr) minmax(150px, 210px);
+  grid-template-columns: minmax(250px, 1fr) minmax(150px, 210px) minmax(150px, 210px);
   grid-template-areas: "title mode port";
 }
 
@@ -391,7 +391,7 @@ html[data-theme="light"] .xps2-salamander {
   }
 
   .xps2-parameter-row[data-profile-panel="xhttp_tls"] {
-    grid-template-columns: minmax(210px, .8fr) minmax(260px, 1.2fr) minmax(135px, 180px);
+    grid-template-columns: minmax(210px, 1fr) minmax(135px, 180px) minmax(135px, 180px);
   }
 
   .xps2-parameter-row[data-profile-panel="hysteria2"] {
