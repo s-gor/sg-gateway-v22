@@ -182,6 +182,7 @@ Routing exposes five explicit actions:
 
 The final Fix30 tree is validated against the complete 022.04 contract:
 
+- the pre-versioning milestone remains recorded as **551 passed**, 1 skipped;
 - source integrity covers every tracked release file;
 - Python syntax covers the complete application and test tree;
 - pytest: **569 passed**, 1 skipped in the restricted build container; the single unavailable system-permission probe requires real `runuser` group switching, which the container blocks before the tested command starts;
