@@ -1,0 +1,338 @@
+name: One-shot classic dark Connections theme
+
+on:
+  push:
+    branches:
+      - fix30-ipv6-dual-stack
+    paths:
+      - .github/workflows/_connections-dark-classic-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix30-ipv6-dual-stack
+          fetch-depth: 0
+
+      - name: Apply dark-only Connections styling
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          css_path = Path('app/web/static/sg-connections-dark-classic-v1.css')
+          if css_path.exists():
+              raise SystemExit('dark classic stylesheet already exists')
+          css_path.write_text(r'''/* SG-Gateway 022.04 · Connections classic dark restoration.
+   Dark only. Reuses the original SG Graphite palette while preserving current geometry. */
+
+html[data-theme="dark"] body.page-connections {
+  --sg-bg: #0c1826;
+  --sg-sidebar: #101d2c;
+  --sg-topbar: #0d1a28;
+  --sg-panel: #192738;
+  --sg-panel-soft: #152435;
+  --sg-panel-deep: #101d2b;
+  --sg-line: #2a3c50;
+  --sg-line-soft: #213348;
+  --sg-text: #f1f5f9;
+  --sg-muted: #96a7ba;
+  --sg-dim: #71859b;
+  --sg-blue: #65a9f3;
+  --sg-blue-strong: #3675b7;
+  --sg-blue-active: #315f92;
+  --sg-green: #31cf91;
+  --sg-green-bg: #103c35;
+  --sg-green-line: #216e5c;
+
+  --sgc-text: #f4f7fa;
+  --sgc-muted: #96a7ba;
+  --sgc-line: #34506b;
+  --sgc-line-soft: #24364b;
+  --sgc-secondary: linear-gradient(180deg, #182b40 0%, #111f30 100%);
+  --sgc-secondary-hover: linear-gradient(180deg, #203a55 0%, #162a40 100%);
+  --sgc-primary: linear-gradient(180deg, #5b96cc 0%, #3e78ad 100%);
+  --sgc-primary-hover: linear-gradient(180deg, #6aa6dc 0%, #4786be 100%);
+  --sgc-primary-line: #65a9f3;
+  --sgc-focus: #7fb9f4;
+  --sgc-track: #18283b;
+  --sgc-shadow: 0 9px 22px rgba(0, 0, 0, .24);
+}
+
+html[data-theme="dark"] body.page-connections .cnv1-engine-card,
+html[data-theme="dark"] body.page-connections #xray-xmux .xmux1-card {
+  border-color: #2a3c50;
+  background: linear-gradient(180deg, #1a293b 0%, #182738 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .025),
+    0 16px 38px rgba(0, 0, 0, .15);
+}
+
+html[data-theme="dark"] body.page-connections .cnv1-endpoint-card,
+html[data-theme="dark"] body.page-connections .xps2-selection,
+html[data-theme="dark"] body.page-connections .xps2-parameters,
+html[data-theme="dark"] body.page-connections .cnv1-advanced {
+  border-color: #2a3c50;
+  background: #101d2b;
+}
+
+html[data-theme="dark"] body.page-connections :is(
+  .cnv1-kicker,
+  .cnv1-card-kicker,
+  .xps2-choice-topline
+) {
+  color: #65a9f3;
+}
+
+html[data-theme="dark"] body.page-connections .cnv1-port-chip {
+  border-color: #345f88;
+  background: #142c43;
+  color: #65a9f3;
+}
+
+html[data-theme="dark"] body.page-connections .cnv1-engine-status.success {
+  border-color: #216e5c;
+  background: #103c35;
+  color: #31cf91;
+  box-shadow: inset 0 0 0 1px rgba(49, 207, 145, .06);
+}
+
+html[data-theme="dark"] body.page-connections .xps2-choice {
+  border-color: #34506b;
+  background: linear-gradient(180deg, #1a2b3e 0%, #172638 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .018);
+}
+
+html[data-theme="dark"] body.page-connections .xps2-choice:hover {
+  border-color: #568bc0;
+  background: linear-gradient(180deg, #1d3148 0%, #182a3f 100%);
+}
+
+html[data-theme="dark"] body.page-connections .xps2-choice.is-selected,
+html[data-theme="dark"] body.page-connections .xps2-selector:checked + .xps2-choice {
+  border-color: #65a9f3;
+  background: linear-gradient(180deg, #1c3047 0%, #182a3f 100%);
+  box-shadow:
+    inset 0 0 0 1px #65a9f3,
+    0 8px 22px rgba(0, 0, 0, .10);
+}
+
+html[data-theme="dark"] body.page-connections .xps2-choice-status {
+  border-color: #2a3c50;
+  background: #101d2b;
+  color: #96a7ba;
+}
+
+html[data-theme="dark"] body.page-connections .xps2-choice-status.active {
+  border-color: #216e5c;
+  background: #103c35;
+  color: #31cf91;
+}
+
+html[data-theme="dark"] body.page-connections .xps2-parameter-row {
+  border-color: #2a3c50;
+  background: linear-gradient(180deg, #192a3c 0%, #172637 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .018);
+}
+
+html[data-theme="dark"] body.page-connections .xps2-parameter-title > strong,
+html[data-theme="dark"] body.page-connections .xps2-section-head h3,
+html[data-theme="dark"] body.page-connections .xmux1-head h2 {
+  color: #f1f5f9;
+}
+
+html[data-theme="dark"] body.page-connections .xps2-parameter-title > span,
+html[data-theme="dark"] body.page-connections .xps2-section-head p,
+html[data-theme="dark"] body.page-connections .xmux1-head p {
+  color: #96a7ba;
+}
+
+html[data-theme="dark"] body.page-connections :is(
+  .xps2-parameter-row input,
+  .xps2-parameter-row select,
+  .xps2-salamander-secret input,
+  #xray-xmux textarea
+) {
+  border-color: #34506b !important;
+  background: #101d2b !important;
+  color: #f1f5f9 !important;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, .16) !important;
+}
+
+html[data-theme="dark"] body.page-connections :is(
+  .xps2-parameter-row input,
+  .xps2-parameter-row select,
+  .xps2-salamander-secret input,
+  #xray-xmux textarea
+):focus {
+  border-color: #65a9f3 !important;
+  outline: 0 !important;
+  box-shadow:
+    0 0 0 2px rgba(101, 169, 243, .14),
+    inset 0 1px 2px rgba(0, 0, 0, .16) !important;
+}
+
+html[data-theme="dark"] body.page-connections .xps2-salamander {
+  border-top-color: #2a3c50 !important;
+}
+
+html[data-theme="dark"] body.page-connections .xps2-salamander-modes span {
+  border-color: #34506b;
+  background: linear-gradient(180deg, #182b40 0%, #111f30 100%);
+  color: #96a7ba;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, .10);
+}
+
+html[data-theme="dark"] body.page-connections .xps2-salamander-modes label:hover span {
+  border-color: #568bc0;
+  color: #f1f5f9;
+}
+
+html[data-theme="dark"] body.page-connections .xps2-salamander-modes input:checked + span {
+  border-color: #65a9f3;
+  background: linear-gradient(180deg, #1e3954 0%, #172d45 100%);
+  color: #f4f8fc;
+  box-shadow:
+    inset 0 0 0 1px #65a9f3,
+    0 5px 14px rgba(0, 0, 0, .14);
+}
+
+html[data-theme="dark"] body.page-connections .xps2-salamander-status[data-tone="ok"] {
+  color: #31cf91;
+}
+
+html[data-theme="dark"] body.page-connections #xray-xmux .xmux1-chip {
+  border-color: #34506b;
+  background: #101d2b;
+  color: #96a7ba;
+}
+
+html[data-theme="dark"] body.page-connections #xray-xmux .xmux1-mode > span {
+  border-color: #34506b !important;
+  background: linear-gradient(180deg, #182b40 0%, #111f30 100%) !important;
+  color: #f1f5f9 !important;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, .12) !important;
+}
+
+html[data-theme="dark"] body.page-connections #xray-xmux .xmux1-mode:hover > span {
+  border-color: #568bc0 !important;
+  background: linear-gradient(180deg, #203a55 0%, #162a40 100%) !important;
+}
+
+html[data-theme="dark"] body.page-connections #xray-xmux .xmux1-mode input:checked + span {
+  border-color: #65a9f3 !important;
+  background: linear-gradient(180deg, #1e3954 0%, #172d45 100%) !important;
+  box-shadow:
+    inset 0 0 0 1px #65a9f3,
+    0 6px 16px rgba(0, 0, 0, .15) !important;
+}
+
+html[data-theme="dark"] body.page-connections #xray-xmux .xmux1-mode input:focus-visible + span {
+  outline: 2px solid #7fb9f4 !important;
+  outline-offset: 2px;
+}
+
+html[data-theme="dark"] body.page-connections #xray-xmux .xmux1-extra {
+  border-color: #2a3c50;
+  background: #101d2b;
+}
+
+html[data-theme="dark"] body.page-connections #xray-xmux .xmux1-extra summary {
+  color: #f1f5f9;
+}
+
+html[data-theme="dark"] body.page-connections #xray-xmux .xmux1-dialog {
+  border-color: #34506b !important;
+  background: #192738 !important;
+  color: #f1f5f9 !important;
+  box-shadow: 0 26px 72px rgba(0, 0, 0, .48) !important;
+}
+
+html[data-theme="dark"] body.page-connections #xray-xmux :is(
+  .xmux1-dialog-grid > div,
+  .xmux1-dialog-json
+) {
+  border-color: #2a3c50 !important;
+  background: #101d2b !important;
+}
+
+html[data-theme="dark"] body.page-connections #xray-xmux .xmux1-dialog-close {
+  border-color: #34506b !important;
+  color: #f1f5f9 !important;
+  background: #101d2b !important;
+}
+''', encoding='utf-8')
+
+          base_path = Path('app/web/templates/base.html')
+          base = base_path.read_text(encoding='utf-8')
+          anchor = "  <link rel=\"stylesheet\" href=\"{{ url_for('static', filename='sg-controls-final-v1.css') }}\">\n"
+          insertion = anchor + "  {% if active_page|default('') == 'connections' %}<link rel=\"stylesheet\" href=\"{{ url_for('static', filename='sg-connections-dark-classic-v1.css') }}?v={{ app_version }}-connections-dark-classic-v1\">{% endif %}\n"
+          if base.count(anchor) != 1:
+              raise SystemExit('base stylesheet anchor mismatch')
+          if 'sg-connections-dark-classic-v1.css' in base:
+              raise SystemExit('dark classic stylesheet link already present')
+          base_path.write_text(base.replace(anchor, insertion), encoding='utf-8')
+
+          test_path = Path('tests/test_ui_connections_visual_v1.py')
+          tests = test_path.read_text(encoding='utf-8')
+          marker = 'def test_connections_dark_classic_theme_is_scoped_and_loaded_last():'
+          if marker in tests:
+              raise SystemExit('dark classic regression test already exists')
+          extra = r'''
+
+
+def test_connections_dark_classic_theme_is_scoped_and_loaded_last():
+    base = (ROOT / "app/web/templates/base.html").read_text(encoding="utf-8")
+    css = (ROOT / "app/web/static/sg-connections-dark-classic-v1.css").read_text(encoding="utf-8")
+    assert "active_page|default('') == 'connections'" in base
+    assert "sg-connections-dark-classic-v1.css" in base
+    assert base.index("sg-controls-final-v1.css") < base.index("sg-connections-dark-classic-v1.css")
+    assert 'html[data-theme="dark"] body.page-connections' in css
+    assert 'html[data-theme="light"]' not in css
+    for colour in ("#0c1826", "#192738", "#65a9f3", "#31cf91"):
+        assert colour in css.lower()
+    assert ".xps2-selector:checked + .xps2-choice" in css
+    assert ".xps2-choice-status.active" in css
+    assert ".xps2-salamander-modes input:checked + span" in css
+    assert "#xray-xmux .xmux1-mode input:checked + span" in css
+'''
+          test_path.write_text(tests.rstrip() + extra + '\n', encoding='utf-8')
+          PY
+
+      - name: Refresh integrity and commit
+        shell: bash
+        run: |
+          rm -f .github/workflows/_connections-dark-classic-once.yml
+          python3 - <<'PY'
+          import hashlib
+          import subprocess
+          from pathlib import Path
+
+          skip = {'SOURCE-SHA256SUMS', '.github/workflows/_connections-dark-classic-once.yml'}
+          tracked = subprocess.check_output(['git', 'ls-files'], text=True, encoding='utf-8').splitlines()
+          rows = []
+          for path in tracked:
+              if path in skip:
+                  continue
+              p = Path(path)
+              if not p.is_file():
+                  raise SystemExit(f'tracked file missing: {path}')
+              rows.append(f'{hashlib.sha256(p.read_bytes()).hexdigest()}  {path}')
+          Path('SOURCE-SHA256SUMS').write_text('\n'.join(rows) + '\n', encoding='utf-8')
+          PY
+
+          changed="$(git diff --name-only | sort)"
+          printf '%s\n' "$changed"
+          expected="$(printf '%s\n' '.github/workflows/_connections-dark-classic-once.yml' 'SOURCE-SHA256SUMS' 'app/web/static/sg-connections-dark-classic-v1.css' 'app/web/templates/base.html' 'tests/test_ui_connections_visual_v1.py' | sort)"
+          test "$changed" = "$expected"
+
+          git config user.name "SG-Gateway CI"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -m "UI: restore classic blue dark Connections style"
+          git push origin HEAD:fix30-ipv6-dual-stack
