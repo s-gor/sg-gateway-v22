@@ -25,6 +25,6 @@ test = test_path.read_text(encoding="utf-8")
 append = '''\n\ndef test_first_three_xray_parameter_cards_have_equal_height_and_centered_level():\n    css = (ROOT / "app/web/static/sg-xmux-settings-v1.css").read_text(encoding="utf-8")\n    polish = css.split("SG-Gateway 022.04 · Connections controls-only polish", 1)[1]\n    desktop = polish.split("@media (min-width: 1051px)", 1)[1].split("@media", 1)[0]\n    for profile_id in ("reality_tcp", "xhttp_reality", "xhttp_tls"):\n        assert f'data-profile-panel="{profile_id}"' in desktop\n    assert 'data-profile-panel="hysteria2"' not in desktop\n    assert "height: 120px;" in desktop\n    assert "align-items: center;" in desktop\n    low = polish.split("@media (min-width: 981px) and (max-width: 1366px)", 1)[1].split("@media (max-width: 1050px)", 1)[0]\n    assert "height: 112px;" in low\n    assert "align-items: center;" in low\n'''
 if "test_first_three_xray_parameter_cards_have_equal_height_and_centered_level" in test:
     raise SystemExit("regression test already present")
-test_path.write_text(test.rstrip() + append + "\n", encoding="utf-8")
+test_path.write_text(test.rstrip() + append.rstrip() + "\n", encoding="utf-8")
 
 print("Prepared equal-height VLESS parameter strips; Hysteria untouched")
