@@ -201,6 +201,7 @@
               </details>
               {% endif %}
               {% if card.export_url and card.status == 'applied' %}<a class="button" href="{{ card.export_url }}">{{ 'Скачать ссылку' if card.kind == 'mihomo' else 'Скачать' }}</a>{% endif %}
+              {% if card.kind == 'mihomo' and card.payload and card.status == 'applied' %}<button class="button dv16-copy" type="button" data-mieru-router-source="{{ card.payload|e }}" title="Совместимый сокращённый URI для роутеров / ZB">Скопировать Router / ZB</button>{% endif %}
               {% if card.secondary_payload and card.status == 'applied' %}<button class="button dv16-copy" type="button" data-copy-value="{{ card.secondary_payload|e }}">Скопировать Mieru JSON</button>{% endif %}
               {% if card.secondary_qr_url and card.status == 'applied' %}
               <details class="dv16-qr">
@@ -323,6 +324,38 @@
       area.remove();
       return ok;
     }
+
+    function buildMieruRouterUri(value) {
+      const text = String(value || '').trim();
+      if (!text.startsWith('mierus://')) return '';
+
+      const hashAt = text.indexOf('#');
+      const fragment = hashAt >= 0 ? text.slice(hashAt) : '';
+      const withoutFragment = hashAt >= 0 ? text.slice(0, hashAt) : text;
+      const queryAt = withoutFragment.indexOf('?');
+      if (queryAt < 0) return '';
+
+      const authority = withoutFragment.slice('mierus://'.length, queryAt);
+      if (!authority || !authority.includes('@')) return '';
+
+      const params = new URLSearchParams(withoutFragment.slice(queryAt + 1));
+      const port = String(params.get('port') || '').trim();
+      const transport = String(params.get('protocol') || 'TCP').trim().toUpperCase();
+      if (!/^\d{1,5}$/.test(port)) return '';
+      const portNumber = Number(port);
+      if (portNumber < 1 || portNumber > 65535) return '';
+
+      return `mieru://${authority}:${portNumber}?transport=${encodeURIComponent(transport)}${fragment}`;
+    }
+
+    document.querySelectorAll('[data-mieru-router-source]').forEach(button => {
+      const converted = buildMieruRouterUri(button.dataset.mieruRouterSource || '');
+      if (converted) {
+        button.dataset.copyValue = converted;
+      } else {
+        button.hidden = true;
+      }
+    });
 
     document.querySelectorAll('[data-copy-value]').forEach(button => {
       button.addEventListener('click', async () => {
