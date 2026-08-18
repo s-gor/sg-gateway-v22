@@ -165,7 +165,7 @@ def build_router_subscription_document(client: Client, device_id: int) -> dict |
 
 
 def build_keenetic_subscription_body(client: Client, device_id: int) -> str:
-    """Return the plain VLESS feed consumed by XKeen/Xkeen UI on Keenetic."""
+    """Return the plain VLESS feed consumed by Xkeen UI on Keenetic."""
     document = build_router_subscription_document(client, device_id)
     if document is None:
         return ""

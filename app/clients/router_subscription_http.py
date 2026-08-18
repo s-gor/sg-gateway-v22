@@ -100,7 +100,7 @@ def register_router_subscription(app: Flask) -> None:
             response.headers["Cache-Control"] = "no-store, max-age=0"
             response.headers["Pragma"] = "no-cache"
             response.headers["X-Content-Type-Options"] = "nosniff"
-            response.headers["X-SG-Router-Target"] = "keenetic-xkeen"
+            response.headers["X-SG-Router-Target"] = "keenetic-xkeen-ui"
             return response
 
         app.add_url_rule(

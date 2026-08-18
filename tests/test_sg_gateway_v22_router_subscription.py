@@ -215,7 +215,7 @@ def test_openwrt_homeproxy_feed_reuses_proven_device_subscription(monkeypatch) -
     assert should_skip_auth(http.OPENWRT_PUBLIC_ENDPOINT) is True
 
 
-def test_keenetic_xkeen_feed_is_plain_vless_subscription(monkeypatch) -> None:
+def test_keenetic_xkeen_ui_feed_is_plain_vless_subscription(monkeypatch) -> None:
     monkeypatch.setattr(http, "get_router_subscription_access", lambda token: (_client(), _device()))
     monkeypatch.setattr(
         http,
@@ -230,7 +230,7 @@ def test_keenetic_xkeen_feed_is_plain_vless_subscription(monkeypatch) -> None:
     assert response.status_code == 200
     assert response.mimetype == "text/plain"
     assert response.get_data(as_text=True) == "vless://one\nvless://two\n"
-    assert response.headers["X-SG-Router-Target"] == "keenetic-xkeen"
+    assert response.headers["X-SG-Router-Target"] == "keenetic-xkeen-ui"
     assert should_skip_auth(http.KEENETIC_PUBLIC_ENDPOINT) is True
 
 
@@ -241,8 +241,8 @@ def test_router_ui_and_production_registration_are_source_native(monkeypatch, tm
     assert "Скопировать OpenWrt SUB" in detail
     assert "Скачать JSON" in detail
     assert "OpenWrt · HomeProxy SUB" in detail
-    assert "Keenetic · XKeen SUB" in detail
-    assert "Скопировать Keenetic SUB" in detail
+    assert "Keenetic · Xkeen UI SUB" in detail
+    assert "Скопировать Xkeen UI SUB" in detail
     assert "Универсальный Router JSON" in detail
 
     monkeypatch.setenv("SG_GATEWAY_DATA_DIR", str(tmp_path / "data"))
