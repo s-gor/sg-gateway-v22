@@ -138,6 +138,26 @@
         </div>
       </section>
 
+      {% set keenetic_subscription = keenetic_subscription_url(client, device) if client.enabled and device.enabled else '' %}
+      <section class="dv16-subscription sg-router-subscription {{ 'state-applied' if keenetic_subscription else 'state-missing' }}" data-sg-router-keenetic-subscription-v1>
+        <div class="dv16-subscription-summary">
+          <strong>Keenetic · XKeen SUB</strong>
+          {% if keenetic_subscription %}
+          <span>Персональная подписка устройства для XKeen/Xkeen UI.</span>
+          <small>Только готовые VLESS: Reality TCP · XHTTP Reality · XHTTP TLS.</small>
+          {% else %}
+          <span>Подписка недоступна для отключённого устройства.</span>
+          {% endif %}
+        </div>
+        <div class="dv16-subscription-actions sg-router-subscription-actions">
+          {% if keenetic_subscription %}
+          <button class="button primary dv16-copy" type="button" data-copy-value="{{ keenetic_subscription|e }}">Скопировать Keenetic SUB</button>
+          {% else %}
+          <span class="dv16-not-ready">Недоступно</span>
+          {% endif %}
+        </div>
+      </section>
+
       {% set router_subscription = router_subscription_url(client, device) if client.enabled and device.enabled else '' %}
       <section class="dv16-subscription sg-router-subscription {{ 'state-applied' if router_subscription else 'state-missing' }}" data-sg-router-subscription-v1>
         <div class="dv16-subscription-summary">

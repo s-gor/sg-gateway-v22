@@ -4,6 +4,7 @@ import secrets
 from urllib.parse import quote
 
 from app.clients.repository import Client, Device, get_client, get_device
+from app.clients.sg_subscription import build_keenetic_subscription_body
 from app.clients.sg_subscription_store import subscription_base_url
 from app.db import connect, init_db
 
@@ -102,3 +103,13 @@ def build_openwrt_subscription_url(client: Client, device: Device) -> str:
     if not token or not base:
         return ""
     return f"{base}/sg/router/openwrt/v1/{quote(token, safe='')}.sub"
+
+
+def build_keenetic_subscription_url(client: Client, device: Device) -> str:
+    if not build_keenetic_subscription_body(client, device.id):
+        return ""
+    token = ensure_router_subscription_token(client.id, device.id)
+    base = subscription_base_url()
+    if not token or not base:
+        return ""
+    return f"{base}/sg/router/keenetic/v1/{quote(token, safe='')}.sub"

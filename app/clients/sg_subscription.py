@@ -63,7 +63,7 @@ def _profile_entry(client: Client, device, spec: tuple[str, ...]) -> dict:
         export = build_protocol_export(client, export_kind, device)
         if not export.body:
             return entry
-    except Exception:
+    except Exception:  # noqa: BLE001 - one broken export must not break the whole feed
         return entry
     entry["ready"] = True
     entry["media_type"] = export.media_type
@@ -162,6 +162,21 @@ def build_router_subscription_document(client: Client, device_id: int) -> dict |
         },
         "profiles": profiles,
     }
+
+
+def build_keenetic_subscription_body(client: Client, device_id: int) -> str:
+    """Return the plain VLESS feed consumed by XKeen/Xkeen UI on Keenetic."""
+    document = build_router_subscription_document(client, device_id)
+    if document is None:
+        return ""
+    links = [
+        str(profile.get("value") or "").strip()
+        for profile in document.get("profiles", [])
+        if profile.get("protocol") == "vless"
+        and profile.get("type") == "uri"
+        and str(profile.get("value") or "").strip().startswith("vless://")
+    ]
+    return "\n".join(links) + ("\n" if links else "")
 
 
 def _subscription_label(client_name: str, device: dict, profile_name: str) -> str:

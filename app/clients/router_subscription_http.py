@@ -7,6 +7,7 @@ from flask import Flask, Response, abort, request
 
 from app.clients.exports import build_subscription
 from app.clients.router_subscription_store import (
+    build_keenetic_subscription_url,
     build_openwrt_subscription_url,
     build_router_subscription_download_url,
     build_router_subscription_url,
@@ -15,11 +16,13 @@ from app.clients.router_subscription_store import (
 from app.clients.sg_subscription import (
     SG_ROUTER_SUBSCRIPTION_FORMAT,
     SG_ROUTER_SUBSCRIPTION_VERSION,
+    build_keenetic_subscription_body,
     build_router_subscription_document,
 )
 
 PUBLIC_ENDPOINT = "router_subscription_v1"
 OPENWRT_PUBLIC_ENDPOINT = "router_openwrt_subscription_v1"
+KEENETIC_PUBLIC_ENDPOINT = "router_keenetic_subscription_v1"
 
 
 def _safe_filename(value: str) -> str:
@@ -84,9 +87,33 @@ def register_router_subscription(app: Flask) -> None:
             methods=["GET"],
         )
 
+    if KEENETIC_PUBLIC_ENDPOINT not in app.view_functions:
+        def keenetic_feed(token: str):
+            access = get_router_subscription_access(token)
+            if access is None:
+                abort(404)
+            client, device = access
+            body = build_keenetic_subscription_body(client, device.id)
+            if not body:
+                abort(404)
+            response = Response(body, content_type="text/plain; charset=utf-8")
+            response.headers["Cache-Control"] = "no-store, max-age=0"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["X-Content-Type-Options"] = "nosniff"
+            response.headers["X-SG-Router-Target"] = "keenetic-xkeen"
+            return response
+
+        app.add_url_rule(
+            "/sg/router/keenetic/v1/<token>.sub",
+            endpoint=KEENETIC_PUBLIC_ENDPOINT,
+            view_func=keenetic_feed,
+            methods=["GET"],
+        )
+
     if not getattr(app, "_sg_router_subscription_v1_template_context", False):
         def template_context():
             return {
+                "keenetic_subscription_url": build_keenetic_subscription_url,
                 "openwrt_subscription_url": build_openwrt_subscription_url,
                 "router_subscription_url": build_router_subscription_url,
                 "router_subscription_download_url": build_router_subscription_download_url,

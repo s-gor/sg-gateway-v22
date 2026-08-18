@@ -141,11 +141,34 @@ def test_router_token_is_stable_per_device_and_disabled_device_stops_resolving(m
 def test_router_url_uses_device_token_and_json_path(monkeypatch) -> None:
     monkeypatch.setattr(store, "ensure_router_subscription_token", lambda client_id, device_id: "sgr1_testtoken")
     monkeypatch.setattr(store, "subscription_base_url", lambda: "https://vpn.example")
+    monkeypatch.setattr(store, "build_keenetic_subscription_body", lambda client, device_id: "vless://ready\n")
     url = store.build_router_subscription_url(_client(), _device())
     assert url == "https://vpn.example/sg/router/v1/sgr1_testtoken.json"
     assert store.build_router_subscription_download_url(_client(), _device()) == url + "?download=1"
     assert store.build_openwrt_subscription_url(_client(), _device()) == (
         "https://vpn.example/sg/router/openwrt/v1/sgr1_testtoken.sub"
+    )
+    assert store.build_keenetic_subscription_url(_client(), _device()) == (
+        "https://vpn.example/sg/router/keenetic/v1/sgr1_testtoken.sub"
+    )
+
+
+def test_keenetic_body_contains_only_ready_vless_links(monkeypatch) -> None:
+    monkeypatch.setattr(
+        subscription,
+        "build_router_subscription_document",
+        lambda client, device_id: {
+            "profiles": [
+                {"protocol": "vless", "type": "uri", "value": "vless://one"},
+                {"protocol": "hysteria2", "type": "uri", "value": "hysteria2://two"},
+                {"protocol": "vless", "type": "config", "value": "ignored"},
+                {"protocol": "vless", "type": "uri", "value": "vless://three"},
+            ]
+        },
+    )
+
+    assert subscription.build_keenetic_subscription_body(_client(), 701) == (
+        "vless://one\nvless://three\n"
     )
 
 
@@ -192,6 +215,25 @@ def test_openwrt_homeproxy_feed_reuses_proven_device_subscription(monkeypatch) -
     assert should_skip_auth(http.OPENWRT_PUBLIC_ENDPOINT) is True
 
 
+def test_keenetic_xkeen_feed_is_plain_vless_subscription(monkeypatch) -> None:
+    monkeypatch.setattr(http, "get_router_subscription_access", lambda token: (_client(), _device()))
+    monkeypatch.setattr(
+        http,
+        "build_keenetic_subscription_body",
+        lambda client, device_id: "vless://one\nvless://two\n",
+    )
+    app = Flask(__name__)
+    http.register_router_subscription(app)
+
+    response = app.test_client().get("/sg/router/keenetic/v1/sgr1_example.sub")
+
+    assert response.status_code == 200
+    assert response.mimetype == "text/plain"
+    assert response.get_data(as_text=True) == "vless://one\nvless://two\n"
+    assert response.headers["X-SG-Router-Target"] == "keenetic-xkeen"
+    assert should_skip_auth(http.KEENETIC_PUBLIC_ENDPOINT) is True
+
+
 def test_router_ui_and_production_registration_are_source_native(monkeypatch, tmp_path) -> None:
     detail = (ROOT / "app/web/templates/client_detail.html").read_text(encoding="utf-8")
     assert detail.count("data-sg-router-subscription-v1") == 1
@@ -199,6 +241,8 @@ def test_router_ui_and_production_registration_are_source_native(monkeypatch, tm
     assert "Скопировать OpenWrt SUB" in detail
     assert "Скачать JSON" in detail
     assert "OpenWrt · HomeProxy SUB" in detail
+    assert "Keenetic · XKeen SUB" in detail
+    assert "Скопировать Keenetic SUB" in detail
     assert "Универсальный Router JSON" in detail
 
     monkeypatch.setenv("SG_GATEWAY_DATA_DIR", str(tmp_path / "data"))
@@ -207,4 +251,5 @@ def test_router_ui_and_production_registration_are_source_native(monkeypatch, tm
     endpoints = [rule.endpoint for rule in production.app.url_map.iter_rules()]
     assert endpoints.count("router_subscription_v1") == 1
     assert endpoints.count("router_openwrt_subscription_v1") == 1
+    assert endpoints.count("router_keenetic_subscription_v1") == 1
     production.app.jinja_env.get_template("client_detail.html")
