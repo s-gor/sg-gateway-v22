@@ -47,15 +47,15 @@
         </div>
       </article>
 
-      <details class="r096-user-rules">
-        <summary>
+      <details class="r096-user-rules" data-r096-user-rules {% if preset == 'custom' %}open{% endif %}>
+        <summary data-r096-user-rules-toggle aria-controls="r096-user-rules-body" aria-expanded="{{ 'true' if preset == 'custom' else 'false' }}">
           <span>
             <strong>Пользовательские правила</strong>
             <small>Свои домены и IP/подсети. По одной записи в строке.</small>
           </span>
-          <em>Открыть</em>
+          <em data-r096-user-rules-label>{{ 'Скрыть' if preset == 'custom' else 'Открыть' }}</em>
         </summary>
-        <div class="r096-user-body">
+        <div class="r096-user-body" id="r096-user-rules-body">
           <p>Для доменов можно использовать <code>full:</code>, <code>domain:</code>, <code>regexp:</code>, <code>keyword:</code> и <code>geosite:</code>. Без префикса используется <code>domain:</code>.</p>
           <div class="r096-rule-tabs">
             <button type="button" data-r096-rule-tab="direct4" class="active">SG-Gateway · IPv4</button>
@@ -246,6 +246,24 @@
   }));
 
   const form = document.getElementById('r096-smart-form');
+  const userRules = document.querySelector('[data-r096-user-rules]');
+  const userRulesToggle = document.querySelector('[data-r096-user-rules-toggle]');
+  const userRulesLabel = document.querySelector('[data-r096-user-rules-label]');
+  const syncUserRules = () => {
+    if (!userRules) return;
+    if (userRulesToggle) userRulesToggle.setAttribute('aria-expanded', String(userRules.open));
+    if (userRulesLabel) userRulesLabel.textContent = userRules.open ? 'Скрыть' : 'Открыть';
+  };
+  if (userRules && userRulesToggle) {
+    userRulesToggle.addEventListener('click', event => {
+      event.preventDefault();
+      userRules.open = !userRules.open;
+      syncUserRules();
+    });
+    userRules.addEventListener('toggle', syncUserRules);
+    syncUserRules();
+  }
+
   const presetDefaults = {
     direct: {local_action:'direct4',russia_scope:'none',russia_action:'direct4',blocked_action:'direct4',ads_action:'direct4',default_action:'direct4'},
     ads_block: {local_action:'direct4',russia_scope:'none',russia_action:'direct4',blocked_action:'direct4',ads_action:'block',default_action:'direct4'},
@@ -255,6 +273,11 @@
   let applyingPreset = false;
   const setValue = (name, value) => { const input = form?.querySelector(`input[name="${name}"][value="${value}"]`); if (input) input.checked = true; };
   form?.querySelectorAll('input[name="preset"]').forEach(input => input.addEventListener('change', () => {
+    if (input.value === 'custom' && input.checked && userRules) {
+      userRules.open = true;
+      syncUserRules();
+      userRules.scrollIntoView({behavior: 'smooth', block: 'start'});
+    }
     const values = presetDefaults[input.value];
     if (!values) return;
     applyingPreset = true;
