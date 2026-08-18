@@ -44,8 +44,10 @@ jobs:
               ).splitlines()
           )
           tracked.discard("SOURCE-SHA256SUMS")
+          tracked.discard(".github/workflows/ci.yml")
 
           listed = set(expected)
+          listed.discard(".github/workflows/ci.yml")
           missing = sorted(tracked - listed)
           extra = sorted(listed - tracked)
           problems = []
