@@ -10,7 +10,6 @@ from flask import redirect, request, session, url_for
 
 from app.config import load_config
 
-
 PUBLIC_ENDPOINTS = {
     "login",
     "login_post",
@@ -19,6 +18,7 @@ PUBLIC_ENDPOINTS = {
     "recovery",
     "download_diagnostics",
     "subscription_feed",
+    "router_subscription_v1",
     "sg_subscription_v1",
 }
 

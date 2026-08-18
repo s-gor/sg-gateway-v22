@@ -138,6 +138,27 @@
         </div>
       </section>
 
+      {% set router_subscription = router_subscription_url(client, device) if client.enabled and device.enabled else '' %}
+      <section class="dv16-subscription sg-router-subscription {{ 'state-applied' if router_subscription else 'state-missing' }}" data-sg-router-subscription-v1>
+        <div class="dv16-subscription-summary">
+          <strong>Router JSON</strong>
+          {% if router_subscription %}
+          <span>Персональная JSON-подписка устройства.</span>
+          <small>Только выбранные и готовые профили. Обновляется при каждом запросе.</small>
+          {% else %}
+          <span>Подписка недоступна для отключённого устройства.</span>
+          {% endif %}
+        </div>
+        <div class="dv16-subscription-actions sg-router-subscription-actions">
+          {% if router_subscription %}
+          <button class="button primary dv16-copy" type="button" data-copy-value="{{ router_subscription|e }}">Скопировать ссылку</button>
+          <a class="button" href="{{ router_subscription_download_url(client, device)|e }}">Скачать JSON</a>
+          {% else %}
+          <span class="dv16-not-ready">Недоступно</span>
+          {% endif %}
+        </div>
+      </section>
+
       <section class="dv16-technical dv16-technical-always-open">
         <div class="dv16-technical-list">
           {% for card in profiles %}

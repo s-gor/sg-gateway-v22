@@ -31,6 +31,17 @@
   align-self: center;
 }
 
+.sg-router-subscription {
+  border-color: color-mix(in srgb, var(--sg-blue, #5b82a8) 36%, var(--sg-line, rgba(148, 163, 184, .22)));
+}
+
+.sg-router-subscription-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .sg-subscription-dual {
   display: grid;
   grid-template-columns: minmax(220px, .72fr) minmax(0, 1.28fr);

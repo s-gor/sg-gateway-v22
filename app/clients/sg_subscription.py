@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import json
+from datetime import UTC, datetime
 from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
 
 from app.clients.exports import build_protocol_export, protocol_ready
@@ -9,6 +10,8 @@ from app.clients.repository import Client, device_access_tokens, list_devices
 
 SG_SUBSCRIPTION_FORMAT = "sg-subscription"
 SG_SUBSCRIPTION_VERSION = 1
+SG_ROUTER_SUBSCRIPTION_FORMAT = "sg-router-subscription"
+SG_ROUTER_SUBSCRIPTION_VERSION = 1
 
 _PROFILE_SPECS = (
     ("xray_reality_tcp", "xray_reality_tcp", "xray-reality-tcp", "VLESS Reality TCP", "vless", "uri"),
@@ -110,6 +113,54 @@ def build_sg_subscription_document(client: Client) -> dict:
             "profiles_ready": total_ready,
         },
         "devices": devices,
+    }
+
+
+def build_router_subscription_document(client: Client, device_id: int) -> dict | None:
+    """Build the small device-scoped JSON contract used by router subscriptions."""
+    document = build_sg_subscription_document(client)
+    device = next(
+        (item for item in document["devices"] if int(item.get("id") or 0) == int(device_id)),
+        None,
+    )
+    if device is None or not device.get("enabled"):
+        return None
+
+    profiles = []
+    for profile in device.get("profiles", []):
+        if not profile.get("ready"):
+            continue
+        payload_type = str(profile.get("format") or "")
+        value = str(profile.get("uri") or profile.get("config") or "")
+        if payload_type not in {"uri", "config"} or not value:
+            continue
+        profiles.append({
+            "id": str(profile.get("id") or ""),
+            "name": str(profile.get("name") or ""),
+            "protocol": str(profile.get("protocol") or ""),
+            "type": payload_type,
+            "value": value,
+        })
+
+    return {
+        "format": SG_ROUTER_SUBSCRIPTION_FORMAT,
+        "version": SG_ROUTER_SUBSCRIPTION_VERSION,
+        "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
+        "scope": "device",
+        "client": {
+            "id": client.id,
+            "name": client.name,
+        },
+        "device": {
+            "id": int(device.get("id") or 0),
+            "name": str(device.get("name") or ""),
+            "primary": bool(device.get("primary")),
+            "expires_at": device.get("expires_at"),
+        },
+        "summary": {
+            "profiles": len(profiles),
+        },
+        "profiles": profiles,
     }
 
 
