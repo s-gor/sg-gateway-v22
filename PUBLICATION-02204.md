@@ -6,8 +6,8 @@
 
 ## Версия и проверка обновления
 
-- Исходная стабильная версия: `0.1.0-021.12` (`main`).
-- Целевая версия: `0.1.0-022.04 Fix30` (`fix30-ipv6-dual-stack`).
+- Исходная стабильная версия: `0.1.0-021.12` (`s-gor/sg-gateway`, ветка `main`).
+- Целевая версия: `0.1.0-022.04 Fix30` (`s-gor/sg-gateway-v22`, ветка `main`).
 - После Update панель и файл `/opt/sg-gateway/VERSION` должны показывать `0.1.0-022.04`.
 
 ### 1. Установка стабильной 0.1.0-021.12
@@ -15,7 +15,7 @@
 На чистой Ubuntu:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/main/deploy/install-from-github.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway/main/deploy/install-from-github.sh | sudo bash
 ```
 
 ### 2. Update до 0.1.0-022.04 Fix30
@@ -23,7 +23,7 @@ curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/main/deploy/in
 На сервере с уже установленной `0.1.0-021.12`:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/fix30-ipv6-dual-stack/deploy/update-from-github.sh | sudo env SG_GATEWAY_GITHUB_BRANCH=fix30-ipv6-dual-stack bash
+curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/main/deploy/update-from-github.sh | sudo bash
 ```
 
 ### 3. Проверка версии
