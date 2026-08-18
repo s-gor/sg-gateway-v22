@@ -39,6 +39,18 @@ def test_mieru_link_json_and_two_qr_exports_are_present() -> None:
     assert "card.secondary_qr_url" in template
 
 
+def test_mieru_router_zb_copy_helper_is_present() -> None:
+    template = source("app/web/templates/client_detail.html")
+    assert 'data-mieru-router-source="{{ card.payload|e }}"' in template
+    assert "Скопировать Router / ZB" in template
+    assert "function buildMieruRouterUri(value)" in template
+    assert "text.startsWith('mierus://')" in template
+    assert "params.get('port')" in template
+    assert "params.get('protocol')" in template
+    assert "?transport=${encodeURIComponent(transport)}" in template
+    assert "button.dataset.copyValue = converted" in template
+
+
 def test_shared_subscription_excludes_mieru_and_uses_real_newlines() -> None:
     exports = source("app/clients/exports.py")
     start = exports.index("def build_subscription(")
