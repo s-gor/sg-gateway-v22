@@ -7,13 +7,13 @@
 Установите стабильную `0.1.0-021.12` на чистую Ubuntu:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway/main/deploy/install-from-github.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway/stable-02112/deploy/install-from-github.sh | sudo env SG_GATEWAY_GITHUB_BRANCH=stable-02112 bash
 ```
 
 После завершения установки выполните Update до `0.1.0-022.04 Fix30`:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/main/deploy/update-from-github.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/main/deploy/update-from-github.sh | sudo env SG_GATEWAY_GITHUB_BRANCH=main bash
 ```
 
 Проверьте установленную версию:

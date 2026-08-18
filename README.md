@@ -22,13 +22,13 @@
 Сначала установите стабильную `0.1.0-021.12` на чистую Ubuntu:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway/main/deploy/install-from-github.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway/stable-02112/deploy/install-from-github.sh | sudo env SG_GATEWAY_GITHUB_BRANCH=stable-02112 bash
 ```
 
 Затем обновите установленный SG-Gateway до `0.1.0-022.04 Fix30`:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/main/deploy/update-from-github.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/main/deploy/update-from-github.sh | sudo env SG_GATEWAY_GITHUB_BRANCH=main bash
 ```
 
 После успешного Update панель должна показывать версию `v0.1.0-022.04`. Проверка на сервере:
@@ -58,7 +58,7 @@ SG-Gateway устанавливается на **один самостоятел
 Для чистой Ubuntu:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway/main/deploy/install-from-github.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/main/deploy/install-from-github.sh | sudo env SG_GATEWAY_GITHUB_BRANCH=main bash
 ```
 
 Если SG-Gateway уже установлен, Clean Install останавливается до изменений и предлагает отдельную команду Update.
@@ -66,7 +66,7 @@ curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway/main/deploy/instal
 ### Update — существующий SG-Gateway
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/main/deploy/update-from-github.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/main/deploy/update-from-github.sh | sudo env SG_GATEWAY_GITHUB_BRANCH=main bash
 ```
 
 Update не запускает полный installer и не переустанавливает Nginx, Certbot, Xray, AmneziaWG, Mihomo, sing-box или WARP helper. Перед переключением кода создаётся safety backup, а после обновления проверяются HTTPS, Clients, Nginx и runtime.
