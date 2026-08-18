@@ -546,26 +546,54 @@ bootstrap_packages() {
   apt_get install -y ca-certificates curl tar gzip unzip zstd jq openssl python3 python3-venv python3-pip
 }
 
+require_interactive_tty() {
+  if [[ ! -c /dev/tty ]]; then
+    fail "интерактивный терминал недоступен; запустите Clean Install из обычной SSH-сессии"
+  fi
+  if ! { : < /dev/tty; } 2>/dev/null; then
+    fail "не удалось открыть интерактивный терминал /dev/tty; переподключитесь по SSH и повторите Clean Install"
+  fi
+}
+
 read_tty() {
   local prompt="$1"
   local target="$2"
   local default_value="${3:-}"
   local value=""
+  require_interactive_tty
   if [[ -n "$default_value" ]]; then
-    read -r -p "[SG-Gateway] ${prompt} [${default_value}]: " value < /dev/tty
+    printf '[SG-Gateway] %s [%s]: ' "$prompt" "$default_value" > /dev/tty
+    if ! IFS= read -r value < /dev/tty; then
+      fail "не удалось прочитать ответ из интерактивного терминала"
+    fi
     value="${value:-$default_value}"
   else
-    read -r -p "[SG-Gateway] ${prompt}: " value < /dev/tty
+    printf '[SG-Gateway] %s: ' "$prompt" > /dev/tty
+    if ! IFS= read -r value < /dev/tty; then
+      fail "не удалось прочитать ответ из интерактивного терминала"
+    fi
   fi
   printf -v "$target" '%s' "$value"
 }
 
 read_password() {
   local first="" second=""
+  local timeout_seconds=300
+  require_interactive_tty
+  printf '\n[SG-Gateway] Требуется задать пароль администратора панели.\n'
+  printf '[SG-Gateway] Ввод выполняется в текущем терминале; символы пароля не отображаются.\n' > /dev/tty
   while true; do
-    read -r -s -p "[SG-Gateway] Пароль администратора (не менее 8 символов): " first < /dev/tty
+    printf '[SG-Gateway] Пароль администратора (не менее 8 символов): ' > /dev/tty
+    if ! IFS= read -r -s -t "$timeout_seconds" first < /dev/tty; then
+      printf '\n' > /dev/tty
+      fail "пароль не получен из интерактивного терминала за ${timeout_seconds} секунд"
+    fi
     printf "\n" > /dev/tty
-    read -r -s -p "[SG-Gateway] Повторите пароль: " second < /dev/tty
+    printf '[SG-Gateway] Повторите пароль: ' > /dev/tty
+    if ! IFS= read -r -s -t "$timeout_seconds" second < /dev/tty; then
+      printf '\n' > /dev/tty
+      fail "повтор пароля не получен из интерактивного терминала за ${timeout_seconds} секунд"
+    fi
     printf "\n" > /dev/tty
     if (( ${#first} < 8 )); then
       printf "%sПароль слишком короткий.%s\n" "$YELLOW" "$RESET" > /dev/tty
@@ -655,9 +683,13 @@ detect_country_code() {
 read_yes_no() {
   local prompt="$1" target="$2" default_value="${3:-1}" answer=""
   local suffix="[Enter = Да / n = Нет]"
+  require_interactive_tty
   [[ "$default_value" == "0" ]] && suffix="[y = Да / Enter = Нет]"
   while true; do
-    read -r -p "[SG-Gateway] $prompt $suffix: " answer < /dev/tty
+    printf '[SG-Gateway] %s %s: ' "$prompt" "$suffix" > /dev/tty
+    if ! IFS= read -r answer < /dev/tty; then
+      fail "не удалось прочитать подтверждение из интерактивного терминала"
+    fi
     answer="${answer:-$([[ "$default_value" == "1" ]] && echo y || echo n)}"
     case "${answer,,}" in
       y|yes|д|да) printf -v "$target" '%s' 1; return 0 ;;
