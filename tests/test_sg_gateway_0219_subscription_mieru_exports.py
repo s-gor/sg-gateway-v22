@@ -34,7 +34,8 @@ def test_mieru_link_json_and_two_qr_exports_are_present() -> None:
     assert "secondary_payload=(" in access
     assert "secondary_qr_url=(" in access
     assert 'tertiary_label="Mihomo YAML"' in access
-    assert ">QR JSON<" in template
+    assert "QR · Mieru" in template
+    assert "QR · iPhone" in template
     assert "card.qr_url" in template
     assert "card.secondary_qr_url" in template
 
