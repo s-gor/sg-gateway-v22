@@ -2,12 +2,33 @@
 
 > **0.1.0-021.12 = FINAL AWG2.** Версия зафиксирована как окончательная линия с AmneziaWG 2. AWG3 начинается только с `0.1.0-022.01`.
 
+## Проверка Update 0.1.0-021.12 → 0.1.0-022.04 Fix30
+
+Установите стабильную `0.1.0-021.12` на чистую Ubuntu:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/main/deploy/install-from-github.sh | sudo bash
+```
+
+После завершения установки выполните Update до `0.1.0-022.04 Fix30`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/fix30-ipv6-dual-stack/deploy/update-from-github.sh | sudo env SG_GATEWAY_GITHUB_BRANCH=fix30-ipv6-dual-stack bash
+```
+
+Проверьте установленную версию:
+
+```bash
+sudo cat /opt/sg-gateway/VERSION
+```
+
+Ожидается `0.1.0-022.04`; тот же номер отображается в интерфейсе панели.
+
 ## Требования
 
 - чистая Ubuntu Server 24.04;
 - root-доступ через `sudo`;
 - публичный IPv4;
-- открытые в AWS Security Group порты используемых профилей.
 
 SG-Gateway устанавливается нативно и не требует Docker.
 

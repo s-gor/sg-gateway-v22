@@ -17,6 +17,32 @@
 
 > **022.04 Release Candidate.** Dual Stack IPv4+IPv6, AWG3 userspace, Family Routing, independent WARP IPv4/IPv6 health and non-destructive Update. Полное техническое описание: [`PUBLICATION-02204.md`](PUBLICATION-02204.md). Исторический baseline 021.12 остаётся frozen и не переписывается.
 
+## Проверка обновления 0.1.0-021.12 → 0.1.0-022.04 Fix30
+
+Сначала установите стабильную `0.1.0-021.12` на чистую Ubuntu:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/main/deploy/install-from-github.sh | sudo bash
+```
+
+Затем обновите установленный SG-Gateway до `0.1.0-022.04 Fix30`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/fix30-ipv6-dual-stack/deploy/update-from-github.sh | sudo env SG_GATEWAY_GITHUB_BRANCH=fix30-ipv6-dual-stack bash
+```
+
+После успешного Update панель должна показывать версию `v0.1.0-022.04`. Проверка на сервере:
+
+```bash
+sudo cat /opt/sg-gateway/VERSION
+```
+
+Ожидаемый результат:
+
+```text
+0.1.0-022.04
+```
+
 SG-Gateway устанавливается на **один самостоятельный Ubuntu-сервер** и превращает его в готовый VPN-шлюз с удобным веб-интерфейсом.
 
 Он предназначен для дома, семьи и небольшой группы доверенных пользователей. Здесь нет Controller, SG-Nodes, Cluster, Cascade, распределённой базы серверов и ручного редактора полного JSON.
@@ -40,7 +66,7 @@ curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway/main/deploy/instal
 ### Update — существующий SG-Gateway
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway/main/deploy/update-from-github.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/fix30-ipv6-dual-stack/deploy/update-from-github.sh | sudo env SG_GATEWAY_GITHUB_BRANCH=fix30-ipv6-dual-stack bash
 ```
 
 Update не запускает полный installer и не переустанавливает Nginx, Certbot, Xray, AmneziaWG, Mihomo, sing-box или WARP helper. Перед переключением кода создаётся safety backup, а после обновления проверяются HTTPS, Clients, Nginx и runtime.

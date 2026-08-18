@@ -4,6 +4,40 @@
 
 Версия опубликована для финальной установки и проверки на реальном сервере. После подтверждения clean install, обновления существующей установки и клиентских подключений prerelease можно переводить в стабильный выпуск.
 
+## Версия и проверка обновления
+
+- Исходная стабильная версия: `0.1.0-021.12` (`main`).
+- Целевая версия: `0.1.0-022.04 Fix30` (`fix30-ipv6-dual-stack`).
+- После Update панель и файл `/opt/sg-gateway/VERSION` должны показывать `0.1.0-022.04`.
+
+### 1. Установка стабильной 0.1.0-021.12
+
+На чистой Ubuntu:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/main/deploy/install-from-github.sh | sudo bash
+```
+
+### 2. Update до 0.1.0-022.04 Fix30
+
+На сервере с уже установленной `0.1.0-021.12`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/fix30-ipv6-dual-stack/deploy/update-from-github.sh | sudo env SG_GATEWAY_GITHUB_BRANCH=fix30-ipv6-dual-stack bash
+```
+
+### 3. Проверка версии
+
+```bash
+sudo cat /opt/sg-gateway/VERSION
+```
+
+Ожидаемый результат:
+
+```text
+0.1.0-022.04
+```
+
 ## Главное в версии
 
 Fix30 объединяет полноценный **Dual Stack IPv4 + IPv6**, изолированный **AWG3 userspace**, раздельную проверку семейств WARP, явную **семейную маршрутизацию**, безопасное обновление без разрушения рабочего runtime, расширенный SG Subscription и накопленные исправления интерфейса.
