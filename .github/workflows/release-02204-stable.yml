@@ -1,0 +1,64 @@
+name: Release 0.1.0-022.04 Stable
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/release-02204-stable.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-02204-stable
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TAG: v0.1.0-022.04
+      TITLE: SG-Gateway 0.1.0-022.04
+      RUN_NAME: SG-Gateway-0.1.0-022.04-FULL.run
+
+    steps:
+      - name: Checkout exact release commit
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+
+      - name: Verify Python syntax
+        run: |
+          python -B -c "from pathlib import Path; files=list(Path('app').rglob('*.py'))+list(Path('engines').rglob('*.py'))+list(Path('tests').rglob('*.py')); [compile(p.read_text(encoding='utf-8'), str(p), 'exec') for p in files]; print(f'syntax ok: {len(files)} files')"
+
+      - name: Run complete test suite
+        run: python -m pytest tests
+
+      - name: Build and verify FULL release
+        run: |
+          mkdir -p dist
+          bash build-run.sh "dist/$RUN_NAME"
+          bash "dist/$RUN_NAME" --verify-only
+          (cd dist && sha256sum -c "${RUN_NAME%.run}-SHA256.txt")
+
+      - name: Publish stable GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$TAG" \
+            --target "$GITHUB_SHA" \
+            --title "$TITLE" \
+            --notes-file PUBLICATION-02204.md \
+            --latest \
+            "dist/$RUN_NAME" \
+            "dist/${RUN_NAME%.run}-TRANSFER.zip" \
+            "dist/${RUN_NAME%.run}-SHA256.txt"

@@ -16,7 +16,7 @@ def test_02204_version_identity_and_manifest_are_consistent() -> None:
     assert manifest["rebuild_target"] == version
     assert manifest["next_development_line"] == "0.1.0-022.05"
     assert manifest["rebuild_policy"]["baseline"] == "0.1.0-021.12"
-    assert manifest["status"] == "DEV"
+    assert manifest["status"] == "STABLE"
 
 
 def test_02204_manifest_describes_real_dual_stack_routing_and_manual_warp() -> None:

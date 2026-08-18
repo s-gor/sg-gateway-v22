@@ -13,9 +13,9 @@
 ![WARP](https://img.shields.io/badge/WARP-supported-F38020?logo=cloudflare&logoColor=white)
 ![systemd](https://img.shields.io/badge/deploy-systemd-16A085)
 ![HTTPS](https://img.shields.io/badge/HTTPS-Let%27s_Encrypt-003A70?logo=letsencrypt&logoColor=white)
-![Status](https://img.shields.io/badge/status-022.04--RC-F59E0B)
+![Status](https://img.shields.io/badge/status-022.04--STABLE-16A34A)
 
-> **022.04 Release Candidate.** Dual Stack IPv4+IPv6, AWG3 userspace, Family Routing, independent WARP IPv4/IPv6 health and non-destructive Update. Полное техническое описание: [`PUBLICATION-02204.md`](PUBLICATION-02204.md). Исторический baseline 021.12 остаётся frozen и не переписывается.
+> **0.1.0-022.04 STABLE.** Dual Stack IPv4+IPv6, AWG3 userspace, Family Routing, independent WARP IPv4/IPv6 health and non-destructive Update. Полное техническое описание: [`PUBLICATION-02204.md`](PUBLICATION-02204.md). Исторический baseline 021.12 сохранён в отдельной frozen-ветке и не переписывается.
 
 ## Проверка обновления 0.1.0-021.12 → 0.1.0-022.04 Fix30
 
