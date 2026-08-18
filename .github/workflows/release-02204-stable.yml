@@ -1,6 +1,7 @@
 name: Release 0.1.0-022.04 Stable
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
     paths:
