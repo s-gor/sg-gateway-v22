@@ -15,33 +15,27 @@
 ![HTTPS](https://img.shields.io/badge/HTTPS-Let%27s_Encrypt-003A70?logo=letsencrypt&logoColor=white)
 ![Status](https://img.shields.io/badge/status-022.04--STABLE-16A34A)
 
-> **0.1.0-022.04 STABLE.** Dual Stack IPv4+IPv6, AWG3 userspace, Family Routing, independent WARP IPv4/IPv6 health and non-destructive Update. Полное техническое описание: [`PUBLICATION-02204.md`](PUBLICATION-02204.md). Исторический baseline 021.12 сохранён в отдельной frozen-ветке и не переписывается.
+> **Актуальная версия — 0.1.0-022.04 STABLE.** Это полноценный стабильный выпуск, а не тестовая ветка и не Release Candidate.
 
-## Проверка обновления 0.1.0-021.12 → 0.1.0-022.04 Fix30
+## Что нового в SG-Gateway 0.1.0-022.04
 
-Сначала установите стабильную `0.1.0-021.12` на чистую Ubuntu:
+- **Dual Stack IPv4 + IPv6.** SG-Gateway определяет оба семейства адресов, сохраняет их в состоянии сервера и не считает отсутствие IPv6 аварией установки.
+- **Family Routing.** Для каждого правила явно выбирается `SG-Gateway · IPv4`, `SG-Gateway · IPv6`, `WARP · IPv4`, `WARP · IPv6` или `Заблокировать`. Скрытого fallback между IPv4 и IPv6 нет.
+- **AWG3 userspace.** Добавлена отдельная линия AmneziaWG 3 рядом с AWG2, со своей службой, runtime и клиентскими конфигурациями.
+- **WARP больше не ломает Clean Install.** WARP создаётся вручную после установки, а доступность IPv4 и IPv6 проверяется независимо.
+- **XHTTP и XMUX.** Добавлены управляемые XMUX-пресеты, экспертный режим, нормализация XHTTP Reality в `stream-one` и отдельный клиентский mode для XHTTP TLS.
+- **Hysteria 2 Gecko.** Доступны режимы Off, Salamander и Gecko с управляемым FinalMask.
+- **Персональная SG Subscription.** У каждого устройства есть собственная ссылка, QR-код и независимые credentials; миграция не перевыпускает уже работающие доступы.
+- **Безопасный Update.** Обновление сохраняет базу, сертификаты, assets, AWG3 runtime, GeoFiles и активные службы; перед переключением создаётся Safety Backup, при ошибке выполняется rollback.
+- **Очистка старых копий.** В Maintenance появилась кнопка **«Удалить старые»**: она показывает количество и объём, требует подтверждения и сохраняет две последние SQLite-копии, не затрагивая Full Backup и Safety Backup.
+- **Full Backup и Restore.** Расширены проверка архива, перенос на новый сервер, страховочная копия перед восстановлением и финальная проверка runtime.
+- **Новый интерфейс Connections.** Три VLESS-карточки имеют одинаковую компактную высоту, XHTTP mode и TCP-порт выровнены, лишний разделитель Hysteria 2 удалён.
+- **Поддержка слабого разрешения.** Добавлена отдельная компактная раскладка для узких и низких экранов без скрытия действий.
+- **Production и диагностика.** Усилены проверки установки, atomic-обновление GeoFiles, журнал операций и диагностика без вывода чувствительных значений.
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway/stable-02112/deploy/install-from-github.sh | sudo env SG_GATEWAY_GITHUB_BRANCH=stable-02112 bash
-```
+Полное описание выпуска и выполненных проверок: **[SG-Gateway 0.1.0-022.04 — описание релиза](PUBLICATION-02204.md)**.
 
-Затем обновите установленный SG-Gateway до `0.1.0-022.04 Fix30`:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/main/deploy/update-from-github.sh | sudo env SG_GATEWAY_GITHUB_BRANCH=main bash
-```
-
-После успешного Update панель должна показывать версию `v0.1.0-022.04`. Проверка на сервере:
-
-```bash
-sudo cat /opt/sg-gateway/VERSION
-```
-
-Ожидаемый результат:
-
-```text
-0.1.0-022.04
-```
+Если у вас уже установлена frozen-версия `0.1.0-021.12`, используйте обычную команду **Update** ниже. Историческая 021.12 сохранена отдельно и не изменялась.
 
 SG-Gateway устанавливается на **один самостоятельный Ubuntu-сервер** и превращает его в готовый VPN-шлюз с удобным веб-интерфейсом.
 
@@ -74,7 +68,7 @@ Update не запускает полный installer и не переустан
 ### Full Uninstall — полное удаление SG-Gateway
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway/main/deploy/full-uninstall-ubuntu.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/main/deploy/full-uninstall-ubuntu.sh | sudo env SG_GATEWAY_GITHUB_BRANCH=main bash
 ```
 
 Подтверждение:
@@ -90,7 +84,12 @@ DELETE SG-GATEWAY
 ![System — ресурсы и состояние](docs/screenshots/0218-system-overview.png)
 
 
-## SG-Gateway 0.1.0-021.12
+## История предыдущих выпусков
+
+<details>
+<summary><strong>SG-Gateway 0.1.0-021.12</strong></summary>
+
+### SG-Gateway 0.1.0-021.12
 
 SG-Gateway 0.1.0-021.12 — целевая рабочая версия без Traffic/statistics и без новых экспериментальных функций.
 
@@ -103,7 +102,7 @@ SG-Gateway 0.1.0-021.12 — целевая рабочая версия без Tr
 #### CLEAN INSTALL — только новый сервер
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway/main/deploy/install-from-github.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway/stable-02112/deploy/install-from-github.sh | sudo env SG_GATEWAY_GITHUB_BRANCH=stable-02112 bash
 ```
 
 Clean Install предназначен только для новой Ubuntu. Он устанавливает системные пакеты, Nginx, Certbot, Xray, AmneziaWG, Mihomo, sing-box, WARP helper, systemd-службы и первоначальный runtime.
@@ -113,7 +112,7 @@ Clean Install предназначен только для новой Ubuntu. О
 #### UPDATE — только существующий SG-Gateway
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway/main/deploy/update-from-github.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway/stable-02112/deploy/update-from-github.sh | sudo env SG_GATEWAY_GITHUB_BRANCH=stable-02112 bash
 ```
 
 Update больше не является повторным полным installer.
@@ -313,7 +312,12 @@ Full Restore рассчитан и на ошибочный сценарий.
 
 Traffic/statistics в эту версию не включались.
 
-## Что изменилось в SG-Gateway 0.1.0-021.10
+</details>
+
+<details>
+<summary><strong>SG-Gateway 0.1.0-021.10</strong></summary>
+
+### Что изменилось в SG-Gateway 0.1.0-021.10
 
 Версия `0.1.0-021.10` собрала полную переработку управления клиентами и устройствами, персональные подписки, расширенный экспорт Mieru, новые QR-коды, принятую мобильную навигацию и понятные подписи Routing. Ниже перечислены все изменения версии.
 
@@ -408,7 +412,12 @@ Mieru JSON использует фактический адрес и порт с
 - Обновлены `VERSION`, release manifest, README, CHANGELOG и документация установки.
 - Добавлен отдельный контракт версии 021.10 для проверки подписки, Mieru URI/JSON, обоих QR, мобильной навигации, редактирования и сохранения неизменённых реквизитов.
 
-## Что изменилось в SG-Gateway 0.1.0-021.8
+</details>
+
+<details>
+<summary><strong>SG-Gateway 0.1.0-021.8</strong></summary>
+
+### Что изменилось в SG-Gateway 0.1.0-021.8
 
 Версия `0.1.0-021.8` собрала большую доводку уже существующей панели. Мы упростили установку и первый запуск, переработали страницу состояния сервера, вернули смену пароля, сделали понятнее создание клиентов и исправили обновление работающего SG-Gateway.
 
@@ -465,7 +474,7 @@ Mieru JSON использует фактический адрес и порт с
 Актуальная команда Update:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway/main/deploy/update-from-github.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway/stable-02112/deploy/update-from-github.sh | sudo env SG_GATEWAY_GITHUB_BRANCH=stable-02112 bash
 ```
 
 Clean Install предназначен только для нового сервера. На уже установленном SG-Gateway он останавливается до изменений.
@@ -473,6 +482,8 @@ Clean Install предназначен только для нового серв
 В 021.12 Update сохраняет рабочее состояние сервера и не переустанавливает Nginx, Certbot и VPN cores. Перед переключением кода создаётся safety backup, а при неуспешной финальной проверке выполняется rollback.
 
 Также удалены предварительные проверки портов, которые могли ошибочно остановить установку до запуска реальных служб.
+
+</details>
 
 ## Две дороги
 
@@ -687,7 +698,7 @@ SG-Gateway не является уменьшенной копией всей SG
 Используйте чистую Ubuntu EC2/VPS:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway/main/deploy/install-from-github.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/main/deploy/install-from-github.sh | sudo env SG_GATEWAY_GITHUB_BRANCH=main bash
 ```
 
 После установки панель доступна по адресу, показанному установщиком. Начальная настройка может выполняться по HTTP и IP; домен и HTTPS добавляются позднее из раздела `Security`.
@@ -707,7 +718,7 @@ curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway/main/deploy/instal
 Для уже установленного SG-Gateway используется **отдельная команда Update**:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway/main/deploy/update-from-github.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/main/deploy/update-from-github.sh | sudo env SG_GATEWAY_GITHUB_BRANCH=main bash
 ```
 
 Clean Install для обновления существующего сервера больше не используется.
@@ -719,7 +730,7 @@ Update не запускает полный `install.sh`, не выполняе�
 ## Полное удаление
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway/main/deploy/full-uninstall-ubuntu.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/main/deploy/full-uninstall-ubuntu.sh | sudo env SG_GATEWAY_GITHUB_BRANCH=main bash
 ```
 
 Подтверждение:
