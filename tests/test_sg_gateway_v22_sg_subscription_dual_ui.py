@@ -4,7 +4,6 @@ import importlib
 import sys
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 DETAIL = ROOT / "app" / "web" / "templates" / "client_detail.html"
 PARTIAL = ROOT / "app" / "web" / "templates" / "_sg_subscription_dual.html"
@@ -21,8 +20,8 @@ def test_dual_ui_is_source_native_exactly_once_before_devices() -> None:
     assert text.count(include) == 1
     assert text.index(marker) < text.index(include) < text.index(devices)
     assert "<strong>Подписка устройства</strong>" not in text
-    assert text.count("<strong>Legacy SUB устройства</strong>") == 1
-    assert text.count("<span>Совместимая legacy-подписка устройства.</span>") == 1
+    assert text.count("<strong>OpenWrt · HomeProxy SUB</strong>") == 1
+    assert text.count("<span>Подписка устройства для HomeProxy-совместимых клиентов.</span>") == 1
     assert "Ссылка для NekoBox и совместимых клиентов." not in text
     assert not PATCHER.exists()
 

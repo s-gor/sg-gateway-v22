@@ -94,3 +94,11 @@ def build_router_subscription_url(client: Client, device: Device) -> str:
 def build_router_subscription_download_url(client: Client, device: Device) -> str:
     url = build_router_subscription_url(client, device)
     return f"{url}?download=1" if url else ""
+
+
+def build_openwrt_subscription_url(client: Client, device: Device) -> str:
+    token = ensure_router_subscription_token(client.id, device.id)
+    base = subscription_base_url()
+    if not token or not base:
+        return ""
+    return f"{base}/sg/router/openwrt/v1/{quote(token, safe='')}.sub"

@@ -5,7 +5,9 @@ import re
 
 from flask import Flask, Response, abort, request
 
+from app.clients.exports import build_subscription
 from app.clients.router_subscription_store import (
+    build_openwrt_subscription_url,
     build_router_subscription_download_url,
     build_router_subscription_url,
     get_router_subscription_access,
@@ -17,6 +19,7 @@ from app.clients.sg_subscription import (
 )
 
 PUBLIC_ENDPOINT = "router_subscription_v1"
+OPENWRT_PUBLIC_ENDPOINT = "router_openwrt_subscription_v1"
 
 
 def _safe_filename(value: str) -> str:
@@ -58,9 +61,33 @@ def register_router_subscription(app: Flask) -> None:
             methods=["GET"],
         )
 
+    if OPENWRT_PUBLIC_ENDPOINT not in app.view_functions:
+        def openwrt_feed(token: str):
+            access = get_router_subscription_access(token)
+            if access is None:
+                abort(404)
+            client, device = access
+            export = build_subscription(client, device)
+            if not export.body:
+                abort(404)
+            response = Response(export.body + "\n", content_type="text/plain; charset=utf-8")
+            response.headers["Cache-Control"] = "no-store, max-age=0"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["X-Content-Type-Options"] = "nosniff"
+            response.headers["X-SG-Router-Target"] = "openwrt-homeproxy"
+            return response
+
+        app.add_url_rule(
+            "/sg/router/openwrt/v1/<token>.sub",
+            endpoint=OPENWRT_PUBLIC_ENDPOINT,
+            view_func=openwrt_feed,
+            methods=["GET"],
+        )
+
     if not getattr(app, "_sg_router_subscription_v1_template_context", False):
         def template_context():
             return {
+                "openwrt_subscription_url": build_openwrt_subscription_url,
                 "router_subscription_url": build_router_subscription_url,
                 "router_subscription_download_url": build_router_subscription_download_url,
             }

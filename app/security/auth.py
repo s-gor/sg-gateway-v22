@@ -18,7 +18,8 @@ PUBLIC_ENDPOINTS = {
     "recovery",
     "download_diagnostics",
     "subscription_feed",
-    "router_subscription_v1",
+        "router_subscription_v1",
+        "router_openwrt_subscription_v1",
     "sg_subscription_v1",
 }
 

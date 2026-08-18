@@ -144,6 +144,9 @@ def test_router_url_uses_device_token_and_json_path(monkeypatch) -> None:
     url = store.build_router_subscription_url(_client(), _device())
     assert url == "https://vpn.example/sg/router/v1/sgr1_testtoken.json"
     assert store.build_router_subscription_download_url(_client(), _device()) == url + "?download=1"
+    assert store.build_openwrt_subscription_url(_client(), _device()) == (
+        "https://vpn.example/sg/router/openwrt/v1/sgr1_testtoken.sub"
+    )
 
 
 def test_router_http_feed_and_download_contract(monkeypatch) -> None:
@@ -169,16 +172,39 @@ def test_router_http_feed_and_download_contract(monkeypatch) -> None:
     assert should_skip_auth(http.PUBLIC_ENDPOINT) is True
 
 
+def test_openwrt_homeproxy_feed_reuses_proven_device_subscription(monkeypatch) -> None:
+    monkeypatch.setattr(http, "get_router_subscription_access", lambda token: (_client(), _device()))
+    monkeypatch.setattr(
+        http,
+        "build_subscription",
+        lambda client, device: type("Export", (), {"body": "dmxlc3M6Ly9leGFtcGxl"})(),
+    )
+    app = Flask(__name__)
+    http.register_router_subscription(app)
+
+    response = app.test_client().get("/sg/router/openwrt/v1/sgr1_example.sub")
+
+    assert response.status_code == 200
+    assert response.mimetype == "text/plain"
+    assert response.get_data(as_text=True) == "dmxlc3M6Ly9leGFtcGxl\n"
+    assert response.headers["X-SG-Router-Target"] == "openwrt-homeproxy"
+    assert response.headers["Cache-Control"] == "no-store, max-age=0"
+    assert should_skip_auth(http.OPENWRT_PUBLIC_ENDPOINT) is True
+
+
 def test_router_ui_and_production_registration_are_source_native(monkeypatch, tmp_path) -> None:
     detail = (ROOT / "app/web/templates/client_detail.html").read_text(encoding="utf-8")
     assert detail.count("data-sg-router-subscription-v1") == 1
     assert "router_subscription_url(client, device)" in detail
-    assert "Скопировать ссылку" in detail
+    assert "Скопировать OpenWrt SUB" in detail
     assert "Скачать JSON" in detail
+    assert "OpenWrt · HomeProxy SUB" in detail
+    assert "Универсальный Router JSON" in detail
 
     monkeypatch.setenv("SG_GATEWAY_DATA_DIR", str(tmp_path / "data"))
     sys.modules.pop("app.production", None)
     production = importlib.import_module("app.production")
     endpoints = [rule.endpoint for rule in production.app.url_map.iter_rules()]
     assert endpoints.count("router_subscription_v1") == 1
+    assert endpoints.count("router_openwrt_subscription_v1") == 1
     production.app.jinja_env.get_template("client_detail.html")

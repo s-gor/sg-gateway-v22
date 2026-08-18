@@ -112,17 +112,17 @@
 
       <section class="dv16-subscription state-{{ subscription.status if subscription else 'missing' }}">
         <div class="dv16-subscription-summary">
-          <strong>Legacy SUB устройства</strong>
+          <strong>OpenWrt · HomeProxy SUB</strong>
           {% if subscription and subscription.status == 'applied' and subscription.payload %}
-          <span>Совместимая legacy-подписка устройства.</span>
-          <small>SUB: VLESS Reality TCP · Hysteria2 · AnyTLS · TUIC v5 — только выбранные и готовые.</small>
+          <span>Подписка устройства для HomeProxy-совместимых клиентов.</span>
+          <small>Legacy Base64: VLESS Reality TCP · Hysteria2 · AnyTLS · TUIC v5 — только выбранные и готовые.</small>
           {% else %}
           <span>Подписка ещё не создана.</span>
           {% endif %}
         </div>
         <div class="dv16-subscription-actions">
           {% if subscription and subscription.status == 'applied' and subscription.payload %}
-          <button class="button primary dv16-copy" type="button" data-copy-value="{{ subscription.payload|e }}">Скопировать ссылку</button>
+          <button class="button primary dv16-copy" type="button" data-copy-value="{{ openwrt_subscription_url(client, device)|e }}">Скопировать OpenWrt SUB</button>
           {% if subscription.qr_url %}
           <details class="dv16-qr">
             <summary class="button">QR</summary>
@@ -141,7 +141,7 @@
       {% set router_subscription = router_subscription_url(client, device) if client.enabled and device.enabled else '' %}
       <section class="dv16-subscription sg-router-subscription {{ 'state-applied' if router_subscription else 'state-missing' }}" data-sg-router-subscription-v1>
         <div class="dv16-subscription-summary">
-          <strong>Router JSON</strong>
+          <strong>Универсальный Router JSON</strong>
           {% if router_subscription %}
           <span>Персональная JSON-подписка устройства.</span>
           <small>Только выбранные и готовые профили. Обновляется при каждом запросе.</small>
