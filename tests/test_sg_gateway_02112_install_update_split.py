@@ -21,7 +21,7 @@ def test_clean_install_rejects_unsupported_ubuntu_before_mutation() -> None:
         assert "require_supported_ubuntu()" in body
         assert '${VERSION_ID:-}' in body
         assert '"24.04"' in body
-        assert "Ubuntu Server 24.04 LTS" in body
+        assert "Ubuntu 24.04" in body
     assert wrapper.index("require_supported_ubuntu\n") < wrapper.index("missing_packages=()")
     assert installer.index("require_supported_ubuntu\n") < installer.index("prepare_log\n")
 

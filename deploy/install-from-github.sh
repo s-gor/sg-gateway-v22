@@ -32,12 +32,12 @@ if [[ -f /opt/sg-gateway/VERSION && -f /etc/sg-gateway/runtime.env && -f /etc/sg
 fi
 
 require_supported_ubuntu() {
-  [[ -r /etc/os-release ]] || fail "cannot detect the operating system; Ubuntu Server 24.04 LTS is required"
+  [[ -r /etc/os-release ]] || fail "cannot detect the operating system; Ubuntu 24.04 is required"
   # shellcheck disable=SC1091
   . /etc/os-release
-  [[ "${ID:-}" == "ubuntu" ]] || fail "Ubuntu Server 24.04 LTS is required; detected ${PRETTY_NAME:-unknown system}"
-  [[ "${VERSION_ID:-}" == "24.04" ]] || fail "only Ubuntu Server 24.04 LTS is supported; detected ${PRETTY_NAME:-Ubuntu ${VERSION_ID:-unknown}}"
-  printf '[SG-Gateway] Supported system: %s\n' "${PRETTY_NAME:-Ubuntu 24.04 LTS}"
+  [[ "${ID:-}" == "ubuntu" ]] || fail "Ubuntu 24.04 is required; detected ${PRETTY_NAME:-unknown system}"
+  [[ "${VERSION_ID:-}" == "24.04" ]] || fail "only Ubuntu 24.04 is supported; detected ${PRETTY_NAME:-Ubuntu ${VERSION_ID:-unknown}}"
+  printf '[SG-Gateway] Supported system: %s\n' "${PRETTY_NAME:-Ubuntu 24.04}"
 }
 
 # Reject an unsupported release before apt or any other server mutation.
