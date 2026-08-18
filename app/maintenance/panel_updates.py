@@ -14,7 +14,8 @@ from typing import Any
 from app.version import ROOT as APP_ROOT, get_version
 
 
-GITHUB_REPO = os.getenv("SG_GATEWAY_UPDATE_REPO", "s-gor/sg-gateway").strip() or "s-gor/sg-gateway"
+GITHUB_REPO = os.getenv("SG_GATEWAY_UPDATE_REPO", "s-gor/sg-gateway-v22").strip() or "s-gor/sg-gateway-v22"
+GITHUB_BRANCH = os.getenv("SG_GATEWAY_UPDATE_BRANCH", "dev-v22").strip() or "dev-v22"
 GITHUB_API = f"https://api.github.com/repos/{GITHUB_REPO}"
 STATE_FILE = Path(os.getenv("SG_GATEWAY_PANEL_UPDATE_STATE", "/var/lib/sg-gateway/updates/panel-state.json"))
 CACHE_TTL_SECONDS = 300
@@ -112,16 +113,16 @@ def _request_json(url: str, timeout: float = 8.0) -> Any:
         try:
             return json.loads(_curl_text(url, timeout))
         except (PanelUpdateError, json.JSONDecodeError) as second_exc:
-            raise PanelUpdateError(f"Не удалось проверить GitHub main: {first_exc}; fallback: {second_exc}") from second_exc
+            raise PanelUpdateError(f"Не удалось проверить GitHub {GITHUB_BRANCH}: {first_exc}; fallback: {second_exc}") from second_exc
 
 
-def _latest_main() -> tuple[str, str, str]:
+def _latest_channel() -> tuple[str, str, str]:
     # Primary path: GitHub REST API. Fallback: the public Atom feed, which is
     # not subject to the unauthenticated REST API rate-limit bucket.
     try:
-        payload = _request_json(f"{GITHUB_API}/commits/main")
+        payload = _request_json(f"{GITHUB_API}/commits/{GITHUB_BRANCH}")
         if not isinstance(payload, dict):
-            raise PanelUpdateError("GitHub не вернул commit main")
+            raise PanelUpdateError("GitHub не вернул commit update-channel")
         sha = str(payload.get("sha") or "").strip().lower()
         if len(sha) != 40 or any(ch not in "0123456789abcdef" for ch in sha):
             raise PanelUpdateError("GitHub вернул некорректный SHA commit")
@@ -129,10 +130,10 @@ def _latest_main() -> tuple[str, str, str]:
         author = commit.get("author") if isinstance(commit.get("author"), dict) else {}
         return sha, str(author.get("date") or ""), str(payload.get("html_url") or "")
     except PanelUpdateError:
-        atom = _request_text(f"https://github.com/{GITHUB_REPO}/commits/main.atom", timeout=10.0)
+        atom = _request_text(f"https://github.com/{GITHUB_REPO}/commits/{GITHUB_BRANCH}.atom", timeout=10.0)
         match = re.search(r"Grit::Commit/([0-9a-fA-F]{40})", atom)
         if not match:
-            raise PanelUpdateError("GitHub main не удалось определить ни через API, ни через Atom feed")
+            raise PanelUpdateError(f"GitHub {GITHUB_BRANCH} не удалось определить ни через API, ни через Atom feed")
         sha = match.group(1).lower()
         date_match = re.search(r"<updated>([^<]+)</updated>", atom)
         return sha, (date_match.group(1).strip() if date_match else ""), f"https://github.com/{GITHUB_REPO}/commit/{sha}"
@@ -187,11 +188,11 @@ def overview(*, refresh: bool = False) -> dict[str, Any]:
             if installed_commit == latest_commit:
                 cached["state"] = "current"
                 cached["can_install"] = False
-                cached["message"] = "Локальная база уже соответствует проверенному GitHub main."
+                cached["message"] = f"Локальная база уже соответствует проверенному GitHub {GITHUB_BRANCH}."
             elif latest_commit:
                 cached["state"] = "available"
                 cached["can_install"] = True
-                cached["message"] = "GitHub main содержит новый commit. Можно выполнить безопасное обновление панели."
+                cached["message"] = f"GitHub {GITHUB_BRANCH} содержит новый commit. Можно выполнить безопасное обновление панели."
         elif state_empty and _version_key(latest_version) > _version_key(installed_version):
             cached["state"] = "available"
             cached["can_install"] = True
@@ -210,12 +211,13 @@ def overview(*, refresh: bool = False) -> dict[str, Any]:
         return _decorate(_CACHE[1])
 
     try:
-        sha, latest_date, html_url = _latest_main()
+        sha, latest_date, html_url = _latest_channel()
         latest_version = _remote_version(sha)
         result = {
             "checked": True,
             "error": "",
             "repo": GITHUB_REPO,
+            "channel": GITHUB_BRANCH,
             "installed_version": installed_version,
             "installed_commit": installed_commit,
             "source_fingerprint": current_fingerprint,
@@ -238,6 +240,7 @@ def overview(*, refresh: bool = False) -> dict[str, Any]:
             "checked": False,
             "error": str(exc),
             "repo": GITHUB_REPO,
+            "channel": GITHUB_BRANCH,
             "installed_version": installed_version,
             "installed_commit": installed_commit,
             "source_fingerprint": current_fingerprint,
@@ -250,6 +253,6 @@ def overview(*, refresh: bool = False) -> dict[str, Any]:
             "html_url": "",
             "state": "unavailable",
             "can_install": False,
-            "message": "Проверка GitHub main не выполнена.",
+            "message": f"Проверка GitHub {GITHUB_BRANCH} не выполнена.",
         }
 

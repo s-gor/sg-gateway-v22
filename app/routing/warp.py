@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import configparser
+import ipaddress
 import json
 import os
 import re
@@ -30,6 +31,7 @@ class WarpProfile:
 WGCF_VERSION = "v0.3.6"
 WARP_TAG = "warp"
 WARP_IPV4_ENDPOINT = "162.159.192.1:2408"
+WARP_ROUTING_TAGS = {"warp", "warp4", "warp6"}
 
 
 def state_dir() -> Path:
@@ -302,6 +304,59 @@ def scrubbed_profile() -> dict:
     }
 
 
+def _profile_family_flags(profile: dict) -> dict[str, bool]:
+    addresses = profile.get("addresses") if isinstance(profile, dict) else []
+    allowed = profile.get("allowed_ips") if isinstance(profile, dict) else []
+    address_versions: set[int] = set()
+    allowed_versions: set[int] = set()
+    for raw in addresses if isinstance(addresses, list) else []:
+        try:
+            address_versions.add(ipaddress.ip_interface(str(raw)).version)
+        except ValueError:
+            continue
+    for raw in allowed if isinstance(allowed, list) else []:
+        try:
+            allowed_versions.add(ipaddress.ip_network(str(raw), strict=False).version)
+        except ValueError:
+            continue
+    return {
+        "ipv4": 4 in address_versions and 4 in allowed_versions,
+        "ipv6": 6 in address_versions and 6 in allowed_versions,
+    }
+
+
+def family_capabilities() -> dict[str, bool]:
+    """Return which destination families the stored WARP profile can carry."""
+    state = _read_state()
+    profile = state.get("profile") if isinstance(state.get("profile"), dict) else {}
+    if not profile and os.geteuid() == 0:
+        profile = scrubbed_profile()
+    return _profile_family_flags(profile)
+
+
+def routing_family_capabilities() -> dict[str, bool]:
+    """Return WARP families currently eligible for Routing.
+
+    Profile support stays separate from health. A supported family is
+    selectable before the first test. After an explicit family test
+    fails, only that family is disabled until a later successful test
+    or profile regeneration clears the recorded health result.
+    """
+    families = family_capabilities()
+    state = _read_state()
+    last_test = state.get("last_test") if isinstance(state.get("last_test"), dict) else {}
+    for key in ("ipv4", "ipv6"):
+        result = last_test.get(key) if isinstance(last_test, dict) else None
+        if (
+            isinstance(result, dict)
+            and bool(result.get("supported"))
+            and "ok" in result
+            and not bool(result.get("ok"))
+        ):
+            families[key] = False
+    return families
+
+
 def export_document() -> str:
     document = outbound(require_enabled=False)
     if document is None:
@@ -311,7 +366,7 @@ def export_document() -> str:
 
 def routing_uses_warp(payload: object) -> bool:
     if isinstance(payload, dict):
-        if str(payload.get("outboundTag") or "") == WARP_TAG:
+        if str(payload.get("outboundTag") or "").strip().lower() in WARP_ROUTING_TAGS:
             return True
         return any(routing_uses_warp(value) for value in payload.values())
     if isinstance(payload, list):
@@ -319,9 +374,31 @@ def routing_uses_warp(payload: object) -> bool:
     return False
 
 
+def _routing_warp_tags(payload: object) -> set[str]:
+    tags: set[str] = set()
+    if isinstance(payload, dict):
+        tag = str(payload.get("outboundTag") or "").strip().lower()
+        if tag in WARP_ROUTING_TAGS:
+            tags.add(tag)
+        for value in payload.values():
+            tags.update(_routing_warp_tags(value))
+    elif isinstance(payload, list):
+        for value in payload:
+            tags.update(_routing_warp_tags(value))
+    return tags
+
+
 def ensure_routing_supported(payload: object) -> None:
-    if routing_uses_warp(payload) and not enabled():
+    tags = _routing_warp_tags(payload)
+    if not tags:
+        return
+    if not enabled():
         raise WarpError("В маршрутизации выбран WARP, но WARP ещё не установлен или выключен")
+    families = routing_family_capabilities()
+    if tags & {"warp", "warp4"} and not families.get("ipv4"):
+        raise WarpError("В маршрутизации выбран WARP IPv4, но его проверка не пройдена")
+    if "warp6" in tags and not families.get("ipv6"):
+        raise WarpError("В маршрутизации выбран WARP IPv6, но его проверка не пройдена")
 
 
 def overview() -> dict:
@@ -332,6 +409,8 @@ def overview() -> dict:
     profile = state.get("profile") if isinstance(state.get("profile"), dict) else {}
     if not profile and os.geteuid() == 0:
         profile = scrubbed_profile()
+    families = _profile_family_flags(profile)
+    routing_families = routing_family_capabilities()
     return {
         "installed": ready,
         "enabled": active,
@@ -340,6 +419,10 @@ def overview() -> dict:
         "wgcf_version": str(state.get("wgcf_version") or WGCF_VERSION),
         "profile": profile,
         "last_test": last_test,
+        "families": families,
+        "routing_families": routing_families,
+        "ipv4_ready": bool(routing_families.get("ipv4")),
+        "ipv6_ready": bool(routing_families.get("ipv6")),
         "updated_at": str(state.get("updated_at") or ""),
         "tag": WARP_TAG,
         "protocol_label": "wireguard · noKernelTun",
@@ -347,28 +430,55 @@ def overview() -> dict:
     }
 
 
-def set_last_test(*, ok: bool, message: str, ip: str = "", warp: str = "") -> dict:
-    return save_state(
-        last_test={
-            "ok": bool(ok),
-            "message": str(message),
-            "ip": str(ip),
-            "warp": str(warp),
-            "checked_at": _utc_now(),
-        }
-    )
+def set_last_test(
+    *,
+    ok: bool,
+    message: str,
+    ip: str = "",
+    warp: str = "",
+    ipv4: dict | None = None,
+    ipv6: dict | None = None,
+) -> dict:
+    payload = {
+        "ok": bool(ok),
+        "message": str(message),
+        "ip": str(ip),
+        "warp": str(warp),
+        "checked_at": _utc_now(),
+    }
+    if isinstance(ipv4, dict):
+        payload["ipv4"] = ipv4
+    if isinstance(ipv6, dict):
+        payload["ipv6"] = ipv6
+    return save_state(last_test=payload)
 
 
 def compatible_actions() -> tuple[str, ...]:
-    return ("direct", "warp", "block") if enabled() else ("direct", "block")
+    actions = ["direct4", "direct6"]
+    if enabled():
+        families = routing_family_capabilities()
+        if families.get("ipv4"):
+            actions.append("warp4")
+        if families.get("ipv6"):
+            actions.append("warp6")
+    actions.append("block")
+    return tuple(actions)
 
 
-def normalize_action(value: object, fallback: str = "direct") -> str:
+def normalize_action(value: object, fallback: str = "direct4") -> str:
     action = str(value or "").strip().lower()
-    allowed = {"direct", "block", "warp"}
+    aliases = {"direct": "direct4", "warp": "warp4"}
+    action = aliases.get(action, action)
+    allowed = {"direct4", "direct6", "warp4", "warp6", "block"}
     return action if action in allowed else fallback
 
 
 def validate_rules(actions: Iterable[str]) -> None:
-    if any(str(action).lower() == "warp" for action in actions) and not enabled():
+    requested = {str(action).strip().lower() for action in actions}
+    if requested & WARP_ROUTING_TAGS and not enabled():
         raise WarpError("Сначала создайте WARP")
+    families = routing_family_capabilities() if enabled() else {"ipv4": False, "ipv6": False}
+    if "warp4" in requested and not families.get("ipv4"):
+        raise WarpError("WARP IPv4 не готов: выполните проверку WARP")
+    if "warp6" in requested and not families.get("ipv6"):
+        raise WarpError("WARP IPv6 не готов: выполните проверку WARP")

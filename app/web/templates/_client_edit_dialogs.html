@@ -27,7 +27,8 @@
       </label>
       {% endfor %}
       <label class="dv16-protocol"><input type="checkbox" name="protocols" value="mihomo" {% if 'mihomo' in primary_tokens %}checked{% endif %}><span><strong>Mieru</strong><small>Для SG Client; существующие credentials сохраняются</small></span></label>
-      <label class="dv16-protocol"><input type="checkbox" name="protocols" value="amneziawg" {% if 'amneziawg' in primary_tokens %}checked{% endif %}><span><strong>AmneziaWG</strong><small>Полная конфигурация и QR</small></span></label>
+      <label class="dv16-protocol"><input type="checkbox" name="protocols" value="amneziawg" {% if 'amneziawg' in primary_tokens %}checked{% endif %}><span><strong>AmneziaWG 2</strong><small>AWG2 · конфигурация и QR</small></span></label>
+      <label class="dv16-protocol"><input type="checkbox" name="protocols" value="amneziawg3" {% if 'amneziawg3' in primary_tokens %}checked{% endif %}><span><strong>AmneziaWG 3</strong><small>AWG3 userspace · конфигурация и QR</small></span></label>
       {% set anytls_selected = 'anytls' in primary_tokens %}
       <label class="dv16-protocol {{ 'is-locked' if not tls.https_ready and not anytls_selected else '' }}"><input type="checkbox" name="protocols" value="anytls" {% if anytls_selected %}checked{% endif %} {% if not tls.https_ready and not anytls_selected %}disabled{% endif %}><span><strong>AnyTLS</strong><small>{{ 'Подключён — пароль сохранится' if anytls_selected else ('Доступен' if tls.https_ready else 'Нужен HTTPS') }}</small></span></label>
       {% set tuic_selected = 'tuic' in primary_tokens %}
@@ -72,7 +73,8 @@
       <label class="dv16-protocol {{ 'is-locked' if not profile.ready and not selected else '' }}"><input type="checkbox" name="protocols" value="{{ token }}" {% if selected %}checked{% endif %} {% if not profile.ready and not selected %}disabled{% endif %}><span><strong>{{ profile.title }}</strong><small>{% if selected %}Подключён — реквизиты сохранятся{% elif profile.ready %}Доступен для добавления{% elif profile.tls_required %}Нужен HTTPS{% else %}Сначала включите профиль{% endif %}</small></span></label>
       {% endfor %}
       <label class="dv16-protocol"><input type="checkbox" name="protocols" value="mihomo" {% if 'mihomo' in selected_tokens %}checked{% endif %}><span><strong>Mieru</strong><small>Для SG Client</small></span></label>
-      <label class="dv16-protocol"><input type="checkbox" name="protocols" value="amneziawg" {% if 'amneziawg' in selected_tokens %}checked{% endif %}><span><strong>AmneziaWG</strong><small>Конфигурация и QR</small></span></label>
+      <label class="dv16-protocol"><input type="checkbox" name="protocols" value="amneziawg" {% if 'amneziawg' in selected_tokens %}checked{% endif %}><span><strong>AmneziaWG 2</strong><small>AWG2 · конфигурация и QR</small></span></label>
+      <label class="dv16-protocol"><input type="checkbox" name="protocols" value="amneziawg3" {% if 'amneziawg3' in selected_tokens %}checked{% endif %}><span><strong>AmneziaWG 3</strong><small>AWG3 userspace · конфигурация и QR</small></span></label>
       {% set anytls_selected = 'anytls' in selected_tokens %}
       <label class="dv16-protocol {{ 'is-locked' if not tls.https_ready and not anytls_selected else '' }}"><input type="checkbox" name="protocols" value="anytls" {% if anytls_selected %}checked{% endif %} {% if not tls.https_ready and not anytls_selected %}disabled{% endif %}><span><strong>AnyTLS</strong><small>{{ 'Подключён — пароль сохранится' if anytls_selected else ('Доступен' if tls.https_ready else 'Нужен HTTPS') }}</small></span></label>
       {% set tuic_selected = 'tuic' in selected_tokens %}

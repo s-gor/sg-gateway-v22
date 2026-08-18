@@ -4,7 +4,7 @@
 
 > **Один сервер. Одна панель. Семейный VPN без серверной акробатики.**
 
-![Версия](https://img.shields.io/badge/version-0.1.0--021.12-3b82f6)
+![Версия](https://img.shields.io/badge/version-0.1.0--022.04-3b82f6)
 ![Ubuntu](https://img.shields.io/badge/Ubuntu-native-E95420?logo=ubuntu&logoColor=white)
 ![Xray](https://img.shields.io/badge/Xray-supported-2563EB)
 ![AmneziaWG](https://img.shields.io/badge/AmneziaWG-supported-6D5BD0)
@@ -13,9 +13,35 @@
 ![WARP](https://img.shields.io/badge/WARP-supported-F38020?logo=cloudflare&logoColor=white)
 ![systemd](https://img.shields.io/badge/deploy-systemd-16A085)
 ![HTTPS](https://img.shields.io/badge/HTTPS-Let%27s_Encrypt-003A70?logo=letsencrypt&logoColor=white)
-![Status](https://img.shields.io/badge/status-FINAL--AWG2-16A34A)
+![Status](https://img.shields.io/badge/status-022.04--RC-F59E0B)
 
-> **021.12 FINAL AWG2.** Эта линия feature-frozen: новые функции и AWG3 в `0.1.0-021.12` больше не добавляются. Только критические bug/security fixes. AWG3 начинается с `0.1.0-022.01`. Подробный freeze: [`SG-GATEWAY-02112-FINAL-AWG2.md`](SG-GATEWAY-02112-FINAL-AWG2.md).
+> **022.04 Release Candidate.** Dual Stack IPv4+IPv6, AWG3 userspace, Family Routing, independent WARP IPv4/IPv6 health and non-destructive Update. Полное техническое описание: [`PUBLICATION-02204.md`](PUBLICATION-02204.md). Исторический baseline 021.12 остаётся frozen и не переписывается.
+
+## Проверка обновления 0.1.0-021.12 → 0.1.0-022.04 Fix30
+
+Сначала установите стабильную `0.1.0-021.12` на чистую Ubuntu:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/main/deploy/install-from-github.sh | sudo bash
+```
+
+Затем обновите установленный SG-Gateway до `0.1.0-022.04 Fix30`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/fix30-ipv6-dual-stack/deploy/update-from-github.sh | sudo env SG_GATEWAY_GITHUB_BRANCH=fix30-ipv6-dual-stack bash
+```
+
+После успешного Update панель должна показывать версию `v0.1.0-022.04`. Проверка на сервере:
+
+```bash
+sudo cat /opt/sg-gateway/VERSION
+```
+
+Ожидаемый результат:
+
+```text
+0.1.0-022.04
+```
 
 SG-Gateway устанавливается на **один самостоятельный Ubuntu-сервер** и превращает его в готовый VPN-шлюз с удобным веб-интерфейсом.
 
@@ -40,7 +66,7 @@ curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway/main/deploy/instal
 ### Update — существующий SG-Gateway
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway/main/deploy/update-from-github.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/fix30-ipv6-dual-stack/deploy/update-from-github.sh | sudo env SG_GATEWAY_GITHUB_BRANCH=fix30-ipv6-dual-stack bash
 ```
 
 Update не запускает полный installer и не переустанавливает Nginx, Certbot, Xray, AmneziaWG, Mihomo, sing-box или WARP helper. Перед переключением кода создаётся safety backup, а после обновления проверяются HTTPS, Clients, Nginx и runtime.
@@ -522,7 +548,9 @@ SG-Gateway поддерживает современные профили Xray:
 
 ### Cloudflare WARP
 
-WARP используется как отдельный outbound. Routing решает, какой трафик отправить через `Direct`, `WARP` или `Block`.
+WARP создаётся вручную в Outbounds и использует одно WireGuard-ядро. Доступность IPv4 и IPv6 проверяется независимо: ошибка одного семейства не отключает второе.
+
+Routing выбирает семейство явно: `WARP · IPv4` или `WARP · IPv6`. Скрытого fallback на прямой выход нет.
 
 WARP находится среди выходов, где ему и положено быть, а не изображает из себя отдельную философскую школу маршрутизации.
 
@@ -567,9 +595,13 @@ WARP находится среди выходов, где ему и положе
 
 Панель управляет направлениями:
 
-- `Direct`;
-- `WARP`;
-- `Block`.
+- `SG-Gateway · IPv4`;
+- `SG-Gateway · IPv6`;
+- `WARP · IPv4`;
+- `WARP · IPv6`;
+- `Заблокировать`.
+
+Между IPv4 и IPv6 нет автоматического fallback. Если выбранное семейство недоступно, правило завершается ошибкой или блокировкой, а не переходит на другой выход.
 
 Поддерживаются доменные и IP-правила, готовые наборы и пользовательские правила.
 
@@ -611,6 +643,7 @@ HTTPS включается из раздела **Security** после напр�
 - журналы;
 - диагностика;
 - резервные копии;
+- очистка старых SQLite-копий с сохранением двух последних;
 - восстановление;
 - обновление компонентов;
 - проверка Xray;

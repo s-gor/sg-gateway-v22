@@ -15,6 +15,16 @@ class RoutingRuntimeError(RuntimeError):
     pass
 
 
+# Public Routing actions are the five family-explicit tags below.  The legacy
+# direct/warp tags remain accepted only so an existing server upgrades to the
+# privacy-conservative IPv4 behaviour instead of breaking or silently changing
+# address family.
+PUBLIC_ROUTING_TAGS = {"direct4", "direct6", "warp4", "warp6", "block"}
+LEGACY_ROUTING_TAGS = {"direct", "warp"}
+ALLOWED_ROUTING_TAGS = PUBLIC_ROUTING_TAGS | LEGACY_ROUTING_TAGS
+MANAGED_OUTBOUND_TAGS = ALLOWED_ROUTING_TAGS | {"warp-core"}
+
+
 def xray_config_path() -> Path:
     return Path(os.getenv("SG_GATEWAY_XRAY_CONFIG", "/usr/local/etc/xray/config.json"))
 
@@ -86,10 +96,96 @@ def atomic_write_json(path: Path, payload: dict, mode: int = 0o600) -> None:
     os.replace(temporary, path)
 
 
+def family_gate_outbound(tag: str, family: int, *, proxy_tag: str | None = None) -> dict:
+    """Build a fail-closed Xray Freedom family gate.
+
+    ForceIPv4/ForceIPv6 makes a domain fail when the selected DNS family is
+    absent.  finalRules additionally rejects a literal destination of the
+    opposite family, so an explicit IPv4/IPv6 rule can never fall through to
+    the other family.
+    """
+    if family not in {4, 6}:
+        raise RoutingRuntimeError("Поддерживаются только семейства IPv4 и IPv6")
+    strategy = "ForceIPv4" if family == 4 else "ForceIPv6"
+    opposite_network = "::/0" if family == 4 else "0.0.0.0/0"
+    result: dict = {
+        "tag": tag,
+        "protocol": "freedom",
+        "settings": {
+            "domainStrategy": strategy,
+            # Block only the opposite address family. Traffic in the
+            # selected family still passes through Xray's native
+            # Freedom final policy, including private-address guards.
+            "finalRules": [
+                {"action": "block", "ip": [opposite_network], "blockDelay": 0},
+            ],
+        },
+    }
+    if proxy_tag:
+        result["proxySettings"] = {"tag": proxy_tag}
+    return result
+
+
+def routing_capabilities() -> dict[str, bool]:
+    """Return action availability without changing routing state."""
+    try:
+        from app.config import load_config
+
+        native_ipv6 = bool(load_config().public_ipv6)
+    except Exception:
+        native_ipv6 = False
+
+    warp_enabled = False
+    warp_ipv4 = False
+    warp_ipv6 = False
+    try:
+        from app.routing.warp import enabled as warp_is_enabled, routing_family_capabilities
+
+        warp_enabled = bool(warp_is_enabled())
+        families = routing_family_capabilities() if warp_enabled else {"ipv4": False, "ipv6": False}
+        warp_ipv4 = warp_enabled and bool(families.get("ipv4"))
+        warp_ipv6 = warp_enabled and bool(families.get("ipv6"))
+    except Exception:
+        pass
+
+    return {
+        # IPv4 is SG-Gateway's compatibility baseline.  A server that cannot
+        # use it will fail at the actual outbound rather than exposing another
+        # family behind the user's back.
+        "direct4": True,
+        "direct6": native_ipv6,
+        "warp4": warp_ipv4,
+        "warp6": warp_ipv6,
+        "block": True,
+        "warp_enabled": warp_enabled,
+    }
+
+
+def validate_outbound_tag(tag: str) -> None:
+    tag = str(tag or "").strip().lower()
+    if tag not in ALLOWED_ROUTING_TAGS:
+        raise RoutingRuntimeError(
+            "Разрешены только SG-Gateway IPv4/IPv6, WARP IPv4/IPv6 и Block"
+        )
+    caps = routing_capabilities()
+    if tag == "direct6" and not caps["direct6"]:
+        raise RoutingRuntimeError(
+            "Выбран SG-Gateway · IPv6, но у сервера нет доступного публичного IPv6"
+        )
+    if tag in {"warp", "warp4"} and not caps["warp4"]:
+        raise RoutingRuntimeError(
+            "Выбран WARP · IPv4, но WARP IPv4 не готов или WARP выключен"
+        )
+    if tag == "warp6" and not caps["warp6"]:
+        raise RoutingRuntimeError(
+            "Выбран WARP · IPv6, но WARP IPv6 не готов или WARP выключен"
+        )
+
+
 def default_routing() -> dict:
-    # Unmatched traffic uses the first Xray outbound (direct).  Keeping that
-    # fallback implicit preserves a known-good Preview 39 runtime during a
-    # panel-only update and avoids manufacturing a needless catch-all rule.
+    # Unmatched traffic uses the first managed outbound.  It is the hidden
+    # legacy `direct` alias, implemented below as a strict IPv4 gate.  This
+    # keeps old installations working without ever auto-falling back to IPv6.
     return {"routing": {"domainStrategy": "AsIs", "rules": []}}
 
 
@@ -107,11 +203,15 @@ def sanitize_managed_fragment(fragment: dict | None) -> dict:
     for index, raw in enumerate(rules, start=1):
         if not isinstance(raw, dict):
             raise RoutingRuntimeError(f"Routing rule {index} имеет неверный формат")
-        tag = str(raw.get("outboundTag") or "").strip()
-        if tag not in {"direct", "warp", "block"}:
+        tag = str(raw.get("outboundTag") or "").strip().lower()
+        if tag not in ALLOWED_ROUTING_TAGS:
             raise RoutingRuntimeError(
-                f"Routing rule {index}: разрешены только outboundTag direct, warp и block"
+                f"Routing rule {index}: разрешены только direct4, direct6, warp4, warp6 и block"
             )
+        try:
+            validate_outbound_tag(tag)
+        except RoutingRuntimeError as exc:
+            raise RoutingRuntimeError(f"Routing rule {index}: {exc}") from exc
         item = dict(raw)
         item["type"] = "field"
         item["outboundTag"] = tag
@@ -149,8 +249,8 @@ def load_managed_fragment() -> dict:
         } & {"xray", "proxy", "vpn"}
         if legacy_tags:
             # Preview 40 could persist a decorative outbound. Migrate only
-            # that known legacy defect to Direct. WARP failures must remain
-            # fail-closed and must never be converted into a silent fallback.
+            # that known legacy defect to the strict IPv4 default. WARP
+            # failures remain fail-closed and are never silently bypassed.
             return default_routing()
     return sanitize_managed_fragment(value)
 
@@ -199,6 +299,63 @@ def missing_geo_references(
     return tuple(missing)
 
 
+def build_managed_outbounds(existing_outbounds: list | None = None) -> list[dict]:
+    """Build deterministic family-explicit outbounds used by every Xray path."""
+    source = existing_outbounds if isinstance(existing_outbounds, list) else []
+    block = next(
+        (
+            dict(item)
+            for item in source
+            if isinstance(item, dict) and item.get("tag") == "block"
+        ),
+        {"tag": "block", "protocol": "blackhole"},
+    )
+    rest = [
+        dict(item)
+        for item in source
+        if isinstance(item, dict)
+        and str(item.get("tag") or "") not in MANAGED_OUTBOUND_TAGS
+    ]
+
+    # Keep legacy aliases first for backward compatibility with an old managed
+    # fragment and with Xray's implicit-first-outbound default.  Both aliases
+    # are strict IPv4, never dual-stack fallbacks.
+    direct_legacy = family_gate_outbound("direct", 4)
+    direct4 = family_gate_outbound("direct4", 4)
+    direct6 = family_gate_outbound("direct6", 6)
+
+    managed: list[dict] = [direct_legacy]
+    warp_bundle: list[dict] = []
+    try:
+        from app.routing.warp import outbound as warp_outbound, routing_family_capabilities
+
+        warp = warp_outbound(require_enabled=True)
+        if warp is not None:
+            core = json.loads(json.dumps(warp))
+            core["tag"] = "warp-core"
+            families = routing_family_capabilities()
+            if families.get("ipv4"):
+                # Hidden old `warp` tag is an IPv4-only compatibility alias.
+                managed.append(family_gate_outbound("warp", 4, proxy_tag="warp-core"))
+                warp_bundle.append(family_gate_outbound("warp4", 4, proxy_tag="warp-core"))
+            if families.get("ipv6"):
+                warp_bundle.append(family_gate_outbound("warp6", 6, proxy_tag="warp-core"))
+            warp_bundle.append(core)
+    except ImportError:
+        pass
+    except Exception as exc:
+        raise RoutingRuntimeError(str(exc)) from exc
+
+    # Preserve the historical first-three order when WARP exists so old code
+    # reading tags direct/warp/block remains compatible.  New family tags are
+    # explicit and are never exposed through those aliases.
+    managed.append(block)
+    managed.extend((direct4, direct6))
+    managed.extend(warp_bundle)
+    managed.extend(rest)
+    return managed
+
+
 def build_full_config(
     routing_fragment: dict | None = None,
     *,
@@ -209,42 +366,13 @@ def build_full_config(
         config = {
             "log": {"loglevel": "warning"},
             "inbounds": [],
-            "outbounds": [
-                {"tag": "direct", "protocol": "freedom"},
-                {"tag": "block", "protocol": "blackhole"},
-            ],
+            "outbounds": [],
         }
 
     outbounds = config.get("outbounds")
-    if not isinstance(outbounds, list):
-        outbounds = []
-    direct = next(
-        (dict(item) for item in outbounds if isinstance(item, dict) and item.get("tag") == "direct"),
-        {"tag": "direct", "protocol": "freedom"},
+    config["outbounds"] = build_managed_outbounds(
+        outbounds if isinstance(outbounds, list) else []
     )
-    block = next(
-        (dict(item) for item in outbounds if isinstance(item, dict) and item.get("tag") == "block"),
-        {"tag": "block", "protocol": "blackhole"},
-    )
-    rest = [
-        dict(item)
-        for item in outbounds
-        if isinstance(item, dict) and item.get("tag") not in {"direct", "warp", "block"}
-    ]
-    managed_outbounds = [direct]
-    try:
-        from app.routing.warp import outbound as warp_outbound
-
-        warp = warp_outbound(require_enabled=True)
-        if warp is not None:
-            managed_outbounds.append(warp)
-    except ImportError:
-        pass
-    except Exception as exc:
-        raise RoutingRuntimeError(str(exc)) from exc
-    managed_outbounds.append(block)
-    managed_outbounds.extend(rest)
-    config["outbounds"] = managed_outbounds
 
     fragment = sanitize_managed_fragment(
         routing_fragment if routing_fragment is not None else load_managed_fragment()
@@ -387,6 +515,8 @@ def build_roscom_direct_block_fragment(
                 {
                     "type": "field",
                     "domain": [f"geosite:{category}"],
+                    # Keep the legacy tag for RoscomVPN restore compatibility;
+                    # it is now a strict IPv4 family gate.
                     "outboundTag": "direct",
                 }
             )

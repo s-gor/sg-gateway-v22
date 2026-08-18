@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 import sys
 import traceback
 from pathlib import Path
@@ -71,12 +72,21 @@ def run_xray_update(channel: str) -> int:
 
 
 def run_panel_update() -> int:
-    from sg_hostd.panel_update_runtime import update_panel
+    from app.maintenance.panel_updates import GITHUB_BRANCH
 
-    print("[SG-Gateway Update] Подготавливаю транзакционное обновление панели", flush=True)
-    _dump(update_panel())
-    return 0
-
+    script = _PROJECT_ROOT / "deploy" / "update-from-github.sh"
+    if not script.is_file():
+        raise RuntimeError(f"Не найден {script}")
+    env = dict(os.environ)
+    env["SG_GATEWAY_GITHUB_BRANCH"] = GITHUB_BRANCH
+    print(f"[SG-Gateway Update] Запускаю проверенный updater · channel {GITHUB_BRANCH}", flush=True)
+    completed = subprocess.run(
+        ["/bin/bash", str(script)],
+        cwd=str(_PROJECT_ROOT),
+        env=env,
+        check=False,
+    )
+    return int(completed.returncode)
 
 def run_core_update(engine: str) -> int:
     from sg_hostd.core_update_runtime import update_core

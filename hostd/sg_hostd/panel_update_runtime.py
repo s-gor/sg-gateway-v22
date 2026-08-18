@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from app.maintenance.operations import log_operation
-from app.maintenance.panel_updates import GITHUB_API, GITHUB_REPO, STATE_FILE, source_fingerprint
+from app.maintenance.panel_updates import GITHUB_API, GITHUB_BRANCH, GITHUB_REPO, STATE_FILE, source_fingerprint
 
 
 LIVE_ROOT = Path(os.getenv("SG_GATEWAY_APP_ROOT", "/opt/sg-gateway"))
@@ -91,23 +91,23 @@ def _curl_text(url: str, timeout: float = 20.0) -> str:
     return completed.stdout
 
 
-def _latest_main_commit() -> str:
+def _latest_channel_commit() -> str:
     try:
-        payload = _request_json(f"{GITHUB_API}/commits/main")
+        payload = _request_json(f"{GITHUB_API}/commits/{GITHUB_BRANCH}")
         if not isinstance(payload, dict):
-            raise PanelUpdateRuntimeError("GitHub не вернул commit main")
+            raise PanelUpdateRuntimeError("GitHub не вернул commit update-channel")
         sha = str(payload.get("sha") or "").strip().lower()
         if not _SHA_RE.fullmatch(sha):
-            raise PanelUpdateRuntimeError("GitHub вернул некорректный SHA main")
+            raise PanelUpdateRuntimeError("GitHub вернул некорректный SHA update-channel")
         return sha
     except PanelUpdateRuntimeError:
         try:
-            atom = _curl_text(f"https://github.com/{GITHUB_REPO}/commits/main.atom", timeout=20.0)
+            atom = _curl_text(f"https://github.com/{GITHUB_REPO}/commits/{GITHUB_BRANCH}.atom", timeout=20.0)
         except PanelUpdateRuntimeError as exc:
-            raise PanelUpdateRuntimeError(f"GitHub main недоступен: {exc}") from exc
+            raise PanelUpdateRuntimeError(f"GitHub {GITHUB_BRANCH} недоступен: {exc}") from exc
         match = re.search(r"Grit::Commit/([0-9a-fA-F]{40})", atom)
         if not match:
-            raise PanelUpdateRuntimeError("GitHub main не удалось определить ни через API, ни через Atom feed")
+            raise PanelUpdateRuntimeError(f"GitHub {GITHUB_BRANCH} не удалось определить ни через API, ни через Atom feed")
         return match.group(1).lower()
 
 
@@ -123,7 +123,7 @@ def _download_archive(commit: str, destination: Path) -> None:
                     break
                 total += len(chunk)
                 if total > MAX_ARCHIVE_BYTES:
-                    raise PanelUpdateRuntimeError("Архив GitHub main неожиданно большой")
+                    raise PanelUpdateRuntimeError("Архив GitHub update-channel неожиданно большой")
                 stream.write(chunk)
             stream.flush()
             os.fsync(stream.fileno())
@@ -188,6 +188,7 @@ def _validate_snapshot(root: Path) -> tuple[str, str]:
         "VERSION",
         "requirements.txt",
         "app/main.py",
+        "app/production.py",
         "hostd/sg_hostd/app.py",
         "hostd/sg_hostd/commands.py",
         "app/web/templates/base.html",
@@ -225,10 +226,13 @@ def _validate_snapshot(root: Path) -> tuple[str, str]:
     env = dict(os.environ)
     env["PYTHONPATH"] = f"{root}:{root / 'hostd'}"
     env["SG_GATEWAY_ENV"] = "production"
-    env["SG_GATEWAY_DATA_DIR"] = "/var/lib/sg-gateway"
-    env["SG_GATEWAY_LOG_DIR"] = "/var/log/sg-gateway"
+    validation_root = root.parent / "wsgi-validation"
+    (validation_root / "data").mkdir(parents=True, exist_ok=True)
+    (validation_root / "log").mkdir(parents=True, exist_ok=True)
+    env["SG_GATEWAY_DATA_DIR"] = str(validation_root / "data")
+    env["SG_GATEWAY_LOG_DIR"] = str(validation_root / "log")
     check = subprocess.run(
-        [str(python), "-c", "import app.main; import sg_hostd.commands; print('imports-ok')"],
+        [str(python), "-c", "import app.production; import sg_hostd.commands; print('imports-ok')"],
         cwd=str(root),
         env=env,
         capture_output=True,
@@ -387,66 +391,34 @@ def _write_state(commit: str, version: str, backup: Path) -> None:
 
 
 def update_panel() -> dict[str, Any]:
-    LOCK_FILE.parent.mkdir(parents=True, exist_ok=True)
-    with LOCK_FILE.open("w", encoding="utf-8") as lock:
-        try:
-            fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError as exc:
-            raise PanelUpdateRuntimeError("Другая операция обновления SG-Gateway уже выполняется") from exc
-
-        baseline_mode, baseline = _baseline_mode()
-        commit = _latest_main_commit()
-        if baseline_mode == "bound" and str(baseline.get("commit") or "").strip().lower() == commit:
-            raise PanelUpdateRuntimeError(f"SG-Gateway уже соответствует GitHub main commit {commit[:12]}")
-        UPDATE_ROOT.mkdir(parents=True, exist_ok=True)
-        BACKUP_ROOT.mkdir(parents=True, exist_ok=True)
-        with tempfile.TemporaryDirectory(prefix="sg-gateway-panel-update-", dir=str(UPDATE_ROOT)) as temp_name:
-            temp = Path(temp_name)
-            archive = temp / f"{commit}.tar.gz"
-            print(f"[SG-Gateway Update 1/8] Фиксирую GitHub main commit {commit[:12]}", flush=True)
-            _download_archive(commit, archive)
-            print(f"[SG-Gateway Update 2/8] Snapshot скачан; SHA-256 {_sha256(archive)}", flush=True)
-            source = _safe_extract(archive, temp / "source", commit)
-            current_version, target_version = _validate_snapshot(source)
-            if baseline_mode == "bootstrap" and _version_key(target_version) <= _version_key(current_version):
-                raise PanelUpdateRuntimeError(
-                    "Обновление разрешено только на строго более новую VERSION "
-                    f"({current_version} → {target_version})."
-                )
-            if baseline_mode == "bootstrap":
-                print("[SG-Gateway Update] Подготавливаю безопасное обновление на более новую VERSION.", flush=True)
-            print(f"[SG-Gateway Update 3/8] Staging прошёл Python/import проверки; VERSION {current_version} → {target_version}", flush=True)
-            _check_space(source)
-            backup = _backup_live()
-            print(f"[SG-Gateway Update 4/8] Проверенный backup: {backup.name}", flush=True)
-
-            stopped = False
-            try:
-                print("[SG-Gateway Update 5/8] Останавливаю только panel и hostd на время переключения кода", flush=True)
-                subprocess.run(["systemctl", "stop", "sg-gateway.service", "sg-hostd.service"], timeout=60, check=False)
-                stopped = True
-                _deploy_source(source)
-                print("[SG-Gateway Update 6/8] Код панели переключён; .venv и runtime data сохранены", flush=True)
-                _start_and_verify()
-                print("[SG-Gateway Update 7/8] sg-hostd и SG-Gateway прошли health-check", flush=True)
-            except Exception as exc:
-                print(f"[SG-Gateway Update] Ошибка: {exc}", flush=True)
-                if stopped:
-                    subprocess.run(["systemctl", "stop", "sg-gateway.service", "sg-hostd.service"], timeout=60, check=False)
-                _deploy_source(backup)
-                try:
-                    _start_and_verify()
-                except Exception as rollback_exc:
-                    raise PanelUpdateRuntimeError(
-                        f"Обновление не применено; backup возвращён на диск, но runtime требует проверки: {rollback_exc}"
-                    ) from exc
-                raise PanelUpdateRuntimeError(f"Обновление отменено, предыдущая панель восстановлена: {exc}") from exc
-
-            _write_state(commit, target_version, backup)
-            message = f"SG-Gateway обновлён до commit {commit[:12]}; VERSION {target_version}. Backup: {backup.name}"
-            try:
-                log_operation("panel.update", "github:main", message, "ok")
-            except Exception:
-                pass
-            print(f"[SG-Gateway Update 8/8] {message}", flush=True)
-            return {"ok": True, "message": message, "commit": commit, "version": target_version, "backup": backup.name}
+    """Compatibility entrypoint: delegate to the verified full-state shell updater."""
+    script = LIVE_ROOT / "deploy" / "update-from-github.sh"
+    if not script.is_file():
+        raise PanelUpdateRuntimeError(f"Не найден безопасный updater: {script}")
+    env = dict(os.environ)
+    env["SG_GATEWAY_GITHUB_BRANCH"] = GITHUB_BRANCH
+    completed = subprocess.run(
+        ["/bin/bash", str(script)],
+        cwd=str(LIVE_ROOT),
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=1800,
+        check=False,
+    )
+    output = "\n".join(
+        part.strip() for part in (completed.stdout, completed.stderr) if part and part.strip()
+    )
+    if output:
+        print(output, flush=True)
+    if completed.returncode:
+        raise PanelUpdateRuntimeError(
+            output.splitlines()[-1] if output else f"safe updater failed: rc={completed.returncode}"
+        )
+    version = (LIVE_ROOT / "VERSION").read_text(encoding="utf-8").strip()
+    return {
+        "ok": True,
+        "message": f"SG-Gateway безопасно обновлён из GitHub {GITHUB_BRANCH}; VERSION {version}",
+        "channel": GITHUB_BRANCH,
+        "version": version,
+    }

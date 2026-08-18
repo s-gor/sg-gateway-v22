@@ -175,7 +175,7 @@ server {
     }
     # SG_GATEWAY_FULL_BACKUP_UPLOAD_FIX1
     location = /maintenance/full-backups/restore {
-        client_max_body_size 1024m;
+        client_max_body_size 0;
         proxy_pass http://127.0.0.1:$BACKEND_PORT;
         proxy_http_version 1.1;
         proxy_set_header Host \$host;

@@ -1,0 +1,389 @@
+/* SG-Gateway 022.04 · Connections classic dark restoration.
+   Dark only. Reuses the original SG Graphite palette while preserving current geometry. */
+
+html[data-theme="dark"] body.page-connections {
+  --sg-bg: #0c1826;
+  --sg-sidebar: #101d2c;
+  --sg-topbar: #0d1a28;
+  --sg-panel: #192738;
+  --sg-panel-soft: #152435;
+  --sg-panel-deep: #101d2b;
+  --sg-line: #2a3c50;
+  --sg-line-soft: #213348;
+  --sg-text: #f1f5f9;
+  --sg-muted: #96a7ba;
+  --sg-dim: #71859b;
+  --sg-blue: #65a9f3;
+  --sg-blue-strong: #3675b7;
+  --sg-blue-active: #315f92;
+  --sg-green: #31cf91;
+  --sg-green-bg: #103c35;
+  --sg-green-line: #216e5c;
+
+  --sgc-text: #f4f7fa;
+  --sgc-muted: #96a7ba;
+  --sgc-line: #34506b;
+  --sgc-line-soft: #24364b;
+  --sgc-secondary: linear-gradient(180deg, #182b40 0%, #111f30 100%);
+  --sgc-secondary-hover: linear-gradient(180deg, #203a55 0%, #162a40 100%);
+  --sgc-primary: linear-gradient(180deg, #5b96cc 0%, #3e78ad 100%);
+  --sgc-primary-hover: linear-gradient(180deg, #6aa6dc 0%, #4786be 100%);
+  --sgc-primary-line: #65a9f3;
+  --sgc-focus: #7fb9f4;
+  --sgc-track: #18283b;
+  --sgc-shadow: 0 9px 22px rgba(0, 0, 0, .24);
+}
+
+html[data-theme="dark"] body.page-connections .cnv1-engine-card,
+html[data-theme="dark"] body.page-connections #xray-xmux .xmux1-card {
+  border-color: #2a3c50;
+  background: linear-gradient(180deg, #1a293b 0%, #182738 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .025),
+    0 16px 38px rgba(0, 0, 0, .15);
+}
+
+html[data-theme="dark"] body.page-connections .cnv1-endpoint-card,
+html[data-theme="dark"] body.page-connections .xps2-selection,
+html[data-theme="dark"] body.page-connections .xps2-parameters,
+html[data-theme="dark"] body.page-connections .cnv1-advanced {
+  border-color: #2a3c50;
+  background: #101d2b;
+}
+
+html[data-theme="dark"] body.page-connections :is(
+  .cnv1-kicker,
+  .cnv1-card-kicker,
+  .xps2-choice-topline
+) {
+  color: #65a9f3;
+}
+
+html[data-theme="dark"] body.page-connections .cnv1-port-chip {
+  border-color: #345f88;
+  background: #142c43;
+  color: #65a9f3;
+}
+
+html[data-theme="dark"] body.page-connections .cnv1-engine-status.success {
+  border-color: #216e5c;
+  background: #103c35;
+  color: #31cf91;
+  box-shadow: inset 0 0 0 1px rgba(49, 207, 145, .06);
+}
+
+html[data-theme="dark"] body.page-connections .xps2-choice {
+  border-color: #34506b;
+  background: linear-gradient(180deg, #1a2b3e 0%, #172638 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .018);
+}
+
+html[data-theme="dark"] body.page-connections .xps2-choice:hover {
+  border-color: #568bc0;
+  background: linear-gradient(180deg, #1d3148 0%, #182a3f 100%);
+}
+
+html[data-theme="dark"] body.page-connections .xps2-choice.is-selected,
+html[data-theme="dark"] body.page-connections .xps2-selector:checked + .xps2-choice {
+  border-color: #65a9f3;
+  background: linear-gradient(180deg, #1c3047 0%, #182a3f 100%);
+  box-shadow:
+    inset 0 0 0 1px #65a9f3,
+    0 8px 22px rgba(0, 0, 0, .10);
+}
+
+html[data-theme="dark"] body.page-connections .xps2-choice-status {
+  border-color: #2a3c50;
+  background: #101d2b;
+  color: #96a7ba;
+}
+
+html[data-theme="dark"] body.page-connections .xps2-choice-status.active {
+  border-color: #216e5c;
+  background: #103c35;
+  color: #31cf91;
+}
+
+html[data-theme="dark"] body.page-connections .xps2-parameter-row {
+  border-color: #2a3c50;
+  background: linear-gradient(180deg, #192a3c 0%, #172637 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .018);
+}
+
+html[data-theme="dark"] body.page-connections .xps2-parameter-title > strong,
+html[data-theme="dark"] body.page-connections .xps2-section-head h3,
+html[data-theme="dark"] body.page-connections .xmux1-head h2 {
+  color: #f1f5f9;
+}
+
+html[data-theme="dark"] body.page-connections .xps2-parameter-title > span,
+html[data-theme="dark"] body.page-connections .xps2-section-head p,
+html[data-theme="dark"] body.page-connections .xmux1-head p {
+  color: #96a7ba;
+}
+
+html[data-theme="dark"] body.page-connections :is(
+  .xps2-parameter-row input,
+  .xps2-parameter-row select,
+  .xps2-salamander-secret input,
+  #xray-xmux textarea
+) {
+  border-color: #34506b !important;
+  background: #101d2b !important;
+  color: #f1f5f9 !important;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, .16) !important;
+}
+
+html[data-theme="dark"] body.page-connections :is(
+  .xps2-parameter-row input,
+  .xps2-parameter-row select,
+  .xps2-salamander-secret input,
+  #xray-xmux textarea
+):focus {
+  border-color: #65a9f3 !important;
+  outline: 0 !important;
+  box-shadow:
+    0 0 0 2px rgba(101, 169, 243, .14),
+    inset 0 1px 2px rgba(0, 0, 0, .16) !important;
+}
+
+html[data-theme="dark"] body.page-connections .xps2-salamander-modes span {
+  border-color: #34506b;
+  background: linear-gradient(180deg, #182b40 0%, #111f30 100%);
+  color: #96a7ba;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, .10);
+}
+
+html[data-theme="dark"] body.page-connections .xps2-salamander-modes label:hover span {
+  border-color: #568bc0;
+  color: #f1f5f9;
+}
+
+html[data-theme="dark"] body.page-connections .xps2-salamander-modes input:checked + span {
+  border-color: #65a9f3;
+  background: linear-gradient(180deg, #1e3954 0%, #172d45 100%);
+  color: #f4f8fc;
+  box-shadow:
+    inset 0 0 0 1px #65a9f3,
+    0 5px 14px rgba(0, 0, 0, .14);
+}
+
+html[data-theme="dark"] body.page-connections .xps2-salamander-status[data-tone="ok"] {
+  color: #31cf91;
+}
+
+html[data-theme="dark"] body.page-connections #xray-xmux .xmux1-chip {
+  border-color: #34506b;
+  background: #101d2b;
+  color: #96a7ba;
+}
+
+html[data-theme="dark"] body.page-connections #xray-xmux .xmux1-mode > span {
+  border-color: #34506b !important;
+  background: linear-gradient(180deg, #182b40 0%, #111f30 100%) !important;
+  color: #f1f5f9 !important;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, .12) !important;
+}
+
+html[data-theme="dark"] body.page-connections #xray-xmux .xmux1-mode:hover > span {
+  border-color: #568bc0 !important;
+  background: linear-gradient(180deg, #203a55 0%, #162a40 100%) !important;
+}
+
+html[data-theme="dark"] body.page-connections #xray-xmux .xmux1-mode input:checked + span {
+  border-color: #65a9f3 !important;
+  background: linear-gradient(180deg, #1e3954 0%, #172d45 100%) !important;
+  box-shadow:
+    inset 0 0 0 1px #65a9f3,
+    0 6px 16px rgba(0, 0, 0, .15) !important;
+}
+
+html[data-theme="dark"] body.page-connections #xray-xmux .xmux1-mode input:focus-visible + span {
+  outline: 2px solid #7fb9f4 !important;
+  outline-offset: 2px;
+}
+
+html[data-theme="dark"] body.page-connections #xray-xmux .xmux1-extra {
+  border-color: #2a3c50;
+  background: #101d2b;
+}
+
+html[data-theme="dark"] body.page-connections #xray-xmux .xmux1-extra summary {
+  color: #f1f5f9;
+}
+
+html[data-theme="dark"] body.page-connections #xray-xmux .xmux1-dialog {
+  border-color: #34506b !important;
+  background: #192738 !important;
+  color: #f1f5f9 !important;
+  box-shadow: 0 26px 72px rgba(0, 0, 0, .48) !important;
+}
+
+html[data-theme="dark"] body.page-connections #xray-xmux :is(
+  .xmux1-dialog-grid > div,
+  .xmux1-dialog-json
+) {
+  border-color: #2a3c50 !important;
+  background: #101d2b !important;
+}
+
+html[data-theme="dark"] body.page-connections #xray-xmux .xmux1-dialog-close {
+  border-color: #34506b !important;
+  color: #f1f5f9 !important;
+  background: #101d2b !important;
+}
+/* SG-Gateway 022.04 · Connections classic dark depth pass 2.
+   Restore the old blue-glass hierarchy: dark bed, blue card surfaces, deep inputs. */
+html[data-theme="dark"] body.page-connections .cnv1-engine-card,
+html[data-theme="dark"] body.page-connections #xray-xmux .xmux1-card {
+  border-color: #355a7c !important;
+  background:
+    radial-gradient(circle at 94% -18%, rgba(101, 169, 243, .13), transparent 38%),
+    linear-gradient(180deg, #1a2e43 0%, #15263a 100%) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(173, 211, 247, .07),
+    0 15px 36px rgba(0, 0, 0, .18) !important;
+}
+
+html[data-theme="dark"] body.page-connections :is(
+  .xps2-selection,
+  .xps2-parameters,
+  .cnv1-endpoint-card,
+  .cnv1-advanced
+) {
+  border-color: #2f506f !important;
+  background:
+    radial-gradient(circle at 96% -22%, rgba(101, 169, 243, .08), transparent 40%),
+    linear-gradient(180deg, #12243a 0%, #0e1d2d 100%) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(173, 211, 247, .045),
+    0 8px 24px rgba(0, 0, 0, .10) !important;
+}
+
+html[data-theme="dark"] body.page-connections .xps2-parameter-row {
+  border-color: #3a6083 !important;
+  background:
+    radial-gradient(circle at 100% -12%, rgba(101, 169, 243, .12), transparent 34%),
+    linear-gradient(180deg, #1c3249 0%, #172a3f 100%) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(173, 211, 247, .075),
+    0 5px 14px rgba(0, 0, 0, .12) !important;
+  transition: border-color .16s ease, background .16s ease, box-shadow .16s ease;
+}
+
+html[data-theme="dark"] body.page-connections .xps2-parameter-row:hover {
+  border-color: #4979a5 !important;
+  background:
+    radial-gradient(circle at 100% -12%, rgba(101, 169, 243, .16), transparent 36%),
+    linear-gradient(180deg, #203851 0%, #192e45 100%) !important;
+}
+
+html[data-theme="dark"] body.page-connections .xps2-parameter-title > strong {
+  color: #f6f9fc !important;
+}
+
+html[data-theme="dark"] body.page-connections .xps2-parameter-title > span {
+  color: #8fb2d2 !important;
+}
+
+html[data-theme="dark"] body.page-connections .xps2-parameter-row > label > span,
+html[data-theme="dark"] body.page-connections .xps2-salamander-secret > label > span {
+  color: #a6bfd7 !important;
+}
+
+html[data-theme="dark"] body.page-connections :is(
+  .xps2-parameter-row input,
+  .xps2-parameter-row select,
+  .xps2-salamander-secret input,
+  #xray-xmux textarea
+) {
+  border-color: #3c6388 !important;
+  background: linear-gradient(180deg, #0f2032 0%, #0b1826 100%) !important;
+  color: #f5f8fb !important;
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, .28),
+    inset 0 0 0 1px rgba(126, 181, 231, .025) !important;
+}
+
+html[data-theme="dark"] body.page-connections :is(
+  .xps2-parameter-row input,
+  .xps2-parameter-row select,
+  .xps2-salamander-secret input,
+  #xray-xmux textarea
+):hover {
+  border-color: #4a79a5 !important;
+}
+
+html[data-theme="dark"] body.page-connections :is(
+  .xps2-parameter-row input,
+  .xps2-parameter-row select,
+  .xps2-salamander-secret input,
+  #xray-xmux textarea
+):focus {
+  border-color: #69b1f4 !important;
+  box-shadow:
+    0 0 0 2px rgba(101, 169, 243, .20),
+    0 0 18px rgba(73, 137, 199, .08),
+    inset 0 1px 2px rgba(0, 0, 0, .25) !important;
+}
+
+html[data-theme="dark"] body.page-connections .xps2-salamander-modes span {
+  border-color: #3a6083 !important;
+  background: linear-gradient(180deg, #193049 0%, #112338 100%) !important;
+  color: #a5bdd4 !important;
+}
+
+html[data-theme="dark"] body.page-connections .xps2-salamander-modes label:hover span {
+  border-color: #568fc3 !important;
+  background: linear-gradient(180deg, #213d59 0%, #17304a 100%) !important;
+  color: #f3f7fb !important;
+}
+
+html[data-theme="dark"] body.page-connections .xps2-salamander-modes input:checked + span {
+  border-color: #69b1f4 !important;
+  background: linear-gradient(180deg, #28527a 0%, #1d3f61 100%) !important;
+  color: #ffffff !important;
+  box-shadow:
+    inset 0 0 0 1px rgba(132, 194, 249, .75),
+    0 5px 16px rgba(0, 0, 0, .18) !important;
+}
+
+html[data-theme="dark"] body.page-connections :is(
+  .xps2-salamander-buttons .button:not(.primary),
+  .xps2-actions .button:not(.primary)
+) {
+  border-color: #3a6083 !important;
+  background: linear-gradient(180deg, #193049 0%, #112338 100%) !important;
+  color: #eef5fb !important;
+}
+
+html[data-theme="dark"] body.page-connections :is(
+  .xps2-salamander-buttons .button:not(.primary),
+  .xps2-actions .button:not(.primary)
+):hover:not(:disabled) {
+  border-color: #568fc3 !important;
+  background: linear-gradient(180deg, #213d59 0%, #17304a 100%) !important;
+}
+
+html[data-theme="dark"] body.page-connections .xps2-actions .button.primary {
+  border-color: #72b8f7 !important;
+  background: linear-gradient(180deg, #5c9bd2 0%, #3f7db5 100%) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .16),
+    0 7px 18px rgba(0, 0, 0, .22) !important;
+}
+
+html[data-theme="dark"] body.page-connections #xray-xmux .xmux1-mode > span {
+  border-color: #3a6083 !important;
+  background:
+    radial-gradient(circle at 100% 0, rgba(101, 169, 243, .07), transparent 42%),
+    linear-gradient(180deg, #193049 0%, #112338 100%) !important;
+}
+
+html[data-theme="dark"] body.page-connections #xray-xmux .xmux1-mode input:checked + span {
+  border-color: #69b1f4 !important;
+  background:
+    radial-gradient(circle at 100% 0, rgba(101, 169, 243, .16), transparent 44%),
+    linear-gradient(180deg, #28527a 0%, #1d3f61 100%) !important;
+  color: #ffffff !important;
+}

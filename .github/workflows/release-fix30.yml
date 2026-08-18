@@ -1,0 +1,72 @@
+name: Release Fix30
+
+on:
+  push:
+    branches: [fix30-ipv6-dual-stack]
+    paths:
+      - .github/workflows/release-fix30.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-fix30
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30 # Финальная пересборка после русификации публикации.
+    env:
+      TAG: v0.1.0-022.04-fix30
+      TITLE: SG-Gateway 0.1.0-022.04 Fix30
+      RUN_NAME: SG-Gateway-0.1.0-022.04-Fix30-FULL.run
+
+    steps:
+      - name: Checkout exact release commit
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+
+      - name: Verify Python syntax
+        run: |
+          python -B -c "from pathlib import Path; files=list(Path('app').rglob('*.py'))+list(Path('engines').rglob('*.py'))+list(Path('tests').rglob('*.py')); [compile(p.read_text(encoding='utf-8'), str(p), 'exec') for p in files]; print(f'syntax ok: {len(files)} files')"
+
+      - name: Run complete test suite
+        run: python -m pytest tests
+
+      - name: Build and verify FULL release
+        run: |
+          mkdir -p dist
+          bash build-run.sh "dist/$RUN_NAME"
+          bash "dist/$RUN_NAME" --verify-only
+          (cd dist && sha256sum -c "${RUN_NAME%.run}-SHA256.txt")
+
+      - name: Publish GitHub prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --title "$TITLE" --notes-file PUBLICATION-02204.md --prerelease
+            gh release upload "$TAG" --clobber \
+              "dist/$RUN_NAME" \
+              "dist/${RUN_NAME%.run}-TRANSFER.zip" \
+              "dist/${RUN_NAME%.run}-SHA256.txt"
+          else
+            gh release create "$TAG" \
+              --target "$GITHUB_SHA" \
+              --title "$TITLE" \
+              --notes-file PUBLICATION-02204.md \
+              --prerelease \
+              "dist/$RUN_NAME" \
+              "dist/${RUN_NAME%.run}-TRANSFER.zip" \
+              "dist/${RUN_NAME%.run}-SHA256.txt"
+          fi

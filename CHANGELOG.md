@@ -1,3 +1,29 @@
+# Changelog
+
+## 0.1.0-022.04 — 2026-08-16
+
+- В Maintenance добавлена безопасная очистка старых SQLite-копий: перед удалением показываются количество и объём, после подтверждения сохраняются две последние копии; Full Backup и Safety Backup обновления не затрагиваются.
+- Завершён интерфейс Connections Fix30: три карточки VLESS приведены к одной компактной высоте, mode XHTTP TLS и TCP-порт выровнены, а неизменяемые Path убраны из сетки настроек.
+- Упрощён блок Hysteria 2 и удалён разделитель над Obfuscation без изменения runtime.
+- XMUX-пресеты оформлены как видимые кнопки с окном точных значений; сохранены названия SG-Panel и клиентский контракт.
+- В Safety Backup добавлены проверка свободного места, ограничение истории и удаление незавершённых архивов.
+- Добавлен Dual Stack IPv4 + IPv6 для metadata, Xray, URI/экспортов, AWG2 и AWG3 с сохранением штатного IPv4-only режима при отсутствии IPv6.
+- Добавлен изолированный AWG3 userspace 3.x с отдельной IPv6 ULA-подсетью, службой и полным lifecycle.
+- WARP убран из автоматического clean install; IPv4 и IPv6 проверяются независимо, скрытый fallback на прямой выход запрещён.
+- Добавлен fail-closed Family Routing: SG-Gateway IPv4/IPv6, WARP IPv4/IPv6 и Block без автоматического перехода между семействами.
+- Исправлено действие Block для остального трафика в UI и backend.
+- Updater сохраняет Clients, TLS/HTTPS, assets, cores, AWG3 и runtime с Safety Backup, финальной проверкой и автоматическим rollback.
+- Добавлен полный конвейер SG Subscription: отдельные subscriptions, QR, Base64/compatibility-формат, credentials и доступ для каждого устройства.
+- В Clients/Devices добавлены независимый выбор AWG2/AWG3, компактные карточки и удаление дублирующихся/пустых блоков.
+- Завершены режимы Hysteria 2 Off/Salamander/Gecko и корректные URI.
+- Добавлены XHTTP XMUX Standard/Reduced/Expert с проверкой конфликтов и без изменения серверного inbound.
+- Расширены проверка Full Backup, безопасность Restore и сохранение состояния Panel Update.
+- Добавлен production-контракт WSGI/systemd и усилена диагностика установки.
+- GeoIP/GeoSite обновляются парой через полный Xray candidate; Apply/rollback атомарен, пользовательские правила сохраняются.
+- Нативные browser confirm заменены внутренними диалогами; исправлены темы и визуальные регрессии System/Connections/Xray.
+- Добавлены раскладки для экранов до 1366×820 и 761–980 px: элементы уплотняются без скрытия действий.
+- Полное удаление учитывает AWG3; добавлено регрессионное покрытие контракта 022.04.
+
 # SG-Gateway 0.1.0-021.12 — Full Backup / Full Restore / Recovery
 
 - R5-R3 PS1 archive EOL: `SOURCE-SHA256SUMS` hashes canonical LF Git blobs; four tracked `scripts/*.ps1` files previously had `eol=crlf`, so `git archive` exported different bytes and FULL CLEAN reported exactly four checksum mismatches. PS1 export is now fixed to LF; runtime code is unchanged.

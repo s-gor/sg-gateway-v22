@@ -1,21 +1,8 @@
 {
-  "build": "full-clean-ec2-02112-full-backup-domain-endpoint",
-  "status": "FINAL-AWG2",
-  "next_development_line": "0.1.0-022.01",
-  "safe_update": {
-    "mode": "light-runtime-whitelist",
-    "download_assets": false,
-    "preserve_local_assets": true,
-    "recover_missing_assets_from_safety_backup": true
-  },
-  "source_integrity": {
-    "manifest": "SOURCE-SHA256SUMS",
-    "mode": "git-blob-sha256",
-    "ci_verified": true,
-    "build_run_verified": true
-  },
-  "channel": "main-02112",
+  "build": "DEV-V22-02204-RELEASE-CANDIDATE",
+  "channel": "dev-v22",
   "client_access_model": {
+    "awg2_awg3_independent_selection": true,
     "hysteria_auth_per_device": true,
     "independent_enable_disable": true,
     "legacy_credentials_preserved": true,
@@ -67,6 +54,10 @@
     "migration": "legacy-client-to-primary-device"
   },
   "clients_ui": {
+    "awg_generations": [
+      "AWG2",
+      "AWG3"
+    ],
     "compact_device_modal": true,
     "create_protocol_grid": "4x2-desktop-8-real-vpn-protocols",
     "dark_palette": "crisp-graphite",
@@ -121,6 +112,25 @@
       "disable",
       "delete-additional"
     ]
+  },
+  "dual_stack": {
+    "awg2_ipv6": "deterministic-rfc4193-subnet-2",
+    "awg3_ipv6": "deterministic-rfc4193-subnet-3",
+    "client_default_allowed_ips": [
+      "0.0.0.0/0",
+      "::/0"
+    ],
+    "ipv4_compatibility_baseline": true,
+    "ipv6_absence_is_nonfatal": true,
+    "ipv6_literal_uri_authority": "bracketed",
+    "ipv6_only_vps": "deferred",
+    "legacy_public_address_preserved": "SG_GATEWAY_PUBLIC_ADDRESS",
+    "mode": "ipv4-plus-optional-ipv6",
+    "public_metadata": [
+      "SG_GATEWAY_PUBLIC_IPV4",
+      "SG_GATEWAY_PUBLIC_IPV6"
+    ],
+    "xray_public_listener_when_dual": "::"
   },
   "geofiles": {
     "active_path": "/usr/local/share/xray",
@@ -184,6 +194,8 @@
     "amneziawg_udp_port": 585,
     "amneziawg_udp_port_invariant": "database-seed-backend-ui-firewall-runtime-profile",
     "application_smoke_test": "render-contract-not-runtime-health",
+    "awg2_runtime_line": "frozen-1.x-kernel",
+    "awg3_runtime_line": "isolated-3.x-userspace-no-kernel-module",
     "clean_install_database_assertion": true,
     "client_detail_typography_preserved": true,
     "client_list_row_typography_v020": "reverted-to-approved-018-scale",
@@ -242,7 +254,7 @@
     "sg_admin_enter_defaults_to_yes": true,
     "stage9_exact_failure_logging": true,
     "template_endpoint_audit": true,
-    "version": "021-rebuilt",
+    "version": "02204-release-candidate",
     "warp_panel_port_v017": true,
     "xhttp_reality_stream_one_migration": true
   },
@@ -271,6 +283,7 @@
     },
     "panel": {
       "automatic_rollback": true,
+      "channel": "dev-v22",
       "full_code_backup": true,
       "health_checks": [
         "sg-hostd",
@@ -309,6 +322,7 @@
     "public_sni_router_port": 443,
     "reality_internal_listener": "127.0.0.1:7443"
   },
+  "next_development_line": "0.1.0-022.05",
   "portable_full_backup": {
     "automatic_safety_backup_before_restore": true,
     "certificate_files_verified_before_success": true,
@@ -340,6 +354,12 @@
     "https_domain_preferred_when_ready": true,
     "ip_fallback_when_https_not_ready": true
   },
+  "rebuild_policy": {
+    "awg3": true,
+    "baseline": "0.1.0-021.12",
+    "publication_requires_real_clean_install": true
+  },
+  "rebuild_target": "0.1.0-022.04",
   "rollback": {
     "atomic_application": true,
     "requires_backup": true,
@@ -350,25 +370,42 @@
     "atomic_apply_and_rollback": true,
     "bundled_geofiles": "SG Client 096 RunetFreedom pair",
     "custom_rules": [
-      "direct",
-      "warp",
+      "direct4",
+      "direct6",
+      "warp4",
+      "warp6",
       "block"
     ],
     "dark_theme": "Graphite exact palette",
-    "final_outbound": "direct-or-explicit-warp",
+    "default_traffic_block_supported": true,
+    "family_actions": {
+      "block": "Block",
+      "direct4": "SG-Gateway IPv4",
+      "direct6": "SG-Gateway IPv6",
+      "warp4": "WARP IPv4",
+      "warp6": "WARP IPv6"
+    },
+    "family_fallback": false,
+    "final_outbound": "explicit-family-or-block",
     "forbidden_outbounds": [
       "vpn",
       "proxy",
       "xray"
     ],
     "full_xray_candidate_test": true,
-    "layout": "routing-plus-geofiles-plus-warp-three-tabs",
+    "layout": "routing-plus-geofiles-with-five-family-actions",
+    "legacy_action_migration": {
+      "direct": "direct4",
+      "warp": "warp4"
+    },
     "light_theme": "Luxury Jade exact palette",
     "live_xray_integration": true,
     "paired_geofiles_only": true,
     "real_outbounds": [
-      "direct",
-      "warp",
+      "direct4",
+      "direct6",
+      "warp4",
+      "warp6",
       "block"
     ],
     "roscomvpn_compatibility": "direct-block-separate-preset",
@@ -384,11 +421,18 @@
     "source": "SG Client 096"
   },
   "runtime": "native-systemd",
+  "safe_update": {
+    "download_assets": false,
+    "mode": "light-runtime-whitelist",
+    "preserve_local_assets": true,
+    "recover_missing_assets_from_safety_backup": true
+  },
   "services": [
     "sg-gateway",
     "sg-hostd",
     "xray",
     "sg-gateway-awg",
+    "sg-gateway-awg3",
     "mihomo",
     "sg-gateway-singbox",
     "nginx"
@@ -403,6 +447,13 @@
     "xray_contract": "VLESS Reality TCP + XHTTP Reality + XTLS Vision; server auto, client stream-one",
     "xray_preservation": "Reality X25519, ShortID and full ML-KEM-768 pair from 013 are preserved"
   },
+  "source_integrity": {
+    "build_run_verified": true,
+    "ci_verified": true,
+    "manifest": "SOURCE-SHA256SUMS",
+    "mode": "git-blob-sha256"
+  },
+  "status": "DEV",
   "system_ui_02110": {
     "cpu_breakdown_margin_top_px": -16,
     "cpu_title_margin_bottom_px": 6,
@@ -433,7 +484,7 @@
     ],
     "xray_status_cards_theme_fixed": true
   },
-  "version": "0.1.0-021.12",
+  "version": "0.1.0-022.04",
   "vless_sg_panel_port": {
     "client_contract": {
       "fingerprint_normalized": true,
@@ -463,22 +514,35 @@
       "recreate",
       "remove"
     ],
-    "automatic_on_full_install": true,
+    "automatic_on_full_install": false,
     "candidate_before_live": true,
     "changes_system_routes": false,
-    "default_state": "active",
+    "default_state": "not-created-until-manual-outbounds-action",
     "fail_closed": true,
+    "family_fallback": false,
+    "family_gates": [
+      "warp4",
+      "warp6"
+    ],
+    "family_health": "independent-ipv4-ipv6-cloudflare-trace",
     "generation": "register + generate --xray",
+    "health_gates_routing": true,
     "ipv4_endpoint": "162.159.192.1:2408",
     "legacy_wgcf_profile_migration": true,
+    "manual_creation": true,
     "no_kernel_tun": true,
     "one_click_create_and_activate": true,
+    "profile_allowed_ips": [
+      "0.0.0.0/0",
+      "::/0"
+    ],
     "registration": "ArchiveNetwork wgcf-cli v0.3.6",
     "secret_files": "root-only-0600",
+    "shared_core_tag": "warp-core",
     "silent_direct_fallback": false,
     "source": "SG-Panel FIX40 verified WARP contract",
-    "tag": "warp",
-    "trace_verification": "cloudflare-cdn-cgi-trace",
+    "tag": "warp-core-with-family-gates",
+    "trace_verification": "cloudflare-trace-per-ip-family",
     "xray_outbound": "native-wireguard"
   },
   "xray": {

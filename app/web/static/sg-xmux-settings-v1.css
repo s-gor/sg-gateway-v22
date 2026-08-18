@@ -1,0 +1,454 @@
+.xps2-xmux {
+  display: none !important;
+}
+
+.xmux1-wrap {
+  margin-top: 22px;
+}
+
+.xmux1-card {
+  padding: 22px;
+}
+
+.xmux1-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 18px;
+}
+
+.xmux1-head h2 {
+  margin: 4px 0 6px;
+}
+
+.xmux1-head p {
+  margin: 0;
+  max-width: 820px;
+}
+
+.xmux1-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 5px 10px;
+  border: 1px solid var(--sg-line, rgba(120, 145, 135, .35));
+  border-radius: 999px;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.xmux1-modes {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.xmux1-mode {
+  display: block;
+  cursor: pointer;
+}
+
+.xmux1-mode input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.xmux1-mode > span {
+  display: flex;
+  min-height: 116px;
+  flex-direction: column;
+  gap: 7px;
+  padding: 15px;
+  border: 1px solid var(--sg-line, rgba(120, 145, 135, .35));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--sg-card, #1f2925) 94%, transparent);
+}
+
+.xmux1-mode input:checked + span {
+  border-color: var(--sg-ok, #4f8f75);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--sg-ok, #4f8f75) 58%, transparent);
+}
+
+.xmux1-mode strong {
+  font-size: 15px;
+}
+
+.xmux1-mode small,
+.xmux1-extra small {
+  line-height: 1.45;
+}
+
+.xmux1-extra {
+  margin-top: 14px;
+  border: 1px solid var(--sg-line, rgba(120, 145, 135, .28));
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.xmux1-extra summary {
+  cursor: pointer;
+  padding: 12px 14px;
+  font-weight: 700;
+}
+
+.xmux1-extra label {
+  display: grid;
+  gap: 7px;
+  padding: 0 14px 14px;
+}
+
+.xmux1-extra textarea {
+  width: 100%;
+  min-height: 190px;
+  resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.xmux1-error {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(190, 90, 90, .5);
+  border-radius: 10px;
+}
+
+.xmux1-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
+.xmux1-fixed-mode {
+  min-width: 0;
+}
+
+@media (max-width: 980px) {
+  .xmux1-modes {
+    grid-template-columns: 1fr;
+  }
+
+  .xmux1-head {
+    flex-direction: column;
+  }
+}
+
+/* SG-Gateway 022.04 · Connections controls-only polish.
+   Only actual user controls occupy the form grid. Fixed protocol contracts are metadata. */
+.xps2-parameters {
+  padding: 16px;
+}
+
+.xps2-parameter-list {
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.xps2-parameter-row {
+  align-items: end;
+  gap: 12px 14px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  box-shadow: none;
+}
+
+.xps2-parameter-title {
+  display: grid;
+  align-content: center;
+  gap: 3px;
+  min-width: 0;
+  padding: 1px 8px 1px 0;
+}
+
+.xps2-parameter-title > strong {
+  font-size: 14px;
+  line-height: 1.25;
+}
+
+.xps2-parameter-title > span {
+  color: var(--sg-muted);
+  font-size: 10.5px;
+  line-height: 1.35;
+}
+
+.xps2-profile-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  margin-top: 5px;
+}
+
+.xps2-profile-meta > span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 2px 7px;
+  border: 1px solid color-mix(in srgb, var(--sg-line) 78%, transparent);
+  border-radius: 999px;
+  color: var(--sg-muted);
+  background: color-mix(in srgb, var(--sg-panel) 72%, transparent);
+  font-size: 9px;
+  font-weight: 650;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.xps2-profile-meta > span.is-ready {
+  color: var(--sg-green);
+  border-color: color-mix(in srgb, var(--sg-green) 32%, var(--sg-line));
+}
+
+.xps2-profile-meta > span.is-warning {
+  color: var(--sg-warning, #b47d32);
+}
+
+.xps2-parameter-row > label {
+  display: grid;
+  align-content: end;
+  min-width: 0;
+  gap: 5px;
+}
+
+.xps2-parameter-row > label > span {
+  color: var(--sg-muted);
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: .025em;
+}
+
+.xps2-parameter-row > label > small {
+  margin-top: 1px;
+  color: var(--sg-muted);
+  font-size: 9.5px;
+  line-height: 1.35;
+}
+
+.xps2-parameter-row > label input,
+.xps2-parameter-row > label select {
+  min-height: 42px;
+}
+
+.xps2-field-port { grid-area: port; }
+.xps2-field-mode { grid-area: mode; }
+.xps2-parameter-title { grid-area: title; }
+.xps2-salamander { grid-area: obfs; }
+
+/* Keep the three VLESS parameter strips compact and aligned on one-row layouts. */
+@media (min-width: 1051px) {
+  .xps2-parameter-row[data-profile-panel="reality_tcp"],
+  .xps2-parameter-row[data-profile-panel="xhttp_reality"],
+  .xps2-parameter-row[data-profile-panel="xhttp_tls"] {
+    align-items: center;
+  }
+}
+
+.xps2-parameter-row[data-profile-panel="xhttp_tls"] .xps2-field-mode > small {
+  display: none;
+}
+
+.xps2-parameter-row[data-profile-panel="reality_tcp"] {
+  grid-template-columns: minmax(300px, 1fr) minmax(150px, 210px);
+  grid-template-areas: "title port";
+}
+
+.xps2-parameter-row[data-profile-panel="xhttp_reality"] {
+  grid-template-columns: minmax(300px, 1fr) minmax(150px, 210px);
+  grid-template-areas: "title port";
+}
+
+.xps2-parameter-row[data-profile-panel="xhttp_tls"] {
+  grid-template-columns: minmax(250px, 1fr) minmax(150px, 210px) minmax(150px, 210px);
+  grid-template-areas: "title mode port";
+}
+
+.xps2-parameter-row[data-profile-panel="hysteria2"] {
+  grid-template-columns: minmax(300px, 1fr) minmax(150px, 210px);
+  grid-template-areas:
+    "title port"
+    "obfs obfs";
+}
+
+.xps2-salamander {
+  display: grid;
+  gap: 9px;
+  margin-top: 2px;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  padding: 11px 0 0;
+  box-shadow: none !important;
+}
+
+.xps2-salamander > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.xps2-salamander > header > div {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 5px 9px;
+}
+
+.xps2-salamander > header strong {
+  font-size: 13px;
+}
+
+.xps2-salamander > header p,
+.xps2-salamander-warning,
+.xps2-salamander-status {
+  margin: 0;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.xps2-salamander-version {
+  min-height: 25px;
+  padding: 0 8px;
+  font-size: 8.5px;
+}
+
+.xps2-salamander-modes {
+  gap: 7px;
+}
+
+.xps2-salamander-modes label,
+.xps2-salamander-modes span {
+  min-height: 34px;
+}
+
+.xps2-salamander-modes span {
+  padding: 0 12px;
+  font-size: 10.5px;
+}
+
+.xps2-salamander-secret {
+  gap: 8px 10px;
+}
+
+.xps2-salamander-warning {
+  border-left-width: 2px;
+  padding: 7px 9px;
+}
+
+html[data-theme="light"] .xps2-parameter-row {
+  background: color-mix(in srgb, var(--sg-ljd-ivory-high, #fbfaf6) 78%, transparent);
+  border-color: color-mix(in srgb, var(--sg-ljd-border, #89968a) 72%, transparent);
+}
+
+html[data-theme="light"] .xps2-salamander {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+@media (min-width: 981px) and (max-width: 1366px),
+       (min-width: 981px) and (max-height: 820px) {
+  .xps2-parameters {
+    padding: 13px;
+  }
+
+  .xps2-parameter-row {
+    gap: 9px 11px;
+    padding: 11px 12px;
+  }
+
+  .xps2-parameter-row[data-profile-panel="reality_tcp"] {
+    grid-template-columns: minmax(230px, 1fr) minmax(135px, 180px);
+  }
+
+  .xps2-parameter-row[data-profile-panel="xhttp_reality"] {
+    grid-template-columns: minmax(230px, 1fr) minmax(135px, 180px);
+  }
+
+  .xps2-parameter-row[data-profile-panel="xhttp_tls"] {
+    grid-template-columns: minmax(210px, 1fr) minmax(135px, 180px) minmax(135px, 180px);
+  }
+
+  .xps2-parameter-row[data-profile-panel="hysteria2"] {
+    grid-template-columns: minmax(230px, 1fr) minmax(135px, 180px);
+  }
+
+  .xps2-parameter-row > label input,
+  .xps2-parameter-row > label select {
+    min-height: 38px;
+  }
+
+  .xps2-profile-meta > span {
+    min-height: 20px;
+    padding: 1px 6px;
+    font-size: 8.5px;
+  }
+
+  .xps2-salamander {
+    gap: 7px;
+    padding-top: 9px;
+  }
+}
+
+@media (max-width: 1050px) {
+  .xps2-parameter-row[data-profile-panel="reality_tcp"],
+  .xps2-parameter-row[data-profile-panel="xhttp_reality"],
+  .xps2-parameter-row[data-profile-panel="xhttp_tls"],
+  .xps2-parameter-row[data-profile-panel="hysteria2"] {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .xps2-parameter-row[data-profile-panel="reality_tcp"] {
+    grid-template-areas:
+      "title port";
+  }
+
+  .xps2-parameter-row[data-profile-panel="xhttp_reality"] {
+    grid-template-areas:
+      "title port";
+  }
+
+  .xps2-parameter-row[data-profile-panel="xhttp_tls"] {
+    grid-template-areas:
+      "title port"
+      "mode mode";
+  }
+
+  .xps2-parameter-row[data-profile-panel="hysteria2"] {
+    grid-template-areas:
+      "title port"
+      "obfs obfs";
+  }
+}
+
+@media (max-width: 760px) {
+  .xps2-parameter-row[data-profile-panel="reality_tcp"],
+  .xps2-parameter-row[data-profile-panel="xhttp_reality"],
+  .xps2-parameter-row[data-profile-panel="xhttp_tls"],
+  .xps2-parameter-row[data-profile-panel="hysteria2"] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .xps2-parameter-row[data-profile-panel="reality_tcp"] {
+    grid-template-areas: "title" "port";
+  }
+
+  .xps2-parameter-row[data-profile-panel="xhttp_reality"] {
+    grid-template-areas: "title" "port";
+  }
+
+  .xps2-parameter-row[data-profile-panel="xhttp_tls"] {
+    grid-template-areas: "title" "port" "mode";
+  }
+
+  .xps2-parameter-row[data-profile-panel="hysteria2"] {
+    grid-template-areas: "title" "port" "obfs";
+  }
+
+  .xps2-salamander > header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .xps2-profile-meta > span {
+    white-space: normal;
+  }
+}

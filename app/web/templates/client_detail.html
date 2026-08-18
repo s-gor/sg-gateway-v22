@@ -58,6 +58,9 @@
     </div>
   </header>
 
+  <!-- SG_SUBSCRIPTION_DUAL_UI_V1 -->
+  {% include "_sg_subscription_dual.html" %}
+
   <section class="dv16-devices" aria-label="Устройства клиента">
     {% for view in device_views %}
     {% set device = view.device %}
@@ -109,9 +112,9 @@
 
       <section class="dv16-subscription state-{{ subscription.status if subscription else 'missing' }}">
         <div class="dv16-subscription-summary">
-          <strong>Подписка устройства</strong>
+          <strong>Legacy SUB устройства</strong>
           {% if subscription and subscription.status == 'applied' and subscription.payload %}
-          <span>Ссылка для NekoBox и совместимых клиентов.</span>
+          <span>Совместимая legacy-подписка устройства.</span>
           <small>SUB: VLESS Reality TCP · Hysteria2 · AnyTLS · TUIC v5 — только выбранные и готовые.</small>
           {% else %}
           <span>Подписка ещё не создана.</span>
@@ -223,7 +226,11 @@
         </label>
         <label class="dv16-protocol">
           <input type="checkbox" name="protocols" value="amneziawg">
-          <span><strong>AmneziaWG</strong><small>Отдельная конфигурация и QR</small></span>
+          <span><strong>AmneziaWG 2</strong><small>AWG2 · отдельная конфигурация и QR</small></span>
+        </label>
+        <label class="dv16-protocol">
+          <input type="checkbox" name="protocols" value="amneziawg3">
+          <span><strong>AmneziaWG 3</strong><small>AWG3 userspace · отдельная конфигурация и QR</small></span>
         </label>
         <label class="dv16-protocol {{ 'is-locked' if not tls.https_ready else '' }}">
           <input type="checkbox" name="protocols" value="anytls" {% if not tls.https_ready %}disabled{% endif %}>

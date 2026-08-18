@@ -8,12 +8,15 @@ from app.connections.settings import get_connection_settings, update_connection_
 from app.security.tls import overview as tls_overview
 from app.xray.encryption import client_value_ready
 from app.xray.salamander import (
+    GECKO_MINIMUM_VERSION,
+    GECKO_MODE,
     SALAMANDER_MINIMUM_VERSION,
     SALAMANDER_MODE,
     SALAMANDER_MODE_NONE,
     SalamanderError,
     ensure_base_has_no_salamander,
     generate_password,
+    minimum_version_for_mode,
     normalise_mode,
     password_ready,
     safe_status,
@@ -202,9 +205,9 @@ def _config() -> tuple[Any, dict[str, Any], dict[str, Any]]:
 
 def _values(config: dict[str, Any], legacy_port: int) -> dict[str, Any]:
     try:
-        salamander_mode = normalise_mode(config.get("hysteria2_obfs_mode"))
+        obfs_mode = normalise_mode(config.get("hysteria2_obfs_mode"))
     except SalamanderError:
-        salamander_mode = SALAMANDER_MODE_NONE
+        obfs_mode = SALAMANDER_MODE_NONE
     finalmask = config.get("hysteria2_finalmask")
     if not isinstance(finalmask, dict):
         finalmask = {}
@@ -226,7 +229,7 @@ def _values(config: dict[str, Any], legacy_port: int) -> dict[str, Any]:
         "xhttp_tls_xmux_enabled": True,
         "hysteria2_enabled": _bool(config.get("hysteria2_enabled"), False),
         "hysteria2_port": _port(config.get("hysteria2_port"), 8446),
-        "hysteria2_obfs_mode": salamander_mode,
+        "hysteria2_obfs_mode": obfs_mode,
         "hysteria2_obfs_password": str(config.get("hysteria2_obfs_password") or ""),
         "hysteria2_finalmask": finalmask,
         "hysteria2_uri_scheme": uri_scheme,
@@ -241,7 +244,6 @@ def _prepare(form: Any) -> PreparedXraySettings:
     settings, config, tls = _config()
     current = _values(config, int(settings.port or 443))
     tls_ready = bool(tls.get("https_ready"))
-    encryption_ready = _vless_encryption_ready(config.get("vless_encryption"))
 
     values: dict[str, Any] = {
         "reality_tcp_enabled": bool(form.get("reality_tcp_enabled")),
@@ -319,14 +321,17 @@ def _prepare(form: Any) -> PreparedXraySettings:
     password_field = str(form.get("hysteria2_obfs_password") or "").strip()
     rotate_requested = _bool(form.get("hysteria2_obfs_rotate"), False)
     new_password = old_password
-    if requested_obfs == SALAMANDER_MODE:
+    obfs_enabled = requested_obfs != SALAMANDER_MODE_NONE
+    if obfs_enabled:
         if not values["hysteria2_enabled"]:
             raise XrayProfilesError("Сначала включите Hysteria 2")
         installed = _installed_xray_version()
-        if not salamander_version_supported(installed):
+        required = minimum_version_for_mode(requested_obfs)
+        if not salamander_version_supported(installed, required):
+            title = "Gecko" if requested_obfs == GECKO_MODE else "Salamander"
             raise XrayProfilesError(
-                "Установленная версия Xray не поддерживает Hysteria2 Salamander "
-                f"FinalMask. Требуется {SALAMANDER_MINIMUM_VERSION} или новее."
+                f"Установленная версия Xray не поддерживает Hysteria2 {title}. "
+                f"Требуется {required} или новее."
             )
         if rotate_requested and password_field:
             try:
@@ -347,8 +352,8 @@ def _prepare(form: Any) -> PreparedXraySettings:
         except SalamanderError as exc:
             raise XrayProfilesError(str(exc)) from exc
     else:
-        # Keep the previous secret in the database so re-enabling can reuse it,
-        # but it is never rendered into the live config or client URI while off.
+        # Keep the previous secret so either obfuscation mode can be re-enabled
+        # without rotating credentials. It is not rendered while mode is none.
         if password_field:
             try:
                 new_password = validate_password(password_field)
@@ -376,10 +381,10 @@ def _prepare(form: Any) -> PreparedXraySettings:
         config=config,
         salamander_changed=(
             old_obfs != requested_obfs
-            or (requested_obfs == SALAMANDER_MODE and old_password != new_password)
+            or (obfs_enabled and old_password != new_password)
         ),
         salamander_rotated=(
-            requested_obfs == SALAMANDER_MODE
+            obfs_enabled
             and password_ready(old_password)
             and old_password != new_password
         ),
@@ -401,14 +406,18 @@ def overview() -> dict[str, Any]:
     encryption_ready = _vless_encryption_ready(vless_encryption)
     installed_version = _installed_xray_version()
     version_ready = _version_supported(installed_version)
-    salamander = safe_status(
+    obfs = safe_status(
         values["hysteria2_obfs_mode"], values["hysteria2_obfs_password"]
     )
-    salamander.update(
+    obfs.update(
         {
-            "version_ready": salamander_version_supported(installed_version),
+            "version_ready": salamander_version_supported(
+                installed_version, str(obfs["minimum_version"])
+            ),
             "installed_version": installed_version,
             "base_finalmask_present": bool(values["hysteria2_finalmask"]),
+            "salamander_minimum_version": SALAMANDER_MINIMUM_VERSION,
+            "gecko_minimum_version": GECKO_MINIMUM_VERSION,
         }
     )
 
@@ -431,8 +440,8 @@ def overview() -> dict[str, Any]:
         enabled = bool(values[enabled_key])
         obfs_ready = not (
             profile_id == "hysteria2"
-            and salamander["enabled"]
-            and not salamander["password_configured"]
+            and obfs["enabled"]
+            and not obfs["password_configured"]
         )
         ready = (
             enabled
@@ -449,7 +458,7 @@ def overview() -> dict[str, Any]:
         elif encryption_required and not encryption_ready:
             status = "Нужен VLESS Encryption"
         elif not obfs_ready:
-            status = "Нужен пароль Salamander"
+            status = "Нужен пароль Hysteria2 obfs"
         elif not enabled:
             status = "Выключен"
         elif service_active and ready:
@@ -509,7 +518,7 @@ def overview() -> dict[str, Any]:
             "hysteria2", "Hysteria 2", "QUIC / UDP", "TLS",
             "hysteria2_port", "hysteria2_enabled",
             tls_required=True,
-            note="Один Hysteria 2 inbound на отдельном UDP-порту.",
+            note="Hysteria 2 с выбором Off / Salamander / Gecko на отдельном UDP-порту.",
         ),
     ]
     return {
@@ -531,7 +540,7 @@ def overview() -> dict[str, Any]:
         "vless_encryption_algorithm": (
             vless_encryption.split(".", 1)[0] if encryption_ready else ""
         ),
-        "hysteria2_obfs": salamander,
+        "hysteria2_obfs": obfs,
         "enabled_count": sum(1 for item in profiles if item.enabled),
         "ready_count": sum(1 for item in profiles if item.ready),
     }
@@ -575,7 +584,7 @@ def salamander_secret() -> str:
     values = _values(dict(settings.config), int(settings.port or 443))
     secret = str(values["hysteria2_obfs_password"] or "")
     if not password_ready(secret):
-        raise XrayProfilesError("Пароль Salamander ещё не создан")
+        raise XrayProfilesError("Пароль Hysteria2 obfs ещё не создан")
     return secret
 
 

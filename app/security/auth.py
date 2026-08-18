@@ -19,6 +19,7 @@ PUBLIC_ENDPOINTS = {
     "recovery",
     "download_diagnostics",
     "subscription_feed",
+    "sg_subscription_v1",
 }
 
 

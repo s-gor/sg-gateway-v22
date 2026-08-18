@@ -259,6 +259,10 @@ def collect_system_activity():
             "total_text": _format_bytes(item["total"]),
         })
 
+    config = load_config()
+    public_ipv4 = config.public_ipv4
+    public_ipv6 = config.public_ipv6
+
     return {
         "today_total": _format_bytes(today_rx + today_tx),
         "today_rx": _format_bytes(today_rx),
@@ -270,6 +274,12 @@ def collect_system_activity():
         "peak_24h": _format_rate(peak_24h),
         "hourly": hourly,
         "interface": _primary_interface() or "—",
+        "network": {
+            "mode": "dual-stack" if public_ipv4 and public_ipv6 else ("ipv6" if public_ipv6 else "ipv4"),
+            "ipv4": public_ipv4,
+            "ipv6": public_ipv6,
+            "dual_stack": bool(public_ipv4 and public_ipv6),
+        },
     }
 
 # Start once when SG-Gateway imports this module.

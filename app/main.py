@@ -8,6 +8,7 @@ from flask import Flask, Response, abort, flash, jsonify, redirect, render_templ
 from app.clients.access import build_access_cards
 from app.clients.exports import (
     build_awg_config,
+    build_awg3_config,
     build_mihomo_yaml,
     build_mieru_link,
     build_subscription,
@@ -48,8 +49,10 @@ from app.connections.settings import get_connection_settings, update_connection_
 from app.db import init_db
 from app.help.content import get_topic, list_topics
 from app.maintenance.backups import (
+    backup_cleanup_preview,
     confirm_restore_runtime,
     create_backup,
+    delete_old_backups,
     get_backup,
     list_backups,
     restore_backup_transaction,
@@ -59,10 +62,11 @@ from app.maintenance.full_backups import (
     get_full_backup,
     list_full_backups,
     stage_uploaded_full_backup,
+    stage_uploaded_full_backup_for_verification,
 )
 from app.maintenance.diagnostics import build_diagnostic_report, build_diagnostic_report_json
 from app.maintenance.health import collect_health_checks, health_summary
-from app.maintenance.operations import list_operations
+from app.maintenance.operations import list_operations, log_operation
 from app.maintenance.service import collect_diagnostics
 from app.maintenance.xray_updates import overview as xray_update_overview
 from app.maintenance.panel_updates import overview as panel_update_overview
@@ -1140,6 +1144,7 @@ def create_app() -> Flask:
 
         builders = {
             "amneziawg": build_awg_config,
+        "amneziawg3": build_awg3_config,
             "xray": build_xray_link,
             "mihomo": build_mihomo_yaml,
             "mieru": build_mieru_link,
@@ -1405,6 +1410,7 @@ def create_app() -> Flask:
             active_page="connections",
             connections=list_connections(),
             awg_settings=get_connection_settings("amneziawg"),
+            awg3_settings=get_connection_settings("amneziawg3"),
             xray_settings=get_connection_settings("xray"),
             xray_profiles=xray_profiles_overview(),
             mihomo=mihomo_overview(),
@@ -1430,6 +1436,29 @@ def create_app() -> Flask:
             config,
         )
         flash("Настройки AmneziaWG сохранены." if updated else "Настройки AmneziaWG не применены. Проверьте адрес и порт.", "success" if updated else "error")
+        return redirect(url_for("connections"))
+
+    @app.post("/connections/amneziawg3")
+    def update_amneziawg3():
+        current = get_connection_settings("amneziawg3")
+        config = dict(current.config)
+        config["dns"] = request.form.get("dns", config.get("dns", "1.1.1.1"))
+        config["server_public_key"] = request.form.get(
+            "server_public_key", config.get("server_public_key", "")
+        )
+        config["generation"] = 3
+        updated = update_connection_settings(
+            "amneziawg3",
+            request.form.get("host", current.host),
+            request.form.get("port", str(current.port)),
+            config,
+        )
+        flash(
+            "Настройки AmneziaWG 3 сохранены."
+            if updated
+            else "Настройки AmneziaWG 3 не применены. Проверьте адрес.",
+            "success" if updated else "error",
+        )
         return redirect(url_for("connections"))
 
     @app.post("/connections/xray")
@@ -1594,6 +1623,7 @@ def create_app() -> Flask:
             panel_updates = panel_update_overview(refresh=refresh_updates)
             core_updates = core_update_overview(refresh=refresh_updates)
             geofiles_updates = geofiles_overview()
+        backups = list_backups()
         return render_template(
             "maintenance.html",
             active_page="maintenance",
@@ -1604,7 +1634,8 @@ def create_app() -> Flask:
             geofiles_updates=geofiles_updates,
             diagnostics=collect_diagnostics(),
             health_checks=collect_health_checks(),
-            backups=list_backups(),
+            backups=backups,
+            backup_cleanup=backup_cleanup_preview(backups),
             full_backups=list_full_backups(),
             operations=list_operations(),
             release=get_release_manifest(),
@@ -1661,13 +1692,58 @@ def create_app() -> Flask:
     @app.post("/maintenance/full-backups/restore")
     def restore_full_backup_route():
         upload = request.files.get("backup")
-        if upload is None or not str(upload.filename or "").strip():
+        original_name = str(getattr(upload, "filename", "") or "").strip() if upload is not None else ""
+        if upload is None or not original_name:
             flash("Выберите файл .sgbackup", "error")
             return redirect(url_for("maintenance", tab="backups"))
+
+        verify_only = request.form.get("backup_action", "").strip().lower() == "verify"
+        staged = None
         try:
-            stage_uploaded_full_backup(upload)
+            if verify_only:
+                staged = stage_uploaded_full_backup_for_verification(upload)
+            else:
+                stage_uploaded_full_backup(upload)
         except ValueError as exc:
+            if verify_only:
+                log_operation("backup.full.verify", f"backup:{original_name}", str(exc), status="error")
             flash(str(exc), "error")
+            return redirect(url_for("maintenance", tab="backups"))
+
+        if verify_only:
+            try:
+                result = run_hostd_command("backup.full.verify", timeout=180)
+            except Exception as exc:
+                message = f"Проверка backup не выполнена: {exc}"
+                log_operation("backup.full.verify", f"backup:{original_name}", message, status="error")
+                flash(message, "error")
+                return redirect(url_for("maintenance", tab="backups"))
+            finally:
+                if staged is not None:
+                    staged.unlink(missing_ok=True)
+
+            if result.status != "ok":
+                message = result.message or "Backup не прошёл проверку"
+                log_operation("backup.full.verify", f"backup:{original_name}", message, status="error")
+                flash(f"Backup НЕ прошёл проверку: {message}", "error")
+                return redirect(url_for("maintenance", tab="backups"))
+
+            payload = result.payload or {}
+            sha256 = str(payload.get("sha256") or "")
+            source_version = str(payload.get("source_version") or "unknown")
+            created_at = str(payload.get("created_at") or "не указано")
+            tables = int(payload.get("database_tables") or 0)
+            database_size = _format_bytes(payload.get("database_size_bytes") or 0)
+            certificates = "есть" if payload.get("contains_letsencrypt_certificates") else "нет"
+            message = (
+                f"Backup исправен: {original_name}. "
+                f"SG-Gateway {source_version}; создан {created_at}; "
+                f"SQLite: OK, таблиц {tables}, {database_size}; "
+                f"сертификаты: {certificates}; SHA-256: {sha256}. "
+                "Восстановление не выполнялось."
+            )
+            log_operation("backup.full.verify", f"backup:{original_name}", message)
+            flash(message, "success")
             return redirect(url_for("maintenance", tab="backups"))
 
         result = run_hostd_command("backup.full.restore.start", timeout=20)
@@ -1686,6 +1762,26 @@ def create_app() -> Flask:
         backup = create_backup()
         flash(f"Резервная копия создана: {backup.name}", "success")
         return redirect(url_for("maintenance"))
+
+    @app.post("/maintenance/backups/delete-old")
+    def delete_old_backups_route():
+        result = delete_old_backups()
+        freed = _format_bytes(result.freed_bytes)
+        if result.failed_names:
+            flash(
+                f"Удалены {result.deleted_count} старые копии, освобождено {freed}. "
+                f"Не удалось удалить: {', '.join(result.failed_names)}",
+                "error",
+            )
+        elif result.deleted_count:
+            flash(
+                f"Удалены {result.deleted_count} старые копии, освобождено {freed}. "
+                f"Сохранены {result.kept_count} последние копии.",
+                "success",
+            )
+        else:
+            flash("Старых резервных копий для удаления нет.", "success")
+        return redirect(url_for("maintenance", tab="backups"))
 
     def _restore_backup_response(name: str, destination_endpoint: str):
         restored = restore_backup_transaction(name)

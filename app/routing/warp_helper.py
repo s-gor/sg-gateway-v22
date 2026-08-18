@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import hashlib
+import ipaddress
 import json
 import os
 import platform
@@ -17,6 +18,7 @@ from app.routing.runtime import (
     RoutingRuntimeError,
     apply_full_config,
     build_full_config,
+    family_gate_outbound,
     load_managed_fragment,
     restart_xray,
     service_is_active,
@@ -30,6 +32,7 @@ from app.routing.warp import (
     account_json_path,
     account_path,
     export_document,
+    family_capabilities,
     outbound,
     overview,
     parse_xray_outbound,
@@ -284,6 +287,7 @@ def _persist_and_apply(account: bytes, document: dict, *, event: str) -> tuple[s
             enabled=True,
             profile_ready=True,
             profile=scrubbed_profile(),
+            last_test={},
             wgcf_version=WGCF_VERSION,
             **{event: time.time()},
         )
@@ -360,7 +364,7 @@ def _apply_enabled_state(enable_value: bool) -> dict:
         else:
             fragment = load_managed_fragment()
             if routing_uses_warp(fragment):
-                raise WarpError("Сначала замените правила WARP на Direct или Block")
+                raise WarpError("Сначала замените правила WARP на SG-Gateway или Block")
             save_state(
                 enabled=False,
                 profile_ready=profile_ready(),
@@ -439,16 +443,42 @@ def _free_port() -> int:
         return int(sock.getsockname()[1])
 
 
-def test() -> dict:
-    warp_outbound = outbound(require_enabled=False)
-    if warp_outbound is None:
-        raise WarpError("WARP-профиль не готов")
-    if not XRAY_BIN.is_file():
-        raise WarpError("Xray не установлен")
-    curl = shutil.which("curl")
-    if not curl:
-        raise WarpError("Для проверки WARP требуется curl")
+def _parse_trace(trace: str, family: int) -> dict:
+    values: dict[str, str] = {}
+    for line in trace.splitlines():
+        if "=" in line:
+            key, value = line.split("=", 1)
+            values[key.strip()] = value.strip()
+    warp_mode = values.get("warp", "")
+    ip = values.get("ip", "")
+    try:
+        actual_family = ipaddress.ip_address(ip).version
+    except ValueError:
+        actual_family = 0
+    ok = warp_mode in {"on", "plus"} and actual_family == family
+    label = "IPv4" if family == 4 else "IPv6"
+    message = (
+        f"WARP {label} OK · {ip}"
+        if ok
+        else (
+            f"WARP {label} не подтверждён: warp={warp_mode or 'unknown'}, "
+            f"ip={ip or 'unknown'}"
+        )
+    )
+    return {
+        "supported": True,
+        "ok": ok,
+        "message": message,
+        "ip": ip,
+        "warp": warp_mode,
+    }
 
+
+def _test_family(curl: str, warp_outbound: dict, family: int) -> dict:
+    label = "IPv4" if family == 4 else "IPv6"
+    core = json.loads(json.dumps(warp_outbound))
+    core["tag"] = "warp-test-core"
+    gate_tag = f"warp-test-{family}"
     port = _free_port()
     config = {
         "log": {"loglevel": "warning"},
@@ -461,16 +491,31 @@ def test() -> dict:
                 "settings": {"udp": True},
             }
         ],
-        "outbounds": [warp_outbound, {"tag": "block", "protocol": "blackhole"}],
-        "routing": {"domainStrategy": "AsIs", "rules": []},
+        "outbounds": [
+            family_gate_outbound(gate_tag, family, proxy_tag="warp-test-core"),
+            core,
+            {"tag": "block", "protocol": "blackhole"},
+        ],
+        "routing": {
+            "domainStrategy": "AsIs",
+            "rules": [
+                {
+                    "type": "field",
+                    "network": "tcp,udp",
+                    "outboundTag": gate_tag,
+                }
+            ],
+        },
     }
     status, message = xray_test_config(config)
     if status == "error":
-        raise WarpError(message)
+        raise WarpError(f"WARP {label}: {message}")
 
-    with tempfile.TemporaryDirectory(prefix="sg-gateway-warp-test-") as directory:
+    with tempfile.TemporaryDirectory(prefix=f"sg-gateway-warp-test-{family}-") as directory:
         config_path = Path(directory) / "config.json"
-        config_path.write_text(json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8")
+        config_path.write_text(
+            json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
         process = subprocess.Popen(
             [str(XRAY_BIN), "run", "-config", str(config_path)],
             stdout=subprocess.PIPE,
@@ -485,10 +530,10 @@ def test() -> dict:
                         break
                 if process.poll() is not None:
                     error = (process.stderr.read() if process.stderr else "").strip()
-                    raise WarpError(error or "Тестовый Xray завершился раньше времени")
+                    raise WarpError(error or f"Тестовый Xray WARP {label} завершился раньше времени")
                 time.sleep(0.2)
             else:
-                raise WarpError("Тестовый SOCKS WARP не запустился")
+                raise WarpError(f"Тестовый SOCKS WARP {label} не запустился")
 
             trace = _run(
                 [
@@ -510,23 +555,69 @@ def test() -> dict:
                 process.kill()
                 process.wait(timeout=5)
 
-    values: dict[str, str] = {}
-    for line in trace.splitlines():
-        if "=" in line:
-            key, value = line.split("=", 1)
-            values[key.strip()] = value.strip()
-    warp_mode = values.get("warp", "")
-    ip = values.get("ip", "")
-    ok = warp_mode in {"on", "plus"}
-    result_message = (
-        f"WARP {warp_mode}, IP {ip}"
-        if ok
-        else f"Cloudflare trace не подтвердил WARP (warp={warp_mode or 'unknown'})"
+    return _parse_trace(trace, family)
+
+
+def test() -> dict:
+    warp_outbound = outbound(require_enabled=False)
+    if warp_outbound is None:
+        raise WarpError("WARP-профиль не готов")
+    if not XRAY_BIN.is_file():
+        raise WarpError("Xray не установлен")
+    curl = shutil.which("curl")
+    if not curl:
+        raise WarpError("Для проверки WARP требуется curl")
+
+    capabilities = family_capabilities()
+    results: dict[str, dict] = {}
+    failures: list[str] = []
+    for family, key in ((4, "ipv4"), (6, "ipv6")):
+        if not capabilities.get(key):
+            results[key] = {
+                "supported": False,
+                "ok": False,
+                "message": f"WARP {'IPv4' if family == 4 else 'IPv6'} отсутствует в профиле",
+                "ip": "",
+                "warp": "",
+            }
+            continue
+        try:
+            results[key] = _test_family(curl, warp_outbound, family)
+        except (WarpError, OSError, subprocess.SubprocessError) as exc:
+            results[key] = {
+                "supported": True,
+                "ok": False,
+                "message": str(exc),
+                "ip": "",
+                "warp": "",
+            }
+        if not results[key]["ok"]:
+            failures.append(results[key]["message"])
+
+    supported = [item for item in results.values() if item.get("supported")]
+    ok = bool(supported) and all(bool(item.get("ok")) for item in supported)
+    messages = [item["message"] for item in results.values()]
+    result_message = "; ".join(messages)
+    primary = results.get("ipv4") if results.get("ipv4", {}).get("ok") else results.get("ipv6", {})
+    primary = primary or {}
+    set_last_test(
+        ok=ok,
+        message=result_message,
+        ip=str(primary.get("ip") or ""),
+        warp=str(primary.get("warp") or ""),
+        ipv4=results.get("ipv4"),
+        ipv6=results.get("ipv6"),
     )
-    set_last_test(ok=ok, message=result_message, ip=ip, warp=warp_mode)
-    if not ok:
+    if failures or not ok:
         raise WarpError(result_message)
-    return {"ok": True, "message": result_message, "ip": ip, "warp": warp_mode}
+    return {
+        "ok": True,
+        "message": result_message,
+        "ip": str(primary.get("ip") or ""),
+        "warp": str(primary.get("warp") or ""),
+        "ipv4": results.get("ipv4"),
+        "ipv6": results.get("ipv6"),
+    }
 
 
 def main(argv: list[str]) -> int:

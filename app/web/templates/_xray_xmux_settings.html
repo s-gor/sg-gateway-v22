@@ -1,0 +1,409 @@
+{% set xmux_mode = xray_xmux.mode if xray_xmux is defined else 'auto' %}
+{% set xmux_stored_json = xray_xmux.stored_json if xray_xmux is defined else '{}' %}
+
+<style>
+/* XMUX compact panel: keep this UI dense and scoped to the XHTTP client-only block. */
+#xray-xmux.xmux1-wrap {
+  margin-top: 14px;
+}
+
+#xray-xmux .xmux1-card {
+  padding: 16px 18px 14px;
+}
+
+#xray-xmux .xmux1-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+#xray-xmux .xmux1-head h2 {
+  margin: 2px 0 3px;
+}
+
+#xray-xmux .xmux1-head p {
+  margin: 0;
+  max-width: 980px;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+#xray-xmux .xmux1-chip {
+  min-height: 28px;
+  padding: 4px 9px;
+  font-size: 11px;
+}
+
+#xray-xmux .xmux1-modes {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+#xray-xmux .xmux1-mode {
+  min-width: 0;
+  cursor: pointer;
+}
+
+#xray-xmux .xmux1-mode > span {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 12px;
+  border: 1px solid var(--sg-line, rgba(120, 145, 135, .35));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--sg-panel, #f5f3ed) 82%, transparent);
+  box-shadow: 0 1px 2px rgba(10, 18, 15, .06);
+  text-align: center;
+  transition: border-color .16s ease, background .16s ease, box-shadow .16s ease, transform .16s ease;
+}
+
+#xray-xmux .xmux1-mode:hover > span {
+  border-color: color-mix(in srgb, var(--sg-green, #4f8f75) 52%, var(--sg-line, rgba(120, 145, 135, .35)));
+  background: color-mix(in srgb, var(--sg-green, #4f8f75) 7%, var(--sg-panel, #f5f3ed));
+}
+
+#xray-xmux .xmux1-mode:active > span {
+  transform: translateY(1px);
+}
+
+#xray-xmux .xmux1-mode strong {
+  font-size: 13.5px;
+  line-height: 1.2;
+}
+
+#xray-xmux .xmux1-mode small {
+  display: none;
+}
+
+#xray-xmux .xmux1-mode input:checked + span {
+  border-color: color-mix(in srgb, var(--sg-green, #4f8f75) 78%, var(--sg-line, rgba(120, 145, 135, .35)));
+  background: color-mix(in srgb, var(--sg-green, #4f8f75) 16%, var(--sg-panel, #f5f3ed));
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--sg-green, #4f8f75) 28%, transparent),
+    0 2px 6px rgba(10, 18, 15, .08);
+}
+
+#xray-xmux .xmux1-mode input:focus-visible + span {
+  outline: 2px solid color-mix(in srgb, var(--sg-green, #4f8f75) 64%, transparent);
+  outline-offset: 2px;
+}
+
+#xray-xmux .xmux1-extra {
+  margin-top: 8px;
+  border-radius: 10px;
+}
+
+#xray-xmux .xmux1-extra summary {
+  padding: 9px 11px;
+  font-size: 13.5px;
+}
+
+#xray-xmux .xmux1-extra label {
+  gap: 5px;
+  padding: 0 11px 10px;
+}
+
+#xray-xmux .xmux1-extra textarea {
+  min-height: 160px;
+}
+
+#xray-xmux .xmux1-extra small {
+  font-size: 10.5px;
+  line-height: 1.35;
+}
+
+#xray-xmux .xmux1-error {
+  margin-top: 8px;
+}
+
+#xray-xmux .xmux1-actions {
+  margin-top: 8px;
+}
+
+#xray-xmux .xmux1-actions .button {
+  min-height: 38px;
+  padding-top: 7px;
+  padding-bottom: 7px;
+}
+
+#xray-xmux .xmux1-dialog {
+  width: min(620px, calc(100vw - 28px));
+  max-height: min(82vh, 720px);
+  padding: 0;
+  border: 1px solid var(--sg-line, rgba(120, 145, 135, .4));
+  border-radius: 16px;
+  color: inherit;
+  background: var(--sg-panel, #f5f3ed);
+  box-shadow: 0 24px 70px rgba(10, 18, 15, .28);
+}
+
+#xray-xmux .xmux1-dialog::backdrop {
+  background: rgba(10, 18, 15, .46);
+  backdrop-filter: blur(2px);
+}
+
+#xray-xmux .xmux1-dialog-shell {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+}
+
+#xray-xmux .xmux1-dialog-head,
+#xray-xmux .xmux1-dialog-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+#xray-xmux .xmux1-dialog-head span {
+  color: var(--sg-muted);
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: .08em;
+}
+
+#xray-xmux .xmux1-dialog-head h3 {
+  margin: 2px 0 0;
+  font-size: 20px;
+}
+
+#xray-xmux .xmux1-dialog-close {
+  display: inline-grid;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--sg-line, rgba(120, 145, 135, .35));
+  border-radius: 999px;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+  font-size: 22px;
+  line-height: 1;
+}
+
+#xray-xmux .xmux1-dialog-panel {
+  display: grid;
+  gap: 12px;
+}
+
+#xray-xmux .xmux1-dialog-panel[hidden] {
+  display: none;
+}
+
+#xray-xmux .xmux1-dialog-panel p,
+#xray-xmux .xmux1-dialog-panel small,
+#xray-xmux .xmux1-dialog-foot span {
+  margin: 0;
+  color: var(--sg-muted);
+  line-height: 1.45;
+}
+
+#xray-xmux .xmux1-dialog-panel p {
+  color: inherit;
+  font-size: 13.5px;
+}
+
+#xray-xmux .xmux1-dialog-panel small,
+#xray-xmux .xmux1-dialog-foot span {
+  font-size: 10.5px;
+}
+
+#xray-xmux .xmux1-dialog-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+#xray-xmux .xmux1-dialog-grid > div {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 11px;
+  border: 1px solid var(--sg-line, rgba(120, 145, 135, .28));
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--sg-panel, #f5f3ed) 74%, transparent);
+}
+
+#xray-xmux .xmux1-dialog-grid code {
+  overflow-wrap: anywhere;
+  font-size: 10.5px;
+}
+
+#xray-xmux .xmux1-dialog-grid strong {
+  flex: 0 0 auto;
+  font-size: 13px;
+}
+
+#xray-xmux .xmux1-dialog-json {
+  max-height: 220px;
+  margin: 0;
+  overflow: auto;
+  padding: 11px 12px;
+  border: 1px solid var(--sg-line, rgba(120, 145, 135, .28));
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--sg-panel, #f5f3ed) 74%, transparent);
+  font: 11px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+#xray-xmux .xmux1-dialog-foot {
+  padding-top: 2px;
+}
+
+@media (min-width: 981px) and (max-height: 820px) {
+  #xray-xmux .xmux1-card {
+    padding: 13px 15px 12px;
+  }
+
+  #xray-xmux .xmux1-head {
+    margin-bottom: 9px;
+  }
+
+  #xray-xmux .xmux1-mode > span {
+    min-height: 40px;
+    padding: 6px 9px;
+  }
+
+
+  #xray-xmux .xmux1-extra {
+    margin-top: 7px;
+  }
+
+  #xray-xmux .xmux1-actions {
+    margin-top: 7px;
+  }
+}
+
+@media (max-width: 760px) {
+  #xray-xmux .xmux1-head {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  #xray-xmux .xmux1-modes,
+  #xray-xmux .xmux1-dialog-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  #xray-xmux .xmux1-dialog-head,
+  #xray-xmux .xmux1-dialog-foot {
+    align-items: flex-start;
+  }
+
+  #xray-xmux .xmux1-dialog-foot {
+    flex-direction: column;
+  }
+}
+</style>
+
+<section id="xray-xmux" class="xmux1-wrap cnv1-page">
+  <article class="xmux1-card sg-ljd-card">
+    <header class="xmux1-head">
+      <div>
+        <div class="cnv1-card-kicker">XRAY · XHTTP · CLIENT EXTRA</div>
+        <h2>XMUX для XHTTP</h2>
+        <p>Клиентские XMUX-параметры для VLESS XHTTP Reality и TLS. Серверный Xray не меняется.</p>
+      </div>
+      <span class="xmux1-chip">SG-Panel contract</span>
+    </header>
+
+    <form method="post" action="/connections/xmux" data-xmux-form>
+      <div class="xmux1-modes" role="radiogroup" aria-label="Режим XMUX">
+        <label class="xmux1-mode" title="Рекомендуется: maxConnections 2-4, reuse 300-600, requests 1000-2000, lifetime 1200-2400, keepalive 600.">
+          <input type="radio" name="xhttp_xmux_mode" value="auto" {% if xmux_mode == 'auto' %}checked{% endif %}>
+          <span>
+            <strong>Стандартный</strong>
+          </span>
+        </label>
+        <label class="xmux1-mode" title="Уменьшенный профиль: maxConcurrency 0, maxConnections 6, reuse 0, requests 600-900, lifetime 1800-3000, keepalive 0.">
+          <input type="radio" name="xhttp_xmux_mode" value="reduced" {% if xmux_mode == 'reduced' %}checked{% endif %}>
+          <span>
+            <strong>Для РФ — уменьшенный</strong>
+          </span>
+        </label>
+        <label class="xmux1-mode" title="Полный Client Extra JSON. Объект xmux обязателен; остальные поля сохраняются.">
+          <input type="radio" name="xhttp_xmux_mode" value="expert" {% if xmux_mode == 'expert' %}checked{% endif %}>
+          <span>
+            <strong>Ручной</strong>
+          </span>
+        </label>
+      </div>
+
+      <details class="xmux1-extra" data-xmux-extra>
+        <summary>Client Extra JSON</summary>
+        <label>
+          <span>Дополнительные клиентские поля</span>
+          <textarea name="xhttp_extra_client_json" rows="10" spellcheck="false" data-xmux-json>{{ xmux_stored_json }}</textarea>
+          <small>В Стандартном/РФ режимах дополнительные поля сохраняются, а <code>xmux</code> заменяется выбранным пресетом. В Ручном режиме JSON используется как есть после проверки конфликта maxConnections/maxConcurrency.</small>
+        </label>
+      </details>
+
+      {% if xray_xmux is defined and xray_xmux.error %}
+      <div class="xmux1-error">{{ xray_xmux.error }}</div>
+      {% endif %}
+
+      <div class="xmux1-actions">
+        <button class="button primary" type="submit">Сохранить XMUX</button>
+      </div>
+    </form>
+
+    <dialog class="xmux1-dialog" data-xmux-dialog aria-labelledby="xmux1-dialog-title">
+      <div class="xmux1-dialog-shell">
+        <header class="xmux1-dialog-head">
+          <div>
+            <span>ПАРАМЕТРЫ XMUX</span>
+            <h3 id="xmux1-dialog-title" data-xmux-dialog-title>XMUX</h3>
+          </div>
+          <button type="button" class="xmux1-dialog-close" data-xmux-dialog-close aria-label="Закрыть">×</button>
+        </header>
+
+        <section class="xmux1-dialog-panel" data-xmux-dialog-panel="auto" hidden>
+          <p>После сохранения будет установлен стандартный клиентский XMUX-пресет:</p>
+          <div class="xmux1-dialog-grid">
+            <div><code>maxConnections</code><strong>2-4</strong></div>
+            <div><code>cMaxReuseTimes</code><strong>300-600</strong></div>
+            <div><code>hMaxRequestTimes</code><strong>1000-2000</strong></div>
+            <div><code>hMaxReusableSecs</code><strong>1200-2400</strong></div>
+            <div><code>hKeepAlivePeriod</code><strong>600</strong></div>
+          </div>
+          <small>Остальные поля Client Extra сохраняются; объект <code>xmux</code> заменяется этим пресетом.</small>
+        </section>
+
+        <section class="xmux1-dialog-panel" data-xmux-dialog-panel="reduced" hidden>
+          <p>После сохранения будет установлен уменьшенный клиентский XMUX-пресет:</p>
+          <div class="xmux1-dialog-grid">
+            <div><code>maxConcurrency</code><strong>0</strong></div>
+            <div><code>maxConnections</code><strong>6</strong></div>
+            <div><code>cMaxReuseTimes</code><strong>0</strong></div>
+            <div><code>hMaxRequestTimes</code><strong>600-900</strong></div>
+            <div><code>hMaxReusableSecs</code><strong>1800-3000</strong></div>
+            <div><code>hKeepAlivePeriod</code><strong>0</strong></div>
+          </div>
+          <small>Остальные поля Client Extra сохраняются; объект <code>xmux</code> заменяется этим пресетом.</small>
+        </section>
+
+        <section class="xmux1-dialog-panel" data-xmux-dialog-panel="expert" hidden>
+          <p>В ручном режиме после сохранения используется весь Client Extra JSON как есть. Объект <code>xmux</code> обязателен.</p>
+          <pre class="xmux1-dialog-json" data-xmux-manual-preview>{}</pre>
+          <small>Проверка не позволит одновременно задать положительные <code>maxConnections</code> и <code>maxConcurrency</code>.</small>
+        </section>
+
+        <footer class="xmux1-dialog-foot">
+          <span>Выбор режима ещё ничего не применяет. Параметры сохранятся только по кнопке «Сохранить XMUX».</span>
+          <button class="button primary" type="button" data-xmux-dialog-close>Закрыть</button>
+        </footer>
+      </div>
+    </dialog>
+  </article>
+</section>

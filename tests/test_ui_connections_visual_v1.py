@@ -98,3 +98,129 @@ def test_connections_visual_v1_css_exists():
     final = (ROOT / "app/web/static/sg-preview28-final.css").read_text(encoding="utf-8")
     assert ".cnv1-engine-pair" in final
     assert "grid-template-columns: minmax(0, 1fr) minmax(0, 1fr)" in final
+
+
+
+def test_connections_protocol_cards_show_only_real_controls_as_fields():
+    template = (ROOT / "app/web/templates/connections.html").read_text(encoding="utf-8")
+    css = (ROOT / "app/web/static/sg-xmux-settings-v1.css").read_text(encoding="utf-8")
+    polish = css.split("SG-Gateway 022.04 · Connections controls-only polish", 1)[1]
+    assert "Здесь только то, что можно изменить" in template
+    assert "Public Path" not in template
+    assert "Vision · {{ profile.flow }}" not in template
+    assert "XHTTP client · stream-one" not in template
+    assert "VLESS Encryption ·" not in template
+    assert "xps2-field-path" not in template
+    assert '<input type="hidden" name="{{ profile.id }}_path" value="{{ profile.path }}">' in template
+    assert "xps2-field-port" in template
+    assert "xps2-field-mode" in template
+    assert ".xps2-field-port" in polish
+    assert ".xps2-field-mode" in polish
+
+
+def test_reality_xhttp_fixed_mode_is_native_hidden_form_value_not_fake_control():
+    template = (ROOT / "app/web/templates/connections.html").read_text(encoding="utf-8")
+    js = (ROOT / "app/web/static/sg-xmux-settings-v1.js").read_text(encoding="utf-8")
+    assert "{% if profile.id == 'xhttp_reality' %}" in template
+    assert '<input type="hidden" name="{{ profile.id }}_mode" value="stream-one">' in template
+    assert "data-xmux-reality-fixed" not in js
+    assert "label.replaceWith" not in js
+    assert "Reality XHTTP mode is rendered by the main form as a hidden stream-one" in js
+
+
+def test_connections_protocol_cards_keep_all_mutable_form_contracts():
+    template = (ROOT / "app/web/templates/connections.html").read_text(encoding="utf-8")
+    for field in (
+        'name="{{ profile.id }}_port"',
+        'name="{{ profile.id }}_mode"',
+        'name="{{ profile.id }}_path"',
+        'name="hysteria2_obfs_mode"',
+        'name="hysteria2_obfs_password"',
+        'name="hysteria2_obfs_rotate"',
+    ):
+        assert field in template
+    for value in ('value="none"', 'value="salamander"', 'value="gecko"'):
+        assert value in template
+    assert "Проверить конфигурацию" in template
+    assert "Сохранить и применить" in template
+
+
+def test_connections_protocol_cards_have_minimal_profile_specific_grids():
+    css = (ROOT / "app/web/static/sg-xmux-settings-v1.css").read_text(encoding="utf-8")
+    polish = css.split("SG-Gateway 022.04 · Connections controls-only polish", 1)[1]
+    for profile_id in ("reality_tcp", "xhttp_reality", "xhttp_tls", "hysteria2"):
+        assert f'data-profile-panel="{profile_id}"' in polish
+    assert polish.count('grid-template-areas: "title port";') >= 2
+    assert 'grid-template-areas: "title mode port";' in polish
+    assert '"obfs obfs"' in polish
+    assert "path port" not in polish
+    assert ".xps2-field-path" not in polish
+    assert "box-shadow: none" in polish
+
+
+def test_first_three_xray_cards_keep_ports_aligned_and_tls_mode_only():
+    css = (ROOT / "app/web/static/sg-xmux-settings-v1.css").read_text(encoding="utf-8")
+    polish = css.split("SG-Gateway 022.04 · Connections controls-only polish", 1)[1]
+    assert polish.count("minmax(150px, 210px)") >= 3
+    assert polish.count("minmax(135px, 180px)") >= 3
+    assert 'grid-template-areas: "title mode port";' in polish
+
+
+def test_connections_protocol_cards_cover_low_resolution_and_mobile():
+    css = (ROOT / "app/web/static/sg-xmux-settings-v1.css").read_text(encoding="utf-8")
+    polish = css.split("SG-Gateway 022.04 · Connections controls-only polish", 1)[1]
+    assert "@media (min-width: 981px) and (max-width: 1366px)" in polish
+    assert "(min-width: 981px) and (max-height: 820px)" in polish
+    assert "@media (max-width: 1050px)" in polish
+    assert "@media (max-width: 760px)" in polish
+    assert 'grid-template-areas: "title" "port" "mode";' in polish
+
+
+def test_first_three_xray_parameter_cards_use_compact_natural_height_and_centered_level():
+    css = (ROOT / "app/web/static/sg-xmux-settings-v1.css").read_text(encoding="utf-8")
+    polish = css.split("SG-Gateway 022.04 · Connections controls-only polish", 1)[1]
+    selector = '.xps2-parameter-row[data-profile-panel="reality_tcp"],\n  .xps2-parameter-row[data-profile-panel="xhttp_reality"],\n  .xps2-parameter-row[data-profile-panel="xhttp_tls"] {'
+    assert selector in polish
+    assert "@media (min-width: 1051px) {" in polish
+    assert "height: 120px;" not in polish
+    assert "height: 112px;" not in polish
+    assert "align-items: center;" in polish
+    assert 'data-profile-panel="hysteria2"] {\n    height:' not in polish
+
+
+def test_xhttp_tls_mode_helper_is_hidden_without_affecting_responsive_layout():
+    css = (ROOT / "app/web/static/sg-xmux-settings-v1.css").read_text(encoding="utf-8")
+    polish = css.split("SG-Gateway 022.04 · Connections controls-only polish", 1)[1]
+    assert '.xps2-parameter-row[data-profile-panel="xhttp_tls"] .xps2-field-mode > small {' in polish
+    assert "display: none;" in polish
+    stacked = polish.split("@media (max-width: 1050px)", 1)[1]
+    assert '"title port"\n      "mode mode";' in stacked
+    assert 'grid-template-areas: "title" "port" "mode";' in stacked
+    assert "height: 120px;" not in stacked
+    assert "height: 112px;" not in stacked
+
+def test_connections_dark_classic_theme_is_scoped_and_loaded_last():
+    base = (ROOT / "app/web/templates/base.html").read_text(encoding="utf-8")
+    css = (ROOT / "app/web/static/sg-connections-dark-classic-v1.css").read_text(encoding="utf-8")
+    assert "active_page|default('') == 'connections'" in base
+    assert "sg-connections-dark-classic-v1.css" in base
+    assert base.index("sg-controls-final-v1.css") < base.index("sg-connections-dark-classic-v1.css")
+    assert 'html[data-theme="dark"] body.page-connections' in css
+    assert 'html[data-theme="light"]' not in css
+    for colour in ("#0c1826", "#192738", "#65a9f3", "#31cf91"):
+        assert colour in css.lower()
+    assert ".xps2-selector:checked + .xps2-choice" in css
+    assert ".xps2-choice-status.active" in css
+    assert ".xps2-salamander-modes input:checked + span" in css
+    assert "#xray-xmux .xmux1-mode input:checked + span" in css
+
+def test_connections_dark_classic_depth_pass_restores_blue_glass_hierarchy():
+    css = (ROOT / "app/web/static/sg-connections-dark-classic-v1.css").read_text(encoding="utf-8")
+    assert "Connections classic dark depth pass 2" in css
+    assert 'radial-gradient(circle at 100% -12%, rgba(101, 169, 243, .12)' in css
+    assert 'border-color: #3a6083 !important;' in css
+    assert 'background: linear-gradient(180deg, #0f2032 0%, #0b1826 100%) !important;' in css
+    assert '.xps2-parameter-row:hover' in css
+    assert '.xps2-salamander-modes input:checked + span' in css
+    assert '.xps2-actions .button.primary' in css
+    assert 'html[data-theme="light"]' not in css

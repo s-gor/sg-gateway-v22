@@ -26,12 +26,15 @@ def test_half_width_cards_have_equal_height():
     assert ".cnv1-engine-awg .cnv1-engine-form-compact { flex: 1 1 auto; }" in css
 
 
-def test_vision_is_explicit_in_connections_ui():
+def test_vision_contract_remains_explicit_without_duplicate_parameter_badges():
     template = (ROOT / "app/web/templates/connections.html").read_text(encoding="utf-8")
+    profiles = (ROOT / "app/xray/profiles.py").read_text(encoding="utf-8")
     assert "XTLS VISION" in template
-    assert "{{ profile.flow }}" in template
-    assert "Обязательный XTLS Vision для выбранного VLESS-профиля" in template
-    assert "VLESS Encryption" in template
+    assert '{{ profile.flow }}' not in template
+    assert "Vision · {{ profile.flow }}" not in template
+    assert "VLESS Encryption ·" not in template
+    assert 'REALITY_TCP_FLOW = "xtls-rprx-vision"' in profiles
+    assert "Обязательный XTLS Vision для выбранного VLESS-профиля" not in template
 
 
 def _profiles():

@@ -27,6 +27,28 @@ class RestoreResult:
     message: str
 
 
+@dataclass(frozen=True)
+class BackupCleanupPreview:
+    total_count: int
+    total_size_bytes: int
+    delete_count: int
+    delete_size_bytes: int
+    keep_count: int
+    total_size_label: str
+    delete_size_label: str
+
+
+@dataclass(frozen=True)
+class BackupCleanupResult:
+    deleted_count: int
+    freed_bytes: int
+    kept_count: int
+    failed_names: tuple[str, ...]
+
+
+BACKUP_RETENTION = 2
+
+
 def get_backup_dir() -> Path:
     directory = load_config().data_dir / "backups"
     directory.mkdir(parents=True, exist_ok=True)
@@ -62,6 +84,55 @@ def list_backups() -> list[BackupInfo]:
     ]
     backups = [_backup_info(path) for path in paths]
     return sorted(backups, key=lambda item: item.name, reverse=True)
+
+
+def backup_cleanup_preview(backups: list[BackupInfo] | None = None) -> BackupCleanupPreview:
+    backups = list_backups() if backups is None else backups
+    old_backups = backups[BACKUP_RETENTION:]
+    total_size = sum(item.size_bytes for item in backups)
+    delete_size = sum(item.size_bytes for item in old_backups)
+    return BackupCleanupPreview(
+        total_count=len(backups),
+        total_size_bytes=total_size,
+        delete_count=len(old_backups),
+        delete_size_bytes=delete_size,
+        keep_count=min(len(backups), BACKUP_RETENTION),
+        total_size_label=_format_size(total_size),
+        delete_size_label=_format_size(delete_size),
+    )
+
+
+def delete_old_backups() -> BackupCleanupResult:
+    backups = list_backups()
+    old_backups = backups[BACKUP_RETENTION:]
+    deleted_count = 0
+    freed_bytes = 0
+    failed_names: list[str] = []
+
+    for backup in old_backups:
+        try:
+            backup.path.unlink()
+        except OSError:
+            failed_names.append(backup.name)
+            continue
+        deleted_count += 1
+        freed_bytes += backup.size_bytes
+
+    kept_count = len(backups) - deleted_count
+    status = "error" if failed_names else "ok"
+    message = (
+        f"Удалены старые резервные копии: {deleted_count}; "
+        f"освобождено {freed_bytes} B; сохранено последних: {kept_count}"
+    )
+    if failed_names:
+        message += f"; не удалены: {', '.join(failed_names)}"
+    log_operation("backup.cleanup", "backup:old", message, status=status)
+    return BackupCleanupResult(
+        deleted_count=deleted_count,
+        freed_bytes=freed_bytes,
+        kept_count=kept_count,
+        failed_names=tuple(failed_names),
+    )
 
 
 def get_backup(name: str) -> BackupInfo | None:
@@ -167,3 +238,12 @@ def _backup_info(path: Path) -> BackupInfo:
         created_at=created_at,
         kind=_backup_kind(path),
     )
+
+
+def _format_size(size_bytes: int) -> str:
+    value = float(max(0, size_bytes))
+    for unit in ("Б", "КБ", "МБ", "ГБ"):
+        if value < 1024 or unit == "ГБ":
+            return f"{value:.0f} {unit}" if unit == "Б" else f"{value:.1f} {unit}"
+        value /= 1024
+    return f"{size_bytes} Б"

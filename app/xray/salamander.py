@@ -7,9 +7,13 @@ from typing import Any
 
 SALAMANDER_MODE_NONE = "none"
 SALAMANDER_MODE = "salamander"
-SALAMANDER_MODES = (SALAMANDER_MODE_NONE, SALAMANDER_MODE)
+GECKO_MODE = "gecko"
+SALAMANDER_MODES = (SALAMANDER_MODE_NONE, SALAMANDER_MODE, GECKO_MODE)
 SALAMANDER_MINIMUM_VERSION = "26.3.27"
+GECKO_MINIMUM_VERSION = "26.6.27"
 SALAMANDER_PASSWORD_BYTES = 24
+GECKO_PACKET_SIZE = "512-1200"
+MANAGED_VARIANT_MARKER = "_sg_hysteria2_obfs_managed"
 
 
 class SalamanderError(ValueError):
@@ -19,9 +23,8 @@ class SalamanderError(ValueError):
 def generate_password() -> str:
     """Return 24 cryptographically-random bytes as Base64URL without padding."""
     value = secrets.token_urlsafe(SALAMANDER_PASSWORD_BYTES)
-    # token_urlsafe(24) is 32 URL-safe characters and never needs '=' padding.
     if len(value) < 32 or "=" in value:
-        raise SalamanderError("Не удалось создать корректный пароль Salamander")
+        raise SalamanderError("Не удалось создать корректный пароль Hysteria2 obfs")
     return value
 
 
@@ -30,6 +33,13 @@ def normalise_mode(value: Any) -> str:
     if mode not in SALAMANDER_MODES:
         raise SalamanderError("Неизвестный режим обфускации Hysteria2")
     return mode
+
+
+def minimum_version_for_mode(value: Any) -> str:
+    mode = normalise_mode(value)
+    if mode == GECKO_MODE:
+        return GECKO_MINIMUM_VERSION
+    return SALAMANDER_MINIMUM_VERSION
 
 
 def password_ready(value: Any) -> bool:
@@ -41,10 +51,10 @@ def validate_password(value: Any) -> str:
     text = str(value or "").strip()
     if not password_ready(text):
         raise SalamanderError(
-            "Пароль Salamander должен содержать не менее 16 символов без пробелов"
+            "Пароль Hysteria2 obfs должен содержать не менее 16 символов без пробелов"
         )
     if len(text) > 256:
-        raise SalamanderError("Пароль Salamander слишком длинный")
+        raise SalamanderError("Пароль Hysteria2 obfs слишком длинный")
     return text
 
 
@@ -76,17 +86,26 @@ def _contains_salamander(finalmask: dict[str, Any]) -> bool:
 
 
 def finalmask_base(value: Any) -> dict[str, Any]:
-    """Return a safe deep copy of the unmanaged/base FinalMask object."""
+    """Return a safe stored base FinalMask with an internal managed marker.
+
+    The marker intentionally keeps the stored base non-empty even when there
+    are no unmanaged FinalMask fields. HostD therefore does not rediscover the
+    currently-live managed Salamander/Gecko layer as unmanaged state when the
+    administrator switches between the two variants. ``merge_finalmask``
+    removes this marker before rendering the live Xray JSON.
+    """
     if value is None:
-        return {}
-    if not isinstance(value, dict):
+        result: dict[str, Any] = {}
+    elif not isinstance(value, dict):
         raise SalamanderError("Существующий FinalMask Hysteria2 повреждён")
-    result = copy.deepcopy(value)
+    else:
+        result = copy.deepcopy(value)
     for key in ("tcp", "udp"):
         if key in result and not isinstance(result[key], list):
             raise SalamanderError(f"FinalMask {key} должен быть массивом")
     if "quicParams" in result and not isinstance(result["quicParams"], dict):
         raise SalamanderError("FinalMask quicParams должен быть объектом")
+    result[MANAGED_VARIANT_MARKER] = True
     return result
 
 
@@ -94,23 +113,22 @@ def ensure_base_has_no_salamander(value: Any) -> dict[str, Any]:
     base = finalmask_base(value)
     if _contains_salamander(base):
         raise SalamanderError(
-            "В базовом FinalMask уже существует внешний слой Salamander. "
+            "В базовом FinalMask уже существует управляемый Salamander/Gecko слой. "
             "SG-Gateway не будет перезаписывать его автоматически."
         )
     return base
 
 
 def merge_finalmask(base_value: Any, mode: Any, password: Any) -> dict[str, Any]:
-    """Render the Hysteria2 FinalMask for the selected obfuscation mode.
+    """Render Off, Salamander or Gecko without mutating stored base FinalMask.
 
-    SG-Gateway stores the pre-Salamander/base FinalMask separately.  Salamander
-    is exclusive for the UDP FinalMask path: while it is enabled, stored base
-    UDP masks are preserved in state but are not rendered into the live Xray
-    config.  Disabling Salamander restores the exact stored base, including its
-    UDP masks.  Non-UDP FinalMask fields (for example tcp and quicParams) stay
-    active in both modes.
+    Xray uses FinalMask type ``salamander`` for both variants. Plain Salamander
+    renders only its password. Gecko uses the same primitive plus
+    ``packetSize=512-1200``, which enables handshake fragmentation/padding.
+    The private SG-Gateway marker is never emitted into the live Xray config.
     """
     base = finalmask_base(base_value)
+    base.pop(MANAGED_VARIANT_MARKER, None)
     selected = normalise_mode(mode)
     if selected == SALAMANDER_MODE_NONE:
         return base
@@ -118,16 +136,17 @@ def merge_finalmask(base_value: Any, mode: Any, password: Any) -> dict[str, Any]
     secret = validate_password(password)
     if _contains_salamander(base):
         raise SalamanderError(
-            "Нельзя добавить управляемый Salamander поверх существующего слоя Salamander"
+            "Нельзя добавить управляемый Salamander/Gecko поверх существующего слоя Salamander"
         )
 
-    # Hysteria2 Salamander is the only live UDP FinalMask layer in this mode.
-    # Keep any stored base UDP masks untouched in the database so they can be
-    # restored exactly when Salamander is disabled.
+    settings: dict[str, Any] = {"password": secret}
+    if selected == GECKO_MODE:
+        settings["packetSize"] = GECKO_PACKET_SIZE
+
     base["udp"] = [
         {
             "type": SALAMANDER_MODE,
-            "settings": {"password": secret},
+            "settings": settings,
         }
     ]
     return base
@@ -135,11 +154,14 @@ def merge_finalmask(base_value: Any, mode: Any, password: Any) -> dict[str, Any]
 
 def safe_status(mode: Any, password: Any) -> dict[str, Any]:
     selected = normalise_mode(mode)
-    configured = selected == SALAMANDER_MODE and password_ready(password)
+    enabled = selected != SALAMANDER_MODE_NONE
+    configured = enabled and password_ready(password)
     return {
         "mode": selected,
-        "enabled": selected == SALAMANDER_MODE,
+        "variant": selected,
+        "enabled": enabled,
         "password_configured": configured,
         "password_mask": "•" * 32 if configured else "",
-        "minimum_version": SALAMANDER_MINIMUM_VERSION,
+        "minimum_version": minimum_version_for_mode(selected),
+        "packet_size": GECKO_PACKET_SIZE if selected == GECKO_MODE else "",
     }

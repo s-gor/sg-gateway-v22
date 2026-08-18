@@ -15,13 +15,14 @@ MAX_DEVICE_NAME_LENGTH = 60
 PRIMARY_DEVICE_NAME = "Основной доступ"
 SUPPORTED_ENGINES = (
     "amneziawg",
+    "amneziawg3",
     "xray",
     "mihomo",
     "anytls",
     "tuic",
     "sgclient",
 )
-RUNTIME_ENGINES = ("amneziawg", "xray", "mihomo", "anytls", "tuic")
+RUNTIME_ENGINES = ("amneziawg", "amneziawg3", "xray", "mihomo", "anytls", "tuic")
 XRAY_PROFILE_TOKENS = {
     "xray_reality_tcp": "reality_tcp",
     "xray_xhttp_reality": "xhttp_reality",
@@ -46,6 +47,7 @@ class Client:
     sgclient_status: str = "missing"
     device_count: int = 0
     active_device_count: int = 0
+    awg3_status: str = "missing"
 
 
 @dataclass(frozen=True)
@@ -182,7 +184,7 @@ def _parse_access(access: str) -> tuple[list[str], list[str], list[str]]:
     aliases = {
         "recommended": "xray_xhttp_reality,sgclient",
         "full": (
-            "amneziawg,xray_reality_tcp,xray_xhttp_reality,"
+            "amneziawg,amneziawg3,xray_reality_tcp,xray_xhttp_reality,"
             "xray_xhttp_tls,xray_hysteria2,sgclient"
         ),
         "xray": "xray_reality_tcp,xray_xhttp_reality",
@@ -293,6 +295,7 @@ def _client_from_row(connection, row) -> Client:
         enabled=bool(row["enabled"]),
         expires_at=row["expires_at"],
         awg_status=_aggregate_status(credentials, "amneziawg"),
+        awg3_status=_aggregate_status(credentials, "amneziawg3"),
         xray_status=_aggregate_status(credentials, "xray"),
         mihomo_status=_aggregate_status(credentials, "mihomo"),
         anytls_status=_aggregate_status(credentials, "anytls"),

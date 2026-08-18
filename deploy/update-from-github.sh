@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-REPOSITORY="s-gor/sg-gateway"
-BRANCH="${SG_GATEWAY_GITHUB_BRANCH:-main}"
+REPOSITORY="s-gor/sg-gateway-v22"
+BRANCH="${SG_GATEWAY_GITHUB_BRANCH:-${SG_GATEWAY_UPDATE_BRANCH:-dev-v22}}"
 ARCHIVE_URL="https://github.com/${REPOSITORY}/archive/refs/heads/${BRANCH}.tar.gz"
 GIT_URL="https://github.com/${REPOSITORY}.git"
 
@@ -10,11 +10,19 @@ PREFIX="/opt/sg-gateway"
 CONFIG_DIR="/etc/sg-gateway"
 DATA_DIR="/var/lib/sg-gateway"
 BACKUP_ROOT="/root/sg-gateway-update-safety"
+BACKUP_KEEP="${SG_GATEWAY_UPDATE_BACKUP_KEEP:-2}"
+BACKUP_HEADROOM_MB="${SG_GATEWAY_UPDATE_BACKUP_HEADROOM_MB:-256}"
 PANEL_SERVICE="sg-gateway.service"
 HOSTD_SERVICE="sg-hostd.service"
+AWG3_SERVICE="sg-gateway-awg3.service"
+AWG3_CONFIG="/etc/amnezia/amneziawg/awg3.conf"
+AWG3_UNIT="/etc/systemd/system/sg-gateway-awg3.service"
+AWG3_ROOT="$PREFIX/awg3"
 TEMP_DIR=""
 BACKUP_DIR=""
 SOURCE_DIR=""
+SOURCE_COMMIT=""
+PANEL_UPDATE_STATE="${SG_GATEWAY_PANEL_UPDATE_STATE:-$DATA_DIR/updates/panel-state.json}"
 BACKUP_READY=0
 SERVICES_STOPPED=0
 UPDATE_FINISHED=0
@@ -37,6 +45,138 @@ cleanup() {
   if [[ -n "$TEMP_DIR" && -d "$TEMP_DIR" ]]; then
     rm -rf "$TEMP_DIR"
   fi
+}
+
+
+# SG_GATEWAY_02205_SAFETY_BACKUP_DISK_GUARD_V1
+validate_backup_policy() {
+  [[ "$BACKUP_KEEP" =~ ^[0-9]+$ ]] || fail "SG_GATEWAY_UPDATE_BACKUP_KEEP must be an integer"
+  (( BACKUP_KEEP >= 1 )) || fail "SG_GATEWAY_UPDATE_BACKUP_KEEP must be at least 1"
+  [[ "$BACKUP_HEADROOM_MB" =~ ^[0-9]+$ ]] || fail "SG_GATEWAY_UPDATE_BACKUP_HEADROOM_MB must be a non-negative integer"
+}
+
+backup_is_complete() {
+  local dir="$1"
+  [[ -d "$dir" ]] || return 1
+  [[ -f "$dir/state.tar" && -f "$dir/existing-paths.txt" && -f "$dir/service-state.tsv" ]] || return 1
+  tar -tf "$dir/state.tar" >/dev/null 2>&1
+}
+
+cleanup_incomplete_safety_backups() {
+  local dir
+  [[ -d "$BACKUP_ROOT" ]] || return 0
+  while IFS= read -r dir; do
+    [[ -n "$dir" ]] || continue
+    [[ -n "$BACKUP_DIR" && "$dir" == "$BACKUP_DIR" ]] && continue
+    if ! backup_is_complete "$dir"; then
+      printf '[SG-Gateway Update] Removing incomplete Safety Backup: %s\n' "$(basename "$dir")"
+      rm -rf -- "$dir"
+    fi
+  done < <(find "$BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d -name '*-before-update' -print 2>/dev/null | sort)
+}
+
+prune_safety_backups() {
+  local keep="$1" kept=0 dir
+  [[ "$keep" =~ ^[0-9]+$ ]] || return 1
+  [[ -d "$BACKUP_ROOT" ]] || return 0
+  while IFS= read -r dir; do
+    [[ -n "$dir" ]] || continue
+    backup_is_complete "$dir" || continue
+    if (( kept < keep )); then
+      ((kept += 1))
+      continue
+    fi
+    printf '[SG-Gateway Update] Pruning old Safety Backup: %s\n' "$(basename "$dir")"
+    rm -rf -- "$dir" || return 1
+  done < <(find "$BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d -name '*-before-update' -print 2>/dev/null | sort -r)
+}
+
+remove_current_incomplete_backup() {
+  (( BACKUP_READY == 0 )) || return 0
+  [[ -n "$BACKUP_DIR" && -d "$BACKUP_DIR" ]] || return 0
+  case "$BACKUP_DIR" in
+    "$BACKUP_ROOT"/*-before-update)
+      printf '[SG-Gateway Update] Removing failed partial Safety Backup: %s\n' "$(basename "$BACKUP_DIR")" >&2
+      rm -rf -- "$BACKUP_DIR"
+      ;;
+    *)
+      printf '[SG-Gateway Update] Refusing unsafe partial-backup cleanup path: %s\n' "$BACKUP_DIR" >&2
+      return 1
+      ;;
+  esac
+}
+
+ensure_safety_backup_space() {
+  local probe_env="$BACKUP_DIR/space-preflight-https.env"
+  local probe_paths="$BACKUP_DIR/space-preflight-protected.txt"
+  local candidate kept_path covered size_kb available_kb
+  local payload_kb=0
+  local candidates=()
+  local unique=()
+  local filtered=()
+
+  https_state > "$probe_env"
+  protected_runtime_paths "$probe_env" "$probe_paths"
+
+  candidates+=(
+    "$PREFIX"
+    "$CONFIG_DIR"
+    "$DATA_DIR"
+    /etc/letsencrypt
+    "$AWG3_CONFIG"
+    "$AWG3_UNIT"
+    /etc/nginx/nginx.conf
+    /etc/nginx/sites-available/sg-gateway
+    /etc/nginx/sites-enabled/sg-gateway
+    /etc/nginx/stream-conf.d/sg-gateway-443.conf
+    /etc/systemd/system/sg-gateway.service
+    /etc/systemd/system/sg-hostd.service
+  )
+  while IFS= read -r candidate; do
+    [[ -n "$candidate" ]] && candidates+=("$candidate")
+  done < "$probe_paths"
+
+  for candidate in "${candidates[@]}"; do
+    [[ "$candidate" == /* ]] || continue
+    candidate="${candidate%/}"
+    [[ -e "$candidate" || -L "$candidate" ]] || continue
+    covered=0
+    for kept_path in "${unique[@]}"; do
+      if [[ "$candidate" == "$kept_path" || "$candidate" == "$kept_path/"* ]]; then
+        covered=1
+        break
+      fi
+    done
+    (( covered == 1 )) && continue
+    filtered=()
+    for kept_path in "${unique[@]}"; do
+      [[ "$kept_path" == "$candidate/"* ]] && continue
+      filtered+=("$kept_path")
+    done
+    unique=("${filtered[@]}" "$candidate")
+  done
+
+  for candidate in "${unique[@]}"; do
+    size_kb="$(du -sk --apparent-size -- "$candidate" 2>/dev/null | awk 'NR==1 {print $1}')"
+    [[ "$size_kb" =~ ^[0-9]+$ ]] || fail "cannot estimate Safety Backup size for $candidate"
+    ((payload_kb += size_kb))
+  done
+
+  available_kb="$(df -Pk "$BACKUP_ROOT" | awk 'NR==2 {print $4}')"
+  [[ "$available_kb" =~ ^[0-9]+$ ]] || fail "cannot determine free disk space for Safety Backup"
+
+  local headroom_kb=$(( BACKUP_HEADROOM_MB * 1024 ))
+  local required_kb=$(( payload_kb + headroom_kb ))
+  local payload_mb=$(( (payload_kb + 1023) / 1024 ))
+  local available_mb=$(( available_kb / 1024 ))
+  local required_mb=$(( (required_kb + 1023) / 1024 ))
+
+  printf '[SG-Gateway Update] Safety Backup disk preflight: payload ~%s MiB; free %s MiB; required with reserve %s MiB.\n' \
+    "$payload_mb" "$available_mb" "$required_mb"
+  (( available_kb >= required_kb )) || \
+    fail "not enough free disk space for Safety Backup: need about ${required_mb} MiB, free ${available_mb} MiB"
+
+  rm -f -- "$probe_env" "$probe_paths"
 }
 
 env_value() {
@@ -207,30 +347,36 @@ PYCLIENTS
 }
 
 capture_service_states() {
-  local output="$1" service active enabled
+  local output="$1" service active enabled failed
   : > "$output"
   for service in \
-    nginx.service xray.service mihomo.service sg-gateway-awg.service \
+    nginx.service xray.service mihomo.service sg-gateway-awg.service "$AWG3_SERVICE" \
     sg-gateway-singbox.service "$HOSTD_SERVICE" "$PANEL_SERVICE"; do
     active=0
     enabled=0
+    failed=0
     systemctl is-active --quiet "$service" && active=1 || true
     systemctl is-enabled --quiet "$service" && enabled=1 || true
-    printf '%s\t%s\t%s\n' "$service" "$active" "$enabled" >> "$output"
+    systemctl is-failed --quiet "$service" && failed=1 || true
+    printf '%s\t%s\t%s\t%s\n' "$service" "$active" "$enabled" "$failed" >> "$output"
   done
 }
 
 verify_runtime_states_unchanged() {
-  local before="$1" service active enabled now
-  while IFS=$'\t' read -r service active enabled; do
+  local before="$1" service active enabled failed now now_enabled now_failed
+  while IFS=$'\t' read -r service active enabled failed; do
     [[ -n "$service" ]] || continue
     case "$service" in
       "$PANEL_SERVICE"|"$HOSTD_SERVICE") continue ;;
     esac
     now=0
+    now_enabled=0
+    now_failed=0
     systemctl is-active --quiet "$service" && now=1 || true
-    if [[ "$now" != "$active" ]]; then
-      echo "Runtime service state changed: $service active before=$active after=$now" >&2
+    systemctl is-enabled --quiet "$service" && now_enabled=1 || true
+    systemctl is-failed --quiet "$service" && now_failed=1 || true
+    if [[ "$now" != "$active" || "$now_enabled" != "$enabled" || "$now_failed" != "$failed" ]]; then
+      echo "Runtime service state changed: $service active $active->$now enabled $enabled->$now_enabled failed $failed->$now_failed" >&2
       return 1
     fi
   done < "$before"
@@ -278,18 +424,78 @@ for name, value in (
 PYHTTPS
 }
 
+protected_runtime_paths() {
+  local https_env="$1" output="$2"
+  local cert="" key=""
+  # shellcheck disable=SC1090
+  source "$https_env"
+  cert="${HTTPS_CERT:-}"
+  key="${HTTPS_KEY:-}"
+  python3 - "$output" "$cert" "$key" <<'PYPROTECTED'
+import os
+import sys
+from pathlib import Path
+
+output = Path(sys.argv[1])
+values = [
+    "/etc/letsencrypt",
+    "/var/lib/sg-gateway/security/tls-state.json",
+    "/etc/amnezia/amneziawg/awg3.conf",
+    "/etc/systemd/system/sg-gateway-awg3.service",
+    "/opt/sg-gateway/awg3",
+]
+for raw in sys.argv[2:]:
+    raw = str(raw or "").strip()
+    if not raw:
+        continue
+    path = Path(raw)
+    if not path.is_absolute() or ".." in path.parts or str(path) == "/":
+        raise SystemExit(f"unsafe protected runtime path: {raw!r}")
+    values.append(os.path.normpath(str(path)))
+    if path.exists() or path.is_symlink():
+        values.append(os.path.realpath(str(path)))
+
+seen = set()
+ordered = []
+for raw in values:
+    value = os.path.normpath(str(raw))
+    if value == "/" or not value.startswith("/") or value in seen:
+        continue
+    seen.add(value)
+    ordered.append(value)
+output.write_text("\n".join(ordered) + "\n", encoding="utf-8")
+PYPROTECTED
+}
+
 create_safety_backup() {
   mkdir -p "$BACKUP_ROOT"
   chmod 0700 "$BACKUP_ROOT"
+
+  cleanup_incomplete_safety_backups
+  local pre_keep=1
+  if (( BACKUP_KEEP > 1 )); then
+    pre_keep=$(( BACKUP_KEEP - 1 ))
+  fi
+  prune_safety_backups "$pre_keep"
+
   BACKUP_DIR="$BACKUP_ROOT/$(date -u +%Y%m%d-%H%M%S)-before-update"
   mkdir -p "$BACKUP_DIR"
   chmod 0700 "$BACKUP_DIR"
+
+  # Refuse the update before stopping services when the rollback archive
+  # cannot fit on disk. The reserve also covers tar metadata and update work.
+  ensure_safety_backup_space
 
   capture_service_states "$BACKUP_DIR/service-state.tsv"
   systemctl stop "$PANEL_SERVICE" "$HOSTD_SERVICE"
   SERVICES_STOPPED=1
 
   https_state > "$BACKUP_DIR/https-before.env"
+  protected_runtime_paths "$BACKUP_DIR/https-before.env" "$BACKUP_DIR/protected-runtime-paths.txt"
+
+  local protected_paths=()
+  mapfile -t protected_paths < "$BACKUP_DIR/protected-runtime-paths.txt"
+  fingerprint_paths "${protected_paths[@]}" > "$BACKUP_DIR/protected-runtime-before.sha256"
   fingerprint_clients > "$BACKUP_DIR/clients-before.sha256"
   fingerprint_paths /etc/letsencrypt > "$BACKUP_DIR/letsencrypt-before.sha256"
   fingerprint_paths \
@@ -299,22 +505,54 @@ create_safety_backup() {
     /etc/nginx/stream-conf.d/sg-gateway-443.conf \
     > "$BACKUP_DIR/nginx-before.sha256"
 
-  local existing=() relative
+  local existing=() relative absolute
   for relative in \
     opt/sg-gateway \
     etc/sg-gateway \
     var/lib/sg-gateway \
     etc/letsencrypt \
+    etc/amnezia/amneziawg/awg3.conf \
     etc/nginx/nginx.conf \
     etc/nginx/sites-available/sg-gateway \
     etc/nginx/sites-enabled/sg-gateway \
     etc/nginx/stream-conf.d/sg-gateway-443.conf \
     etc/systemd/system/sg-gateway.service \
-    etc/systemd/system/sg-hostd.service; do
+    etc/systemd/system/sg-hostd.service \
+    etc/systemd/system/sg-gateway-awg3.service; do
     if [[ -e "/$relative" || -L "/$relative" ]]; then
       existing+=("$relative")
     fi
   done
+
+  while IFS= read -r absolute; do
+    [[ -n "$absolute" && "$absolute" == /* ]] || continue
+    if [[ -e "$absolute" || -L "$absolute" ]]; then
+      existing+=("${absolute#/}")
+    fi
+  done < "$BACKUP_DIR/protected-runtime-paths.txt"
+
+  local unique=() filtered=() item kept_path covered
+  for item in "${existing[@]}"; do
+    item="${item#/}"
+    item="${item%/}"
+    [[ -n "$item" ]] || continue
+    covered=0
+    for kept_path in "${unique[@]}"; do
+      if [[ "$item" == "$kept_path" || "$item" == "$kept_path/"* ]]; then
+        covered=1
+        break
+      fi
+    done
+    (( covered == 1 )) && continue
+    filtered=()
+    for kept_path in "${unique[@]}"; do
+      [[ "$kept_path" == "$item/"* ]] && continue
+      filtered+=("$kept_path")
+    done
+    unique=("${filtered[@]}" "$item")
+  done
+  existing=("${unique[@]}")
+
   printf '%s\n' "${existing[@]}" > "$BACKUP_DIR/existing-paths.txt"
   tar -C / -cpf "$BACKUP_DIR/state.tar" "${existing[@]}"
   tar -tf "$BACKUP_DIR/state.tar" >/dev/null
@@ -324,7 +562,7 @@ create_safety_backup() {
 rollback_update() {
   (( BACKUP_READY == 1 )) || return 0
   printf '\n%s[SG-Gateway Update] ROLLBACK:%s restoring the pre-update server state...\n' "$YELLOW" "$RESET"
-  systemctl stop "$PANEL_SERVICE" "$HOSTD_SERVICE" >/dev/null 2>&1 || true
+  systemctl stop "$PANEL_SERVICE" "$HOSTD_SERVICE" "$AWG3_SERVICE" >/dev/null 2>&1 || true
 
   local path
   for path in \
@@ -332,13 +570,27 @@ rollback_update() {
     /etc/sg-gateway \
     /var/lib/sg-gateway \
     /etc/letsencrypt \
+    /etc/amnezia/amneziawg/awg3.conf \
     /etc/nginx/sites-available/sg-gateway \
     /etc/nginx/sites-enabled/sg-gateway \
     /etc/nginx/stream-conf.d/sg-gateway-443.conf \
     /etc/systemd/system/sg-gateway.service \
-    /etc/systemd/system/sg-hostd.service; do
-    rm -rf "$path"
+    /etc/systemd/system/sg-hostd.service \
+    /etc/systemd/system/sg-gateway-awg3.service; do
+    rm -rf -- "$path"
   done
+
+  while IFS= read -r path; do
+    [[ -n "$path" && "$path" == /* ]] || continue
+    case "$path" in
+      /opt/sg-gateway|/opt/sg-gateway/*|/etc/sg-gateway|/etc/sg-gateway/*|/var/lib/sg-gateway|/var/lib/sg-gateway/*|/etc/letsencrypt|/etc/letsencrypt/*|/etc/amnezia/amneziawg/awg3.conf|/etc/systemd/system/sg-gateway-awg3.service)
+        continue
+        ;;
+    esac
+    if [[ -f "$path" || -L "$path" ]]; then
+      rm -f -- "$path"
+    fi
+  done < "$BACKUP_DIR/protected-runtime-paths.txt"
 
   tar -C / -xpf "$BACKUP_DIR/state.tar"
   systemctl daemon-reload >/dev/null 2>&1 || true
@@ -347,14 +599,18 @@ rollback_update() {
     systemctl is-active --quiet nginx.service && systemctl reload nginx.service >/dev/null 2>&1 || true
   fi
 
-  local service active enabled
-  while IFS=$'\t' read -r service active enabled; do
+  local service active enabled failed
+  while IFS=$'\t' read -r service active enabled failed; do
     [[ -n "$service" ]] || continue
     if [[ "$enabled" == "1" ]]; then
       systemctl enable "$service" >/dev/null 2>&1 || true
+    else
+      systemctl disable "$service" >/dev/null 2>&1 || true
     fi
     if [[ "$active" == "1" ]]; then
       systemctl restart "$service" >/dev/null 2>&1 || true
+    else
+      systemctl stop "$service" >/dev/null 2>&1 || true
     fi
   done < "$BACKUP_DIR/service-state.tsv"
 
@@ -372,6 +628,9 @@ on_error() {
       systemctl start "$PANEL_SERVICE" >/dev/null 2>&1 || true
     fi
   fi
+  if (( BACKUP_READY == 0 )); then
+    remove_current_incomplete_backup || true
+  fi
   cleanup
   printf '%s[SG-Gateway Update] Update failed.%s\n' "$RED" "$RESET" >&2
   exit "$rc"
@@ -388,14 +647,113 @@ run_stage() {
   printf '%s[SG-Gateway Update] [OK]%s %s\n' "$GREEN" "$RESET" "$label"
 }
 
+# SG_GATEWAY_02205_WSGI_ISOLATED_VALIDATION_V1
+panel_wsgi_target() {
+  local raw
+  raw="$(systemctl show -p ExecStart --value "$PANEL_SERVICE" 2>/dev/null || true)"
+  python3 - "$raw" <<'PYWSGITARGET'
+import re
+import sys
+
+raw = sys.argv[1]
+items = re.findall(
+    r"(?<![A-Za-z0-9_.])([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*:[A-Za-z_]\w*)(?![A-Za-z0-9_])",
+    raw,
+)
+print(items[-1] if items else "app.production:app")
+PYWSGITARGET
+}
+
+validate_candidate_wsgi_target() {
+  local source="$1" target module
+  target="$(panel_wsgi_target)"
+  module="${target%%:*}"
+  "$PREFIX/.venv/bin/python" -B - "$source" "$module" "$target" <<'PYCANDIDATEWSGI'
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+module = sys.argv[2]
+target = sys.argv[3]
+module_path = root.joinpath(*module.split("."))
+present = module_path.with_suffix(".py").is_file() or (module_path / "__init__.py").is_file()
+if not present:
+    raise SystemExit(
+        f"candidate source does not provide installed panel WSGI target {target}"
+    )
+print(f"Candidate WSGI target: {target} -> module present")
+PYCANDIDATEWSGI
+}
+
+validate_deployed_panel() {
+  runuser -u sg-gateway -- "$PREFIX/.venv/bin/python" -B -c \
+    'from pathlib import Path; from jinja2 import Environment; env=Environment(); [env.parse(p.read_text(encoding="utf-8")) for p in Path("/opt/sg-gateway/app/web/templates").rglob("*.html")]; print("Templates: OK")'
+
+  local target validation_root validation_env
+  target="$(panel_wsgi_target)"
+  validation_root="$TEMP_DIR/wsgi-validation"
+  rm -rf "$validation_root"
+  # TEMP_DIR is created root:root 0700 by mktemp. The deployed WSGI import
+  # runs as sg-gateway, so allow traversal only for the duration of this
+  # isolated validation. Directory listing remains denied.
+  chmod 0711 "$TEMP_DIR"
+  install -d -m 0750 -o sg-gateway -g sg-gateway \
+    "$validation_root" "$validation_root/data" "$validation_root/log"
+  validation_env="$validation_root/sg-gateway.env"
+  install -m 0600 -o sg-gateway -g sg-gateway "$CONFIG_DIR/sg-gateway.env" "$validation_env"
+
+  runuser -u sg-gateway -- "$PREFIX/.venv/bin/python" -B - \
+    "$PREFIX" "$validation_env" "$target" "$validation_root" <<'PYDEPLOYEDWSGI'
+import importlib
+import os
+import shlex
+import sys
+from pathlib import Path
+
+prefix = Path(sys.argv[1])
+env_file = Path(sys.argv[2])
+target = sys.argv[3]
+validation_root = Path(sys.argv[4])
+
+for raw in env_file.read_text(encoding="utf-8").splitlines():
+    line = raw.strip()
+    if not line or line.startswith("#") or "=" not in line:
+        continue
+    name, value = line.split("=", 1)
+    name = name.strip()
+    value = value.strip()
+    if value[:1] in {'"', "'"}:
+        try:
+            parsed = shlex.split(value, posix=True)
+            value = parsed[0] if parsed else ""
+        except ValueError:
+            value = value[1:-1] if len(value) >= 2 else ""
+    os.environ[name] = value
+
+# The import can execute app.main -> init_db(). Keep it away from production.
+os.environ["SG_GATEWAY_DATA_DIR"] = str(validation_root / "data")
+os.environ["SG_GATEWAY_LOG_DIR"] = str(validation_root / "log")
+
+os.chdir(prefix)
+sys.path.insert(0, str(prefix))
+module_name, object_name = target.split(":", 1)
+module = importlib.import_module(module_name)
+getattr(module, object_name)
+print(f"Panel WSGI import: OK ({target}) with isolated data/log")
+PYDEPLOYEDWSGI
+  chmod 0700 "$TEMP_DIR"
+}
+
 preflight() {
   [[ "$(id -u)" -eq 0 ]] || fail "run this updater through sudo"
   [[ -f "$PREFIX/VERSION" && -f "$CONFIG_DIR/runtime.env" && -f "$CONFIG_DIR/sg-gateway.env" ]] || {
     fail "SG-Gateway is not installed. Use the Clean Install command instead."
   }
 
+  validate_backup_policy
+
   local command
-  for command in curl tar gzip python3 sha256sum systemctl; do
+  for command in curl tar gzip python3 sha256sum systemctl du df find sort; do
     command -v "$command" >/dev/null 2>&1 || fail "required command is missing: $command"
   done
 
@@ -420,14 +778,47 @@ preflight() {
   fi
 }
 
+resolve_source_commit() {
+  local resolved=""
+
+  if command -v git >/dev/null 2>&1; then
+    resolved="$(git ls-remote --exit-code "$GIT_URL" "refs/heads/$BRANCH" 2>/dev/null | awk 'NR==1 {print $1}' || true)"
+  fi
+
+  if [[ ! "$resolved" =~ ^[0-9a-f]{40}$ ]]; then
+    resolved="$(
+      curl -4 -fsSL --max-time 20 -A 'SG-Gateway-Updater' \
+        "https://api.github.com/repos/${REPOSITORY}/commits/${BRANCH}" 2>/dev/null \
+      | python3 -c 'import json,re,sys; value=str(json.load(sys.stdin).get("sha") or "").strip().lower(); print(value if re.fullmatch(r"[0-9a-f]{40}", value) else "")' \
+        2>/dev/null || true
+    )"
+  fi
+
+  if [[ ! "$resolved" =~ ^[0-9a-f]{40}$ ]]; then
+    resolved="$(
+      curl -4 -fsSL --max-time 20 -A 'SG-Gateway-Updater' \
+        "https://github.com/${REPOSITORY}/commits/${BRANCH}.atom" 2>/dev/null \
+      | python3 -c 'import re,sys; match=re.search(r"Grit::Commit/([0-9a-fA-F]{40})", sys.stdin.read()); print(match.group(1).lower() if match else "")' \
+        2>/dev/null || true
+    )"
+  fi
+
+  [[ "$resolved" =~ ^[0-9a-f]{40}$ ]] || fail "cannot resolve exact GitHub commit for update channel $BRANCH"
+  SOURCE_COMMIT="$resolved"
+}
+
 prepare_source_archive() {
-  local archive="$TEMP_DIR/sg-gateway-main.tar.gz"
+  local archive archive_url
+  resolve_source_commit
+  archive="$TEMP_DIR/sg-gateway-${SOURCE_COMMIT}.tar.gz"
+  archive_url="https://github.com/${REPOSITORY}/archive/${SOURCE_COMMIT}.tar.gz"
   rm -rf "$SOURCE_DIR"
   mkdir -p "$SOURCE_DIR"
 
   printf '[SG-Gateway Update] Source mode: COMPATIBILITY (full GitHub archive)\n'
+  printf '[SG-Gateway Update] Source commit: %s\n' "$SOURCE_COMMIT"
   curl -fL --retry 6 --retry-all-errors --retry-delay 3 --connect-timeout 20 \
-    "$ARCHIVE_URL" -o "$archive"
+    "$archive_url" -o "$archive"
   gzip -t "$archive"
   tar -xzf "$archive" -C "$SOURCE_DIR" --strip-components=1
 }
@@ -448,6 +839,10 @@ prepare_source_light() {
     --single-branch \
     --branch "$BRANCH" \
     "$GIT_URL" "$SOURCE_DIR" || return 1
+
+  SOURCE_COMMIT="$(git -C "$SOURCE_DIR" rev-parse HEAD 2>/dev/null || true)"
+  [[ "$SOURCE_COMMIT" =~ ^[0-9a-f]{40}$ ]] || return 1
+  printf '[SG-Gateway Update] Source commit: %s\n' "$SOURCE_COMMIT"
 
   # SG_GATEWAY_02112_LIGHT_UPDATE_FIX9_R2
   # Whitelist only live application source. Cone mode also keeps the small
@@ -490,6 +885,7 @@ prepare_source() {
   [[ -f "$SOURCE_DIR/requirements.txt" ]] || fail "requirements.txt is missing from GitHub source"
   [[ -f "$SOURCE_DIR/hostd/requirements.txt" ]] || fail "hostd/requirements.txt is missing from GitHub source"
   [[ -f "$SOURCE_DIR/app/main.py" ]] || fail "app/main.py is missing from GitHub source"
+  [[ -f "$SOURCE_DIR/app/production.py" ]] || fail "app/production.py is missing from GitHub source"
   [[ -f "$SOURCE_DIR/hostd/sg_hostd/app.py" ]] || fail "hostd source is missing from GitHub source"
 
   if ! cmp -s "$PREFIX/requirements.txt" "$SOURCE_DIR/requirements.txt"; then
@@ -512,6 +908,7 @@ if not ok:
 print("Python syntax: OK")
 PYCHECK
 
+  validate_candidate_wsgi_target "$SOURCE_DIR"
 }
 
 # SG_GATEWAY_02112_LIGHT_UPDATE_ASSET_PRESERVE_FIX10
@@ -576,7 +973,8 @@ deploy_source() {
   local child
   while IFS= read -r -d '' child; do
     case "$(basename "$child")" in
-      ".venv"|"assets") continue ;;
+      ".venv"|"awg3") continue ;;
+      "assets") continue ;;
     esac
     rm -rf "$child"
   done < <(find "$PREFIX" -mindepth 1 -maxdepth 1 -print0)
@@ -587,10 +985,16 @@ deploy_source() {
     rm -rf "$PREFIX/assets"
     cp -a "$ASSETS_RECOVERY_DIR" "$PREFIX/assets"
   fi
-  chown -R root:root "$PREFIX"
   chmod 0755 "$PREFIX"
-  find "$PREFIX" -path "$PREFIX/.venv" -prune -o -type d -exec chmod 0755 {} +
-  find "$PREFIX" -path "$PREFIX/.venv" -prune -o -type f -exec chmod 0644 {} +
+  find "$PREFIX" \
+    \( -path "$PREFIX/.venv" -o -path "$PREFIX/assets" -o -path "$AWG3_ROOT" \) -prune -o \
+    -exec chown root:root {} +
+  find "$PREFIX" \
+    \( -path "$PREFIX/.venv" -o -path "$PREFIX/assets" -o -path "$AWG3_ROOT" \) -prune -o \
+    -type d -exec chmod 0755 {} +
+  find "$PREFIX" \
+    \( -path "$PREFIX/.venv" -o -path "$PREFIX/assets" -o -path "$AWG3_ROOT" \) -prune -o \
+    -type f -exec chmod 0644 {} +
   find "$PREFIX/deploy" -maxdepth 1 -type f -name '*.sh' -exec chmod 0755 {} + 2>/dev/null || true
   chmod -R a+rX "$PREFIX/.venv"
 
@@ -625,6 +1029,7 @@ restart_panel() {
 
 verify_final() {
   local before after
+  local protected_paths=()
 
   before="$(cat "$BACKUP_DIR/clients-before.sha256")"
   after="$(fingerprint_clients)"
@@ -633,6 +1038,15 @@ verify_final() {
   before="$(cat "$BACKUP_DIR/letsencrypt-before.sha256")"
   after="$(fingerprint_paths /etc/letsencrypt)"
   [[ "$before" == "$after" ]] || fail "/etc/letsencrypt changed during Update"
+
+  mapfile -t protected_paths < "$BACKUP_DIR/protected-runtime-paths.txt"
+  before="$(cat "$BACKUP_DIR/protected-runtime-before.sha256")"
+  after="$(fingerprint_paths "${protected_paths[@]}")"
+  [[ "$before" == "$after" ]] || fail "TLS/AWG3 protected runtime changed during Update"
+
+  https_state > "$TEMP_DIR/https-after.env"
+  cmp -s "$BACKUP_DIR/https-before.env" "$TEMP_DIR/https-after.env" || \
+    fail "HTTPS certificate state changed during Update"
 
   before="$(cat "$BACKUP_DIR/nginx-before.sha256")"
   after="$(fingerprint_paths \
@@ -660,6 +1074,62 @@ verify_final() {
   systemctl is-active --quiet nginx.service
 }
 
+bind_panel_update_state() {
+  [[ "$SOURCE_COMMIT" =~ ^[0-9a-f]{40}$ ]] || fail "source commit is unavailable after deployment"
+
+  local new_version
+  new_version="$(tr -d '\r\n' < "$PREFIX/VERSION")"
+  install -d -m 0750 -o root -g sg-gateway "$(dirname "$PANEL_UPDATE_STATE")"
+
+  PYTHONPATH="$PREFIX:$PREFIX/hostd" \
+  SG_GATEWAY_APP_ROOT="$PREFIX" \
+  SG_GATEWAY_PANEL_UPDATE_STATE="$PANEL_UPDATE_STATE" \
+  "$PREFIX/.venv/bin/python" -B - \
+    "$SOURCE_COMMIT" "$new_version" "$BACKUP_DIR" "$BRANCH" <<'PYPANELSTATE'
+import json
+import os
+import re
+import shutil
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+from app.maintenance.panel_updates import source_fingerprint
+
+commit = sys.argv[1].strip().lower()
+version = sys.argv[2].strip()
+backup = Path(sys.argv[3]).name
+channel = sys.argv[4].strip()
+root = Path(os.environ["SG_GATEWAY_APP_ROOT"])
+state_path = Path(os.environ["SG_GATEWAY_PANEL_UPDATE_STATE"])
+
+if not re.fullmatch(r"[0-9a-f]{40}", commit):
+    raise SystemExit("invalid source commit")
+
+fingerprint = source_fingerprint(root)
+if not re.fullmatch(r"[0-9a-f]{64}", fingerprint):
+    raise SystemExit("invalid deployed source fingerprint")
+
+payload = {
+    "commit": commit,
+    "version": version,
+    "channel": channel,
+    "updated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+    "backup": backup,
+    "source_fingerprint": fingerprint,
+}
+state_path.parent.mkdir(parents=True, exist_ok=True)
+temporary = state_path.with_name(state_path.name + ".new")
+temporary.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+os.chmod(temporary, 0o640)
+shutil.chown(temporary, user="root", group="sg-gateway")
+os.replace(temporary, state_path)
+print(f"Panel Update baseline: {commit[:12]} ({channel})")
+PYPANELSTATE
+
+  runuser -u sg-gateway -- test -r "$PANEL_UPDATE_STATE"
+}
+
 main() {
   printf '\n%s[SG-Gateway Update]%s Dedicated panel-only Update\n' "$CYAN" "$RESET"
   printf '[SG-Gateway Update] This mode does NOT install packages, Certbot, Nginx or VPN cores.\n\n'
@@ -669,13 +1139,17 @@ main() {
   # Download and validate the candidate before any server mutation.
   prepare_source
 
-  run_stage 2 "Safety Backup: SG state + full /etc/letsencrypt" create_safety_backup
+  run_stage 2 "Safety Backup: SG state + TLS + AWG3 runtime" create_safety_backup
   run_stage 3 "Обновление только исходников SG-Gateway" deploy_source "$SOURCE_DIR"
-  run_stage 4 "Python/UI проверка без изменения runtime" \
-    runuser -u sg-gateway -- "$PREFIX/.venv/bin/python" -B -c \
-      'from pathlib import Path; from jinja2 import Environment; env=Environment(); [env.parse(p.read_text(encoding="utf-8")) for p in Path("/opt/sg-gateway/app/web/templates").rglob("*.html")]; print("Templates: OK")'
+  run_stage 4 "Python/UI проверка без изменения runtime" validate_deployed_panel
   run_stage 5 "Перезапуск только panel + hostd" restart_panel
   run_stage 6 "Проверка HTTPS, Clients, Nginx и runtime" verify_final
+  bind_panel_update_state
+
+  if ! prune_safety_backups "$BACKUP_KEEP"; then
+    printf '%s[SG-Gateway Update] WARNING:%s old Safety Backup retention cleanup failed; update itself is already verified.
+'       "$YELLOW" "$RESET" >&2
+  fi
 
   UPDATE_FINISHED=1
   trap - ERR INT TERM
@@ -686,7 +1160,7 @@ main() {
   printf '%s[SG-Gateway Update] SG-Gateway safely updated.%s\n' "$GREEN" "$RESET"
   printf '[SG-Gateway Update] VERSION: %s\n' "$new_version"
   printf '[SG-Gateway Update] Safety Backup: %s\n' "$BACKUP_DIR"
-  printf '[SG-Gateway Update] Nginx/Certbot/Let'\''s Encrypt/cores were not modified.\n'
+  printf '[SG-Gateway Update] TLS certificates/Nginx/AWG3 runtime/VPN cores were not modified.\n'
   printf '[SG-Gateway Update] ============================================================\n'
 }
 

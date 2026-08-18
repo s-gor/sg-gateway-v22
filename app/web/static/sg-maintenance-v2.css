@@ -216,6 +216,21 @@
   margin: 0;
 }
 
+.mtv2-backup-head-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.mtv2-backup-storage-summary {
+  margin: 12px 0 0;
+  color: var(--sg-muted);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
 .mtv2-panel-head .button {
   min-height: 36px;
   justify-content: center;
@@ -694,6 +709,15 @@
 
   .mtv2-backup-actions {
     grid-column: 1 / -1;
+  }
+
+  .mtv2-backup-head-actions {
+    justify-content: stretch;
+  }
+
+  .mtv2-backup-head-actions form,
+  .mtv2-backup-head-actions .button {
+    width: 100%;
   }
 
   .mtv2-backup-details {

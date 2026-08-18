@@ -5,7 +5,7 @@ PREFIX="/opt/sg-gateway"
 CONFIG_DIR="/etc/sg-gateway"
 DATA_DIR="/var/lib/sg-gateway"
 LOG_DIR="/var/log/sg-gateway"
-UNINSTALL_LOG="/var/log/sg-gateway-full-uninstall-02112.log"
+UNINSTALL_LOG="/var/log/sg-gateway-full-uninstall-02204.log"
 
 PANEL_PORT="63443"
 XRAY_PORT="443"
@@ -62,7 +62,7 @@ if [[ ! "$TLS_DOMAIN" =~ ^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$ ]]
   TLS_DOMAIN=""
 fi
 
-printf '\n%sSG-Gateway 0.1.0-021.12 · ПОЛНОЕ УДАЛЕНИЕ%s\n' "$CYAN" "$RESET"
+printf '\n%sSG-Gateway 0.1.0-022.04 · ПОЛНОЕ УДАЛЕНИЕ%s\n' "$CYAN" "$RESET"
 printf 'Будут удалены приложение, база, настройки, backups, SG-службы и установленные SG runtime.\n'
 printf 'Системные пакеты Ubuntu (nginx, certbot, ufw, Python и т.п.) останутся установленными.\n'
 if [[ -n "$TLS_DOMAIN" ]]; then
@@ -101,10 +101,12 @@ stop_runtime(){
   local service
   for service in \
     sg-gateway.service sg-hostd.service xray.service mihomo.service \
-    sg-gateway-awg.service sg-gateway-singbox.service; do
+    sg-gateway-awg.service sg-gateway-awg3.service sg-gateway-singbox.service; do
     systemctl disable --now "$service" >/dev/null 2>&1 || true
   done
   ip link delete awg0 >/dev/null 2>&1 || true
+  ip link delete awg3 >/dev/null 2>&1 || true
+  rm -f /var/run/amneziawg/awg3.sock >/dev/null 2>&1 || true
   if command -v nft >/dev/null 2>&1; then
     nft delete table ip sg_gateway_awg >/dev/null 2>&1 || true
   fi
@@ -118,6 +120,7 @@ remove_service_and_web_config(){
     /etc/systemd/system/xray@.service \
     /etc/systemd/system/mihomo.service \
     /etc/systemd/system/sg-gateway-awg.service \
+    /etc/systemd/system/sg-gateway-awg3.service \
     /etc/systemd/system/sg-gateway-singbox.service
   rm -rf \
     /etc/systemd/system/sg-gateway.service.d \
@@ -215,7 +218,8 @@ remove_application_and_state(){
     /run/sg-gateway \
     /etc/mihomo /var/lib/mihomo \
     /etc/sing-box /var/lib/sing-box /var/log/sing-box \
-    /etc/amnezia/amneziawg
+    /etc/amnezia/amneziawg \
+    /var/run/amneziawg
   rmdir /etc/amnezia >/dev/null 2>&1 || true
   rm -f \
     /etc/sysctl.d/99-sg-gateway.conf \

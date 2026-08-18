@@ -18,8 +18,10 @@ from app.routing.runtime import (
     RoutingRuntimeError,
     atomic_write_json,
     build_full_config,
+    build_managed_outbounds,
     managed_routing_path,
     restart_xray,
+    routing_capabilities,
     sanitize_managed_fragment,
     service_is_active,
     xray_config_path,
@@ -235,6 +237,7 @@ TEMPLATES = tuple(
     if all(rule.action in {"direct", "block"} for rule in template.rules)
 )
 
+
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -406,6 +409,7 @@ def _run_helper(action: str) -> dict:
     payload.setdefault("message", result.message)
     return payload
 
+
 def apply_candidate() -> dict:
     candidate = _read_json(_candidate_path())
     if not candidate or not candidate.get("ready"):
@@ -463,10 +467,11 @@ def overview() -> dict:
         "geoip_count": len(geoip),
         "geosite_count": len(geosite),
         "managed_path": "/etc/sg-gateway/xray-routing-managed.json",
+        "capabilities": routing_capabilities(),
         "engine_connected": True,
         "engine_message": (
             "Managed Routing подключён к рабочему config.json Xray. "
-            "Доступны реальные выходы: Через SG-Gateway, Через WARP и Заблокировать; WARP включается отдельно."
+            "Выходы разделены по семейству: SG-Gateway IPv4/IPv6, WARP IPv4/IPv6 и Block."
         ),
     }
 
@@ -480,11 +485,7 @@ def _minimal_xray_test(fragment: dict) -> tuple[str, str]:
     config = {
         "log": {"loglevel": "none"},
         "inbounds": [],
-        "outbounds": [
-            {"protocol": "freedom", "tag": "direct"},
-            {"protocol": "blackhole", "tag": "block"},
-            {"protocol": "freedom", "tag": "xray"},
-        ],
+        "outbounds": build_managed_outbounds([]),
         **fragment,
     }
     with tempfile.TemporaryDirectory(prefix="sg-gateway-routing-") as directory:
@@ -635,15 +636,18 @@ def root_rollback_latest() -> dict:
         "message": f"Routing и рабочий Xray config восстановлены из {source.name}",
     }
 
-# SG Client 096 Direct/Block model adapted for SG-Gateway Preview 41.
+
+# SG Client 096 layout retained, but Fix30 makes every public egress action
+# family-explicit. Legacy direct/warp values are still parsed for old saved
+# candidates and are treated by runtime as strict IPv4 aliases.
 SMART_PRESET_TITLES = {
-    "direct": "Обычный доступ · через SG-Gateway",
-    "ads_block": "Блокировка рекламы и трекеров",
-    "blocked_warp": "Ресурсы, заблокированные в РФ через WARP",
-    "all_warp": "Весь интернет через WARP",
+    "direct": "Обычный доступ · SG-Gateway · IPv4",
+    "ads_block": "Блокировка рекламы и трекеров · SG-Gateway · IPv4",
+    "blocked_warp": "Ресурсы, заблокированные в РФ через WARP · IPv4",
+    "all_warp": "Весь интернет через WARP · IPv4",
     "custom": "Пользовательская схема",
 }
-SMART_ACTIONS = {"direct", "warp", "block"}
+SMART_ACTIONS = {"direct", "warp", "direct4", "direct6", "warp4", "warp6", "block"}
 SMART_RUSSIA_SCOPES = {"none", "tld", "sites_ip"}
 SMART_BLOCKED_CATEGORIES = (
     "russia-blocked",
@@ -667,6 +671,8 @@ SMART_PRIVATE_IPS = (
 
 
 def _smart_default() -> dict:
+    # Legacy direct defaults are intentional for loading old forms/tests.  The
+    # current UI posts direct4/direct6 explicitly for every visible selector.
     return {
         "preset": "direct",
         "local_action": "direct",
@@ -675,12 +681,21 @@ def _smart_default() -> dict:
         "blocked_action": "direct",
         "ads_action": "direct",
         "default_action": "direct",
+        "custom_direct4_domains": [],
+        "custom_direct6_domains": [],
+        "custom_warp4_domains": [],
+        "custom_warp6_domains": [],
+        "custom_block_domains": [],
+        "custom_direct4_ips": [],
+        "custom_direct6_ips": [],
+        "custom_warp4_ips": [],
+        "custom_warp6_ips": [],
+        "custom_block_ips": [],
+        # Old field names remain input-only compatibility buckets.
         "custom_direct_domains": [],
         "custom_warp_domains": [],
-        "custom_block_domains": [],
         "custom_direct_ips": [],
         "custom_warp_ips": [],
-        "custom_block_ips": [],
     }
 
 
@@ -727,26 +742,43 @@ def _smart_action(value: object, fallback: str = "direct") -> str:
     return action if action in SMART_ACTIONS else fallback
 
 
+def _canonical_family_action(action: str) -> str:
+    return {"direct": "direct4", "warp": "warp4"}.get(action, action)
+
+
+def _actions_equivalent(left: str, right: str) -> bool:
+    return _canonical_family_action(left) == _canonical_family_action(right)
+
+
 def _smart_apply_preset(state: dict) -> dict:
     preset = str(state.get("preset") or "direct").strip().lower()
     if preset not in SMART_PRESET_TITLES:
         preset = "direct"
     state["preset"] = preset
-    state["local_action"] = "direct"
+    state["local_action"] = "direct4"
     state.update(
         russia_scope="none",
-        russia_action="direct",
-        blocked_action="direct",
-        ads_action="direct",
-        default_action="direct",
+        russia_action="direct4",
+        blocked_action="direct4",
+        ads_action="direct4",
+        default_action="direct4",
     )
     if preset == "ads_block":
         state["ads_action"] = "block"
     elif preset == "blocked_warp":
-        state["blocked_action"] = "warp"
+        state["blocked_action"] = "warp4"
     elif preset == "all_warp":
-        state["default_action"] = "warp"
+        state["blocked_action"] = "warp4"
+        state["ads_action"] = "warp4"
+        state["default_action"] = "warp4"
     return state
+
+
+def _parse_custom_values(form, state: dict, key: str, parser) -> None:
+    value = form.get(key)
+    if value is None:
+        return
+    state[key] = [item for item in (parser(v) for v in _smart_lines(value)) if item]
 
 
 def _smart_state_from_form(form) -> dict:
@@ -762,24 +794,13 @@ def _smart_state_from_form(form) -> dict:
         state[key] = _smart_action(form.get(key), state[key])
     scope = str(form.get("russia_scope", "none")).strip().lower()
     state["russia_scope"] = scope if scope in SMART_RUSSIA_SCOPES else "none"
-    for key in ("custom_direct_domains", "custom_warp_domains", "custom_block_domains"):
-        state[key] = [
-            item
-            for item in (_smart_domain(v) for v in _smart_lines(form.get(key)))
-            if item
-        ]
-    for key in ("custom_direct_ips", "custom_warp_ips", "custom_block_ips"):
-        state[key] = [
-            item
-            for item in (_smart_ip(v) for v in _smart_lines(form.get(key)))
-            if item
-        ]
+
+    for action in ("direct4", "direct6", "warp4", "warp6", "block", "direct", "warp"):
+        _parse_custom_values(form, state, f"custom_{action}_domains", _smart_domain)
+        _parse_custom_values(form, state, f"custom_{action}_ips", _smart_ip)
+
     if state["preset"] != "custom":
         state = _smart_apply_preset(state)
-    # Block is never a safe catch-all for a simple server.  The final route
-    # may be Direct or the explicitly installed WARP outbound.
-    if state["default_action"] == "block":
-        state["default_action"] = "direct"
     return state
 
 
@@ -815,8 +836,13 @@ def _smart_build(state: dict) -> dict:
 
     custom_groups = (
         ("Пользовательские правила: Заблокировать", "block", state["custom_block_domains"], state["custom_block_ips"]),
-        ("Пользовательские правила: Через SG-Gateway", "direct", state["custom_direct_domains"], state["custom_direct_ips"]),
-        ("Пользовательские правила: Через WARP", "warp", state["custom_warp_domains"], state["custom_warp_ips"]),
+        ("Пользовательские правила: SG-Gateway · IPv4", "direct4", state["custom_direct4_domains"], state["custom_direct4_ips"]),
+        ("Пользовательские правила: SG-Gateway · IPv6", "direct6", state["custom_direct6_domains"], state["custom_direct6_ips"]),
+        ("Пользовательские правила: WARP · IPv4", "warp4", state["custom_warp4_domains"], state["custom_warp4_ips"]),
+        ("Пользовательские правила: WARP · IPv6", "warp6", state["custom_warp6_domains"], state["custom_warp6_ips"]),
+        # Compatibility for a saved Preview 40/49 candidate.
+        ("Пользовательские правила: SG-Gateway · IPv4", "direct", state["custom_direct_domains"], state["custom_direct_ips"]),
+        ("Пользовательские правила: WARP · IPv4", "warp", state["custom_warp_domains"], state["custom_warp_ips"]),
     )
     for title, action, domains, ips in custom_groups:
         if domains or ips:
@@ -824,7 +850,14 @@ def _smart_build(state: dict) -> dict:
 
     local_domains = ["geosite:private"] if "private" in geosite else []
     local_ips = ["geoip:private"] if "private" in geoip else list(SMART_PRIVATE_IPS)
-    rules.append(_smart_rule("Локальная сеть", "direct", domains=local_domains, ips=local_ips))
+    rules.append(
+        _smart_rule(
+            "Локальная сеть",
+            state["local_action"],
+            domains=local_domains,
+            ips=local_ips,
+        )
+    )
 
     scope = state["russia_scope"]
     if scope != "none":
@@ -845,88 +878,105 @@ def _smart_build(state: dict) -> dict:
                 ips.append("geoip:ru")
             else:
                 missing.append("geoip:ru")
-        rules.append(_smart_rule("Российская маршрутизация", state["russia_action"], domains=domains, ips=ips, missing=missing))
+        rules.append(
+            _smart_rule(
+                "Российская маршрутизация",
+                state["russia_action"],
+                domains=domains,
+                ips=ips,
+                missing=missing,
+            )
+        )
 
-    if state["blocked_action"] != "direct":
+    if not _actions_equivalent(state["blocked_action"], state["default_action"]):
         category = _choose(SMART_BLOCKED_CATEGORIES, geosite)
-        rules.append(_smart_rule(
-            "Ресурсы, заблокированные в РФ",
-            state["blocked_action"],
-            domains=[f"geosite:{category}"] if category else [],
-            missing=[] if category else ["geosite:ru-blocked"],
-        ))
+        rules.append(
+            _smart_rule(
+                "Ресурсы, заблокированные в РФ",
+                state["blocked_action"],
+                domains=[f"geosite:{category}"] if category else [],
+                missing=[] if category else ["geosite:ru-blocked"],
+            )
+        )
 
-    if state["ads_action"] != "direct":
+    if not _actions_equivalent(state["ads_action"], state["default_action"]):
         category = _choose(SMART_ADS_CATEGORIES, geosite)
-        rules.append(_smart_rule(
-            "Реклама и трекеры",
-            state["ads_action"],
-            domains=[f"geosite:{category}"] if category else [],
-            missing=[] if category else ["geosite:category-ads"],
-        ))
+        rules.append(
+            _smart_rule(
+                "Реклама и трекеры",
+                state["ads_action"],
+                domains=[f"geosite:{category}"] if category else [],
+                missing=[] if category else ["geosite:category-ads"],
+            )
+        )
 
     default_action = state["default_action"]
+    # Only an old saved `direct` candidate keeps the implicit first-outbound
+    # behaviour. Every new Fix30 family action gets an explicit catch-all, so
+    # the selected IP family is never inferred from outbound order.
     default_rule = None
-    if default_action == "warp":
+    if default_action != "direct":
         default_rule = {
             "type": "field",
             "network": "tcp,udp",
-            "outboundTag": "warp",
+            "outboundTag": default_action,
         }
-    rules.append({
-        "title": "Остальной трафик",
-        "action": default_action,
-        "enabled": True,
-        "required": True,
-        "selected_geosite": None,
-        "selected_geoip": None,
-        "missing": [],
-        # Direct remains the implicit first outbound. WARP needs an explicit
-        # catch-all rule because it is intentionally not the default route.
-        "xray_rule": default_rule,
-        "implicit_default": default_rule is None,
-    })
+    rules.append(
+        {
+            "title": "Остальной трафик",
+            "action": default_action,
+            "enabled": True,
+            "required": True,
+            "selected_geosite": None,
+            "selected_geoip": None,
+            "missing": [],
+            "xray_rule": default_rule,
+            "implicit_default": default_rule is None,
+        }
+    )
 
-    warp_requested = any(item.get("action") == "warp" for item in rules)
-    if warp_requested:
-        try:
-            from app.routing.warp import enabled as warp_enabled
-            if not warp_enabled():
-                rules.append({
-                    "title": "WARP outbound",
-                    "action": "warp",
+    caps = routing_capabilities()
+    requested_actions = {
+        _canonical_family_action(str(item.get("action") or ""))
+        for item in rules
+        if item.get("enabled")
+    }
+    for action, label in (
+        ("direct6", "SG-Gateway · IPv6"),
+        ("warp4", "WARP · IPv4"),
+        ("warp6", "WARP · IPv6"),
+    ):
+        if action in requested_actions and not caps.get(action):
+            rules.append(
+                {
+                    "title": label,
+                    "action": action,
                     "enabled": False,
                     "required": True,
                     "selected_geosite": None,
                     "selected_geoip": None,
-                    "missing": ["WARP не установлен или выключен"],
+                    "missing": [f"{label} сейчас недоступен"],
                     "xray_rule": None,
-                })
-        except ImportError:
-            rules.append({
-                "title": "WARP outbound",
-                "action": "warp",
-                "enabled": False,
-                "required": True,
-                "selected_geosite": None,
-                "selected_geoip": None,
-                "missing": ["Модуль WARP недоступен"],
-                "xray_rule": None,
-            })
+                }
+            )
 
     missing = [item for item in rules if item["missing"]]
     ready = not missing
-    enabled_rules = [item["xray_rule"] for item in rules if item["enabled"] and item["xray_rule"]]
+    enabled_rules = [
+        item["xray_rule"]
+        for item in rules
+        if item["enabled"] and item["xray_rule"]
+    ]
     note = (
-        "Схема совместима с активными GeoFiles и реальными выходами SG-Gateway/WARP/Block"
+        "Схема готова: семейство IP зафиксировано отдельно для каждого выбранного выхода"
         if ready
-        else "В активных GeoFiles отсутствуют категории, необходимые выбранной схеме"
+        else "Выбранный выход или категория сейчас недоступны"
     )
     return {
-        "template_id": "smart-096-direct-warp-block",
+        "template_id": "smart-fix30-ip-family",
         "title": SMART_PRESET_TITLES[state["preset"]],
-        "summary": "Серверная схема SG Client 096 с необязательным реальным WARP-outbound",
-        "recommended_action": "direct",
+        "summary": "Family-explicit Routing без автоматического fallback IPv4/IPv6",
+        "recommended_action": "direct4",
         "mode": "replace_managed",
         "checked_at": _utc_now(),
         "ready": ready,
@@ -972,14 +1022,34 @@ def build_roscom_compatible_candidate(
     rules: list[dict] = []
     for category in direct_sites:
         if category in geosite_categories:
-            rules.append({"type": "field", "domain": [f"geosite:{category}"], "outboundTag": "direct"})
+            rules.append(
+                {
+                    "type": "field",
+                    "domain": [f"geosite:{category}"],
+                    "outboundTag": "direct",
+                }
+            )
     for category in direct_ips:
         if category in geoip_categories:
-            rules.append({"type": "field", "ip": [f"geoip:{category}"], "outboundTag": "direct"})
+            rules.append(
+                {
+                    "type": "field",
+                    "ip": [f"geoip:{category}"],
+                    "outboundTag": "direct",
+                }
+            )
     for category in block_sites:
         if category not in geosite_categories:
-            raise RoutingTemplateError(f"В RoscomVPN отсутствует выбранная категория geosite:{category}")
-        rules.append({"type": "field", "domain": [f"geosite:{category}"], "outboundTag": "block"})
+            raise RoutingTemplateError(
+                f"В RoscomVPN отсутствует выбранная категория geosite:{category}"
+            )
+        rules.append(
+            {
+                "type": "field",
+                "domain": [f"geosite:{category}"],
+                "outboundTag": "block",
+            }
+        )
     return sanitize_managed_fragment(
         {"routing": {"domainStrategy": "IPIfNonMatch", "rules": rules}}
     )
@@ -991,7 +1061,7 @@ def stage_smart_routing(form) -> dict:
     _write_json(_candidate_path(), preview)
     log_operation(
         "routing.smart.check",
-        "routing-smart:096-direct-warp-block",
+        "routing-smart:fix30-ip-family",
         f"Схема подготовлена: {preview['title']}",
     )
     return preview

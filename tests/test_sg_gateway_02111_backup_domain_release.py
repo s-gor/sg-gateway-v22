@@ -11,9 +11,10 @@ def text(path: str) -> str:
 
 
 def test_02111_scope_is_backup_and_domain_only() -> None:
-    assert text("VERSION").strip() == "0.1.0-021.12"
+    assert text("VERSION").strip() == "0.1.0-022.04"
     manifest = json.loads(text("release-manifest.json"))
-    assert manifest["version"] == "0.1.0-021.12"
+    assert manifest["version"] == "0.1.0-022.04"
+    assert manifest["rebuild_policy"]["baseline"] == "0.1.0-021.12"
     assert manifest["portable_full_backup"]["single_file"] is True
     assert manifest["portable_full_backup"]["includes_https_certificates"] is True
     assert manifest["portable_full_backup"]["restore_live_terminal"] is True
@@ -66,7 +67,7 @@ def test_nginx_upload_contract_is_durable() -> None:
     access = text("deploy/configure-panel-access.sh")
     runtime = text("hostd/sg_hostd/full_backup_runtime.py")
     assert "SG_GATEWAY_FULL_BACKUP_UPLOAD_FIX1" in access
-    assert "client_max_body_size 1024m;" in access
+    assert "client_max_body_size 0;" in access
     assert "proxy_read_timeout 300s;" in access
     assert "def _ensure_full_restore_upload_nginx()" in runtime
 

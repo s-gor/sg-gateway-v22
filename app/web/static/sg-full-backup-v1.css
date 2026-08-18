@@ -1,17 +1,11 @@
-/* SG-Gateway 0.1.0-021.12 · Full Backup UI V2
-   Visual-only polish. Backup/restore runtime is intentionally untouched. */
+/* SG-Gateway 0.1.0-022.04 · Full Backup UI V3
+   Visual-only refinement. Backup/restore runtime is intentionally untouched. */
 .sg-full-backup-card{
   position:relative;
   overflow:hidden;
-  isolation:isolate;
 }
-.sg-full-backup-card::before{
-  content:"";
-  position:absolute;
-  inset:0 auto 0 0;
-  width:4px;
-  background:linear-gradient(180deg,var(--sg-green),color-mix(in srgb,var(--sg-green) 55%,var(--sg-blue)));
-}
+/* The old decorative release stripe consumed visual weight without carrying state. */
+.sg-full-backup-card::before{display:none!important;content:none!important}
 .sg-full-backup-head{align-items:flex-start;gap:24px}
 .sg-full-backup-head>div{max-width:980px}
 .sg-full-backup-head h2{margin-bottom:7px}
@@ -30,15 +24,26 @@
 }
 .sg-full-backup-grid{
   display:grid;
-  grid-template-columns:minmax(0,1.45fr) minmax(360px,.75fr);
-  gap:18px;
+  grid-template-columns:minmax(0,1.45fr) minmax(390px,.75fr);
+  gap:24px;
   margin-top:20px;
-  align-items:stretch;
+  align-items:start;
 }
-.sg-full-backup-note,.sg-full-restore-box{
+.sg-full-backup-note{
   min-width:0;
   padding:22px 24px;
   border-radius:16px!important;
+}
+/* Restore is an action zone, not a second heavy card inside the Full Backup card. */
+.sg-full-restore-box{
+  min-width:0;
+  align-self:start;
+  padding:10px 0 0 8px!important;
+  border:0!important;
+  border-radius:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+  backdrop-filter:none!important;
 }
 .sg-full-section-title{
   display:flex;
@@ -72,9 +77,9 @@
   background:color-mix(in srgb,var(--sg-green) 12%,transparent);
 }
 .sg-full-section-icon.restore{
-  color:var(--sg-blue);
-  border-color:color-mix(in srgb,var(--sg-blue) 38%,transparent);
-  background:color-mix(in srgb,var(--sg-blue) 10%,transparent);
+  color:var(--sg-yellow);
+  border-color:color-mix(in srgb,var(--sg-yellow) 38%,transparent);
+  background:color-mix(in srgb,var(--sg-yellow) 10%,transparent);
 }
 .sg-full-section-icon svg{width:21px!important;height:21px!important}
 .sg-full-backup-components{
@@ -120,7 +125,7 @@
   color:var(--sg-yellow);
 }
 .sg-full-backup-warning strong{display:inline;color:var(--sg-text)}
-.sg-full-upload{display:grid;gap:14px;margin-top:18px}
+.sg-full-upload{display:grid;gap:13px;margin-top:17px}
 .sg-full-file-input{
   position:absolute!important;
   width:1px!important;
@@ -208,21 +213,51 @@
 }
 .sg-full-restore-actions{
   display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:13px;
+  flex-wrap:wrap;
+  align-items:stretch;
+  justify-content:flex-start;
+  gap:10px 12px;
+  min-width:0;
 }
 .sg-full-restore-note{
+  flex:1 0 100%;
+  min-width:0;
+  max-width:none;
   color:var(--sg-muted);
   font-size:.76rem;
   line-height:1.38;
-  max-width:260px;
+}
+.sg-full-restore-actions .sg-full-restore-button{
+  flex:1 1 168px;
+  min-width:0;
+  max-width:100%;
+  min-height:42px;
+}
+/* Verify is safe/read-only, so it stays cool and neutral. */
+.sg-full-restore-actions .sg-full-verify-button{
+  border-color:color-mix(in srgb,var(--sg-blue) 42%,var(--sg-line));
+  background:color-mix(in srgb,var(--sg-blue) 13%,var(--sg-panel));
+  color:color-mix(in srgb,var(--sg-blue) 88%,white);
+}
+/* Restore is destructive-ish: use the same amber/brown visual language as disable actions. */
+.sg-full-restore-actions [data-sg-full-restore-button]{
+  border-color:color-mix(in srgb,var(--sg-yellow) 58%,#6f4728);
+  background:linear-gradient(180deg,
+    color-mix(in srgb,var(--sg-yellow) 44%,#8a5b30),
+    color-mix(in srgb,var(--sg-yellow) 31%,#6b4427));
+  color:#fff5df;
+  box-shadow:0 8px 18px color-mix(in srgb,#4f321d 24%,transparent);
+}
+.sg-full-restore-actions [data-sg-full-restore-button]:not(:disabled):hover{
+  border-color:color-mix(in srgb,var(--sg-yellow) 72%,#7a4c28);
+  filter:brightness(1.06);
 }
 .sg-full-restore-button:disabled{
   opacity:.46!important;
   cursor:not-allowed!important;
   filter:saturate(.35);
   transform:none!important;
+  box-shadow:none!important;
 }
 .sg-full-backup-latest{
   display:flex;
@@ -276,13 +311,17 @@ html[data-theme="light"] .sg-full-backup-components em{
   background:rgba(255,255,255,.38);
 }
 @media(max-width:1050px){
-  .sg-full-backup-grid{grid-template-columns:1fr}
+  .sg-full-backup-grid{grid-template-columns:1fr;gap:18px}
+  .sg-full-restore-box{
+    padding:18px 0 0!important;
+    border-top:1px solid var(--sg-line-soft)!important;
+  }
   .sg-full-restore-note{max-width:none}
 }
 @media(max-width:700px){
   .sg-full-backup-head{display:grid!important}
   .sg-full-backup-head form,.sg-full-create{width:100%}
-  .sg-full-backup-note,.sg-full-restore-box{padding:18px}
+  .sg-full-backup-note{padding:18px}
   .sg-full-backup-components,.sg-full-backup-detail,.sg-full-backup-warning{margin-left:0}
   .sg-full-file-picker{grid-template-columns:40px minmax(0,1fr)}
   .sg-full-file-action{grid-column:1/-1;width:100%}

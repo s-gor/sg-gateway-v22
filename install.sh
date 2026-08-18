@@ -1,28 +1,30 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-VERSION="0.1.0-021.12"
-INSTALLER_BUILD="02112-full-clean-backup-domain"
+VERSION="0.1.0-022.04"
+INSTALLER_BUILD="02204-full-clean-dual-stack"
 SOURCE_DIR="${SG_GATEWAY_SOURCE_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)}"
 PREFIX="/opt/sg-gateway"
 CONFIG_DIR="/etc/sg-gateway"
 DATA_DIR="/var/lib/sg-gateway"
 LOG_DIR="/var/log/sg-gateway"
-INSTALL_LOG="/var/log/sg-gateway-installer-02112.log"
+INSTALL_LOG="/var/log/sg-gateway-installer-02204.log"
 BACKUP_ROOT="/root/sg-gateway-backups"
-RESUME_FILE="/root/sg-gateway-02112-installer-resume.env"
+RESUME_FILE="/root/sg-gateway-02204-installer-resume.env"
 MIHOMO_VERSION="v1.19.29"
 SING_BOX_VERSION="1.13.14"
 WGCF_CLI_VERSION="v0.3.6"
 AMNEZIAWG_TOOLS_VERSION="1.0.20260618-2"
 AMNEZIAWG_KMOD_VERSION="1.0.20260329-2"
 AMNEZIAWG_DKMS_VERSION="1.0.0"
+AWG3_TOOLS_VERSION="3.0.20260805"
+AWG3_GO_VERSION="v3.0.0"
 PANEL_USER="sg-gateway"
 PANEL_GROUP="sg-gateway"
 XRAY_REQUIRED_VERSION="v26.6.27"
 XRAY_MINIMUM_VERSION="v26.6.27"
 
-# SG-Gateway 021 vendor bundle. Clean installation does not download these
+# SG-Gateway V22 vendor bundle. Clean installation does not download these
 # runtimes from upstream projects. The files are committed with the source.
 VENDOR_CORES_DIR="${SG_GATEWAY_VENDOR_CORES_DIR:-$SOURCE_DIR/vendor/cores}"
 VENDOR_CORES_MANIFEST="$VENDOR_CORES_DIR/SHA256SUMS"
@@ -32,10 +34,13 @@ SINGBOX_VENDOR_FILE="sing-box-1.13.14-linux-amd64.tar.gz"
 WGCF_VENDOR_FILE="wgcf-cli-linux-64.tar.zstd"
 AWG_TOOLS_VENDOR_FILE="amneziawg-tools-1.0.20260618-2.tar.gz"
 AWG_KMOD_VENDOR_FILE="amneziawg-linux-kernel-module-1.0.20260329-2.tar.gz"
+AWG3_TOOLS_VENDOR_FILE="amneziawg-tools-3.0.20260805.tar.gz"
+AWG3_GO_VENDOR_FILE="amneziawg-go-linux-amd64-v3.0.0"
 
 DEFAULT_PANEL_PORT="63443"
 DEFAULT_XRAY_PORT="443"
 DEFAULT_AWG_PORT="585"
+DEFAULT_AWG3_PORT="586"
 DEFAULT_REALITY_TARGET="www.bing.com:443"
 DEFAULT_REALITY_SNI="www.bing.com"
 MIHOMO_PORT="2099"
@@ -95,6 +100,7 @@ MANAGED_PATHS=(
   etc/systemd/system/sg-hostd.service
   etc/systemd/system/sg-hostd.service.d
   etc/systemd/system/sg-gateway-awg.service
+  etc/systemd/system/sg-gateway-awg3.service
   etc/systemd/system/sg-gateway-singbox.service
   etc/systemd/system/mihomo.service
   etc/nginx/nginx.conf
@@ -264,7 +270,7 @@ show_service_diagnostics() {
     local service
     echo "===== SERVICE DIAGNOSTICS ====="
     for service in sg-gateway.service sg-hostd.service xray.service mihomo.service \
-      sg-gateway-awg.service sg-gateway-singbox.service nginx.service; do
+      sg-gateway-awg.service sg-gateway-awg3.service sg-gateway-singbox.service nginx.service; do
       if systemctl cat "$service" >/dev/null 2>&1; then
         echo "===== ${service} ====="
         systemctl is-active "$service" 2>/dev/null || true
@@ -296,7 +302,7 @@ restore_backup() {
   printf "\n%s[SG-Gateway] [ОТКАТ]%s Восстанавливаю предыдущую установку SG-Gateway.\n" "$YELLOW" "$RESET"
 
   systemctl stop sg-gateway.service sg-hostd.service xray.service mihomo.service \
-    sg-gateway-awg.service sg-gateway-singbox.service nginx.service >/dev/null 2>&1 || true
+    sg-gateway-awg.service sg-gateway-awg3.service sg-gateway-singbox.service nginx.service >/dev/null 2>&1 || true
   rollback_remove_managed_paths /
 
   if [[ -f "$BACKUP_DIR/managed-paths.tar" ]]; then
@@ -327,7 +333,7 @@ restore_backup() {
   # Restore enablement first.  Missing/optional units are ignored only when
   # they were not present or active before the update.
   for service in sg-hostd.service xray.service mihomo.service \
-    sg-gateway-awg.service sg-gateway-singbox.service sg-gateway.service nginx.service; do
+    sg-gateway-awg.service sg-gateway-awg3.service sg-gateway-singbox.service sg-gateway.service nginx.service; do
     if [[ "${was_enabled[$service]:-0}" == "1" ]]; then
       systemctl enable "$service" >/dev/null 2>&1 || true
     elif [[ -n "${was_enabled[$service]+x}" ]]; then
@@ -337,7 +343,7 @@ restore_backup() {
 
   # Restore the exact active set in dependency-safe order.
   for service in sg-hostd.service xray.service mihomo.service \
-    sg-gateway-awg.service sg-gateway-singbox.service sg-gateway.service nginx.service; do
+    sg-gateway-awg.service sg-gateway-awg3.service sg-gateway-singbox.service sg-gateway.service nginx.service; do
     if [[ "${was_active[$service]:-0}" == "1" ]]; then
       if ! systemctl restart "$service" >>"$INSTALL_LOG" 2>&1; then
         echo "ROLLBACK SERVICE FAILED: $service" >>"$INSTALL_LOG"
@@ -860,6 +866,7 @@ detect_minimal_013_install() {
   PANEL_PORT="$DEFAULT_PANEL_PORT"
   XRAY_PORT="$(env_value "$public_file" SG_TCP_PORT || true)"
   AWG_PORT="$DEFAULT_AWG_PORT"
+  AWG3_PORT="$DEFAULT_AWG3_PORT"
   REALITY_TARGET="$(env_value "$xray_file" SG_REALITY_TARGET || true)"
   REALITY_SNI="$(env_value "$public_file" SG_REALITY_SNI || true)"
   PUBLIC_ADDRESS="$(env_value "$public_file" SG_PUBLIC_HOST || true)"
@@ -1021,6 +1028,7 @@ collect_automatic_parameters() {
   PANEL_PORT="$DEFAULT_PANEL_PORT"
   XRAY_PORT="$DEFAULT_XRAY_PORT"
   AWG_PORT="$DEFAULT_AWG_PORT"
+  AWG3_PORT="$DEFAULT_AWG3_PORT"
   REALITY_TARGET="$DEFAULT_REALITY_TARGET"
   REALITY_SNI="$DEFAULT_REALITY_SNI"
   CREATE_SG_ADMIN="1"
@@ -1054,7 +1062,7 @@ create_backup() {
   : > "$BACKUP_DIR/service-state.tsv"
   local service active enabled
   for service in sg-hostd.service xray.service mihomo.service \
-    sg-gateway-awg.service sg-gateway-singbox.service sg-gateway.service nginx.service; do
+    sg-gateway-awg.service sg-gateway-awg3.service sg-gateway-singbox.service sg-gateway.service nginx.service; do
     active=0; enabled=0
     systemctl is-active --quiet "$service" && active=1 || true
     systemctl is-enabled --quiet "$service" && enabled=1 || true
@@ -1067,7 +1075,7 @@ create_backup() {
 stage_backup_and_prepare() {
   create_backup
   systemctl stop sg-gateway.service sg-hostd.service xray.service mihomo.service \
-    sg-gateway-awg.service sg-gateway-singbox.service >/dev/null 2>&1 || true
+    sg-gateway-awg.service sg-gateway-awg3.service sg-gateway-singbox.service >/dev/null 2>&1 || true
   rm -rf "$PREFIX.new"
   rm -rf "$PREFIX"
   install -d -m 0755 "$PREFIX.new"
@@ -1148,7 +1156,9 @@ verify_vendor_core_set() {
     "$SINGBOX_VENDOR_FILE" \
     "$WGCF_VENDOR_FILE" \
     "$AWG_TOOLS_VENDOR_FILE" \
-    "$AWG_KMOD_VENDOR_FILE"; do
+    "$AWG_KMOD_VENDOR_FILE" \
+    "$AWG3_TOOLS_VENDOR_FILE" \
+    "$AWG3_GO_VENDOR_FILE"; do
     [[ -s "$VENDOR_CORES_DIR/$required" ]] || {
       echo "Vendor core file missing or empty: $required" >&2
       return 1
@@ -1164,7 +1174,9 @@ verify_vendor_core_set() {
   zstd -tq "$VENDOR_CORES_DIR/$WGCF_VENDOR_FILE"
   tar -tzf "$VENDOR_CORES_DIR/$AWG_TOOLS_VENDOR_FILE" >/dev/null
   tar -tzf "$VENDOR_CORES_DIR/$AWG_KMOD_VENDOR_FILE" >/dev/null
-  echo "[SG-Gateway] Vendor core set: OK (6/6, linux/amd64)"
+  tar -tzf "$VENDOR_CORES_DIR/$AWG3_TOOLS_VENDOR_FILE" >/dev/null
+  test -s "$VENDOR_CORES_DIR/$AWG3_GO_VENDOR_FILE"
+  echo "[SG-Gateway] Vendor core set: OK (8/8, linux/amd64)"
 }
 
 install_xray_from_vendor() {
@@ -1340,6 +1352,36 @@ install_amneziawg_from_vendor() {
   rm -rf "$temp"
 }
 
+
+install_amneziawg3_userspace_from_vendor() {
+  local tools_archive temp tools_src jobs
+  tools_archive="$VENDOR_CORES_DIR/$AWG3_TOOLS_VENDOR_FILE"
+  temp="$(mktemp -d)"
+  tar -xzf "$tools_archive" -C "$temp"
+  tools_src="$(find "$temp" -maxdepth 1 -type d -name 'amneziawg-tools-*' -print -quit)"
+  [[ -n "$tools_src" ]] || {
+    rm -rf "$temp"
+    echo "AWG3 tools source directory not found in vendor archive" >&2
+    return 1
+  }
+
+  jobs="$(nproc 2>/dev/null || echo 1)"
+  rm -rf "$PREFIX/awg3"
+  install -d -m 0755 "$PREFIX/awg3/bin"
+  echo "AmneziaWG 3 tools ${AWG3_TOOLS_VERSION}: изолированная userspace-сборка"
+  make -C "$tools_src/src" PLATFORM=linux -j"$jobs"
+  make -C "$tools_src/src" \
+    PLATFORM=linux WITH_WGQUICK=yes WITH_BASHCOMPLETION=no WITH_SYSTEMDUNITS=no \
+    PREFIX="$PREFIX/awg3" install
+  install -m 0755 "$VENDOR_CORES_DIR/$AWG3_GO_VENDOR_FILE" "$PREFIX/awg3/bin/amneziawg-go"
+  [[ -x "$PREFIX/awg3/bin/awg" ]]
+  [[ -x "$PREFIX/awg3/bin/awg-quick" ]]
+  [[ -x "$PREFIX/awg3/bin/amneziawg-go" ]]
+  "$PREFIX/awg3/bin/awg" --version
+  rm -rf "$temp"
+  echo "AmneziaWG 3 userspace ${AWG3_GO_VERSION}: готов; AWG2 runtime не изменён"
+}
+
 xray_installed_version() {
   local output="" first_line="" value=""
   output="$(/usr/local/bin/xray version 2>/dev/null || true)"
@@ -1375,10 +1417,13 @@ stage_engine_runtimes() {
   # With global pipefail, early consumer exit on some VPS can surface as SIGPIPE (141).
   verify_vendor_core_set
 
-  echo "[Engine 1/5] AmneziaWG tools ${AMNEZIAWG_TOOLS_VERSION} / kernel ${AMNEZIAWG_KMOD_VERSION}"
+  echo "[Engine 1/6] AmneziaWG 2 tools ${AMNEZIAWG_TOOLS_VERSION} / kernel ${AMNEZIAWG_KMOD_VERSION}"
   install_amneziawg_from_vendor
 
-  echo "[Engine 2/5] Xray ${XRAY_REQUIRED_VERSION}"
+  echo "[Engine 2/6] AmneziaWG 3 userspace ${AWG3_TOOLS_VERSION} / ${AWG3_GO_VERSION}"
+  install_amneziawg3_userspace_from_vendor
+
+  echo "[Engine 3/6] Xray ${XRAY_REQUIRED_VERSION}"
   local installed_xray=""
   if [[ -x /usr/local/bin/xray ]]; then
     installed_xray="$(xray_installed_version)"
@@ -1392,13 +1437,13 @@ stage_engine_runtimes() {
   verify_xray_version
   systemctl disable --now xray.service >/dev/null 2>&1 || true
 
-  echo "[Engine 3/5] Mihomo ${MIHOMO_VERSION}"
+  echo "[Engine 4/6] Mihomo ${MIHOMO_VERSION}"
   install_mihomo_from_vendor
 
-  echo "[Engine 4/5] sing-box ${SING_BOX_VERSION}"
+  echo "[Engine 5/6] sing-box ${SING_BOX_VERSION}"
   install_sing_box_from_vendor
 
-  echo "[Engine 5/5] WARP wgcf-cli ${WGCF_CLI_VERSION}"
+  echo "[Engine 6/6] WARP wgcf-cli ${WGCF_CLI_VERSION}"
   install_wgcf_from_vendor
 }
 
@@ -1982,8 +2027,7 @@ stage_local_application_smoke_test() {
     SG_GATEWAY_SECRET_KEY="smoke-test-secret" \
     SG_GATEWAY_ADMIN_PASSWORD="smoke-test-password" \
     "$PREFIX/.venv/bin/python" - <<'PY'
-from app.main import create_app
-app = create_app()
+from app.production import app
 app.testing = True
 client = app.test_client()
 health = client.get('/health')
@@ -2129,7 +2173,7 @@ else:
 block = (
     f"{indent}# {marker}\n"
     f"{indent}location = /maintenance/full-backups/restore {{\n"
-    f"{indent}    client_max_body_size 1024m;\n"
+    f"{indent}    client_max_body_size 0;\n"
     f"{indent}    client_body_timeout 300s;\n"
     f"{indent}    proxy_pass http://127.0.0.1:{backend_port};\n"
     f"{indent}    proxy_http_version 1.1;\n"
@@ -2193,7 +2237,7 @@ User=${PANEL_USER}
 Group=${PANEL_GROUP}
 WorkingDirectory=${PREFIX}
 EnvironmentFile=${CONFIG_DIR}/sg-gateway.env
-ExecStart=${PREFIX}/.venv/bin/waitress-serve --host=\${SG_GATEWAY_HOST} --port=\${SG_GATEWAY_PORT} app.main:app
+ExecStart=${PREFIX}/.venv/bin/waitress-serve --host=\${SG_GATEWAY_HOST} --port=\${SG_GATEWAY_PORT} app.production:app
 Restart=on-failure
 RestartSec=3
 TimeoutStopSec=30
@@ -2209,6 +2253,7 @@ WantedBy=multi-user.target
 EOF
 
   install -m 0644 "$PREFIX/deploy/sg-gateway-awg.service" /etc/systemd/system/sg-gateway-awg.service
+  install -m 0644 "$PREFIX/deploy/sg-gateway-awg3.service" /etc/systemd/system/sg-gateway-awg3.service
   install -m 0644 "$PREFIX/deploy/sg-gateway-singbox.service" /etc/systemd/system/sg-gateway-singbox.service
   install -m 0644 "$PREFIX/deploy/mihomo.service" /etc/systemd/system/mihomo.service
 
@@ -2326,7 +2371,7 @@ server {
 
     # SG_GATEWAY_FULL_BACKUP_UPLOAD_FIX1
     location = /maintenance/full-backups/restore {
-        client_max_body_size 1024m;
+        client_max_body_size 0;
         client_body_timeout 300s;
         proxy_pass http://127.0.0.1:${BACKEND_PORT};
         proxy_http_version 1.1;
@@ -2365,7 +2410,7 @@ EOF
   [[ "$(systemctl show -p User --value sg-hostd.service)" == "root" ]]
   [[ -z "$(systemctl show -p DropInPaths --value sg-hostd.service)" ]]
   if (( UPDATE_MODE == 0 )); then
-    systemctl disable sg-gateway-awg.service sg-gateway-singbox.service >/dev/null 2>&1 || true
+    systemctl disable sg-gateway-awg.service sg-gateway-awg3.service sg-gateway-singbox.service >/dev/null 2>&1 || true
     systemctl enable --now mihomo.service
     systemctl is-active --quiet mihomo.service
   fi
@@ -2379,7 +2424,7 @@ stage_firewall_and_network() {
     for rule in \
       "${PANEL_PORT}/tcp" "80/tcp" "${XRAY_PORT}/tcp" \
       "${XHTTP_REALITY_PORT}/tcp" "${XHTTP_TLS_PORT}/tcp" \
-      "${AWG_PORT}/udp" "${HYSTERIA2_PORT}/udp" \
+      "${AWG_PORT}/udp" "${AWG3_PORT}/udp" "${HYSTERIA2_PORT}/udp" \
       "${MIHOMO_PORT}/tcp" "${ANYTLS_PORT}/tcp" "${TUIC_PORT}/udp"; do
       ufw allow "$rule"
     done
@@ -2608,7 +2653,7 @@ service_was_enabled_before_update() {
 restore_update_runtime_services() {
   (( UPDATE_MODE == 1 )) || return 0
   local service
-  for service in mihomo.service sg-gateway-awg.service sg-gateway-singbox.service; do
+  for service in mihomo.service sg-gateway-awg.service sg-gateway-awg3.service sg-gateway-singbox.service; do
     if service_was_enabled_before_update "$service"; then
       systemctl_with_retry enable "$service"
     fi
@@ -2687,10 +2732,9 @@ run_final_stage() {
   local started=$SECONDS
   run_hidden "Этап 9/9 · 1/5 · Запуск sg-hostd" stage9_start_hostd
   run_hidden "Этап 9/9 · 2/5 · Проверка команд hostd" stage9_verify_hostd
-  run_hidden "Этап 9/9 · 3/6 · Сохранение/применение Xray runtime" stage9_apply_runtime
-  run_hidden "Этап 9/9 · 4/6 · Создание и активация WARP" stage9_ensure_warp
-  run_hidden "Этап 9/9 · 5/6 · Запуск панели" stage9_start_panel
-  run_hidden "Этап 9/9 · 6/6 · Проверка Nginx и служб" stage9_verify_nginx
+  run_hidden "Этап 9/9 · 3/5 · Сохранение/применение Xray runtime" stage9_apply_runtime
+  run_hidden "Этап 9/9 · 4/5 · Запуск панели" stage9_start_panel
+  run_hidden "Этап 9/9 · 5/5 · Проверка Nginx и служб" stage9_verify_nginx
   local elapsed=$((SECONDS - started))
   printf "%s[OK]%s Этап 9/%s · Запуск и финальная проверка (%s сек.)\n" \
     "$GREEN" "$RESET" "$TOTAL_STAGES" "$elapsed"
@@ -2769,6 +2813,7 @@ main() {
 
   # AmneziaWG has one canonical SG-Gateway transport port.
   AWG_PORT="$DEFAULT_AWG_PORT"
+  AWG3_PORT="$DEFAULT_AWG3_PORT"
 
   BACKUP_DIR="$BACKUP_ROOT/$(date +%Y%m%d-%H%M%S)-before-sg-gateway-021"
   MUTATION_STARTED=1
@@ -2786,7 +2831,6 @@ main() {
   run_quiet "Этап 10/10 · Запуск sg-hostd" stage9_start_hostd
   run_quiet "Этап 10/10 · Проверка команд hostd" stage9_verify_hostd
   run_quiet "Этап 10/10 · Применение подтверждённого Xray и клиентов" stage9_apply_runtime
-  run_quiet "Этап 10/10 · Создание и активация WARP" stage9_ensure_warp
   run_quiet "Этап 10/10 · Запуск панели" stage9_start_panel
   run_quiet "Этап 10/10 · Проверка Nginx и служб" stage9_verify_nginx
   run_quiet "Этап 10/10 · Контроль неизменности Clients" verify_client_identities_after_update
@@ -2830,7 +2874,11 @@ main() {
   printf '[SG-Gateway] Backup:       %s\n' "$BACKUP_DIR"
   printf '[SG-Gateway] SSH hostname станет виден после нового подключения: %s\n' "$SERVER_NAME"
   print_sg_admin_status
-  printf '[SG-Gateway] WARP:         создан и активен\n'
+  if [[ -s "$DATA_DIR/warp/wgcf.xray.json" || -s "$DATA_DIR/warp/wgcf-profile.conf" ]]; then
+    printf '[SG-Gateway] WARP:         существующий профиль сохранён\n'
+  else
+    printf '[SG-Gateway] WARP:         helper установлен; создаётся при необходимости в Outbounds\n'
+  fi
 
 }
 

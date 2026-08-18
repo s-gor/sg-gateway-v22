@@ -11,6 +11,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Sequence
 
+from app.maintenance.panel_updates import GITHUB_BRANCH
+
 JOB_DIR = Path(
     os.getenv("SG_GATEWAY_OPERATION_JOB_DIR", "/var/lib/sg-gateway/security/jobs")
 )
@@ -22,6 +24,7 @@ XRAY_PREVIOUS = XRAY_CONFIG.with_suffix(".json.previous")
 RUNNER = Path("/opt/sg-gateway/hostd/sg_hostd/operation_job_runner.py")
 PYTHON = Path("/opt/sg-gateway/.venv/bin/python")
 PANEL_ACCESS_SCRIPT = Path("/opt/sg-gateway/deploy/configure-panel-access.sh")
+PANEL_UPDATE_SCRIPT = Path("/opt/sg-gateway/deploy/update-from-github.sh")
 
 
 def _utc_now() -> str:
@@ -252,13 +255,21 @@ def start_xray_apply_job() -> dict[str, Any]:
 
 
 def start_panel_update_job() -> dict[str, Any]:
+    if not PANEL_UPDATE_SCRIPT.is_file():
+        raise RuntimeError(f"Не найден {PANEL_UPDATE_SCRIPT}")
     return _start(
-        "panel_update_main",
-        "Безопасное обновление SG-Gateway из GitHub main",
+        "panel_update_channel",
+        f"Безопасное обновление SG-Gateway из GitHub {GITHUB_BRANCH}",
         "/maintenance?tab=updates&refresh=1",
         "/maintenance?tab=updates",
+        {"channel": GITHUB_BRANCH, "restart_expected": True},
+        command=(
+"/usr/bin/env",
+f"SG_GATEWAY_GITHUB_BRANCH={GITHUB_BRANCH}",
+"/bin/bash",
+str(PANEL_UPDATE_SCRIPT),
+        ),
     )
-
 
 def start_core_update_job(engine: str) -> dict[str, Any]:
     if engine not in {"mihomo", "sing-box", "wgcf"}:

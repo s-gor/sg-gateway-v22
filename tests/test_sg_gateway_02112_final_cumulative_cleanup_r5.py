@@ -17,12 +17,12 @@ def _text(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def test_02112_active_installer_identity_has_no_02111_tail() -> None:
+def test_current_installer_identity_is_02204_and_has_no_02111_tail() -> None:
     text = _text(INSTALLER)
-    assert 'VERSION="0.1.0-021.12"' in text
-    assert 'INSTALLER_BUILD="02112-full-clean-backup-domain"' in text
-    assert 'INSTALL_LOG="/var/log/sg-gateway-installer-02112.log"' in text
-    assert 'RESUME_FILE="/root/sg-gateway-02112-installer-resume.env"' in text
+    assert 'VERSION="0.1.0-022.04"' in text
+    assert 'INSTALLER_BUILD="02204-full-clean-dual-stack"' in text
+    assert 'INSTALL_LOG="/var/log/sg-gateway-installer-02204.log"' in text
+    assert 'RESUME_FILE="/root/sg-gateway-02204-installer-resume.env"' in text
 
     assert 'INSTALLER_BUILD="02111-full-clean-backup-domain"' not in text
     assert 'INSTALL_LOG="/var/log/sg-gateway-installer-02111.log"' not in text
@@ -31,7 +31,7 @@ def test_02112_active_installer_identity_has_no_02111_tail() -> None:
 
 def test_02112_uninstall_has_current_identity_and_legacy_cleanup() -> None:
     text = _text(UNINSTALLER)
-    assert 'UNINSTALL_LOG="/var/log/sg-gateway-full-uninstall-02112.log"' in text
+    assert 'UNINSTALL_LOG="/var/log/sg-gateway-full-uninstall-02204.log"' in text
     assert "/root/sg-gateway-02112-installer-resume.env" in text
     assert "/var/log/sg-gateway-installer-02112.log" in text
 
@@ -57,12 +57,13 @@ def test_light_update_preserves_local_assets_without_downloading_them() -> None:
     assert "sparse-checkout set app hostd deploy assets" not in text
 
 
-def test_build_run_uses_committed_git_archive_and_checks_both_resume_generations() -> None:
+def test_build_run_uses_committed_git_archive_and_version_driven_identity() -> None:
     text = _text(BUILD_RUN)
-    assert "SG_GATEWAY_02112_CANONICAL_GIT_ARCHIVE_FIX11" in text
+    assert 'VERSION="$(tr -d' in text
+    assert 'BUILD_ID="$(tr -d' in text
     assert 'git -C "$ROOT" archive --format=tar HEAD' in text
-    assert "/root/sg-gateway-02112-installer-resume.env" in text
-    assert "/root/sg-gateway-02111-installer-resume.env" in text
+    assert 'DEFAULT_BASENAME="SG-Gateway-${VERSION}-FULL"' in text
+    assert 'EXPECTED_VERSION="0.1.0-021.12"' not in text
 
 
 def test_final_publication_metadata_is_consistent() -> None:
@@ -73,9 +74,13 @@ def test_final_publication_metadata_is_consistent() -> None:
     assert "/opt/sg-gateway/assets" in publication
 
     release = json.loads(_text(ROOT / "release-manifest.json"))
-    assert release["version"] == "0.1.0-021.12"
-    assert release["status"] == "FINAL-AWG2"
-    assert release["next_development_line"] == "0.1.0-022.01"
+    assert release["version"] == "0.1.0-022.04"
+    assert release["status"] == "DEV"
+    assert release["next_development_line"] == "0.1.0-022.05"
+    assert release["channel"] == "dev-v22"
+    assert release["rebuild_target"] == "0.1.0-022.04"
+    assert release["rebuild_policy"]["baseline"] == "0.1.0-021.12"
+    assert release["rebuild_policy"]["awg3"] is True
     assert release["safe_update"]["preserve_local_assets"] is True
     assert release["safe_update"]["download_assets"] is False
     assert release["source_integrity"]["mode"] == "git-blob-sha256"
@@ -114,5 +119,5 @@ def test_ci_checks_canonical_integrity_and_full_clean() -> None:
     assert "Verify FINAL source integrity" in workflow
     assert '["git", "show", f"HEAD:{path}"]' in workflow
     assert "Git-blob source integrity ok:" in workflow
-    assert "Build and verify FINAL FULL CLEAN" in workflow
-    assert "bash build-run.sh /tmp/SG-Gateway-02112-FULL-CLEAN.run" in workflow
+    assert "Build and verify current FULL package" in workflow
+    assert 'OUT="/tmp/SG-Gateway-${VERSION}-FULL.run"' in workflow

@@ -6,7 +6,7 @@ import sqlite3
 from pathlib import Path
 
 from app.config import load_config
-from app.constants import AMNEZIAWG_UDP_PORT
+from app.constants import AMNEZIAWG3_UDP_PORT, AMNEZIAWG_UDP_PORT
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS clients (
@@ -108,6 +108,14 @@ DEFAULT_CONNECTIONS = {
         "config_json": (
             '{"dns":"1.1.1.1","country_code":"nl","server_public_key":"PLACEHOLDER_SERVER_PUBLIC_KEY",'
             '"allowed_ips":"0.0.0.0/0, ::/0","persistent_keepalive":25}'
+        ),
+    },
+    "amneziawg3": {
+        "host": "",
+        "port": AMNEZIAWG3_UDP_PORT,
+        "config_json": (
+            '{"dns":"1.1.1.1","country_code":"nl","server_public_key":"PLACEHOLDER_AWG3_SERVER_PUBLIC_KEY",'
+            '"allowed_ips":"0.0.0.0/0, ::/0","persistent_keepalive":"25-35","generation":3}'
         ),
     },
     "xray": {
@@ -238,7 +246,7 @@ def _migrate_amneziawg_udp_585(connection: sqlite3.Connection) -> None:
 
 
 def _migrate_xray_hysteria2_salamander(connection: sqlite3.Connection) -> None:
-    """Add server-level Hysteria2 Salamander state without changing old links."""
+    """Add server-level Hysteria2 obfuscation state without changing old links."""
     row = connection.execute(
         "SELECT host, port, config_json FROM connection_settings WHERE engine = 'xray'"
     ).fetchone()
@@ -265,7 +273,7 @@ def _migrate_xray_hysteria2_salamander(connection: sqlite3.Connection) -> None:
             changed = True
 
     mode = str(config.get("hysteria2_obfs_mode") or "none").strip().lower()
-    if mode not in {"none", "salamander"}:
+    if mode not in {"none", "salamander", "gecko"}:
         config["hysteria2_obfs_mode"] = "none"
         changed = True
     if config.get("hysteria2_finalmask") is None:
@@ -366,7 +374,6 @@ def _migrate_clients_to_devices(connection: sqlite3.Connection) -> None:
                 "UPDATE device_credentials SET config_json = ? WHERE id = ?",
                 (normalised, int(row["id"])),
             )
-
 
 
 def _migrate_sgclient_subscription_tokens(connection: sqlite3.Connection) -> None:
