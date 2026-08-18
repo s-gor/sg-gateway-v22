@@ -27,9 +27,21 @@ if [[ -f /opt/sg-gateway/VERSION && -f /etc/sg-gateway/runtime.env && -f /etc/sg
   printf '[SG-Gateway] SG-Gateway %s is already installed.\n' "${installed_version:-unknown}"
   printf '[SG-Gateway] Clean Install is blocked on an existing server.\n'
   printf '[SG-Gateway] Use the dedicated Update command:\n'
-  printf 'curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/dev-v22/deploy/update-from-github.sh | sudo bash\n'
+  printf 'curl -fsSL https://raw.githubusercontent.com/%s/%s/deploy/update-from-github.sh | sudo env SG_GATEWAY_GITHUB_BRANCH=%s bash\n' "$REPOSITORY" "$BRANCH" "$BRANCH"
   exit 2
 fi
+
+require_supported_ubuntu() {
+  [[ -r /etc/os-release ]] || fail "cannot detect the operating system; Ubuntu Server 24.04 LTS is required"
+  # shellcheck disable=SC1091
+  . /etc/os-release
+  [[ "${ID:-}" == "ubuntu" ]] || fail "Ubuntu Server 24.04 LTS is required; detected ${PRETTY_NAME:-unknown system}"
+  [[ "${VERSION_ID:-}" == "24.04" ]] || fail "only Ubuntu Server 24.04 LTS is supported; detected ${PRETTY_NAME:-Ubuntu ${VERSION_ID:-unknown}}"
+  printf '[SG-Gateway] Supported system: %s\n' "${PRETTY_NAME:-Ubuntu 24.04 LTS}"
+}
+
+# Reject an unsupported release before apt or any other server mutation.
+require_supported_ubuntu
 
 missing_packages=()
 command -v curl >/dev/null 2>&1 || missing_packages+=(curl)

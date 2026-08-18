@@ -19,7 +19,8 @@ def test_update_channel_defaults_are_consistent_and_old_repo_is_gone() -> None:
     assert 'REPOSITORY="s-gor/sg-gateway-v22"' in update
     assert '${SG_GATEWAY_GITHUB_BRANCH:-${SG_GATEWAY_UPDATE_BRANCH:-dev-v22}}' in update
     assert '${SG_GATEWAY_GITHUB_BRANCH:-${SG_GATEWAY_UPDATE_BRANCH:-dev-v22}}' in bootstrap
-    assert "raw.githubusercontent.com/s-gor/sg-gateway-v22/dev-v22/deploy/update-from-github.sh" in bootstrap
+    assert "raw.githubusercontent.com/%s/%s/deploy/update-from-github.sh" in bootstrap
+    assert "sudo env SG_GATEWAY_GITHUB_BRANCH=%s bash" in bootstrap
     assert "raw.githubusercontent.com/s-gor/sg-gateway/main/deploy/update-from-github.sh" not in bootstrap
     assert 'REPOSITORY="s-gor/sg-gateway"' not in update
     assert "dev-02205" not in update

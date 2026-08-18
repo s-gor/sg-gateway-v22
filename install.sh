@@ -143,6 +143,24 @@ require_root() {
   fi
 }
 
+require_supported_ubuntu() {
+  if [[ ! -r /etc/os-release ]]; then
+    echo "Не удалось определить операционную систему. Требуется Ubuntu Server 24.04 LTS." >&2
+    exit 1
+  fi
+  # shellcheck disable=SC1091
+  . /etc/os-release
+  if [[ "${ID:-}" != "ubuntu" ]]; then
+    printf 'Требуется Ubuntu Server 24.04 LTS. Обнаружено: %s\n' "${PRETTY_NAME:-неизвестная система}" >&2
+    exit 1
+  fi
+  if [[ "${VERSION_ID:-}" != "24.04" ]]; then
+    printf 'Поддерживается только Ubuntu Server 24.04 LTS. Обнаружено: %s\n' "${PRETTY_NAME:-Ubuntu ${VERSION_ID:-неизвестно}}" >&2
+    exit 1
+  fi
+  printf '[SG-Gateway] Поддерживаемая система: %s\n' "${PRETTY_NAME:-Ubuntu 24.04 LTS}"
+}
+
 prepare_log() {
   install -d -m 0755 "$(dirname "$INSTALL_LOG")"
   : > "$INSTALL_LOG"
@@ -2798,6 +2816,9 @@ print_sg_admin_status() {
 
 main() {
   require_root
+  # Public wrapper performs the same check. Keep this guard here as well for
+  # direct/archive launches and fail before log creation or package changes.
+  require_supported_ubuntu
   # Start from a known-safe installation mask. Secret files below are still
   # created with explicit 0600/0640 modes or inside a scoped umask 077 block.
   # This prevents any restrictive umask inherited through sudo/SSH from

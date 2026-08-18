@@ -14,6 +14,24 @@ def test_public_clean_install_refuses_existing_server() -> None:
     assert "deploy/update-from-github.sh" in body
 
 
+def test_clean_install_rejects_unsupported_ubuntu_before_mutation() -> None:
+    wrapper = source("deploy/install-from-github.sh")
+    installer = source("install.sh")
+    for body in (wrapper, installer):
+        assert "require_supported_ubuntu()" in body
+        assert '${VERSION_ID:-}' in body
+        assert '"24.04"' in body
+        assert "Ubuntu Server 24.04 LTS" in body
+    assert wrapper.index("require_supported_ubuntu\n") < wrapper.index("missing_packages=()")
+    assert installer.index("require_supported_ubuntu\n") < installer.index("prepare_log\n")
+
+
+def test_existing_install_update_command_keeps_selected_branch() -> None:
+    body = source("deploy/install-from-github.sh")
+    assert '"$REPOSITORY" "$BRANCH" "$BRANCH"' in body
+    assert "sudo env SG_GATEWAY_GITHUB_BRANCH=%s bash" in body
+
+
 def test_dedicated_update_never_runs_full_installer_or_package_install() -> None:
     body = source("deploy/update-from-github.sh")
     assert "Dedicated panel-only Update" in body
