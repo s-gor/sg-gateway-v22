@@ -335,9 +335,12 @@
         </div>
         <form class="sg-full-upload" method="post" action="{{ url_for('restore_full_backup_route') }}" enctype="multipart/form-data"
               data-sg-full-upload
-              data-sg-confirm="Восстановить полный сервер из выбранного файла? Перед изменением будет автоматически создан страховочный полный backup текущего состояния."
+              data-sg-full-verified="{{ '1' if verified_full_backup else '0' }}"
+              data-sg-verified-name="{{ verified_full_backup.original_name if verified_full_backup else '' }}"
+              data-sg-verified-size="{{ verified_full_backup.size_bytes if verified_full_backup else '' }}"
+              data-sg-confirm="Восстановить полный сервер из проверенного файла? Перед изменением будет автоматически создан страховочный полный backup текущего состояния."
               data-sg-confirm-title="Полное восстановление SG-Gateway" data-sg-confirm-button="Восстановить" data-sg-confirm-tone="danger">
-          <input class="sg-full-file-input" id="sg-full-backup-file" type="file" name="backup" accept=".sgbackup" required data-sg-full-file>
+          <input class="sg-full-file-input" id="sg-full-backup-file" type="file" name="backup" accept=".sgbackup" data-sg-full-file>
           <label class="sg-full-file-picker" for="sg-full-backup-file">
             <span class="sg-full-file-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 16V4m0 0 4 4m-4-4-4 4M5 15v4h14v-4"/></svg></span>
             <span class="sg-full-file-copy">
@@ -347,13 +350,14 @@
             <span class="sg-full-file-action">Выбрать файл</span>
           </label>
           <div class="sg-full-restore-actions">
-            <span class="sg-full-restore-note">Проверка ничего не меняет. Перед восстановлением автоматически создаётся страховочный Full Backup.</span>
+            <span class="sg-full-restore-note">Сначала проверьте файл. После успешной проверки кнопка восстановления станет активной. Перед восстановлением автоматически создаётся страховочный Full Backup.</span>
             <button class="button sg-full-restore-button sg-full-verify-button" type="submit"
                     name="backup_action" value="verify" disabled data-sg-full-verify-button>
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>
               <span>Проверить backup</span>
             </button>
-            <button class="button mtv2-restore sg-full-restore-button" type="submit" disabled data-sg-full-restore-button>
+            <button class="button mtv2-restore sg-full-restore-button" type="submit"
+                    name="backup_action" value="restore_verified" {% if not verified_full_backup %}disabled{% endif %} data-sg-full-restore-button>
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.3-5.7M4 4v6h6"/></svg>
               <span>Восстановить сервер</span>
             </button>
@@ -691,6 +695,7 @@
       const fileMeta = form.querySelector("[data-sg-full-file-meta]");
       const restoreButton = form.querySelector("[data-sg-full-restore-button]");
       const verifyButton = form.querySelector("[data-sg-full-verify-button]");
+      const hasVerifiedBackup = form.dataset.sgFullVerified === "1";
       if (!input || !fileName || !fileMeta || !restoreButton || !verifyButton) return;
 
       verifyButton.addEventListener("click", () => {
@@ -701,11 +706,18 @@
       });
 
       const reset = () => {
-        fileName.textContent = "Выберите .sgbackup";
-        fileMeta.textContent = "Нажмите, чтобы выбрать файл · размер не ограничен";
-        restoreButton.disabled = true;
+        if (hasVerifiedBackup) {
+          fileName.textContent = form.dataset.sgVerifiedName || "Проверенный .sgbackup";
+          fileMeta.textContent = `${formatBytes(form.dataset.sgVerifiedSize)} · проверен и готов к восстановлению`;
+          restoreButton.disabled = false;
+          form.classList.add("has-file");
+        } else {
+          fileName.textContent = "Выберите .sgbackup";
+          fileMeta.textContent = "Нажмите, чтобы выбрать файл · размер не ограничен";
+          restoreButton.disabled = true;
+          form.classList.remove("has-file");
+        }
         verifyButton.disabled = true;
-        form.classList.remove("has-file");
       };
 
       input.addEventListener("change", () => {
@@ -715,8 +727,8 @@
           return;
         }
         fileName.textContent = file.name;
-        fileMeta.textContent = `${formatBytes(file.size)} · готов к проверке / восстановлению`;
-        restoreButton.disabled = false;
+        fileMeta.textContent = `${formatBytes(file.size)} · готов к проверке`;
+        restoreButton.disabled = true;
         verifyButton.disabled = false;
         form.classList.add("has-file");
       });

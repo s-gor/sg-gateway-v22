@@ -8,6 +8,7 @@ from sg_hostd import full_backup_runtime as full_backup
 
 
 VERIFY_UPLOAD_NAME = "verify-upload.sgbackup"
+VERIFIED_UPLOAD_NAME = "verified-upload.sgbackup"
 
 
 def _verify_archive(archive: Path) -> dict:
@@ -60,13 +61,17 @@ def _verify_archive(archive: Path) -> dict:
 
 
 def verify_uploaded_full_backup() -> dict:
-    """Validate an uploaded .sgbackup without modifying live server state."""
+    """Validate an upload and retain that exact archive for confirmed restore."""
     full_backup._ensure_dirs()
     archive = full_backup._backup_dir() / VERIFY_UPLOAD_NAME
+    verified_archive = full_backup._backup_dir() / VERIFIED_UPLOAD_NAME
     if not archive.is_file():
         raise RuntimeError("Uploaded .sgbackup file for verification not found")
 
+    verified_archive.unlink(missing_ok=True)
     try:
-        return _verify_archive(archive)
+        payload = _verify_archive(archive)
+        archive.replace(verified_archive)
+        return payload
     finally:
         archive.unlink(missing_ok=True)
