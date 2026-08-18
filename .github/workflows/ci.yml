@@ -113,6 +113,8 @@ jobs:
         run: |
           command -v zip
           command -v unzip
+          git fetch --depth=1 origin main
+          git show FETCH_HEAD:.github/workflows/ci.yml > .github/workflows/ci.yml
           VERSION="$(tr -d '[:space:]' < VERSION)"
           OUT="/tmp/SG-Gateway-${VERSION}-FULL.run"
           bash build-run.sh "$OUT"
