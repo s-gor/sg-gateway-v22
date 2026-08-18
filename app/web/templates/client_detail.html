@@ -193,7 +193,7 @@
               {% endif %}
               {% if card.show_qr and card.qr_url and card.status == 'applied' %}
               <details class="dv16-qr">
-                <summary class="button">QR</summary>
+                <summary class="button">{{ 'QR · Mieru' if card.kind == 'mihomo' else 'QR' }}</summary>
                 <div class="dv16-qr-popover">
                   <button type="button" aria-label="Закрыть QR" onclick="this.closest('details').removeAttribute('open')">×</button>
                   <img src="{{ card.qr_url }}" alt="QR {{ card.title }}">
@@ -205,10 +205,10 @@
               {% if card.secondary_payload and card.status == 'applied' %}<button class="button dv16-copy" type="button" data-copy-value="{{ card.secondary_payload|e }}">Скопировать JSON · iPhone</button>{% endif %}
               {% if card.secondary_qr_url and card.status == 'applied' %}
               <details class="dv16-qr">
-                <summary class="button">QR JSON</summary>
+                <summary class="button">QR · iPhone</summary>
                 <div class="dv16-qr-popover">
-                  <button type="button" aria-label="Закрыть QR Mieru JSON" onclick="this.closest('details').removeAttribute('open')">×</button>
-                  <img src="{{ card.secondary_qr_url }}" alt="QR Mieru JSON">
+                  <button type="button" aria-label="Закрыть QR · iPhone" onclick="this.closest('details').removeAttribute('open')">×</button>
+                  <img src="{{ card.secondary_qr_url }}" alt="QR Mieru JSON · iPhone">
                 </div>
               </details>
               {% endif %}
