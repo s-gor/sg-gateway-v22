@@ -1821,6 +1821,15 @@ def apply_all_clients() -> dict[str, Any]:
                 "Другое применение клиентских конфигураций уже выполняется"
             ) from exc
 
+        # SG_GATEWAY_02206_RUNTIME_CONTRACT_V1
+        # Check active critical runtimes before the first engine mutates live state.
+        from sg_hostd.runtime_contracts import assert_runtime_contract
+
+        assert_runtime_contract(
+            database_path=DATA_DIR / "sg-gateway.sqlite",
+            strict_optional=False,
+            include_all_critical=False,
+        )
         _repair_deployment_configs()
 
         from sg_hostd.awg3_runtime import apply_awg3

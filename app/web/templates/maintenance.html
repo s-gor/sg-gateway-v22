@@ -26,6 +26,7 @@
   'backup.cleanup': 'Удалены старые резервные копии',
   'backup.restore': 'Восстановлена резервная копия',
   'backup.full.verify': 'Проверен полный backup',
+  'backup.data.verify': 'Проверен backup клиентов и настроек',
   'diagnostics.download': 'Скачана диагностика',
   'client.create': 'Создан клиент',
   'client.enable': 'Клиент включён',
@@ -288,6 +289,86 @@
       </div>
     </article>
   </section>
+
+  {# SG_GATEWAY_02206_DATA_BACKUP_CARD_V1 #}
+  <article class="mtv2-panel sg-ljd-card-large sg-full-backup-card sg-data-backup-card">
+    <header class="mtv2-panel-head sg-full-backup-head">
+      <div>
+        <div class="mtv2-card-kicker">CLIENTS & SETTINGS</div>
+        <h2>Клиенты и настройки</h2>
+        <p>Лёгкая переносимая копия: клиенты, устройства, ключи, Routing, WARP, HTTPS и сертификаты. Cores и сгенерированный runtime не архивируются.</p>
+      </div>
+      <form method="post" action="{{ url_for('create_data_backup_route') }}">
+        <button class="button primary sg-full-create" type="submit">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 19h14"/></svg>
+          <span>Создать DATA backup</span>
+        </button>
+      </form>
+    </header>
+
+    <div class="sg-full-backup-grid">
+      <section class="sg-full-backup-note sg-ljd-nested">
+        <div class="sg-full-section-title">
+          <span class="sg-full-section-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7.5 12 3l8 4.5v9L12 21l-8-4.5zM4 7.5 12 12l8-4.5M12 12v9"/></svg></span>
+          <div><strong>Что переносится</strong><small>Только source-of-truth пользователя. Runtime на новом сервере строится заново.</small></div>
+        </div>
+        <div class="sg-full-backup-components">
+          <em>Клиенты</em><em>Устройства</em><em>Credentials</em><em>Routing</em><em>WARP</em><em>HTTPS</em><em>Сертификаты</em><em>Настройки</em>
+        </div>
+        <div class="sg-full-backup-detail">Ссылки и QR не копируются как картинки: после Restore SG-Gateway пересобирает их из той же базы и ключей.</div>
+        <div class="sg-full-backup-warning">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 3.5 19h17zM12 9v4m0 3h.01"/></svg>
+          <span><strong>Без старого runtime.</strong> Xray/AWG/Mihomo/sing-box configs и binaries не переносятся — это защищает новый сервер от старого повреждённого состояния.</span>
+        </div>
+      </section>
+
+      <section class="sg-full-restore-box sg-ljd-nested">
+        <div class="sg-full-section-title">
+          <span class="sg-full-section-icon restore" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 21V9m0 0 4 4m-4-4-4 4M5 5h14"/></svg></span>
+          <div><strong>Восстановить клиентов и настройки</strong><small>До изменения данных проверяются архив, SQLite и Runtime Contract чистой установки.</small></div>
+        </div>
+        <form class="sg-full-upload" method="post" action="{{ url_for('restore_data_backup_route') }}" enctype="multipart/form-data"
+              data-sg-full-upload
+              data-sg-full-verified="{{ '1' if verified_data_backup else '0' }}"
+              data-sg-verified-name="{{ verified_data_backup.original_name if verified_data_backup else '' }}"
+              data-sg-verified-size="{{ verified_data_backup.size_bytes if verified_data_backup else '' }}"
+              data-sg-confirm="Восстановить клиентов и настройки из проверенного файла? Перед изменением текущего сервера будет создан страховочный Full Backup."
+              data-sg-confirm-title="Восстановить клиентов и настройки" data-sg-confirm-button="Восстановить" data-sg-confirm-tone="danger">
+          <input class="sg-full-file-input" id="sg-data-backup-file" type="file" name="backup" accept=".sgbackup" data-sg-full-file>
+          <label class="sg-full-file-picker" for="sg-data-backup-file">
+            <span class="sg-full-file-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 16V4m0 0 4 4m-4-4-4 4M5 15v4h14v-4"/></svg></span>
+            <span class="sg-full-file-copy">
+              <strong data-sg-full-file-name>Выберите DATA .sgbackup</strong>
+              <small data-sg-full-file-meta>Нажмите, чтобы выбрать файл · размер не ограничен</small>
+            </span>
+            <span class="sg-full-file-action">Выбрать файл</span>
+          </label>
+          <div class="sg-full-restore-actions">
+            <span class="sg-full-restore-note">Проверка ничего не меняет. Restore запускается только после Runtime Contract и использует страховочный Full Backup для автоматического rollback.</span>
+            <button class="button sg-full-restore-button sg-full-verify-button" type="submit" name="backup_action" value="verify" disabled data-sg-full-verify-button>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg><span>Проверить DATA backup</span>
+            </button>
+            <button class="button mtv2-restore sg-full-restore-button" type="submit" name="backup_action" value="restore_verified" {% if not verified_data_backup %}disabled{% endif %} data-sg-full-restore-button>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.3-5.7M4 4v6h6"/></svg><span>Восстановить данные</span>
+            </button>
+          </div>
+        </form>
+      </section>
+    </div>
+
+    {% if data_backups %}
+      {% set data_backup = data_backups[0] %}
+      <div class="sg-full-backup-latest sg-ljd-nested">
+        <div class="sg-full-latest-main">
+          <span class="sg-full-latest-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 3h10l4 4v14H5zM14 3v5h5M8 13h8M8 17h5"/></svg></span>
+          <div><span class="sg-full-latest-label">ПОСЛЕДНИЙ DATA BACKUP</span><strong>{{ data_backup.created_at }}</strong><small>{{ data_backup.name }} · <span data-bytes="{{ data_backup.size_bytes }}">{{ data_backup.size_bytes }} B</span></small></div>
+        </div>
+        <a class="button sg-full-download" href="{{ url_for('download_data_backup_route', name=data_backup.name) }}">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m0 0 4-4m-4 4-4-4M5 20h14"/></svg><span>Скачать DATA .sgbackup</span>
+        </a>
+      </div>
+    {% endif %}
+  </article>
 
   <article class="mtv2-panel sg-ljd-card-large sg-full-backup-card">
     <header class="mtv2-panel-head sg-full-backup-head">

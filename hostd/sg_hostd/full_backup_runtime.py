@@ -873,7 +873,17 @@ def restore_uploaded_full_backup() -> dict:
         finally:
             db.close()
 
-        _restore_progress("[Restore 2/7] Backup и SQLite проверены")
+        # SG_GATEWAY_02206_RESTORE_RUNTIME_CONTRACT_V1
+        # A portable restore must never touch the live server when the clean
+        # destination installation is already missing a required runtime.
+        from sg_hostd.runtime_contracts import assert_runtime_contract
+
+        assert_runtime_contract(
+            database_path=db_path,
+            strict_optional=True,
+            include_all_critical=True,
+        )
+        _restore_progress("[Restore 2/7] Backup, SQLite и Runtime Contract проверены")
         _restore_progress("[Restore 3/7] Создаю страховочный полный backup текущего сервера")
         safety = create_full_backup_archive(prefix="SG-Gateway-SAFETY")
         try:

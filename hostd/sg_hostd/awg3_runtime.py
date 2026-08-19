@@ -405,13 +405,10 @@ def _runtime_valid() -> bool:
 
 
 def apply_awg3() -> cr.EngineResult:
-    _tool(AWG3_AWG)
-    _tool(AWG3_AWG_QUICK)
-    _tool(AWG3_GO)
-    if not AWG3_HELPER.is_file():
-        raise cr.ClientRuntimeError(f"AWG3 runtime helper missing: {AWG3_HELPER}")
-    secrets = _ensure_server_secrets()
-    _repair_configs(secrets)
+    # SG_GATEWAY_02206_AWG3_EMPTY_RUNTIME_V1
+    # Removing/disabling the last AWG3 client must remain possible even when an
+    # old installation never received the AWG3 userspace runtime. Only an
+    # active AWG3 deployment requires the tools.
     rows = cr._deployment_rows(ENGINE)
     ids = [int(row["client_id"]) for row in rows]
     previous = cr._status_snapshot(ENGINE)
@@ -419,6 +416,14 @@ def apply_awg3() -> cr.EngineResult:
     if not rows:
         subprocess.run(["systemctl", "stop", AWG3_SERVICE], capture_output=True, text=True, timeout=60, check=False)
         return cr.EngineResult(ENGINE, True, "Нет активных клиентов AWG3", 0)
+
+    _tool(AWG3_AWG)
+    _tool(AWG3_AWG_QUICK)
+    _tool(AWG3_GO)
+    if not AWG3_HELPER.is_file():
+        raise cr.ClientRuntimeError(f"AWG3 runtime helper missing: {AWG3_HELPER}")
+    secrets = _ensure_server_secrets()
+    _repair_configs(secrets)
 
     candidate = cr.CANDIDATE_DIR / "awg3.conf"
     backup = AWG3_CONFIG.with_suffix(".conf.previous")

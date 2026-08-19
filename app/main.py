@@ -60,11 +60,17 @@ from app.maintenance.backups import (
     restore_safety_backup,
 )
 from app.maintenance.full_backups import (
+    get_data_backup,
     get_full_backup,
+    get_verified_data_backup,
     get_verified_full_backup,
+    list_data_backups,
     list_full_backups,
+    save_verified_data_backup,
     save_verified_full_backup,
+    stage_uploaded_data_backup_for_verification,
     stage_uploaded_full_backup_for_verification,
+    stage_verified_data_backup_for_restore,
     stage_verified_full_backup_for_restore,
 )
 from app.maintenance.diagnostics import build_diagnostic_report, build_diagnostic_report_json
@@ -1651,6 +1657,8 @@ def create_app() -> Flask:
             health_checks=collect_health_checks(),
             backups=backups,
             backup_cleanup=backup_cleanup_preview(backups),
+            data_backups=list_data_backups(),
+            verified_data_backup=get_verified_data_backup(),
             full_backups=list_full_backups(),
             verified_full_backup=get_verified_full_backup(),
             operations=list_operations(),
@@ -1684,6 +1692,106 @@ def create_app() -> Flask:
             flash(f"Обновление Xray не запущено: {result.message}", "error")
             return redirect(url_for("maintenance", tab="updates"))
         return redirect(url_for("operation_job", job_id=str(result.payload.get("job_id") or "")))
+
+    # SG_GATEWAY_02206_DATA_BACKUP_ROUTES_V1
+    @app.post("/maintenance/data-backups")
+    def create_data_backup_route():
+        result = run_hostd_command("backup.data.create", timeout=180)
+        if result.status != "ok":
+            flash(result.message or "Не удалось создать backup клиентов и настроек", "error")
+            return redirect(url_for("maintenance", tab="backups"))
+        name = str(result.payload.get("name") or "")
+        flash(f"Backup клиентов и настроек создан: {name}", "success")
+        return redirect(url_for("maintenance", tab="backups"))
+
+    @app.get("/maintenance/data-backups/<name>/download")
+    def download_data_backup_route(name: str):
+        backup = get_data_backup(name)
+        if backup is None:
+            abort(404)
+        return send_file(
+            backup.path, as_attachment=True, download_name=backup.name,
+            mimetype="application/octet-stream",
+        )
+
+    @app.post("/maintenance/data-backups/restore")
+    def restore_data_backup_route():
+        backup_action = request.form.get("backup_action", "").strip().lower()
+        if backup_action == "restore_verified":
+            try:
+                stage_verified_data_backup_for_restore()
+            except (OSError, RuntimeError, ValueError) as exc:
+                flash(str(exc), "error")
+                return redirect(url_for("maintenance", tab="backups"))
+
+            promoted = run_hostd_command("backup.data.promote", timeout=180)
+            if promoted.status != "ok":
+                flash(promoted.message or "DATA restore не подготовлен", "error")
+                return redirect(url_for("maintenance", tab="backups"))
+
+            result = run_hostd_command("backup.full.restore.start", timeout=20)
+            if result.status != "ok":
+                flash(result.message or "DATA restore не запущен", "error")
+                return redirect(url_for("maintenance", tab="backups"))
+            return redirect(
+                url_for(
+                    "operation_job",
+                    job_id=str(result.payload.get("job_id") or ""),
+                )
+            )
+
+        if backup_action != "verify":
+            flash("Сначала выберите и проверьте DATA .sgbackup", "error")
+            return redirect(url_for("maintenance", tab="backups"))
+
+        upload = request.files.get("backup")
+        original_name = str(getattr(upload, "filename", "") or "").strip() if upload is not None else ""
+        if upload is None or not original_name:
+            flash("Выберите DATA .sgbackup", "error")
+            return redirect(url_for("maintenance", tab="backups"))
+
+        try:
+            stage_uploaded_data_backup_for_verification(upload)
+        except ValueError as exc:
+            log_operation("backup.data.verify", f"backup:{original_name}", str(exc), status="error")
+            flash(str(exc), "error")
+            return redirect(url_for("maintenance", tab="backups"))
+
+        try:
+            result = run_hostd_command("backup.data.verify", timeout=180)
+        except Exception as exc:
+            message = f"Проверка DATA backup не выполнена: {exc}"
+            log_operation("backup.data.verify", f"backup:{original_name}", message, status="error")
+            flash(message, "error")
+            return redirect(url_for("maintenance", tab="backups"))
+
+        if result.status != "ok":
+            message = result.message or "DATA backup не прошёл проверку"
+            log_operation("backup.data.verify", f"backup:{original_name}", message, status="error")
+            flash(f"DATA backup НЕ прошёл проверку: {message}", "error")
+            return redirect(url_for("maintenance", tab="backups"))
+
+        payload = result.payload or {}
+        try:
+            save_verified_data_backup(original_name, payload)
+        except (OSError, RuntimeError, ValueError) as exc:
+            message = f"DATA backup проверен, но не подготовлен к восстановлению: {exc}"
+            log_operation("backup.data.verify", f"backup:{original_name}", message, status="error")
+            flash(message, "error")
+            return redirect(url_for("maintenance", tab="backups"))
+
+        source_version = str(payload.get("source_version") or "unknown")
+        tables = int(payload.get("database_tables") or 0)
+        database_size = _format_bytes(payload.get("database_size_bytes") or 0)
+        certificates = "есть" if payload.get("contains_letsencrypt_certificates") else "нет"
+        message = (
+            f"DATA backup исправен: {original_name}. SG-Gateway {source_version}; "
+            f"SQLite: OK, таблиц {tables}, {database_size}; сертификаты: {certificates}. "
+            "Перед восстановлением будет проверен Runtime Contract целевого сервера."
+        )
+        log_operation("backup.data.verify", f"backup:{original_name}", message)
+        flash(message, "success")
+        return redirect(url_for("maintenance", tab="backups"))
 
     @app.post("/maintenance/full-backups")
     def create_full_backup_route():
