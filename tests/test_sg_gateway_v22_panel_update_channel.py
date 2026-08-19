@@ -13,37 +13,38 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def test_update_channel_defaults_are_consistent_and_old_repo_is_gone() -> None:
     assert panel_updates.GITHUB_REPO == "s-gor/sg-gateway-v22"
-    assert panel_updates.GITHUB_BRANCH == "dev-v22"
+    assert panel_updates.GITHUB_BRANCH == "stable-02204"
     update = (ROOT / "deploy" / "update-from-github.sh").read_text(encoding="utf-8")
     bootstrap = (ROOT / "deploy" / "install-from-github.sh").read_text(encoding="utf-8")
     assert 'REPOSITORY="s-gor/sg-gateway-v22"' in update
-    assert '${SG_GATEWAY_GITHUB_BRANCH:-${SG_GATEWAY_UPDATE_BRANCH:-dev-v22}}' in update
-    assert '${SG_GATEWAY_GITHUB_BRANCH:-${SG_GATEWAY_UPDATE_BRANCH:-dev-v22}}' in bootstrap
-    assert "raw.githubusercontent.com/s-gor/sg-gateway-v22/dev-v22/deploy/update-from-github.sh" in bootstrap
+    assert '${SG_GATEWAY_GITHUB_BRANCH:-${SG_GATEWAY_UPDATE_BRANCH:-stable-02204}}' in update
+    assert '${SG_GATEWAY_GITHUB_BRANCH:-${SG_GATEWAY_UPDATE_BRANCH:-stable-02204}}' in bootstrap
+    assert "raw.githubusercontent.com/s-gor/sg-gateway-v22/stable-02204/deploy/update-from-github.sh" in bootstrap
     assert "raw.githubusercontent.com/s-gor/sg-gateway/main/deploy/update-from-github.sh" not in bootstrap
     assert 'REPOSITORY="s-gor/sg-gateway"' not in update
+    assert "dev-v22" not in update
     assert "dev-02205" not in update
 
 
-def test_overview_queries_configured_channel_not_main(monkeypatch) -> None:
+def test_overview_queries_configured_stable_channel(monkeypatch) -> None:
     seen = []
     monkeypatch.setattr(panel_updates, "GITHUB_REPO", "s-gor/sg-gateway-v22")
     monkeypatch.setattr(panel_updates, "GITHUB_API", "https://api.github.test/repos/s-gor/sg-gateway-v22")
-    monkeypatch.setattr(panel_updates, "GITHUB_BRANCH", "dev-v22")
+    monkeypatch.setattr(panel_updates, "GITHUB_BRANCH", "stable-02204")
     def fake_json(url: str, timeout: float = 8.0):
         seen.append(url)
         return {"sha": "a" * 40, "commit": {"author": {"date": "2026-08-16T00:00:00Z"}}, "html_url": "x"}
     monkeypatch.setattr(panel_updates, "_request_json", fake_json)
     sha, _, _ = panel_updates._latest_channel()
     assert sha == "a" * 40
-    assert seen == ["https://api.github.test/repos/s-gor/sg-gateway-v22/commits/dev-v22"]
+    assert seen == ["https://api.github.test/repos/s-gor/sg-gateway-v22/commits/stable-02204"]
 
 
-def test_operation_job_passes_explicit_channel_to_safe_shell_updater(tmp_path, monkeypatch) -> None:
+def test_operation_job_passes_explicit_stable_channel_to_safe_shell_updater(tmp_path, monkeypatch) -> None:
     script = tmp_path / "update-from-github.sh"
     script.write_text("#!/bin/bash\n", encoding="utf-8")
     monkeypatch.setattr(operation_jobs, "PANEL_UPDATE_SCRIPT", script)
-    monkeypatch.setattr(operation_jobs, "GITHUB_BRANCH", "dev-v22")
+    monkeypatch.setattr(operation_jobs, "GITHUB_BRANCH", "stable-02204")
     captured = {}
     def fake_start(kind, title, target_url, back_url, extra=None, *, command=None):
         captured.update(kind=kind, title=title, extra=extra, command=command)
@@ -51,9 +52,9 @@ def test_operation_job_passes_explicit_channel_to_safe_shell_updater(tmp_path, m
     monkeypatch.setattr(operation_jobs, "_start", fake_start)
     operation_jobs.start_panel_update_job()
     assert captured["kind"] == "panel_update_channel"
-    assert "dev-v22" in captured["title"]
-    assert captured["extra"]["channel"] == "dev-v22"
-    assert captured["command"][:2] == ("/usr/bin/env", "SG_GATEWAY_GITHUB_BRANCH=dev-v22")
+    assert "stable-02204" in captured["title"]
+    assert captured["extra"]["channel"] == "stable-02204"
+    assert captured["command"][:2] == ("/usr/bin/env", "SG_GATEWAY_GITHUB_BRANCH=stable-02204")
     assert captured["command"][-2:] == ("/bin/bash", str(script))
 
 
@@ -62,9 +63,9 @@ def test_python_runtime_delegates_to_shell_with_channel(tmp_path, monkeypatch) -
     script = root / "deploy" / "update-from-github.sh"
     script.parent.mkdir(parents=True)
     script.write_text("#!/bin/bash\n", encoding="utf-8")
-    (root / "VERSION").write_text("0.1.0-021.12\n", encoding="utf-8")
+    (root / "VERSION").write_text("0.1.0-022.04\n", encoding="utf-8")
     monkeypatch.setattr(panel_update_runtime, "LIVE_ROOT", root)
-    monkeypatch.setattr(panel_update_runtime, "GITHUB_BRANCH", "dev-v22")
+    monkeypatch.setattr(panel_update_runtime, "GITHUB_BRANCH", "stable-02204")
     calls = []
     def fake_run(args, **kwargs):
         calls.append((args, kwargs))
@@ -72,10 +73,44 @@ def test_python_runtime_delegates_to_shell_with_channel(tmp_path, monkeypatch) -
     monkeypatch.setattr(subprocess, "run", fake_run)
     result = panel_update_runtime.update_panel()
     assert result["ok"] is True
-    assert result["channel"] == "dev-v22"
+    assert result["channel"] == "stable-02204"
     args, kwargs = calls[0]
     assert args == ["/bin/bash", str(script)]
-    assert kwargs["env"]["SG_GATEWAY_GITHUB_BRANCH"] == "dev-v22"
+    assert kwargs["env"]["SG_GATEWAY_GITHUB_BRANCH"] == "stable-02204"
+
+
+def _overview_for_versions(monkeypatch, *, installed: str, remote: str) -> dict:
+    panel_updates._CACHE = None
+    monkeypatch.setattr(panel_updates, "GITHUB_BRANCH", "stable-02204")
+    monkeypatch.setattr(
+        panel_updates,
+        "_read_state",
+        lambda: {"commit": "1" * 40, "source_fingerprint": "f" * 64},
+    )
+    monkeypatch.setattr(panel_updates, "source_fingerprint", lambda: "f" * 64)
+    monkeypatch.setattr(panel_updates, "get_version", lambda: installed)
+    monkeypatch.setattr(panel_updates, "_latest_channel", lambda: ("2" * 40, "2026-08-19T00:00:00Z", "x"))
+    monkeypatch.setattr(panel_updates, "_remote_version", lambda _commit: remote)
+    return panel_updates.overview(refresh=True)
+
+
+def test_bound_panel_update_blocks_version_downgrade(monkeypatch) -> None:
+    result = _overview_for_versions(monkeypatch, installed="0.1.0-022.04", remote="0.1.0-021.12")
+    assert result["state"] == "blocked"
+    assert result["can_install"] is False
+    assert "Понижение" in result["message"]
+
+
+def test_bound_panel_update_allows_same_version_hotfix(monkeypatch) -> None:
+    result = _overview_for_versions(monkeypatch, installed="0.1.0-022.04", remote="0.1.0-022.04")
+    assert result["state"] == "available"
+    assert result["can_install"] is True
+
+
+def test_bound_panel_update_allows_higher_version_from_channel(monkeypatch) -> None:
+    result = _overview_for_versions(monkeypatch, installed="0.1.0-022.04", remote="0.1.0-022.06")
+    assert result["state"] == "available"
+    assert result["can_install"] is True
 
 
 def test_staged_validation_and_shell_fallback_use_production_wsgi() -> None:
