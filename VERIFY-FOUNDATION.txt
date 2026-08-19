@@ -1,0 +1,6 @@
+isolated foundation verify
+integrity=failure
+syntax=success
+focused_tests=success
+full_tests=failure
+full_package=failure
