@@ -128,10 +128,71 @@ jobs:
             tests/test_sg_gateway_v22_sg_subscription_dual_ui.py
 
       - id: full
-        name: Full pytest
-        run: python -m pytest tests
+        name: Full pytest with captured failure
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          python -m pytest tests 2>&1 | tee /tmp/sg-awg3-full-pytest.log
+
+      - name: Publish exact full-suite failure markers
+        if: steps.full.outcome == 'failure'
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+          import urllib.request
+          from pathlib import Path
+
+          log = Path('/tmp/sg-awg3-full-pytest.log').read_text(encoding='utf-8', errors='replace').splitlines()
+          markers = []
+          for line in log:
+              text = line.strip()
+              if text.startswith('FAILED '):
+                  markers.append('FAILED ' + text[7:])
+          error_lines = []
+          for line in log:
+              text = line.strip()
+              if text.startswith('E   '):
+                  value = text[4:].strip()
+                  if value and value not in error_lines:
+                      error_lines.append(value)
+          markers.extend('E ' + item for item in error_lines[:8])
+          if not markers:
+              markers = ['full pytest failed without summary marker']
+
+          repo = os.environ['GITHUB_REPOSITORY']
+          sha = os.environ['GITHUB_SHA']
+          token = os.environ['GITHUB_TOKEN']
+          for index, marker in enumerate(markers[:16], 1):
+              clean = re.sub(r'[^A-Za-z0-9_.:/=+()\- ]+', '?', marker)
+              context = f'dev-02206/fullfail-{index:02d}-' + clean
+              context = context[:100]
+              payload = json.dumps({
+                  'state': 'failure',
+                  'context': context,
+                  'description': marker[:140],
+              }).encode('utf-8')
+              request = urllib.request.Request(
+                  f'https://api.github.com/repos/{repo}/statuses/{sha}',
+                  data=payload,
+                  method='POST',
+                  headers={
+                      'Authorization': f'Bearer {token}',
+                      'Accept': 'application/vnd.github+json',
+                      'X-GitHub-Api-Version': '2022-11-28',
+                      'Content-Type': 'application/json',
+                  },
+              )
+              with urllib.request.urlopen(request, timeout=30) as response:
+                  print(context, response.status)
+          PY
 
       - id: candidate
+        if: steps.full.outcome == 'success'
         name: Commit tested candidate locally
         run: |
           set -Eeuo pipefail
@@ -145,6 +206,7 @@ jobs:
           echo "CANDIDATE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
 
       - id: package
+        if: steps.full.outcome == 'success' && steps.candidate.outcome == 'success'
         name: Build and verify FULL package from candidate HEAD
         run: |
           set -Eeuo pipefail
@@ -155,6 +217,7 @@ jobs:
           bash "$OUT" --verify-only
 
       - id: push
+        if: steps.full.outcome == 'success' && steps.package.outcome == 'success'
         name: Push verified integration to dev-02206
         run: |
           set -Eeuo pipefail
