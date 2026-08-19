@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 REPOSITORY="s-gor/sg-gateway-v22"
-BRANCH="${SG_GATEWAY_GITHUB_BRANCH:-${SG_GATEWAY_UPDATE_BRANCH:-dev-v22}}"
+BRANCH="${SG_GATEWAY_GITHUB_BRANCH:-${SG_GATEWAY_UPDATE_BRANCH:-stable-02204}}"
 ARCHIVE_URL="https://github.com/${REPOSITORY}/archive/refs/heads/${BRANCH}.tar.gz"
 GIT_URL="https://github.com/${REPOSITORY}.git"
 
@@ -911,6 +911,35 @@ PYCHECK
   validate_candidate_wsgi_target "$SOURCE_DIR"
 }
 
+validate_source_version() {
+  local installed_version target_version
+  installed_version="$(tr -d '\r\n' < "$PREFIX/VERSION")"
+  target_version="$(tr -d '\r\n' < "$SOURCE_DIR/VERSION")"
+
+  python3 - "$installed_version" "$target_version" <<'PYVERSION'
+import re
+import sys
+
+installed_raw = sys.argv[1].strip()
+target_raw = sys.argv[2].strip()
+
+def version_key(value: str) -> tuple[int, ...]:
+    numbers = re.findall(r"\d+", value)
+    if not numbers:
+        raise SystemExit(f"invalid VERSION: {value!r}")
+    return tuple(int(item) for item in numbers)
+
+installed = version_key(installed_raw)
+target = version_key(target_raw)
+if target < installed:
+    raise SystemExit(f"SG-Gateway downgrade blocked: {installed_raw} -> {target_raw}")
+if target == installed:
+    print(f"[SG-Gateway Update] VERSION: {installed_raw} -> {target_raw}. Same-version hotfix is allowed.")
+else:
+    print(f"[SG-Gateway Update] VERSION: {installed_raw} -> {target_raw}. Upgrade is allowed by channel policy.")
+PYVERSION
+}
+
 # SG_GATEWAY_02112_LIGHT_UPDATE_ASSET_PRESERVE_FIX10
 prepare_preserved_assets() {
   local live="$PREFIX/assets"
@@ -1138,6 +1167,7 @@ main() {
 
   # Download and validate the candidate before any server mutation.
   prepare_source
+  validate_source_version
 
   run_stage 2 "Safety Backup: SG state + TLS + AWG3 runtime" create_safety_backup
   run_stage 3 "Обновление только исходников SG-Gateway" deploy_source "$SOURCE_DIR"
@@ -1147,8 +1177,8 @@ main() {
   bind_panel_update_state
 
   if ! prune_safety_backups "$BACKUP_KEEP"; then
-    printf '%s[SG-Gateway Update] WARNING:%s old Safety Backup retention cleanup failed; update itself is already verified.
-'       "$YELLOW" "$RESET" >&2
+    printf '%s[SG-Gateway Update] WARNING:%s old Safety Backup retention cleanup failed; update itself is already verified.\n' \
+      "$YELLOW" "$RESET" >&2
   fi
 
   UPDATE_FINISHED=1

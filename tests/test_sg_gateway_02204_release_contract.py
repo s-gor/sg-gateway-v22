@@ -17,6 +17,18 @@ def test_02204_version_identity_and_manifest_are_consistent() -> None:
     assert manifest["next_development_line"] == "0.1.0-022.05"
     assert manifest["rebuild_policy"]["baseline"] == "0.1.0-021.12"
     assert manifest["status"] == "STABLE"
+    assert manifest["channel"] == "stable-02204"
+    assert manifest["maintenance_updates"]["panel"]["channel"] == "stable-02204"
+    assert manifest["maintenance_updates"]["panel"]["source"] == "github-stable-02204-exact-commit"
+
+
+def test_02204_installer_uses_single_version_identity() -> None:
+    body = (ROOT / "install.sh").read_text(encoding="utf-8")
+    assert 'VERSION="0.1.0-022.04"' in body
+    assert "Запускаю полный мастер SG-Gateway 0.1.0-021.12" not in body
+    assert "Мастер установки SG-Gateway 0.1.0-021.12 запущен" not in body
+    assert "Запускаю полный мастер SG-Gateway %s" in body
+    assert "Мастер установки SG-Gateway %s запущен" in body
 
 
 def test_02204_manifest_describes_real_dual_stack_routing_and_manual_warp() -> None:

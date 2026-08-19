@@ -283,7 +283,7 @@
     },
     "panel": {
       "automatic_rollback": true,
-      "channel": "dev-v22",
+      "channel": "stable-02204",
       "full_code_backup": true,
       "health_checks": [
         "sg-hostd",
@@ -297,7 +297,7 @@
         "cores"
       ],
       "requirements_change_blocks_panel_only_update": true,
-      "source": "github-main-exact-commit",
+      "source": "github-stable-02204-exact-commit",
       "staging": true
     }
   },

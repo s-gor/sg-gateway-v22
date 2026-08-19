@@ -139,7 +139,7 @@ def test_panel_update_bootstrap_allows_strictly_newer_version_without_state(monk
     assert "baseline" not in result["message"].lower()
 
 
-def test_panel_update_bootstrap_does_not_allow_same_version(monkeypatch, tmp_path):
+def test_panel_update_bootstrap_allows_same_version_hotfix(monkeypatch, tmp_path):
     commit = "d" * 40
     monkeypatch.setattr(panel_updates, "STATE_FILE", tmp_path / "missing-state.json")
     monkeypatch.setattr(panel_updates, "source_fingerprint", lambda: "f" * 64)
@@ -148,9 +148,10 @@ def test_panel_update_bootstrap_does_not_allow_same_version(monkeypatch, tmp_pat
     monkeypatch.setattr(panel_updates, "_remote_version", lambda sha: "0.1.0-021.4")
     panel_updates._CACHE = None
     result = panel_updates.overview(refresh=True)
-    assert result["bootstrap_allowed"] is False
-    assert result["can_install"] is False
-    assert result["state"] == "uninitialized"
+    assert result["bootstrap_allowed"] is True
+    assert result["can_install"] is True
+    assert result["state"] == "available"
+    assert "hotfix" in result["message"]
 
 
 def test_panel_update_has_bootstrap_version_gate_and_channel_atom_fallback():
@@ -159,6 +160,6 @@ def test_panel_update_has_bootstrap_version_gate_and_channel_atom_fallback():
     assert "def _baseline_mode" in runtime
     assert 'return "bootstrap", {}' in runtime
     assert "updater-baseline" not in runtime
-    assert "_version_key(latest_version) > _version_key(installed_version)" in overview
+    assert "latest_key >= installed_key" in overview
     assert "commits/{GITHUB_BRANCH}.atom" in overview
     assert "def _latest_channel" in overview

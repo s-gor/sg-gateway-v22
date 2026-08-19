@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from flask import has_request_context, request
+
 from app.config import load_config
 from app.connections.settings import get_connection_settings
 from app.db import get_database_path
@@ -54,6 +56,12 @@ def collect_health_checks() -> list[HealthCheck]:
 
 
 def health_summary() -> str:
+    # Login is a standalone template and does not display runtime health.
+    # Do not make authentication wait for hostd status commands while the
+    # services are still settling during a clean install or restart.
+    if has_request_context() and request.endpoint in {"login", "login_post"}:
+        return "warning"
+
     statuses = {check.status for check in collect_health_checks()}
     if "error" in statuses:
         return "error"

@@ -2805,8 +2805,8 @@ main() {
   umask 022
   prepare_log
   export DEBIAN_FRONTEND=noninteractive LANG=C.UTF-8 LC_ALL=C.UTF-8
-  printf '\n%s[SG-Gateway]%s Запускаю полный мастер SG-Gateway 0.1.0-021.12\n' "$CYAN" "$RESET"
-  printf '%s[SG-Gateway] [OK]%s Мастер установки SG-Gateway 0.1.0-021.12 запущен (0 сек.)\n' "$GREEN" "$RESET"
+  printf '\n%s[SG-Gateway]%s Запускаю полный мастер SG-Gateway %s\n' "$CYAN" "$RESET" "$VERSION"
+  printf '%s[SG-Gateway] [OK]%s Мастер установки SG-Gateway %s запущен (0 сек.)\n' "$GREEN" "$RESET" "$VERSION"
   printf '[SG-Gateway] Технический журнал: %s\n' "$INSTALL_LOG"
   printf '[SG-Gateway] Повторный запуск выполняется на этом же EC2. Домен не обязателен.\n\n'
 
