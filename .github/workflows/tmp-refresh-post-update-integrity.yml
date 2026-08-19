@@ -1,0 +1,44 @@
+name: tmp-refresh-post-update-integrity
+
+on:
+  pull_request:
+    branches: [main]
+    types: [synchronize]
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    if: github.head_ref == 'fix-update-production-wsgi-02204e'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix-update-production-wsgi-02204e
+          fetch-depth: 0
+      - name: Refresh checksums and remove temporary workflow
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git rm .github/workflows/tmp-refresh-post-update-integrity.yml
+          python3 - <<'PY'
+          import hashlib
+          import subprocess
+          from pathlib import Path
+
+          rows = []
+          for path in subprocess.check_output(['git', 'ls-files'], text=True, encoding='utf-8').splitlines():
+              if path == 'SOURCE-SHA256SUMS':
+                  continue
+              file = Path(path)
+              if file.is_file():
+                  rows.append(f"{hashlib.sha256(file.read_bytes()).hexdigest()}  {path}")
+          Path('SOURCE-SHA256SUMS').write_text('\n'.join(rows) + '\n', encoding='utf-8', newline='\n')
+          PY
+          git add -A
+          git diff --cached --check
+          git config user.name 'SG-Gateway CI'
+          git config user.email 'actions@users.noreply.github.com'
+          git commit -m 'Refresh post-update regression source integrity'
+          git push origin HEAD:fix-update-production-wsgi-02204e
