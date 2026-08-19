@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 REPOSITORY="s-gor/sg-gateway-v22"
-BRANCH="${SG_GATEWAY_GITHUB_BRANCH:-${SG_GATEWAY_UPDATE_BRANCH:-main}}"
+BRANCH="${SG_GATEWAY_GITHUB_BRANCH:-${SG_GATEWAY_UPDATE_BRANCH:-dev-02206}}"
 ARCHIVE_URL="https://github.com/${REPOSITORY}/archive/refs/heads/${BRANCH}.tar.gz"
 TEMP_DIR=""
 
@@ -10,6 +10,9 @@ fail() {
   printf '[SG-Gateway] ERROR: %s\n' "$*" >&2
   exit 1
 }
+
+[[ "${SG_GATEWAY_ALLOW_DEVELOPMENT:-0}" == "1" ]] || fail "development build blocked; set SG_GATEWAY_ALLOW_DEVELOPMENT=1 explicitly"
+[[ "$BRANCH" == "dev-02206" ]] || fail "development installer is pinned to dev-02206; requested branch: $BRANCH"
 
 cleanup() {
   if [[ -n "$TEMP_DIR" && -d "$TEMP_DIR" ]]; then
@@ -62,7 +65,7 @@ for command in curl tar gzip; do
 done
 
 TEMP_DIR="$(mktemp -d /tmp/sg-gateway-github-install.XXXXXX)"
-ARCHIVE="$TEMP_DIR/sg-gateway-main.tar.gz"
+ARCHIVE="$TEMP_DIR/sg-gateway-dev-02206.tar.gz"
 SOURCE_DIR="$TEMP_DIR/source"
 mkdir -p "$SOURCE_DIR"
 
@@ -79,6 +82,7 @@ tar -xzf "$ARCHIVE" -C "$SOURCE_DIR" --strip-components=1
 [[ -d "$SOURCE_DIR/app" ]] || fail "application source is missing from the GitHub archive"
 
 printf '[SG-Gateway] GitHub source version: %s\n' "$(tr -d '\r\n' < "$SOURCE_DIR/VERSION")"
+printf '[SG-Gateway] DEVELOPMENT channel: dev-02206\n'
 printf '[SG-Gateway] Starting the native Ubuntu CLEAN installer...\n'
 SG_GATEWAY_SOURCE_DIR="$SOURCE_DIR" bash "$SOURCE_DIR/install.sh"
 
