@@ -77,6 +77,7 @@ jobs:
       - name: Run focused dev-02206 regressions
         run: |
           python -m pytest \
+            tests/test_fix30_awg3_update_preservation.py \
             tests/test_sg_gateway_v22_awg3_runtime_repair.py \
             tests/test_sg_gateway_v22_runtime_contract_data_backup.py \
             tests/test_sg_gateway_v22_02206_hardening.py \
