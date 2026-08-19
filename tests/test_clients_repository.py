@@ -1,4 +1,7 @@
+import pytest
+
 from app.clients.repository import count_clients, create_client, list_clients
+from app.engines import provisioning
 from app.maintenance.operations import list_operations
 
 
@@ -50,4 +53,24 @@ def test_create_client_rejects_invalid_name(tmp_path, monkeypatch):
 
     assert empty_id is None
     assert long_id is None
+    assert count_clients() == 0
+
+
+def test_missing_awg3_runtime_blocks_client_without_persisted_rows(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    missing = tmp_path / "missing-awg3"
+    monkeypatch.setattr(provisioning, "AWG3_AWG", str(missing / "bin" / "awg"))
+    monkeypatch.setattr(provisioning, "AWG3_AWG_QUICK", str(missing / "bin" / "awg-quick"))
+    monkeypatch.setattr(provisioning, "AWG3_GO", str(missing / "bin" / "amneziawg-go"))
+    monkeypatch.setattr(provisioning, "AWG3_HELPER", str(missing / "deploy" / "helper.sh"))
+    monkeypatch.setattr(
+        provisioning,
+        "AWG3_UNIT_PATHS",
+        (str(missing / "systemd" / "sg-gateway-awg3.service"),),
+    )
+
+    with pytest.raises(RuntimeError, match="AWG3 требует восстановления") as error:
+        create_client("AWG3 test", "amneziawg3")
+
+    assert "Откройте Maintenance → AWG3 Runtime" in str(error.value)
     assert count_clients() == 0
