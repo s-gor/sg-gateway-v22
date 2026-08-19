@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -11,6 +12,19 @@ from app.security.operation_jobs import _panel_update_result
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_dev_02206_identity_is_consistent_and_not_stable() -> None:
+    version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
+    build_id = (ROOT / "BUILD-ID").read_text(encoding="utf-8").strip()
+    manifest = json.loads((ROOT / "release-manifest.json").read_text(encoding="utf-8"))
+    assert version == "0.1.0-022.06"
+    assert build_id == "DEV-02206"
+    assert manifest["version"] == version
+    assert manifest["build"] == build_id
+    assert manifest["channel"] == "dev-02206"
+    assert manifest["status"] == "DEVELOPMENT"
+    assert manifest["maintenance_updates"]["panel"]["channel"] == "dev-02206"
 
 
 def test_mieru_router_uri_uses_compact_router_contract() -> None:
