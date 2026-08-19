@@ -8,7 +8,8 @@ from flask import Flask
 
 from app.clients.mieru_router import MieruRouterError, build_mieru_router_uri
 from app.clients.mieru_router_http import register_mieru_router_http
-from app.security.operation_jobs import _panel_update_result
+from app.security import operation_jobs
+from app.security.operation_jobs import _panel_update_result, _panel_update_runtime_attention
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -75,6 +76,33 @@ Panel Update baseline: abcdef1234567890abcdef1234567890abcdef12 (dev-02206)
     assert result["checks"] == {"panel": "ok", "clients": "ok", "https": "ok"}
 
 
+def test_panel_update_success_guides_explicit_missing_awg3_to_maintenance(monkeypatch) -> None:
+    monkeypatch.setattr(
+        operation_jobs,
+        "runtime_engine_state",
+        lambda engine: {"known": True, "ready": False, "missing": ["awg"]},
+    )
+    attention = _panel_update_runtime_attention()
+    assert attention["needs_repair"] is True
+    assert attention["kind"] == "awg3_runtime_repair"
+    assert attention["target_url"] == "/maintenance?tab=updates"
+    assert attention["target_label"] == "Открыть AWG3 Runtime"
+
+    monkeypatch.setattr(
+        operation_jobs,
+        "runtime_engine_state",
+        lambda engine: {"known": True, "ready": True, "missing": []},
+    )
+    assert _panel_update_runtime_attention() == {}
+
+    monkeypatch.setattr(
+        operation_jobs,
+        "runtime_engine_state",
+        lambda engine: {"known": False, "ready": True, "missing": []},
+    )
+    assert _panel_update_runtime_attention() == {}
+
+
 def test_mieru_router_qr_is_registered_only_in_production_entrypoint() -> None:
     production = (ROOT / "app" / "production.py").read_text(encoding="utf-8")
     http = (ROOT / "app" / "clients" / "mieru_router_http.py").read_text(encoding="utf-8")
@@ -117,10 +145,14 @@ def test_client_exporter_error_is_visible_without_breaking_page() -> None:
     assert "Остальные профили устройства доступны" in script
 
 
-def test_panel_update_terminal_has_structured_success_and_failure_screen() -> None:
+def test_panel_update_terminal_has_structured_success_failure_and_runtime_guidance() -> None:
     template = (ROOT / "app" / "web" / "templates" / "operation_job.html").read_text(encoding="utf-8")
     assert "Обновление завершено" in template
     assert "Вернуться в SG-Gateway" in template
+    assert "Открыть AWG3 Runtime" in template
+    assert "attention.target_url" in template
+    assert "result.runtime_attention" in template
+    assert "attention.target_label" in template
     assert "Панель:" in template
     assert "Clients:" in template
     assert "HTTPS:" in template
