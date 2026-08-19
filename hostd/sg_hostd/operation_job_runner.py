@@ -28,7 +28,7 @@ os.environ.setdefault(
 )
 os.environ.setdefault(
     "SG_GATEWAY_OPERATION_JOB_DIR",
-    "/var/lib/sg-gateway/security/jobs",
+    "/var/log/sg-gateway/operation-jobs",
 )
 os.chdir(_PROJECT_ROOT)
 

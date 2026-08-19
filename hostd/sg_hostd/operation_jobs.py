@@ -13,9 +13,8 @@ from typing import Any, Sequence
 
 from app.maintenance.panel_updates import GITHUB_BRANCH
 
-JOB_DIR = Path(
-    os.getenv("SG_GATEWAY_OPERATION_JOB_DIR", "/var/lib/sg-gateway/security/jobs")
-)
+DEFAULT_JOB_DIR = "/var/log/sg-gateway/operation-jobs"
+JOB_DIR = Path(os.getenv("SG_GATEWAY_OPERATION_JOB_DIR", DEFAULT_JOB_DIR))
 REQUEST = Path(
     os.getenv("SG_GATEWAY_SECURITY_STATE_DIR", "/var/lib/sg-gateway/security")
 ) / "tls-request.json"
@@ -110,7 +109,7 @@ export SG_GATEWAY_ENV=production
 export SG_GATEWAY_DATA_DIR=/var/lib/sg-gateway
 export SG_GATEWAY_LOG_DIR=/var/log/sg-gateway
 export SG_GATEWAY_SECURITY_STATE_DIR=/var/lib/sg-gateway/security
-export SG_GATEWAY_OPERATION_JOB_DIR=/var/lib/sg-gateway/security/jobs
+export SG_GATEWAY_OPERATION_JOB_DIR={shlex.quote(str(JOB_DIR))}
 export SG_GATEWAY_TLS_LIVE_LOG=1
 cd /opt/sg-gateway
 STATUS={shlex.quote(str(status_path))}
