@@ -1,23 +1,24 @@
 name: tmp-fix-update-production-wsgi
 
 on:
-  push:
+  pull_request:
     branches:
-      - fix-update-production-wsgi-02204e
+      - main
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: write
 
 jobs:
   patch:
-    if: github.actor != 'github-actions[bot]'
+    if: github.head_ref == 'fix-update-production-wsgi-02204e'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
         with:
           ref: fix-update-production-wsgi-02204e
           fetch-depth: 0
-      - name: Patch updater and regression test
+      - name: Patch updater, legacy WSGI compatibility, login fallback, and tests
         shell: bash
         run: |
           python3 - <<'PY'
@@ -186,12 +187,62 @@ jobs:
           if old not in text:
               raise SystemExit('cannot update stage 3 label')
           text = text.replace(old, new, 1)
-
           updater_path.write_text(text, encoding='utf-8', newline='\n')
+
+          main_path = Path('app/main.py')
+          main = main_path.read_text(encoding='utf-8')
+          old = '''    @app.post("/login")
+              def login_post():
+                  next_url = request.form.get("next") or "/"
+                  if verify_password(request.form.get("password", "")):
+                      login_user()
+                      return redirect(next_url)
+                  return render_template("login.html", error=True, next_url=next_url), 401
+          '''
+          new = '''    @app.post("/login")
+              def login_post():
+                  next_url = request.form.get("next") or "/"
+                  # Only internal paths are accepted. A stale client detail URL can
+                  # survive a reinstall in the browser/login form; do not send the
+                  # user to a guaranteed 404 when that client no longer exists.
+                  if not next_url.startswith("/") or next_url.startswith("//"):
+                      next_url = "/"
+                  stale_client = re.fullmatch(r"/clients/(\\d+)", next_url)
+                  if stale_client and get_client(int(stale_client.group(1))) is None:
+                      next_url = "/clients"
+                  if verify_password(request.form.get("password", "")):
+                      login_user()
+                      return redirect(next_url)
+                  return render_template("login.html", error=True, next_url=next_url), 401
+          '''
+          if old not in main:
+              raise SystemExit('cannot patch login_post')
+          main = main.replace(old, new, 1)
+
+          old = '''app = create_app()
+          '''
+          new = '''app = create_app()
+
+          # Backward compatibility for servers whose historical systemd unit still
+          # points at app.main:app.  Production registers the same extensions again,
+          # but all registrars are idempotent.  This keeps an old unit functional
+          # during the update that migrates it to app.production:app.
+          from app.clients.router_subscription_http import register_router_subscription
+          from app.clients.sg_subscription_http_v4 import register_sg_subscription
+          from app.xray.xmux_http import register_xmux_http
+
+          register_sg_subscription(app)
+          register_router_subscription(app)
+          register_xmux_http(app)
+          '''
+          if old not in main:
+              raise SystemExit('cannot append app.main compatibility registrations')
+          main = main.replace(old, new, 1)
+          main_path.write_text(main, encoding='utf-8', newline='\n')
 
           test_path = Path('tests/test_sg_gateway_v22_clean_install_production_wsgi.py')
           test = test_path.read_text(encoding='utf-8')
-          addition = '''\n\ndef test_update_migrates_old_panel_service_to_production_wsgi() -> None:\n    updater = (ROOT / "deploy/update-from-github.sh").read_text(encoding="utf-8")\n    assert 'PANEL_PRODUCTION_WSGI="app.production:app"' in updater\n    assert "installed_panel_wsgi_target()" in updater\n    assert "migrate_panel_wsgi_service()" in updater\n    assert 'local unit="/etc/systemd/system/sg-gateway.service"' in updater\n    assert 'systemctl daemon-reload' in updater\n    assert 'migrate_panel_wsgi_service' in updater[updater.index("deploy_source() {"):updater.index("restart_panel() {")]\n    assert '[[ "$(installed_panel_wsgi_target)" == "$PANEL_PRODUCTION_WSGI" ]]' in updater\n    assert '"sg_subscription_universal_url"' in updater\n    assert '"sg_subscription_native_url"' in updater\n    assert '"router_subscription_url"' in updater\n    assert "app.main:app" not in updater\n'''
+          addition = '''\n\ndef test_update_migrates_old_panel_service_to_production_wsgi() -> None:\n    updater = (ROOT / "deploy/update-from-github.sh").read_text(encoding="utf-8")\n    assert 'PANEL_PRODUCTION_WSGI="app.production:app"' in updater\n    assert "installed_panel_wsgi_target()" in updater\n    assert "migrate_panel_wsgi_service()" in updater\n    assert 'local unit="/etc/systemd/system/sg-gateway.service"' in updater\n    assert 'systemctl daemon-reload' in updater\n    assert 'migrate_panel_wsgi_service' in updater[updater.index("deploy_source() {"):updater.index("restart_panel() {")]\n    assert '[[ "$(installed_panel_wsgi_target)" == "$PANEL_PRODUCTION_WSGI" ]]' in updater\n    assert '"sg_subscription_universal_url"' in updater\n    assert '"sg_subscription_native_url"' in updater\n    assert '"router_subscription_url"' in updater\n    assert "app.main:app" not in updater\n\n\ndef test_legacy_main_entrypoint_registers_production_extensions_during_migration() -> None:\n    main = (ROOT / "app/main.py").read_text(encoding="utf-8")\n    tail = main[main.rindex("app = create_app()"):]\n    assert "register_sg_subscription(app)" in tail\n    assert "register_router_subscription(app)" in tail\n    assert "register_xmux_http(app)" in tail\n\n\ndef test_login_rejects_external_next_and_falls_back_from_stale_client_detail() -> None:\n    main = (ROOT / "app/main.py").read_text(encoding="utf-8")\n    block = main[main.index('@app.post("/login")'):main.index('@app.post("/logout")')]\n    assert 'not next_url.startswith("/") or next_url.startswith("//")' in block\n    assert 're.fullmatch(r"/clients/(\\\\d+)", next_url)' in block\n    assert 'get_client(int(stale_client.group(1))) is None' in block\n    assert 'next_url = "/clients"' in block\n'''
           if 'def test_update_migrates_old_panel_service_to_production_wsgi' in test:
               raise SystemExit('regression test already exists')
           test_path.write_text(test.rstrip() + addition + '\n', encoding='utf-8', newline='\n')
@@ -220,5 +271,5 @@ jobs:
           git diff --cached --check
           git config user.name 'SG-Gateway CI'
           git config user.email 'actions@users.noreply.github.com'
-          git commit -m 'Fix updater migration to production WSGI'
+          git commit -m 'Fix update WSGI migration and stale login target'
           git push origin HEAD:fix-update-production-wsgi-02204e
