@@ -69,3 +69,13 @@ def test_missing_client_action_returns_404(tmp_path, monkeypatch):
     response = client.post("/clients/404/disable")
 
     assert response.status_code == 404
+
+def test_safe_login_next_rejects_external_and_missing_client(monkeypatch):
+    import app.main as main
+
+    monkeypatch.setattr(main, "get_client", lambda client_id: None if client_id == 999999 else object())
+    assert main._safe_login_next("https://example.invalid/path") == "/"
+    assert main._safe_login_next("//example.invalid/path") == "/"
+    assert main._safe_login_next("/clients/999999") == "/clients"
+    assert main._safe_login_next("/clients/2") == "/clients/2"
+    assert main._safe_login_next("/maintenance?tab=updates") == "/maintenance?tab=updates"
