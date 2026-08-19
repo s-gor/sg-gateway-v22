@@ -26,7 +26,9 @@ jobs:
           git fetch origin dev-02206
           git reset --hard origin/dev-02206
 
-      - name: Enforce development isolation
+      - id: isolation
+        name: Enforce development isolation
+        continue-on-error: true
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -37,7 +39,9 @@ jobs:
           assert 'dev-02206' in panel
           PY
 
-      - name: Verify source integrity
+      - id: integrity
+        name: Verify source integrity
+        continue-on-error: true
         run: |
           python3 -B - <<'PY'
           import hashlib, re, subprocess
@@ -64,12 +68,16 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install dependencies
+      - id: deps
+        name: Install dependencies
+        continue-on-error: true
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements-dev.txt
 
-      - name: Python syntax including hostd
+      - id: syntax
+        name: Python syntax including hostd
+        continue-on-error: true
         run: |
           python -B - <<'PY'
           from pathlib import Path
@@ -79,17 +87,25 @@ jobs:
           print(f'syntax ok: {len(files)} files')
           PY
 
-      - name: Runtime and DATA focused tests
+      - id: focused
+        name: Runtime and DATA focused tests
+        continue-on-error: true
         run: python -m pytest -q tests/test_sg_gateway_v22_runtime_contract_data_backup.py
 
-      - name: Full regression suite
+      - id: fulltests
+        name: Full regression suite
+        continue-on-error: true
         run: python -m pytest tests
 
-      - name: Release manifest baseline
+      - id: manifest
+        name: Release manifest baseline
+        continue-on-error: true
         run: |
           python -B -c "import json,pathlib; m=json.loads(pathlib.Path('release-manifest.json').read_text(encoding='utf-8')); v=pathlib.Path('VERSION').read_text(encoding='utf-8').strip(); assert m['version']==v; assert m['source_integrity']['mode']=='git-blob-sha256'; assert m['safe_update']['preserve_local_assets'] is True; print('manifest baseline ok')"
 
-      - name: Build and verify FULL package
+      - id: package
+        name: Build and verify FULL package
+        continue-on-error: true
         run: |
           command -v zip
           command -v unzip
@@ -98,9 +114,29 @@ jobs:
           bash build-run.sh "$OUT"
           bash "$OUT" --verify-only
 
-      - name: Record successful verification and remove one-shot workflow
+      - name: Persist verification result
+        if: always()
+        env:
+          ISOLATION: ${{ steps.isolation.outcome }}
+          INTEGRITY: ${{ steps.integrity.outcome }}
+          DEPS: ${{ steps.deps.outcome }}
+          SYNTAX: ${{ steps.syntax.outcome }}
+          FOCUSED: ${{ steps.focused.outcome }}
+          FULLTESTS: ${{ steps.fulltests.outcome }}
+          MANIFEST: ${{ steps.manifest.outcome }}
+          PACKAGE: ${{ steps.package.outcome }}
         run: |
-          printf '\n# CI verified: Runtime Contract + portable DATA backup hardening.\n' >> tests/test_sg_gateway_v22_runtime_contract_data_backup.py
+          cat > DEV-02206-RUNTIME-DATA-CI.txt <<EOF
+          DEV 02206 Runtime Contract + DATA Backup verification
+          isolation=${ISOLATION}
+          integrity=${INTEGRITY}
+          dependencies=${DEPS}
+          syntax=${SYNTAX}
+          focused_tests=${FOCUSED}
+          full_tests=${FULLTESTS}
+          release_manifest=${MANIFEST}
+          full_package=${PACKAGE}
+          EOF
           git rm .github/workflows/dev-02206-runtime-data-verify-once.yml
           python3 - <<'PY'
           import hashlib, subprocess
@@ -112,5 +148,8 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "Verify runtime contracts and portable DATA backups"
+          git commit -m "Record runtime and DATA backup verification"
           git push origin HEAD:dev-02206
+          if grep -Ev '^(DEV 02206|isolation=success|integrity=success|dependencies=success|syntax=success|focused_tests=success|full_tests=success|release_manifest=success|full_package=success)$' DEV-02206-RUNTIME-DATA-CI.txt | grep -q .; then
+            exit 1
+          fi
