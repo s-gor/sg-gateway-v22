@@ -64,6 +64,14 @@ jobs:
       - name: Run full panel test suite
         run: python -m pytest tests
 
+      - name: Restore tested tracked tree before integrity
+        run: |
+          # Some runtime-oriented tests intentionally exercise the tracked
+          # activity fixture. Integrity and packaging must use the exact HEAD
+          # that just passed pytest, not test-mutated working-tree bytes.
+          git reset --hard HEAD
+          test -z "$(git status --porcelain --untracked-files=no)"
+
       - name: Refresh source integrity for dev branch
         if: github.event_name == 'push' && github.actor != 'github-actions[bot]'
         run: |
