@@ -16,6 +16,7 @@ from sg_hostd.operation_jobs import (
     start_panel_update_job,
     start_core_update_job,
     start_full_backup_restore_job,
+    start_awg3_repair_job,
 )
 
 from sg_hostd.client_runtime import (
@@ -711,6 +712,25 @@ def _runtime_contract_status() -> HostCommandResult:
     )
 
 
+# SG_GATEWAY_02206_AWG3_REPAIR_COMMAND_V2
+def _awg3_runtime_repair_start() -> HostCommandResult:
+    try:
+        payload = start_awg3_repair_job()
+    except Exception as exc:
+        return HostCommandResult(
+            command="runtime.awg3.repair.start",
+            status="error",
+            message=f"Не удалось запустить восстановление AWG3 runtime: {exc}",
+            payload={},
+        )
+    return HostCommandResult(
+        command="runtime.awg3.repair.start",
+        status="ok",
+        message="Восстановление AWG3 runtime запущено",
+        payload=payload,
+    )
+
+
 def _data_backup_create() -> HostCommandResult:
     try:
         payload = create_data_backup_archive()
@@ -836,6 +856,7 @@ _COMMANDS: dict[str, Callable[[], HostCommandResult]] = {
     "nftables.status": _nftables_status,
     "system.diagnostics": _system_diagnostics,
     "runtime.contract": _runtime_contract_status,
+    "runtime.awg3.repair.start": _awg3_runtime_repair_start,
     "backup.data.create": _data_backup_create,
     "backup.data.verify": _data_backup_verify,
     "backup.data.promote": _data_backup_promote,

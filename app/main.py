@@ -906,7 +906,13 @@ def create_app() -> Flask:
         kind = str(job.get("kind") or "")
         if kind == "tls_issue":
             active = "security"
-        elif kind == "full_backup_restore" or kind.startswith("xray_update_"):
+        elif kind == "full_backup_restore":
+            active = "maintenance"
+        elif (
+            kind in {"awg3_runtime_repair", "panel_update_channel"}
+            or kind.startswith("xray_update_")
+            or kind.startswith("core_update_")
+        ):
             active = "maintenance"
         else:
             active = "connections"
@@ -1638,12 +1644,21 @@ def create_app() -> Flask:
         panel_updates = None
         core_updates = None
         geofiles_updates = None
+        runtime_contract = None
         if tab == "updates":
             refresh_updates = request.args.get("refresh") == "1"
             updates = xray_update_overview(refresh=refresh_updates)
             panel_updates = panel_update_overview(refresh=refresh_updates)
             core_updates = core_update_overview(refresh=refresh_updates)
             geofiles_updates = geofiles_overview()
+            runtime_result = run_hostd_command("runtime.contract", timeout=20)
+            runtime_contract = dict(runtime_result.payload or {})
+            if not runtime_contract:
+                runtime_contract = {
+                    "ok": False,
+                    "checks": [],
+                    "message": runtime_result.message or "Runtime Contract недоступен",
+                }
         backups = list_backups()
         return render_template(
             "maintenance.html",
@@ -1653,6 +1668,7 @@ def create_app() -> Flask:
             panel_updates=panel_updates,
             core_updates=core_updates,
             geofiles_updates=geofiles_updates,
+            runtime_contract=runtime_contract,
             diagnostics=collect_diagnostics(),
             health_checks=collect_health_checks(),
             backups=backups,
@@ -1672,6 +1688,20 @@ def create_app() -> Flask:
             flash(f"Обновление SG-Gateway не запущено: {result.message}", "error")
             return redirect(url_for("maintenance", tab="updates"))
         return redirect(url_for("operation_job", job_id=str(result.payload.get("job_id") or "")))
+
+    # SG_GATEWAY_02206_AWG3_REPAIR_ROUTE_V2
+    @app.post("/maintenance/runtime/awg3/repair")
+    def awg3_runtime_repair_start():
+        result = run_hostd_command("runtime.awg3.repair.start", timeout=20)
+        if result.status != "ok":
+            flash(result.message or "Восстановление AWG3 runtime не запущено", "error")
+            return redirect(url_for("maintenance", tab="updates", refresh="1"))
+        return redirect(
+            url_for(
+                "operation_job",
+                job_id=str(result.payload.get("job_id") or ""),
+            )
+        )
 
     @app.post("/maintenance/core/update/<engine>")
     def core_update_start(engine: str):

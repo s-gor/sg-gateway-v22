@@ -24,6 +24,7 @@ RUNNER = Path("/opt/sg-gateway/hostd/sg_hostd/operation_job_runner.py")
 PYTHON = Path("/opt/sg-gateway/.venv/bin/python")
 PANEL_ACCESS_SCRIPT = Path("/opt/sg-gateway/deploy/configure-panel-access.sh")
 PANEL_UPDATE_SCRIPT = Path("/opt/sg-gateway/deploy/update-from-github.sh")
+AWG3_REPAIR_SCRIPT = Path("/opt/sg-gateway/deploy/repair-awg3-runtime.sh")
 
 
 def _utc_now() -> str:
@@ -269,6 +270,20 @@ f"SG_GATEWAY_GITHUB_BRANCH={GITHUB_BRANCH}",
 str(PANEL_UPDATE_SCRIPT),
         ),
     )
+
+# SG_GATEWAY_02206_AWG3_REPAIR_JOB_V2
+def start_awg3_repair_job() -> dict[str, Any]:
+    if not AWG3_REPAIR_SCRIPT.is_file():
+        raise RuntimeError(f"Не найден {AWG3_REPAIR_SCRIPT}")
+    return _start(
+        "awg3_runtime_repair",
+        "Восстановление AWG3 runtime",
+        "/maintenance?tab=updates&refresh=1",
+        "/maintenance?tab=updates",
+        {"engine": "amneziawg3"},
+        command=("/bin/bash", str(AWG3_REPAIR_SCRIPT)),
+    )
+
 
 def start_core_update_job(engine: str) -> dict[str, Any]:
     if engine not in {"mihomo", "sing-box", "wgcf"}:

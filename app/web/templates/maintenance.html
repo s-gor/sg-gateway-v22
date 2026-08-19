@@ -185,6 +185,47 @@
     </div>
   </article>
 
+  {# SG_GATEWAY_02206_AWG3_REPAIR_CARD_V2 #}
+  {% set awg3_state = namespace(item=None) %}
+  {% if runtime_contract %}
+    {% for check in runtime_contract.get('checks', []) %}
+      {% if check.get('engine') == 'amneziawg3' %}{% set awg3_state.item = check %}{% endif %}
+    {% endfor %}
+  {% endif %}
+  <article class="mtv2-panel sg-ljd-card-large">
+    <header class="mtv2-panel-head">
+      <div>
+        <div class="mtv2-card-kicker">RUNTIME CONTRACT</div>
+        <h2>AWG3 Runtime</h2>
+        <p>Проверка серверных компонентов AWG3. Повреждённый runtime восстанавливается отдельно — клиенты, ключи и настройки не меняются.</p>
+      </div>
+      {% if awg3_state.item and awg3_state.item.get('ready') %}
+        <span class="mtv31-update-badge">READY</span>
+      {% else %}
+        <span class="mtv31-update-badge">ТРЕБУЕТ ВОССТАНОВЛЕНИЯ</span>
+      {% endif %}
+    </header>
+    <div class="sg-ljd-nested" style="margin-top:12px">
+      {% if awg3_state.item %}
+        {% if awg3_state.item.get('ready') %}
+          <div class="sg-full-backup-detail">AWG3: все обязательные runtime-компоненты на месте.</div>
+        {% else %}
+          <div class="sg-full-backup-warning">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 3.5 19h17zM12 9v4m0 3h.01"/></svg>
+            <span><strong>AWG3 требует восстановления.</strong> {% if awg3_state.item.get('missing') %}{{ awg3_state.item.get('missing') | join(' · ') }}{% endif %}</span>
+          </div>
+          <form method="post" action="{{ url_for('awg3_runtime_repair_start') }}" style="margin-top:12px"
+                data-sg-confirm="Восстановить только AWG3 runtime? Клиенты, ключи и настройки не изменяются."
+                data-sg-confirm-title="Восстановить AWG3 runtime" data-sg-confirm-button="Восстановить">
+            <button class="button primary" type="submit">Восстановить AWG3 runtime</button>
+          </form>
+        {% endif %}
+      {% else %}
+        <div class="sg-full-backup-detail">{{ runtime_contract.get('message', 'Runtime Contract недоступен') if runtime_contract else 'Runtime Contract недоступен' }}</div>
+      {% endif %}
+    </div>
+  </article>
+
   <article class="mtv2-panel mtv32-update-panel sg-ljd-card-large">
     <header class="mtv2-panel-head">
       <div>
