@@ -260,6 +260,14 @@ remove_engine_runtimes(){
   fi
   rm -rf /var/lib/dkms/amneziawg/1.0.0 /usr/src/amneziawg-1.0.0
   apt-get -o Dpkg::Use-Pty=0 purge -y amneziawg amneziawg-dkms amneziawg-tools >/dev/null 2>&1 || true
+
+  # DKMS can lose its state while leaving a compiled SG module behind.
+  # Remove orphaned amneziawg modules from every installed kernel so a
+  # later Clean Install cannot accidentally reuse an AWG3/experimental ko.
+  find /lib/modules -type f \
+    \( -name 'amneziawg.ko' -o -name 'amneziawg.ko.*' \) \
+    -path '*/updates/dkms/*' -delete
+
   rm -f /usr/bin/awg /usr/bin/awg-quick
   rm -f /usr/share/man/man8/awg.8 /usr/share/man/man8/awg.8.gz /usr/share/man/man8/awg-quick.8 /usr/share/man/man8/awg-quick.8.gz
   rm -f /usr/share/bash-completion/completions/awg /usr/share/bash-completion/completions/awg-quick
