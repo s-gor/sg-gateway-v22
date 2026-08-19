@@ -48,6 +48,13 @@ def test_dev_deploy_identity_matches_version() -> None:
     assert f"SG-Gateway {version} · ПОЛНОЕ УДАЛЕНИЕ" in uninstaller
 
 
+def test_awg3_repair_does_not_enable_service_without_generated_config() -> None:
+    body = (ROOT / "deploy" / "repair-awg3-runtime.sh").read_text(encoding="utf-8")
+    active = body.split("if (( ACTIVE_CLIENTS > 0 )); then", 1)[1].split("\nelse\n  systemctl stop", 1)[0]
+    assert active.index('if [[ -s "$CONFIG" ]]') < active.index('systemctl enable "$SERVICE"')
+    assert 'else\n    systemctl stop "$SERVICE" >/dev/null 2>&1 || true\n    systemctl disable "$SERVICE" >/dev/null 2>&1 || true\n    log "AWG3 runtime восстановлен.' in active
+
+
 def test_mieru_router_uri_uses_compact_router_contract() -> None:
     source = (
         "mierus://demo:secret@example.com?profile=default&port=2099&protocol=TCP"

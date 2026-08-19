@@ -171,13 +171,15 @@ systemctl daemon-reload
 
 log "5/6 · Восстанавливаю только требуемое runtime-состояние"
 if (( ACTIVE_CLIENTS > 0 )); then
-  systemctl enable "$SERVICE" >/dev/null
   if [[ -s "$CONFIG" ]]; then
+    systemctl enable "$SERVICE" >/dev/null
     systemctl restart "$SERVICE"
     systemctl is-active --quiet "$SERVICE"
     "$AWG3_ROOT/bin/awg" show awg3 >/dev/null
     log "AWG3 runtime запущен для активных клиентов: $ACTIVE_CLIENTS"
   else
+    systemctl stop "$SERVICE" >/dev/null 2>&1 || true
+    systemctl disable "$SERVICE" >/dev/null 2>&1 || true
     log "AWG3 runtime восстановлен. Активные AWG3-клиенты есть, но generated-конфигурация отсутствует. Откройте Clients и нажмите «Проверить и применить»."
   fi
 else
