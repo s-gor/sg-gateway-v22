@@ -33,10 +33,52 @@ jobs:
           test "$(git ls-remote origin refs/heads/stable-02204 | cut -f1)" = "56df9a7b4fe509282e37374dd6ef3bccdc1b1100"
 
       - id: apply
-        name: Apply AWG3 repair integration and clean temporary files
+        name: Apply AWG3 repair integration and preserve frozen contracts
         run: |
           set -Eeuo pipefail
           python3 scripts/dev-02206-awg3-repair-integrate.py
+
+          # Keep the exact frozen 22.04 full-restore source contract while
+          # extending the maintenance navigation for new 22.06 job kinds.
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('app/main.py')
+          body = path.read_text(encoding='utf-8')
+          old = '''        elif (
+              kind in {"full_backup_restore", "awg3_runtime_repair", "panel_update_channel"}
+              or kind.startswith("xray_update_")
+              or kind.startswith("core_update_")
+          ):
+              active = "maintenance"
+'''
+          # The integration patch uses normal 8-space indentation; keep a
+          # second exact spelling to make the compatibility fix deterministic.
+          old2 = '''        elif (
+            kind in {"full_backup_restore", "awg3_runtime_repair", "panel_update_channel"}
+            or kind.startswith("xray_update_")
+            or kind.startswith("core_update_")
+        ):
+            active = "maintenance"
+'''
+          new = '''        elif kind == "full_backup_restore":
+            active = "maintenance"
+        elif (
+            kind in {"awg3_runtime_repair", "panel_update_channel"}
+            or kind.startswith("xray_update_")
+            or kind.startswith("core_update_")
+        ):
+            active = "maintenance"
+'''
+          if old in body:
+              body = body.replace(old, new, 1)
+          elif old2 in body:
+              body = body.replace(old2, new, 1)
+          elif 'kind == "full_backup_restore"' not in body or '"awg3_runtime_repair", "panel_update_channel"' not in body:
+              raise SystemExit('operation-job maintenance compatibility anchor not found')
+          path.write_text(body, encoding='utf-8', newline='\n')
+          PY
+
           chmod 0755 deploy/repair-awg3-runtime.sh
           rm -f scripts/dev-02206-awg3-repair-integrate.py
           rm -f .github/workflows/orchestrate-feature-awg3-repair-once.yml
@@ -117,7 +159,7 @@ jobs:
           PY
 
       - id: focused
-        name: Focused AWG3 and dev regressions
+        name: Focused AWG3 and frozen-regression suite
         run: |
           python -m pytest \
             tests/test_sg_gateway_v22_awg3_runtime_repair.py \
@@ -125,74 +167,14 @@ jobs:
             tests/test_sg_gateway_v22_02206_hardening.py \
             tests/test_sg_gateway_v22_production_entrypoint_v4.py \
             tests/test_sg_gateway_v22_router_subscription.py \
-            tests/test_sg_gateway_v22_sg_subscription_dual_ui.py
+            tests/test_sg_gateway_v22_sg_subscription_dual_ui.py \
+            tests/test_sg_gateway_02111_backup_domain_release.py
 
       - id: full
-        name: Full pytest with captured failure
-        continue-on-error: true
-        run: |
-          set -o pipefail
-          python -m pytest tests 2>&1 | tee /tmp/sg-awg3-full-pytest.log
-
-      - name: Publish exact full-suite failure markers
-        if: steps.full.outcome == 'failure'
-        continue-on-error: true
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          python3 - <<'PY'
-          import json
-          import os
-          import re
-          import urllib.request
-          from pathlib import Path
-
-          log = Path('/tmp/sg-awg3-full-pytest.log').read_text(encoding='utf-8', errors='replace').splitlines()
-          markers = []
-          for line in log:
-              text = line.strip()
-              if text.startswith('FAILED '):
-                  markers.append('FAILED ' + text[7:])
-          error_lines = []
-          for line in log:
-              text = line.strip()
-              if text.startswith('E   '):
-                  value = text[4:].strip()
-                  if value and value not in error_lines:
-                      error_lines.append(value)
-          markers.extend('E ' + item for item in error_lines[:8])
-          if not markers:
-              markers = ['full pytest failed without summary marker']
-
-          repo = os.environ['GITHUB_REPOSITORY']
-          sha = os.environ['GITHUB_SHA']
-          token = os.environ['GITHUB_TOKEN']
-          for index, marker in enumerate(markers[:16], 1):
-              clean = re.sub(r'[^A-Za-z0-9_.:/=+()\- ]+', '?', marker)
-              context = f'dev-02206/fullfail-{index:02d}-' + clean
-              context = context[:100]
-              payload = json.dumps({
-                  'state': 'failure',
-                  'context': context,
-                  'description': marker[:140],
-              }).encode('utf-8')
-              request = urllib.request.Request(
-                  f'https://api.github.com/repos/{repo}/statuses/{sha}',
-                  data=payload,
-                  method='POST',
-                  headers={
-                      'Authorization': f'Bearer {token}',
-                      'Accept': 'application/vnd.github+json',
-                      'X-GitHub-Api-Version': '2022-11-28',
-                      'Content-Type': 'application/json',
-                  },
-              )
-              with urllib.request.urlopen(request, timeout=30) as response:
-                  print(context, response.status)
-          PY
+        name: Full pytest
+        run: python -m pytest tests
 
       - id: candidate
-        if: steps.full.outcome == 'success'
         name: Commit tested candidate locally
         run: |
           set -Eeuo pipefail
@@ -206,7 +188,6 @@ jobs:
           echo "CANDIDATE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
 
       - id: package
-        if: steps.full.outcome == 'success' && steps.candidate.outcome == 'success'
         name: Build and verify FULL package from candidate HEAD
         run: |
           set -Eeuo pipefail
@@ -217,7 +198,6 @@ jobs:
           bash "$OUT" --verify-only
 
       - id: push
-        if: steps.full.outcome == 'success' && steps.package.outcome == 'success'
         name: Push verified integration to dev-02206
         run: |
           set -Eeuo pipefail
