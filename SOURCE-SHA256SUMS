@@ -166,7 +166,7 @@ ea9ad3379273e48181f9a54833154d2146c190d60b8db53e82d7224b86ebe5ed  app/web/static
 cf19d31658c99240b87335618e9bc3af9cd02c9384c9d5a98a1e5bc4956edde0  app/web/static/sg-cpu-breakdown-v1.css
 42968cbf8633caf4590bb83b912389aa6faa4be4f22dabc7458844f65b5f1cce  app/web/static/sg-cpu-breakdown-v1.js
 5d40d57aaf1bd0fc6c438b8e4fae468c00856fe3dcde362134f4abbd36e4014d  app/web/static/sg-cpu-dial-layout-v3.css
-21eb5c1cf99e8692740aff9ccb3f2613473f8306b8455380c27eb3afbfd70520  app/web/static/sg-device-collapse-v1.css
+1fcd60f69845bf566b8ed930adcbd8434968a3bee76104410cfd2b400a44b222  app/web/static/sg-device-collapse-v1.css
 857eed44e9ee368863e3675dca7c0539da32dee960113ffecea4254186202894  app/web/static/sg-device-collapse-v1.js
 a272b19b5a40407b134c1715c06eac930b1fd1395e47d8f8175c43365865f5c6  app/web/static/sg-device-collapse-v4.css
 c81d7e058061474e528581748960fc0789b1b1d78ca253b823463e9b959d3914  app/web/static/sg-device-expanded-cleanup-v1.css
