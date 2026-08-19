@@ -23,7 +23,7 @@
   max-height: 92vh;
   overflow: auto;
   transform: translate(-50%, -50%);
-  padding: 56px 18px 18px !important;
+  padding: 54px 18px 18px !important;
 }
 
 .dv16-qr[open] .dv16-qr-popover > button {
@@ -31,6 +31,24 @@
   top: 12px;
   right: 12px;
   z-index: 1;
+}
+
+.dv16-qr[open] .sg-smart-qr-meta {
+  display: grid;
+  gap: 4px;
+  margin: 0 auto 14px;
+  text-align: center;
+}
+
+.dv16-qr[open] .sg-smart-qr-meta strong {
+  color: var(--text, #e5edf4);
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.dv16-qr[open] .sg-smart-qr-meta small {
+  color: var(--muted, #91a0b0);
+  font-size: 12px;
 }
 
 .dv16-qr[open] .dv16-qr-popover img {
