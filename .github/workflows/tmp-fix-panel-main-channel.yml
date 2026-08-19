@@ -1,0 +1,96 @@
+name: tmp-fix-panel-main-channel
+on:
+  push:
+    branches: [fix-panel-update-channel-main-20260819]
+permissions:
+  contents: write
+jobs:
+  fix:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix-panel-update-channel-main-20260819
+          fetch-depth: 0
+      - name: Apply production update channel fix
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          replacements = {
+              'app/maintenance/panel_updates.py': [
+                  ('GITHUB_BRANCH = os.getenv("SG_GATEWAY_UPDATE_BRANCH", "dev-v22").strip() or "dev-v22"',
+                   'GITHUB_BRANCH = os.getenv("SG_GATEWAY_UPDATE_BRANCH", "main").strip() or "main"'),
+                  ('cached["message"] = f"Локальная база уже соответствует проверенному GitHub {GITHUB_BRANCH}."',
+                   'cached["message"] = "Локальная база уже соответствует проверенному GitHub."'),
+                  ('cached["message"] = f"GitHub {GITHUB_BRANCH} содержит новый commit. Можно выполнить безопасное обновление панели."',
+                   'cached["message"] = "GitHub содержит новый commit. Можно выполнить безопасное обновление панели."'),
+                  ('"message": f"Проверка GitHub {GITHUB_BRANCH} не выполнена.",',
+                   '"message": "Проверка GitHub не выполнена.",'),
+              ],
+              'hostd/sg_hostd/operation_jobs.py': [
+                  ('f"Безопасное обновление SG-Gateway из GitHub {GITHUB_BRANCH}"',
+                   '"Безопасное обновление SG-Gateway из GitHub"'),
+              ],
+              'deploy/update-from-github.sh': [
+                  ('BRANCH="${SG_GATEWAY_GITHUB_BRANCH:-${SG_GATEWAY_UPDATE_BRANCH:-dev-v22}}"',
+                   'BRANCH="${SG_GATEWAY_GITHUB_BRANCH:-${SG_GATEWAY_UPDATE_BRANCH:-main}}"'),
+              ],
+              'deploy/install-from-github.sh': [
+                  ('BRANCH="${SG_GATEWAY_GITHUB_BRANCH:-${SG_GATEWAY_UPDATE_BRANCH:-dev-v22}}"',
+                   'BRANCH="${SG_GATEWAY_GITHUB_BRANCH:-${SG_GATEWAY_UPDATE_BRANCH:-main}}"'),
+              ],
+              'tests/test_sg_gateway_v22_panel_update_channel.py': [
+                  ('assert panel_updates.GITHUB_BRANCH == "dev-v22"',
+                   'assert panel_updates.GITHUB_BRANCH == "main"'),
+                  ("assert '${SG_GATEWAY_GITHUB_BRANCH:-${SG_GATEWAY_UPDATE_BRANCH:-dev-v22}}' in update",
+                   "assert '${SG_GATEWAY_GITHUB_BRANCH:-${SG_GATEWAY_UPDATE_BRANCH:-main}}' in update"),
+                  ("assert '${SG_GATEWAY_GITHUB_BRANCH:-${SG_GATEWAY_UPDATE_BRANCH:-dev-v22}}' in bootstrap",
+                   "assert '${SG_GATEWAY_GITHUB_BRANCH:-${SG_GATEWAY_UPDATE_BRANCH:-main}}' in bootstrap"),
+                  ('assert "dev-v22" in captured["title"]',
+                   'assert captured["title"] == "Безопасное обновление SG-Gateway из GitHub"'),
+              ],
+              'tests/test_sg_gateway_v22_panel_update_state_binding.py': [
+                  ("assert '${SG_GATEWAY_GITHUB_BRANCH:-${SG_GATEWAY_UPDATE_BRANCH:-dev-v22}}' in body",
+                   "assert '${SG_GATEWAY_GITHUB_BRANCH:-${SG_GATEWAY_UPDATE_BRANCH:-main}}' in body"),
+              ],
+          }
+
+          for name, pairs in replacements.items():
+              path = Path(name)
+              text = path.read_text(encoding='utf-8')
+              for old, new in pairs:
+                  count = text.count(old)
+                  if count != 1:
+                      raise SystemExit(f'{name}: expected exactly one occurrence of {old!r}, found {count}')
+                  text = text.replace(old, new)
+              path.write_text(text, encoding='utf-8')
+
+          # Guard the production-facing defaults and labels.
+          assert '"dev-v22").strip() or "dev-v22"' not in Path('app/maintenance/panel_updates.py').read_text(encoding='utf-8')
+          assert 'SG_GATEWAY_UPDATE_BRANCH:-dev-v22' not in Path('deploy/update-from-github.sh').read_text(encoding='utf-8')
+          assert 'SG_GATEWAY_UPDATE_BRANCH:-dev-v22' not in Path('deploy/install-from-github.sh').read_text(encoding='utf-8')
+          assert 'из GitHub {GITHUB_BRANCH}' not in Path('hostd/sg_hostd/operation_jobs.py').read_text(encoding='utf-8')
+          PY
+
+          rm -f .github/workflows/tmp-fix-panel-main-channel.yml
+
+          python3 - <<'PY'
+          import hashlib
+          import subprocess
+          from pathlib import Path
+
+          tracked = subprocess.check_output(['git', 'ls-files'], text=True).splitlines()
+          tracked = [p for p in tracked if p != 'SOURCE-SHA256SUMS' and p != '.github/workflows/tmp-fix-panel-main-channel.yml']
+          lines = []
+          for name in sorted(tracked):
+              data = Path(name).read_bytes()
+              lines.append(f'{hashlib.sha256(data).hexdigest()}  {name}')
+          Path('SOURCE-SHA256SUMS').write_text('\n'.join(lines) + '\n', encoding='utf-8')
+          PY
+
+          git config user.name "SG-Gateway CI"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -m "Use main as production panel update channel"
+          git push origin HEAD:fix-panel-update-channel-main-20260819
