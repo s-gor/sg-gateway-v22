@@ -108,7 +108,7 @@ def test_bound_panel_update_allows_same_version_hotfix(monkeypatch) -> None:
 
 
 def test_bound_panel_update_allows_higher_version_from_channel(monkeypatch) -> None:
-    result = _overview_for_versions(monkeypatch, installed="0.1.0-022.04", remote="0.1.0-022.06")
+    result = _overview_for_versions(monkeypatch, installed="0.1.0-022.04", remote="0.1.0-023.00")
     assert result["state"] == "available"
     assert result["can_install"] is True
 
