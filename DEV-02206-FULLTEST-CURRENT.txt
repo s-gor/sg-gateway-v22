@@ -1,0 +1,224 @@
+DEV 02206 current full pytest diagnostic
+full_tests=failure
+exit_code=1
+--- tail ---
+    ???
+<frozen importlib._bootstrap>:935: in _load_unlocked
+    ???
+<frozen importlib._bootstrap_external>:999: in exec_module
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+app/production.py:12: in <module>
+    register_mieru_router_http(app)
+app/clients/mieru_router_http.py:24: in register_mieru_router_http
+    @app.get("/clients/<int:client_id>/mieru-router/qr")
+     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/opt/hostedtoolcache/Python/3.12.14/x64/lib/python3.12/site-packages/flask/sansio/scaffold.py:362: in decorator
+    self.add_url_rule(rule, endpoint, f, **options)
+/opt/hostedtoolcache/Python/3.12.14/x64/lib/python3.12/site-packages/flask/sansio/scaffold.py:47: in wrapper_func
+    return f(self, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <Flask 'app.main'>, rule = '/clients/<int:client_id>/mieru-router/qr'
+endpoint = 'mieru_router_qr'
+view_func = <function register_mieru_router_http.<locals>.mieru_router_qr at 0x7f29ffe223e0>
+provide_automatic_options = True, options = {'endpoint': 'mieru_router_qr'}
+methods = {'GET', 'OPTIONS'}, required_methods = {'OPTIONS'}
+rule_obj = <Rule '/clients/<client_id>/mieru-router/qr' (HEAD, OPTIONS, GET) -> mieru_router_qr>
+old_func = <function register_mieru_router_http.<locals>.mieru_router_qr at 0x7f29ffd83e20>
+
+    @setupmethod
+    def add_url_rule(
+        self,
+        rule: str,
+        endpoint: str | None = None,
+        view_func: ft.RouteCallable | None = None,
+        provide_automatic_options: bool | None = None,
+        **options: t.Any,
+    ) -> None:
+        if endpoint is None:
+            endpoint = _endpoint_from_view_func(view_func)  # type: ignore
+        options["endpoint"] = endpoint
+        methods = options.pop("methods", None)
+    
+        # if the methods are not given and the view_func object knows its
+        # methods we can use that instead.  If neither exists, we go with
+        # a tuple of only ``GET`` as default.
+        if methods is None:
+            methods = getattr(view_func, "methods", None) or ("GET",)
+        if isinstance(methods, str):
+            raise TypeError(
+                "Allowed methods must be a list of strings, for"
+                ' example: @app.route(..., methods=["POST"])'
+            )
+        methods = {item.upper() for item in methods}
+    
+        # Methods that should always be added
+        required_methods: set[str] = set(getattr(view_func, "required_methods", ()))
+    
+        # starting with Flask 0.8 the view_func object can disable and
+        # force-enable the automatic options handling.
+        if provide_automatic_options is None:
+            provide_automatic_options = getattr(
+                view_func, "provide_automatic_options", None
+            )
+    
+        if provide_automatic_options is None:
+            if "OPTIONS" not in methods and self.config["PROVIDE_AUTOMATIC_OPTIONS"]:
+                provide_automatic_options = True
+                required_methods.add("OPTIONS")
+            else:
+                provide_automatic_options = False
+    
+        # Add the required methods now.
+        methods |= required_methods
+    
+        rule_obj = self.url_rule_class(rule, methods=methods, **options)
+        rule_obj.provide_automatic_options = provide_automatic_options  # type: ignore[attr-defined]
+    
+        self.url_map.add(rule_obj)
+        if view_func is not None:
+            old_func = self.view_functions.get(endpoint)
+            if old_func is not None and old_func != view_func:
+>               raise AssertionError(
+                    "View function mapping is overwriting an existing"
+                    f" endpoint function: {endpoint}"
+                )
+E               AssertionError: View function mapping is overwriting an existing endpoint function: mieru_router_qr
+
+/opt/hostedtoolcache/Python/3.12.14/x64/lib/python3.12/site-packages/flask/sansio/app.py:657: AssertionError
+__________ test_production_jinja_compiles_source_native_dual_partial ___________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f29ffe73e90>
+tmp_path = PosixPath('/tmp/pytest-of-runner/pytest-0/test_production_jinja_compiles0')
+
+    def test_production_jinja_compiles_source_native_dual_partial(monkeypatch, tmp_path) -> None:
+        monkeypatch.setenv("SG_GATEWAY_DATA_DIR", str(tmp_path / "data"))
+        sys.modules.pop("app.production", None)
+>       production = importlib.import_module("app.production")
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_sg_gateway_v22_sg_subscription_dual_ui.py:60: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/opt/hostedtoolcache/Python/3.12.14/x64/lib/python3.12/importlib/__init__.py:90: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1331: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:935: in _load_unlocked
+    ???
+<frozen importlib._bootstrap_external>:999: in exec_module
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+app/production.py:12: in <module>
+    register_mieru_router_http(app)
+app/clients/mieru_router_http.py:24: in register_mieru_router_http
+    @app.get("/clients/<int:client_id>/mieru-router/qr")
+     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/opt/hostedtoolcache/Python/3.12.14/x64/lib/python3.12/site-packages/flask/sansio/scaffold.py:362: in decorator
+    self.add_url_rule(rule, endpoint, f, **options)
+/opt/hostedtoolcache/Python/3.12.14/x64/lib/python3.12/site-packages/flask/sansio/scaffold.py:47: in wrapper_func
+    return f(self, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <Flask 'app.main'>, rule = '/clients/<int:client_id>/mieru-router/qr'
+endpoint = 'mieru_router_qr'
+view_func = <function register_mieru_router_http.<locals>.mieru_router_qr at 0x7f29ffea5260>
+provide_automatic_options = True, options = {'endpoint': 'mieru_router_qr'}
+methods = {'GET', 'OPTIONS'}, required_methods = {'OPTIONS'}
+rule_obj = <Rule '/clients/<client_id>/mieru-router/qr' (HEAD, OPTIONS, GET) -> mieru_router_qr>
+old_func = <function register_mieru_router_http.<locals>.mieru_router_qr at 0x7f29ffd83e20>
+
+    @setupmethod
+    def add_url_rule(
+        self,
+        rule: str,
+        endpoint: str | None = None,
+        view_func: ft.RouteCallable | None = None,
+        provide_automatic_options: bool | None = None,
+        **options: t.Any,
+    ) -> None:
+        if endpoint is None:
+            endpoint = _endpoint_from_view_func(view_func)  # type: ignore
+        options["endpoint"] = endpoint
+        methods = options.pop("methods", None)
+    
+        # if the methods are not given and the view_func object knows its
+        # methods we can use that instead.  If neither exists, we go with
+        # a tuple of only ``GET`` as default.
+        if methods is None:
+            methods = getattr(view_func, "methods", None) or ("GET",)
+        if isinstance(methods, str):
+            raise TypeError(
+                "Allowed methods must be a list of strings, for"
+                ' example: @app.route(..., methods=["POST"])'
+            )
+        methods = {item.upper() for item in methods}
+    
+        # Methods that should always be added
+        required_methods: set[str] = set(getattr(view_func, "required_methods", ()))
+    
+        # starting with Flask 0.8 the view_func object can disable and
+        # force-enable the automatic options handling.
+        if provide_automatic_options is None:
+            provide_automatic_options = getattr(
+                view_func, "provide_automatic_options", None
+            )
+    
+        if provide_automatic_options is None:
+            if "OPTIONS" not in methods and self.config["PROVIDE_AUTOMATIC_OPTIONS"]:
+                provide_automatic_options = True
+                required_methods.add("OPTIONS")
+            else:
+                provide_automatic_options = False
+    
+        # Add the required methods now.
+        methods |= required_methods
+    
+        rule_obj = self.url_rule_class(rule, methods=methods, **options)
+        rule_obj.provide_automatic_options = provide_automatic_options  # type: ignore[attr-defined]
+    
+        self.url_map.add(rule_obj)
+        if view_func is not None:
+            old_func = self.view_functions.get(endpoint)
+            if old_func is not None and old_func != view_func:
+>               raise AssertionError(
+                    "View function mapping is overwriting an existing"
+                    f" endpoint function: {endpoint}"
+                )
+E               AssertionError: View function mapping is overwriting an existing endpoint function: mieru_router_qr
+
+/opt/hostedtoolcache/Python/3.12.14/x64/lib/python3.12/site-packages/flask/sansio/app.py:657: AssertionError
+=============================== warnings summary ===============================
+tests/test_sg_gateway_021_vendored_five_engines.py:61
+  /home/runner/work/sg-gateway-v22/sg-gateway-v22/tests/test_sg_gateway_021_vendored_five_engines.py:61: SyntaxWarning: invalid escape sequence '\.'
+    assert '[[ "$module_version" =~ ^1\. ]]' in installer
+
+tests/test_sg_gateway_021_vendored_five_engines.py:71
+  /home/runner/work/sg-gateway-v22/sg-gateway-v22/tests/test_sg_gateway_021_vendored_five_engines.py:71: SyntaxWarning: invalid escape sequence '\.'
+    assert '[[ "$module_version" =~ ^1\. ]]' in ready
+
+tests/test_sg_gateway_v22_full_backup_verify.py::test_full_backup_verify_accepts_restore_compatible_archive
+tests/test_sg_gateway_v22_full_backup_verify.py::test_full_backup_verify_rejects_archive_without_database
+tests/test_sg_gateway_v22_runtime_contract_data_backup.py::test_data_promotion_is_accepted_by_full_restore_validator
+  /home/runner/work/sg-gateway-v22/sg-gateway-v22/hostd/sg_hostd/full_backup_runtime.py:846: DeprecationWarning: Python 3.14 will, by default, filter extracted tar archives and reject files or modify their metadata. Use the filter argument to control this behavior.
+    tar.extractall(target, members=members)
+
+tests/test_sg_gateway_v22_runtime_contract_data_backup.py::test_data_promotion_is_accepted_by_full_restore_validator
+  /home/runner/work/sg-gateway-v22/sg-gateway-v22/hostd/sg_hostd/data_backup_runtime.py:169: DeprecationWarning: Python 3.14 will, by default, filter extracted tar archives and reject files or modify their metadata. Use the filter argument to control this behavior.
+    tar.extractall(target, members=members)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_sg_gateway_v22_production_entrypoint_v4.py::test_importing_production_owns_dual_endpoints_with_v4 - AssertionError: View function mapping is overwriting an existing endpoint function: mieru_router_qr
+FAILED tests/test_sg_gateway_v22_router_subscription.py::test_router_ui_and_production_registration_are_source_native - AssertionError: View function mapping is overwriting an existing endpoint function: mieru_router_qr
+FAILED tests/test_sg_gateway_v22_sg_subscription_dual_ui.py::test_production_jinja_compiles_source_native_dual_partial - AssertionError: View function mapping is overwriting an existing endpoint function: mieru_router_qr
+============ 3 failed, 608 passed, 1 skipped, 6 warnings in 19.32s =============
