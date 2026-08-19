@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: write
+  statuses: write
 
 jobs:
   guard:
@@ -103,7 +104,15 @@ jobs:
         run: |
           python -B -c "import json, pathlib; manifest=json.loads(pathlib.Path('release-manifest.json').read_text(encoding='utf-8')); version=pathlib.Path('VERSION').read_text(encoding='utf-8').strip(); assert manifest['version']==version; assert manifest['source_integrity']['mode']=='git-blob-sha256'; assert manifest['safe_update']['preserve_local_assets'] is True; print('manifest baseline ok')"
 
-      - name: Run panel tests
+      - name: Run focused Mieru registration regressions
+        run: |
+          python -m pytest \
+            tests/test_sg_gateway_v22_02206_hardening.py \
+            tests/test_sg_gateway_v22_production_entrypoint_v4.py \
+            tests/test_sg_gateway_v22_router_subscription.py \
+            tests/test_sg_gateway_v22_sg_subscription_dual_ui.py
+
+      - name: Run full panel test suite
         run: python -m pytest tests
 
       - name: Build and verify current FULL package
@@ -114,3 +123,39 @@ jobs:
           OUT="/tmp/SG-Gateway-${VERSION}-DEV-02206-FULL.run"
           bash build-run.sh "$OUT"
           bash "$OUT" --verify-only
+
+      - name: Publish acceptance status
+        if: always()
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import subprocess
+          import urllib.request
+
+          repo = os.environ['GITHUB_REPOSITORY']
+          sha = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+          state = 'success' if os.environ.get('JOB_STATUS') == 'success' else 'failure'
+          payload = json.dumps({
+              'state': state,
+              'context': 'dev-02206/acceptance',
+              'description': 'focused + full pytest + source integrity + FULL verify',
+          }).encode('utf-8')
+          request = urllib.request.Request(
+              f'https://api.github.com/repos/{repo}/statuses/{sha}',
+              data=payload,
+              method='POST',
+              headers={
+                  'Authorization': f"Bearer {os.environ['GITHUB_TOKEN']}",
+                  'Accept': 'application/vnd.github+json',
+                  'X-GitHub-Api-Version': '2022-11-28',
+                  'Content-Type': 'application/json',
+              },
+          )
+          with urllib.request.urlopen(request, timeout=30) as response:
+              print(f'acceptance status published: {response.status} {state} {sha}')
+          PY
