@@ -15,7 +15,7 @@ from app.version import ROOT as APP_ROOT, get_version
 
 
 GITHUB_REPO = os.getenv("SG_GATEWAY_UPDATE_REPO", "s-gor/sg-gateway-v22").strip() or "s-gor/sg-gateway-v22"
-GITHUB_BRANCH = os.getenv("SG_GATEWAY_UPDATE_BRANCH", "dev-v22").strip() or "dev-v22"
+GITHUB_BRANCH = os.getenv("SG_GATEWAY_UPDATE_BRANCH", "stable-02204").strip() or "stable-02204"
 GITHUB_API = f"https://api.github.com/repos/{GITHUB_REPO}"
 STATE_FILE = Path(os.getenv("SG_GATEWAY_PANEL_UPDATE_STATE", "/var/lib/sg-gateway/updates/panel-state.json"))
 CACHE_TTL_SECONDS = 300
@@ -184,12 +184,27 @@ def overview(*, refresh: bool = False) -> dict[str, Any]:
         cached["bootstrap_allowed"] = False
         latest_commit = str(cached.get("latest_commit") or "")
         latest_version = str(cached.get("latest_version") or "")
+        installed_key = _version_key(installed_version)
+        latest_key = _version_key(latest_version)
         if baseline_valid:
             if installed_commit == latest_commit:
                 cached["state"] = "current"
                 cached["can_install"] = False
                 cached["message"] = f"Локальная база уже соответствует проверенному GitHub {GITHUB_BRANCH}."
-            elif latest_commit:
+            elif not latest_commit or not latest_key:
+                cached["state"] = "unavailable"
+                cached["can_install"] = False
+                cached["message"] = f"GitHub {GITHUB_BRANCH} не вернул пригодную VERSION для обновления."
+            elif installed_key and latest_key < installed_key:
+                cached["state"] = "blocked"
+                cached["can_install"] = False
+                cached["message"] = (
+                    f"Понижение SG-Gateway {installed_version} → {latest_version} заблокировано."
+                )
+            else:
+                # Same-version commits are valid production hotfixes. A higher
+                # VERSION is also allowed when it comes from the configured
+                # stable channel.
                 cached["state"] = "available"
                 cached["can_install"] = True
                 cached["message"] = f"GitHub {GITHUB_BRANCH} содержит новый commit. Можно выполнить безопасное обновление панели."
@@ -255,4 +270,3 @@ def overview(*, refresh: bool = False) -> dict[str, Any]:
             "can_install": False,
             "message": f"Проверка GitHub {GITHUB_BRANCH} не выполнена.",
         }
-
