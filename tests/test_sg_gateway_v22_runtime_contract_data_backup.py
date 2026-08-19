@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import sqlite3
 import sys
 import tarfile
@@ -143,10 +144,65 @@ def test_data_backup_contains_only_portable_source_of_truth(tmp_path: Path) -> N
     assert not any("/etc/amnezia/amneziawg" in name for name in names)
 
 
+def test_data_promotion_is_accepted_by_full_restore_validator(tmp_path: Path, monkeypatch) -> None:
+    data = tmp_path / "source-data"
+    config = tmp_path / "source-config"
+    letsencrypt = tmp_path / "source-letsencrypt"
+    source_out = tmp_path / "source-out"
+    data.mkdir()
+    config.mkdir()
+    letsencrypt.mkdir()
+    db = data / "sg-gateway.sqlite"
+    con = sqlite3.connect(db)
+    try:
+        con.execute("CREATE TABLE clients(id INTEGER PRIMARY KEY, enabled INTEGER)")
+        con.execute("INSERT INTO clients(id, enabled) VALUES (1, 1)")
+        con.commit()
+    finally:
+        con.close()
+    (config / "engine-secrets.env").write_text("TEST=1\n", encoding="utf-8")
+
+    created = data_backup_runtime.create_data_backup_archive(
+        source_data_dir=data,
+        source_config_dir=config,
+        source_letsencrypt_dir=letsencrypt,
+        destination_dir=source_out,
+    )
+
+    data_store = tmp_path / "data-store"
+    work = tmp_path / "work"
+    full_store = tmp_path / "full-store"
+    data_store.mkdir()
+    work.mkdir()
+    full_store.mkdir()
+    shutil.copy2(Path(created["path"]), data_store / data_backup_runtime.RESTORE_UPLOAD_NAME)
+
+    monkeypatch.setattr(data_backup_runtime, "_data_backup_dir", lambda: data_store)
+    monkeypatch.setattr(data_backup_runtime, "_work_dir", lambda: work)
+    monkeypatch.setattr(data_backup_runtime, "assert_runtime_contract", lambda **kwargs: {"ok": True})
+    monkeypatch.setattr(data_backup_runtime.full, "_ensure_dirs", lambda: None)
+    monkeypatch.setattr(data_backup_runtime.full, "_backup_dir", lambda: full_store)
+
+    result = data_backup_runtime.promote_uploaded_data_backup()
+    promoted = Path(result["full_restore_upload"])
+    with tarfile.open(promoted, "r:gz") as tar:
+        names = tar.getnames()
+    assert "payload" not in names
+    assert all(name == "manifest.json" or name.startswith("payload/") for name in names)
+
+    extracted = tmp_path / "full-extracted"
+    extracted.mkdir()
+    manifest = data_backup_runtime.full._extract_archive(promoted, extracted)
+    assert manifest["format"] == data_backup_runtime.full.FORMAT
+    assert manifest["data_profile"] is True
+    assert (extracted / "payload/var/lib/sg-gateway/sg-gateway.sqlite").is_file()
+
+
 def test_data_backup_ui_and_hostd_commands_are_wired() -> None:
     main = (ROOT / "app/main.py").read_text(encoding="utf-8")
     template = (ROOT / "app/web/templates/maintenance.html").read_text(encoding="utf-8")
     commands = (ROOT / "hostd/sg_hostd/commands.py").read_text(encoding="utf-8")
+    data_source = (ROOT / "hostd/sg_hostd/data_backup_runtime.py").read_text(encoding="utf-8")
     assert '"/maintenance/data-backups"' in main
     assert '"/maintenance/data-backups/restore"' in main
     assert "backup.data.promote" in main
@@ -156,3 +212,4 @@ def test_data_backup_ui_and_hostd_commands_are_wired() -> None:
     assert '"backup.data.create": _data_backup_create' in commands
     assert '"backup.data.verify": _data_backup_verify' in commands
     assert '"backup.data.promote": _data_backup_promote' in commands
+    assert "os.chown(root, uid, gid)" in data_source
