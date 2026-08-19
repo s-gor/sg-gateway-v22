@@ -161,6 +161,7 @@ jobs:
               'state': state,
               'context': 'dev-02206/acceptance',
               'description': 'focused + full pytest + source integrity + FULL build + verify-only',
+              'target_url': f"{os.environ['GITHUB_SERVER_URL']}/{repo}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
           }).encode('utf-8')
           request = urllib.request.Request(
               f'https://api.github.com/repos/{repo}/statuses/{sha}',
