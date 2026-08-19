@@ -282,7 +282,16 @@ def promote_uploaded_data_backup() -> dict:
         manifest_path.write_text(json.dumps(full_manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         with tarfile.open(temporary, "w:gz", dereference=False) as tar:
             tar.add(manifest_path, arcname="manifest.json", recursive=False)
-            tar.add(payload_root, arcname="payload", recursive=True, filter=full._portable_tar_filter)
+            # FULL restore deliberately rejects a bare top-level "payload"
+            # member. Add only its children so every archived state path starts
+            # with "payload/" and passes the established safe-member validator.
+            for child in sorted(payload_root.iterdir(), key=lambda item: item.name):
+                tar.add(
+                    child,
+                    arcname=f"payload/{child.name}",
+                    recursive=True,
+                    filter=full._portable_tar_filter,
+                )
 
         os.replace(temporary, destination)
         os.chmod(destination, 0o600)
