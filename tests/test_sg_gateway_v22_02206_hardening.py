@@ -3,8 +3,10 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from flask import Flask
 
 from app.clients.mieru_router import MieruRouterError, build_mieru_router_uri
+from app.clients.mieru_router_http import register_mieru_router_http
 from app.security.operation_jobs import _panel_update_result
 
 
@@ -65,6 +67,15 @@ def test_mieru_router_qr_is_registered_only_in_production_entrypoint() -> None:
     assert '"/clients/<int:client_id>/mieru-router/qr"' in http
     assert '"/clients/<int:client_id>/devices/<int:device_id>/mieru-router/qr"' in http
     assert "build_qr_svg(payload)" in http
+
+
+def test_mieru_router_http_registration_is_idempotent() -> None:
+    app = Flask("mieru-router-idempotency")
+    register_mieru_router_http(app)
+    register_mieru_router_http(app)
+    endpoints = [rule.endpoint for rule in app.url_map.iter_rules()]
+    assert endpoints.count("mieru_router_qr") == 1
+    assert endpoints.count("device_mieru_router_qr") == 1
 
 
 def test_mieru_ui_has_six_primary_actions_and_smart_qr_metadata() -> None:
