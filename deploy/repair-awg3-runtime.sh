@@ -72,7 +72,7 @@ cleanup() {
 trap cleanup EXIT
 
 [[ "$(id -u)" -eq 0 ]] || { echo "Запустите восстановление через sudo." >&2; exit 1; }
-for command in tar make sha256sum find install cp mv; do
+for command in tar make cc pkg-config sha256sum find install cp mv systemctl; do
   command -v "$command" >/dev/null 2>&1 || { echo "Не найден обязательный инструмент: $command" >&2; exit 1; }
 done
 [[ -x "$PYTHON" ]] || { echo "Не найден Python runtime SG-Gateway" >&2; exit 1; }

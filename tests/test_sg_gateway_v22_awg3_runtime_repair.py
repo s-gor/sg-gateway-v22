@@ -30,6 +30,16 @@ def test_awg3_repair_is_pinned_verified_local_first_and_runtime_only() -> None:
     assert "DELETE FROM" not in body
 
 
+def test_awg3_repair_checks_build_toolchain_before_staging_or_mutation() -> None:
+    body = (ROOT / "deploy/repair-awg3-runtime.sh").read_text(encoding="utf-8")
+    marker = "for command in tar make cc pkg-config sha256sum find install cp mv systemctl; do"
+    assert marker in body
+    preflight_at = body.index(marker)
+    staging_at = body.index('TMP="$(mktemp -d /tmp/sg-gateway-awg3-repair.')
+    mutation_at = body.index("MUTATED=1")
+    assert preflight_at < staging_at < mutation_at
+
+
 def test_awg3_repair_stops_before_swap_and_rolls_back_runtime_unit_and_service_state() -> None:
     body = (ROOT / "deploy/repair-awg3-runtime.sh").read_text(encoding="utf-8")
     stop_at = body.index('systemctl stop "$SERVICE"')
