@@ -149,10 +149,10 @@ def test_panel_update_terminal_has_structured_success_failure_and_runtime_guidan
     template = (ROOT / "app" / "web" / "templates" / "operation_job.html").read_text(encoding="utf-8")
     assert "Обновление завершено" in template
     assert "Вернуться в SG-Gateway" in template
-    assert "Открыть AWG3 Runtime" in template
     assert "attention.target_url" in template
     assert "result.runtime_attention" in template
     assert "attention.target_label" in template
+    assert "attention.message" in template
     assert "Панель:" in template
     assert "Clients:" in template
     assert "HTTPS:" in template
