@@ -1,0 +1,4 @@
+DEV 02206 reverify
+focused_tests=success
+full_tests=failure
+full_package=success
