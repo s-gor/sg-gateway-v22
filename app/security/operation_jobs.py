@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from app.config import load_config
+from app.runtime_ui import runtime_engine_state
 
 JOB_ID_RE = re.compile(r"^[0-9]{14}-[0-9a-f]{12}$")
 _STAGE_RE = re.compile(r"\[SG-Gateway Update\] \[(\d+)/6\]\s+(.+)")
@@ -91,6 +92,19 @@ def _panel_update_result(status: str, log: str) -> dict[str, Any]:
     }
 
 
+def _panel_update_runtime_attention() -> dict[str, Any]:
+    state = runtime_engine_state("amneziawg3")
+    if not state.get("known") or state.get("ready"):
+        return {}
+    return {
+        "kind": "awg3_runtime_repair",
+        "needs_repair": True,
+        "message": "Обновление завершено. AWG3 runtime отсутствует — восстановите его отдельно в Maintenance.",
+        "target_url": "/maintenance?tab=updates",
+        "target_label": "Открыть AWG3 Runtime",
+    }
+
+
 def read_job(job_id: str) -> dict[str, Any]:
     if not JOB_ID_RE.fullmatch(job_id or ""):
         raise FileNotFoundError(job_id)
@@ -126,5 +140,8 @@ def read_job(job_id: str) -> dict[str, Any]:
         "log": log[-240000:],
     }
     if str(meta.get("kind") or "") == "panel_update_channel":
-        payload["update_result"] = _panel_update_result(payload["status"], log)
+        result = _panel_update_result(payload["status"], log)
+        if payload["status"] == "success":
+            result["runtime_attention"] = _panel_update_runtime_attention()
+        payload["update_result"] = result
     return payload

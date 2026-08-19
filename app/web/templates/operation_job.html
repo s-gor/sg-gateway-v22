@@ -6,6 +6,7 @@
 {% block content %}
 {% set is_panel_update = job.kind == 'panel_update_channel' %}
 {% set update = job.update_result if is_panel_update and job.update_result else {} %}
+{% set attention = update.runtime_attention if update and update.runtime_attention else {} %}
 <section class="opjob-page"
          data-kind="{{ job.kind }}"
          data-restart-expected="{{ '1' if job.restart_expected else '0' }}"
@@ -58,8 +59,8 @@
     <a id="opjob-back" class="button" href="{{ job.back_url or url_for('security') }}">Вернуться</a>
     <a id="opjob-target" class="button primary{% if job.status != 'success' %} is-hidden{% endif %}" href="{{ job.target_url or '#' }}">Открыть результат</a>
     <button id="opjob-refresh" class="button primary is-hidden" type="button">Открыть панель заново</button>
-    {% if is_panel_update %}<a id="opjob-return-gateway" class="button primary opjob-return-gateway {{ 'is-hidden' if job.status not in ['success', 'failed'] else '' }}" href="/">Вернуться в SG-Gateway</a>{% endif %}
-    <span id="opjob-message">{% if job.status == 'success' %}Готово.{% elif job.status == 'failed' %}Задача завершилась ошибкой. Причина и rollback показаны выше.{% else %}Задача выполняется…{% endif %}</span>
+    {% if is_panel_update %}<a id="opjob-return-gateway" class="button primary opjob-return-gateway {{ 'is-hidden' if job.status not in ['success', 'failed'] else '' }}" href="{{ attention.target_url if attention and attention.target_url else '/' }}">{{ attention.target_label if attention and attention.target_label else 'Вернуться в SG-Gateway' }}</a>{% endif %}
+    <span id="opjob-message">{% if job.status == 'success' %}{{ attention.message if attention and attention.message else 'Готово.' }}{% elif job.status == 'failed' %}Задача завершилась ошибкой. Причина и rollback показаны выше.{% else %}Задача выполняется…{% endif %}</span>
   </footer>
 </section>
 <script>
@@ -93,6 +94,7 @@
   function renderPanelResult(data) {
     if (!isPanelUpdate || !summary) return;
     const result = data.update_result || {};
+    const attention = result.runtime_attention || {};
     const success = data.status === 'success';
     const failed = data.status === 'failed';
     if (!success && !failed) return;
@@ -123,7 +125,13 @@
     target?.classList.add('is-hidden');
     refresh?.classList.add('is-hidden');
     returnGateway?.classList.remove('is-hidden');
-    message.textContent = success ? 'Проверки завершены. Можно вернуться в SG-Gateway.' : 'Причина сохранена. При необходимости скопируйте последние строки терминала.';
+    if (returnGateway) {
+      returnGateway.href = attention.target_url || '/';
+      returnGateway.textContent = attention.target_label || 'Вернуться в SG-Gateway';
+    }
+    message.textContent = success
+      ? (attention.message || 'Проверки завершены. Можно вернуться в SG-Gateway.')
+      : 'Причина сохранена. При необходимости скопируйте последние строки терминала.';
   }
 
   function markSuccess(text, data) {
