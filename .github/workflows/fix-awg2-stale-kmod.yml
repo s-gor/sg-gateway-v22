@@ -1,8 +1,8 @@
 name: One-shot AWG2 stale kernel repair
 
 on:
-  push:
-    branches: [fix-awg2-stale-kmod-clean-install]
+  pull_request:
+    branches: [main]
 
 permissions:
   contents: write
@@ -13,6 +13,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: fix-awg2-stale-kmod-clean-install
           fetch-depth: 0
 
       - name: Patch clean install and full uninstall
@@ -43,11 +44,11 @@ jobs:
           new = '''  echo "AmneziaWG kernel module ${AMNEZIAWG_KMOD_VERSION}: DKMS из локального source"
 
           # A previous AWG3/experimental install can leave a 3.x amneziawg.ko in
-          # /lib/modules even after its DKMS bookkeeping was removed.  DKMS then
+          # /lib/modules even after its DKMS bookkeeping was removed. DKMS then
           # sees the pinned 1.0.0 package as already installed and skips replacing
           # that stale module, while AWG2 userspace later fails with EINVAL.
-          # Clean Install owns the SG AWG runtime, so remove the stale loaded/file
-          # state before rebuilding the frozen AWG2 module from our vendor source.
+          # Clean Install owns the SG AWG runtime, so remove stale loaded/file
+          # state before rebuilding frozen AWG2 from the vendored source.
           systemctl stop sg-gateway-awg.service sg-gateway-awg3.service >/dev/null 2>&1 || true
           ip link delete awg0 >/dev/null 2>&1 || true
           ip link delete awg3 >/dev/null 2>&1 || true
@@ -108,7 +109,7 @@ jobs:
           apt-get -o Dpkg::Use-Pty=0 purge -y amneziawg amneziawg-dkms amneziawg-tools >/dev/null 2>&1 || true
 
           # DKMS may have lost its bookkeeping while leaving the compiled module
-          # under updates/dkms.  Full uninstall must remove that stale SG module
+          # under updates/dkms. Full uninstall must remove that stale SG module
           # too, otherwise the next Clean Install can accidentally reuse it.
           find /lib/modules -type f \\
             \( -name 'amneziawg.ko' -o -name 'amneziawg.ko.*' \) \\
