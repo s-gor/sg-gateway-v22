@@ -118,6 +118,42 @@ def test_awg3_runtime_ui_prevents_new_access_but_preserves_selected_access() -> 
     assert 'value="amneziawg3"' in detail
 
 
+def test_02204_missing_awg3_can_update_then_repair_without_blocking_other_clients() -> None:
+    updater = (ROOT / "deploy" / "update-from-github.sh").read_text(encoding="utf-8")
+    panel_runtime = (ROOT / "hostd" / "sg_hostd" / "panel_update_runtime.py").read_text(encoding="utf-8")
+    client_runtime = (ROOT / "hostd" / "sg_hostd" / "client_runtime.py").read_text(encoding="utf-8")
+    commands = (ROOT / "hostd" / "sg_hostd" / "commands.py").read_text(encoding="utf-8")
+    repair = (ROOT / "deploy" / "repair-awg3-runtime.sh").read_text(encoding="utf-8")
+
+    # Panel Update is deliberately source-only. A missing AWG3 runtime must not
+    # prevent 22.04 from receiving the 22.06 panel code and Maintenance repair.
+    assert "sparse-checkout set app hostd deploy" in updater
+    assert '".venv"|"awg3") continue ;;' in updater
+    assert "clients.apply" not in updater
+    assert "runtime.contract" not in updater
+    assert 'env["SG_GATEWAY_GITHUB_BRANCH"] = GITHUB_BRANCH' in panel_runtime
+    assert '["/bin/bash", str(script)]' in panel_runtime
+
+    # Applying ordinary clients checks only engines that are actually active;
+    # missing unused AWG3 therefore does not break Xray/AWG2 operations.
+    apply_all = client_runtime.split("def apply_all_clients()", 1)[1]
+    assert "include_all_critical=False" in apply_all
+
+    # Maintenance intentionally checks all critical runtimes so it can expose
+    # the missing AWG3 before any AWG3 client exists.
+    runtime_status = commands.split("def _runtime_contract_status()", 1)[1].split("def ", 1)[0]
+    assert "include_all_critical=True" in runtime_status
+
+    # Repair remains available even when vendor/cores was never installed by
+    # the panel-only update: local verified files are preferred, pinned 22.04
+    # files are the fallback, and no client/settings rows are modified.
+    assert 'VENDOR_DIR="$PREFIX/vendor/cores"' in repair
+    assert 'RAW_BASE="https://raw.githubusercontent.com/s-gor/sg-gateway-v22/${VENDOR_COMMIT}/vendor/cores"' in repair
+    assert "stage_vendor_file" in repair
+    assert "UPDATE device_credentials" not in repair
+    assert "DELETE FROM" not in repair
+
+
 def test_awg3_repair_is_background_job_and_maintenance_route() -> None:
     jobs = (ROOT / "hostd" / "sg_hostd" / "operation_jobs.py").read_text(encoding="utf-8")
     commands = (ROOT / "hostd" / "sg_hostd" / "commands.py").read_text(encoding="utf-8")
