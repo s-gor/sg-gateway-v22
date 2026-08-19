@@ -13,10 +13,9 @@ jobs:
   guard:
     runs-on: ubuntu-24.04
     steps:
-      - name: Checkout dev-02206
+      - name: Checkout tested revision
         uses: actions/checkout@v4
         with:
-          ref: dev-02206
           fetch-depth: 1
 
       - name: Enforce development channel isolation
