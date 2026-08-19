@@ -17,12 +17,16 @@ def _text(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def test_current_installer_identity_matches_version_and_has_no_02111_tail() -> None:
-    text = _text(INSTALLER)
+def _current_version_identity() -> tuple[str, str]:
     version = _text(ROOT / "VERSION").strip()
     match = re.fullmatch(r"0\.1\.0-(\d{3})\.(\d{2})", version)
     assert match is not None, version
-    token = "".join(match.groups())
+    return version, "".join(match.groups())
+
+
+def test_current_installer_identity_matches_version_and_has_no_02111_tail() -> None:
+    text = _text(INSTALLER)
+    version, token = _current_version_identity()
 
     assert f'VERSION="{version}"' in text
     assert f'INSTALLER_BUILD="{token}-full-clean-dual-stack"' in text
@@ -38,13 +42,15 @@ def test_current_installer_identity_matches_version_and_has_no_02111_tail() -> N
     assert 'RESUME_FILE="/root/sg-gateway-02111-installer-resume.env"' not in text
 
 
-def test_02112_uninstall_has_current_identity_and_legacy_cleanup() -> None:
+def test_current_uninstaller_identity_matches_version_and_keeps_legacy_cleanup() -> None:
     text = _text(UNINSTALLER)
-    assert 'UNINSTALL_LOG="/var/log/sg-gateway-full-uninstall-02204.log"' in text
-    assert "/root/sg-gateway-02112-installer-resume.env" in text
-    assert "/var/log/sg-gateway-installer-02112.log" in text
+    version, token = _current_version_identity()
+    assert f'UNINSTALL_LOG="/var/log/sg-gateway-full-uninstall-{token}.log"' in text
+    assert f"SG-Gateway {version} · ПОЛНОЕ УДАЛЕНИЕ" in text
 
     # Historical cleanup must remain so older/partial installations can be removed.
+    assert "/root/sg-gateway-02112-installer-resume.env" in text
+    assert "/var/log/sg-gateway-installer-02112.log" in text
     assert "/root/sg-gateway-02111-installer-resume.env" in text
     assert "/var/log/sg-gateway-installer-02111.log" in text
 

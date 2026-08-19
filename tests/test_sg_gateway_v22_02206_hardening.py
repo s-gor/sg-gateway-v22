@@ -29,10 +29,11 @@ def test_dev_02206_identity_is_consistent_and_not_stable() -> None:
     assert manifest["next_development_line"] == "0.1.0-022.07"
 
 
-def test_dev_installer_identity_matches_version() -> None:
+def test_dev_deploy_identity_matches_version() -> None:
     version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
     token = version.rsplit("-", 1)[1].replace(".", "")
     installer = (ROOT / "install.sh").read_text(encoding="utf-8")
+    uninstaller = (ROOT / "deploy" / "full-uninstall-ubuntu.sh").read_text(encoding="utf-8")
 
     assert f'VERSION="{version}"' in installer
     assert f'INSTALLER_BUILD="{token}-full-clean-dual-stack"' in installer
@@ -42,6 +43,9 @@ def test_dev_installer_identity_matches_version() -> None:
     assert f'Мастер установки SG-Gateway {version} запущен' in installer
     assert installer.count(f'before-sg-gateway-{token}') == 2
     assert "SG-Gateway V22 vendor bundle:" in installer
+
+    assert f'UNINSTALL_LOG="/var/log/sg-gateway-full-uninstall-{token}.log"' in uninstaller
+    assert f"SG-Gateway {version} · ПОЛНОЕ УДАЛЕНИЕ" in uninstaller
 
 
 def test_mieru_router_uri_uses_compact_router_contract() -> None:

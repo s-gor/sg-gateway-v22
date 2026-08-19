@@ -8,6 +8,14 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 VERSION_FILE = ROOT / "VERSION"
 INSTALLER = ROOT / "install.sh"
+UNINSTALLER = ROOT / "deploy" / "full-uninstall-ubuntu.sh"
+
+
+def _version_token(version: str) -> str:
+    match = re.fullmatch(r"0\.1\.0-(\d{3})\.(\d{2})", version)
+    if match is None:
+        raise SystemExit(f"Unsupported SG-Gateway VERSION format: {version!r}")
+    return "".join(match.groups())
 
 
 def _replace_exact_count(text: str, pattern: str, replacement: str, expected: int, label: str) -> str:
@@ -17,19 +25,8 @@ def _replace_exact_count(text: str, pattern: str, replacement: str, expected: in
     return updated
 
 
-def normalized_installer(text: str, version: str) -> str:
-    match = re.fullmatch(r"0\.1\.0-(\d{3})\.(\d{2})", version)
-    if match is None:
-        raise SystemExit(f"Unsupported SG-Gateway VERSION format: {version!r}")
-    token = "".join(match.groups())
-
-    text = _replace_exact_count(
-        text,
-        r'^VERSION="[^"]+"$',
-        f'VERSION="{version}"',
-        1,
-        "installer VERSION",
-    )
+def normalized_installer(text: str, version: str, token: str) -> str:
+    text = _replace_exact_count(text, r'^VERSION="[^"]+"$', f'VERSION="{version}"', 1, "installer VERSION")
     text = _replace_exact_count(
         text,
         r'^INSTALLER_BUILD="[^"]+"$',
@@ -98,26 +95,62 @@ def normalized_installer(text: str, version: str) -> str:
     return text
 
 
+def normalized_uninstaller(text: str, version: str, token: str) -> str:
+    text = _replace_exact_count(
+        text,
+        r'^UNINSTALL_LOG="/var/log/sg-gateway-full-uninstall-[^"]+\.log"$',
+        f'UNINSTALL_LOG="/var/log/sg-gateway-full-uninstall-{token}.log"',
+        1,
+        "uninstaller log",
+    )
+    text = _replace_exact_count(
+        text,
+        r'SG-Gateway 0\.1\.0-\d{3}\.\d{2} · ПОЛНОЕ УДАЛЕНИЕ',
+        f'SG-Gateway {version} · ПОЛНОЕ УДАЛЕНИЕ',
+        1,
+        "uninstaller banner",
+    )
+    required = (
+        f'UNINSTALL_LOG="/var/log/sg-gateway-full-uninstall-{token}.log"',
+        f'SG-Gateway {version} · ПОЛНОЕ УДАЛЕНИЕ',
+    )
+    missing = [marker for marker in required if marker not in text]
+    if missing:
+        raise SystemExit("Uninstaller identity validation failed: " + ", ".join(missing))
+    return text
+
+
 def main() -> int:
     check_only = sys.argv[1:] == ["--check"]
     if sys.argv[1:] not in ([], ["--check"]):
         raise SystemExit("usage: sync-dev-installer-identity.py [--check]")
 
     version = VERSION_FILE.read_text(encoding="utf-8").strip()
-    original = INSTALLER.read_text(encoding="utf-8")
-    updated = normalized_installer(original, version)
+    token = _version_token(version)
+    originals = {
+        INSTALLER: INSTALLER.read_text(encoding="utf-8"),
+        UNINSTALLER: UNINSTALLER.read_text(encoding="utf-8"),
+    }
+    updated = {
+        INSTALLER: normalized_installer(originals[INSTALLER], version, token),
+        UNINSTALLER: normalized_uninstaller(originals[UNINSTALLER], version, token),
+    }
+    changed = [path for path in originals if updated[path] != originals[path]]
 
     if check_only:
-        if updated != original:
-            raise SystemExit("install.sh identity is out of sync with VERSION")
-        print(f"Installer identity: OK ({version})")
+        if changed:
+            names = ", ".join(path.relative_to(ROOT).as_posix() for path in changed)
+            raise SystemExit(f"deploy identity is out of sync with VERSION: {names}")
+        print(f"Deploy identity: OK ({version})")
         return 0
 
-    if updated != original:
-        INSTALLER.write_text(updated, encoding="utf-8", newline="\n")
-        print(f"Installer identity synchronized to {version}")
+    for path in changed:
+        path.write_text(updated[path], encoding="utf-8", newline="\n")
+    if changed:
+        names = ", ".join(path.relative_to(ROOT).as_posix() for path in changed)
+        print(f"Deploy identity synchronized to {version}: {names}")
     else:
-        print(f"Installer identity already synchronized to {version}")
+        print(f"Deploy identity already synchronized to {version}")
     return 0
 
 
