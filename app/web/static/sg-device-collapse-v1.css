@@ -173,6 +173,55 @@ html[data-theme="light"] body .dv16-device.sg-device-collapsed .dv16-device-titl
   filter: none !important;
 }
 
+/* 022.06 · compact Mieru actions */
+body .sg-mieru-more {
+  position: relative;
+  margin: 0;
+}
+
+body .sg-mieru-more > summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+body .sg-mieru-more > summary::-webkit-details-marker {
+  display: none;
+}
+
+body .sg-mieru-more-menu {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 8px);
+  right: 0;
+  display: grid;
+  gap: 7px;
+  min-width: 210px;
+  padding: 10px;
+  border: 1px solid var(--line, #334150);
+  border-radius: 12px;
+  background: var(--panel, #16212d);
+  box-shadow: 0 16px 36px rgba(0,0,0,.26);
+}
+
+body .sg-mieru-more-menu .button {
+  width: 100%;
+  justify-content: flex-start;
+  white-space: nowrap;
+}
+
+body .sg-export-error {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 7px 10px;
+  border: 1px solid rgba(240,125,140,.22);
+  border-radius: 10px;
+  background: rgba(240,125,140,.07);
+  color: #f0a0aa;
+  font-size: 12px;
+  font-weight: 750;
+}
+
 @media (max-width: 900px) {
   body .dv16-device.sg-device-collapsed .dv16-device-head {
     align-items: flex-start !important;
@@ -180,6 +229,12 @@ html[data-theme="light"] body .dv16-device.sg-device-collapsed .dv16-device-titl
 
   body .sg-device-collapse-toggle {
     order: -1;
+  }
+
+  body .sg-mieru-more-menu {
+    left: 0;
+    right: auto;
+    min-width: min(78vw, 240px);
   }
 }
 
