@@ -2,6 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
+from app.engines import provisioning
+
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -54,6 +58,29 @@ def test_awg3_userspace_helper_splits_dual_stack_address_values() -> None:
     assert 'if [[ "$address" == *:* ]]' in body
     assert 'ip -6 address add "$address" dev "$IFACE"' in body
     assert 'ip -4 address add "$address" dev "$IFACE"' in body
+
+
+def test_awg3_credential_preflight_stops_before_subprocess(tmp_path: Path, monkeypatch) -> None:
+    missing = tmp_path / "missing-awg3"
+    monkeypatch.setattr(provisioning, "AWG3_AWG", str(missing / "bin" / "awg"))
+    monkeypatch.setattr(provisioning, "AWG3_AWG_QUICK", str(missing / "bin" / "awg-quick"))
+    monkeypatch.setattr(provisioning, "AWG3_GO", str(missing / "bin" / "amneziawg-go"))
+    monkeypatch.setattr(provisioning, "AWG3_HELPER", str(missing / "deploy" / "helper.sh"))
+    monkeypatch.setattr(
+        provisioning,
+        "AWG3_UNIT_PATHS",
+        (str(missing / "systemd" / "sg-gateway-awg3.service"),),
+    )
+
+    def unexpected_subprocess(*args, **kwargs):
+        raise AssertionError("subprocess.run must not execute before AWG3 preflight passes")
+
+    monkeypatch.setattr(provisioning.subprocess, "run", unexpected_subprocess)
+
+    with pytest.raises(RuntimeError, match="AWG3 требует восстановления") as error:
+        provisioning._awg3_keypair()
+
+    assert "Откройте Maintenance → AWG3 Runtime" in str(error.value)
 
 
 def test_awg3_repair_is_background_job_and_maintenance_route() -> None:
