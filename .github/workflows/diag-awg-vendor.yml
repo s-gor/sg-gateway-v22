@@ -1,0 +1,27 @@
+name: Diagnostic AWG2 vendor metadata
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Print vendored AWG2 kernel metadata
+        run: |
+          python3 - <<'PY'
+          import tarfile
+          from pathlib import Path
+          archive = Path('vendor/cores/amneziawg-linux-kernel-module-1.0.20260329-2.tar.gz')
+          with tarfile.open(archive, 'r:gz') as tar:
+              for member in tar.getmembers():
+                  if member.isfile() and (member.name.endswith('/version.h') or member.name.endswith('/dkms.conf')):
+                      print(f'===== {member.name} =====')
+                      fh = tar.extractfile(member)
+                      print(fh.read().decode('utf-8', errors='replace') if fh else '<unreadable>')
+          PY
