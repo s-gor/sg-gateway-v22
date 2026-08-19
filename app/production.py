@@ -5,7 +5,14 @@ from app.clients.mieru_router_http import register_mieru_router_http
 from app.clients.router_subscription_http import register_router_subscription
 from app.clients.sg_subscription_http_v4 import register_sg_subscription
 from app.main import app
+from app.runtime_ui import runtime_engine_state
 from app.xray.xmux_http import register_xmux_http
+
+
+@app.context_processor
+def _runtime_ui_helpers():
+    return {"runtime_engine_state": runtime_engine_state}
+
 
 register_sg_subscription(app)
 register_router_subscription(app)
