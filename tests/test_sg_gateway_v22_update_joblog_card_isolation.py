@@ -76,25 +76,27 @@ def test_one_broken_exporter_does_not_break_other_client_cards(monkeypatch) -> N
     assert cards["amneziawg"].status == "error"
     assert cards["amneziawg"].payload == ""
     assert cards["amneziawg"].show_qr is False
+    assert "Ошибка генерации" in cards["amneziawg"].error_message
     assert "Остальные профили" in cards["amneziawg"].error_message
     assert cards["anytls"].status == "applied"
     assert cards["anytls"].payload == "anytls://still-works"
 
 
-def test_panel_update_safety_backup_keeps_live_operation_job_outside_rollback_archive() -> None:
-    body = (ROOT / "deploy" / "update-from-github.sh").read_text(encoding="utf-8")
-    assert 'OPERATION_JOB_DIR="$DATA_DIR/security/jobs"' in body
-    assert '--exclude="${OPERATION_JOB_DIR#/}"' in body
-    assert "preserve_operation_jobs_for_rollback()" in body
-    assert "restore_operation_jobs_after_rollback()" in body
+def test_operation_job_logs_live_outside_transactional_data_tree() -> None:
+    hostd = (ROOT / "hostd" / "sg_hostd" / "operation_jobs.py").read_text(encoding="utf-8")
+    reader = (ROOT / "app" / "security" / "operation_jobs.py").read_text(encoding="utf-8")
+    runner = (ROOT / "hostd" / "sg_hostd" / "operation_job_runner.py").read_text(encoding="utf-8")
 
-    rollback = body[body.index("rollback_update() {"):body.index("\non_error() {", body.index("rollback_update() {"))]
-    assert rollback.index("preserve_operation_jobs_for_rollback") < rollback.index('rm -rf -- "$path"')
-    assert rollback.index('tar -C / -xpf "$BACKUP_DIR/state.tar"') < rollback.index("restore_operation_jobs_after_rollback")
+    assert 'DEFAULT_JOB_DIR = "/var/log/sg-gateway/operation-jobs"' in hostd
+    assert 'export SG_GATEWAY_OPERATION_JOB_DIR={shlex.quote(str(JOB_DIR))}' in hostd
+    assert 'load_config().log_dir / "operation-jobs"' in reader
+    assert 'return load_config().data_dir / "security" / "jobs"' in reader
+    assert '"/var/log/sg-gateway/operation-jobs"' in runner
+    assert 'export SG_GATEWAY_OPERATION_JOB_DIR=/var/lib/sg-gateway/security/jobs' not in hostd
 
 
-def test_client_detail_marks_only_failed_card_as_generation_error() -> None:
-    template = (ROOT / "app" / "web" / "templates" / "client_detail.html").read_text(encoding="utf-8")
-    assert "card.status == 'error'" in template
-    assert "Ошибка генерации" in template
-    assert "card.error_message" in template
+def test_job_reader_keeps_legacy_fallback_for_old_terminals() -> None:
+    reader = (ROOT / "app" / "security" / "operation_jobs.py").read_text(encoding="utf-8")
+    assert "def _legacy_jobs_dir()" in reader
+    assert "def _job_roots()" in reader
+    assert "for candidate in _job_roots():" in reader
