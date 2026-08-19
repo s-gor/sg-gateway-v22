@@ -1,0 +1,224 @@
+name: tmp-fix-update-production-wsgi
+
+on:
+  push:
+    branches:
+      - fix-update-production-wsgi-02204e
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix-update-production-wsgi-02204e
+          fetch-depth: 0
+      - name: Patch updater and regression test
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          updater_path = Path('deploy/update-from-github.sh')
+          text = updater_path.read_text(encoding='utf-8')
+
+          old = 'PANEL_SERVICE="sg-gateway.service"\nHOSTD_SERVICE="sg-hostd.service"\n'
+          new = 'PANEL_SERVICE="sg-gateway.service"\nPANEL_PRODUCTION_WSGI="app.production:app"\nHOSTD_SERVICE="sg-hostd.service"\n'
+          if old not in text:
+              raise SystemExit('cannot insert PANEL_PRODUCTION_WSGI')
+          text = text.replace(old, new, 1)
+
+          old = '''panel_wsgi_target() {
+            local raw
+            raw="$(systemctl show -p ExecStart --value "$PANEL_SERVICE" 2>/dev/null || true)"
+            python3 - "$raw" <<'PYWSGITARGET'
+          import re
+          import sys
+
+          raw = sys.argv[1]
+          items = re.findall(
+              r"(?<![A-Za-z0-9_.])([A-Za-z_]\\w*(?:\\.[A-Za-z_]\\w*)*:[A-Za-z_]\\w*)(?![A-Za-z0-9_])",
+              raw,
+          )
+          print(items[-1] if items else "app.production:app")
+          PYWSGITARGET
+          }
+          '''
+          new = '''installed_panel_wsgi_target() {
+            local raw
+            raw="$(systemctl show -p ExecStart --value "$PANEL_SERVICE" 2>/dev/null || true)"
+            python3 - "$raw" <<'PYWSGITARGET'
+          import re
+          import sys
+
+          raw = sys.argv[1]
+          items = re.findall(
+              r"(?<![A-Za-z0-9_.])([A-Za-z_]\\w*(?:\\.[A-Za-z_]\\w*)*:[A-Za-z_]\\w*)(?![A-Za-z0-9_])",
+              raw,
+          )
+          print(items[-1] if items else "")
+          PYWSGITARGET
+          }
+
+          panel_wsgi_target() {
+            printf '%s\\n' "$PANEL_PRODUCTION_WSGI"
+          }
+
+          # SG_GATEWAY_02204E_UPDATE_PRODUCTION_WSGI_FIX1
+          migrate_panel_wsgi_service() {
+            local unit="/etc/systemd/system/sg-gateway.service"
+            local current after
+            [[ -f "$unit" ]] || fail "panel systemd unit is missing: $unit"
+
+            current="$(installed_panel_wsgi_target)"
+            if [[ "$current" == "$PANEL_PRODUCTION_WSGI" ]]; then
+              printf '[SG-Gateway Update] Panel WSGI target: %s (already current).\\n' "$current"
+              return 0
+            fi
+            [[ -n "$current" ]] || fail "cannot determine installed panel WSGI target"
+
+            python3 - "$unit" "$PANEL_PRODUCTION_WSGI" <<'PYMIGRATEWSGI'
+          import re
+          import sys
+          from pathlib import Path
+
+          path = Path(sys.argv[1])
+          target = sys.argv[2]
+          body = path.read_text(encoding="utf-8")
+          lines = body.splitlines(keepends=True)
+          pattern = re.compile(
+              r"(?<![A-Za-z0-9_.])([A-Za-z_]\\w*(?:\\.[A-Za-z_]\\w*)*:[A-Za-z_]\\w*)(?![A-Za-z0-9_])"
+          )
+          hits = []
+          for index, line in enumerate(lines):
+              if not line.startswith("ExecStart="):
+                  continue
+              matches = list(pattern.finditer(line))
+              if len(matches) == 1:
+                  hits.append((index, matches[0]))
+          if len(hits) != 1:
+              raise SystemExit(f"expected exactly one WSGI target in ExecStart, found {len(hits)}")
+          index, match = hits[0]
+          line = lines[index]
+          lines[index] = line[:match.start()] + target + line[match.end():]
+          path.write_text("".join(lines), encoding="utf-8", newline="")
+          PYMIGRATEWSGI
+
+            systemctl daemon-reload
+            after="$(installed_panel_wsgi_target)"
+            [[ "$after" == "$PANEL_PRODUCTION_WSGI" ]] || \
+              fail "panel WSGI migration failed: expected $PANEL_PRODUCTION_WSGI, got ${after:-unknown}"
+            printf '[SG-Gateway Update] Panel WSGI migrated: %s -> %s\\n' "$current" "$after"
+          }
+          '''
+          if old not in text:
+              raise SystemExit('cannot replace panel_wsgi_target block')
+          text = text.replace(old, new, 1)
+
+          old = '''          module = importlib.import_module(module_name)
+          getattr(module, object_name)
+          print(f"Panel WSGI import: OK ({target}) with isolated data/log")
+          PYDEPLOYEDWSGI
+          '''
+          new = '''          module = importlib.import_module(module_name)
+          application = getattr(module, object_name)
+          if target == "app.production:app":
+              with application.test_request_context("/"):
+                  context = {}
+                  for processor in application.template_context_processors[None]:
+                      context.update(processor())
+              required = (
+                  "sg_subscription_universal_url",
+                  "sg_subscription_native_url",
+                  "router_subscription_url",
+              )
+              missing = [name for name in required if not callable(context.get(name))]
+              if missing:
+                  raise SystemExit(
+                      "production WSGI is missing required template context: " + ", ".join(missing)
+                  )
+              print("Production template context: OK")
+          print(f"Panel WSGI import: OK ({target}) with isolated data/log")
+          PYDEPLOYEDWSGI
+          '''
+          if old not in text:
+              raise SystemExit('cannot extend deployed WSGI validation')
+          text = text.replace(old, new, 1)
+
+          old = '''            'import flask, jinja2, waitress; print("Python runtime: OK")'
+          }
+
+          restart_panel() {
+          '''
+          new = '''            'import flask, jinja2, waitress; print("Python runtime: OK")'
+
+            migrate_panel_wsgi_service
+          }
+
+          restart_panel() {
+          '''
+          if old not in text:
+              raise SystemExit('cannot hook WSGI migration into deploy_source')
+          text = text.replace(old, new, 1)
+
+          old = '''            systemctl is-active --quiet "$HOSTD_SERVICE"
+            systemctl is-active --quiet "$PANEL_SERVICE"
+            systemctl is-active --quiet nginx.service
+          }
+          '''
+          new = '''            systemctl is-active --quiet "$HOSTD_SERVICE"
+            systemctl is-active --quiet "$PANEL_SERVICE"
+            systemctl is-active --quiet nginx.service
+            [[ "$(installed_panel_wsgi_target)" == "$PANEL_PRODUCTION_WSGI" ]] || \
+              fail "panel service is not running the production WSGI entrypoint"
+          }
+          '''
+          if old not in text:
+              raise SystemExit('cannot add final WSGI verification')
+          text = text.replace(old, new, 1)
+
+          old = 'run_stage 3 "Обновление только исходников SG-Gateway" deploy_source "$SOURCE_DIR"'
+          new = 'run_stage 3 "Обновление исходников SG-Gateway + WSGI migration" deploy_source "$SOURCE_DIR"'
+          if old not in text:
+              raise SystemExit('cannot update stage 3 label')
+          text = text.replace(old, new, 1)
+
+          updater_path.write_text(text, encoding='utf-8', newline='\n')
+
+          test_path = Path('tests/test_sg_gateway_v22_clean_install_production_wsgi.py')
+          test = test_path.read_text(encoding='utf-8')
+          addition = '''\n\ndef test_update_migrates_old_panel_service_to_production_wsgi() -> None:\n    updater = (ROOT / "deploy/update-from-github.sh").read_text(encoding="utf-8")\n    assert 'PANEL_PRODUCTION_WSGI="app.production:app"' in updater\n    assert "installed_panel_wsgi_target()" in updater\n    assert "migrate_panel_wsgi_service()" in updater\n    assert 'local unit="/etc/systemd/system/sg-gateway.service"' in updater\n    assert 'systemctl daemon-reload' in updater\n    assert 'migrate_panel_wsgi_service' in updater[updater.index("deploy_source() {"):updater.index("restart_panel() {")]\n    assert '[[ "$(installed_panel_wsgi_target)" == "$PANEL_PRODUCTION_WSGI" ]]' in updater\n    assert '"sg_subscription_universal_url"' in updater\n    assert '"sg_subscription_native_url"' in updater\n    assert '"router_subscription_url"' in updater\n    assert "app.main:app" not in updater\n'''
+          if 'def test_update_migrates_old_panel_service_to_production_wsgi' in test:
+              raise SystemExit('regression test already exists')
+          test_path.write_text(test.rstrip() + addition + '\n', encoding='utf-8', newline='\n')
+          PY
+
+          git rm .github/workflows/tmp-fix-update-production-wsgi.yml
+
+          python3 - <<'PY'
+          import hashlib
+          import subprocess
+          from pathlib import Path
+
+          paths = subprocess.check_output(['git', 'ls-files'], text=True, encoding='utf-8').splitlines()
+          rows = []
+          for path in paths:
+              if path == 'SOURCE-SHA256SUMS':
+                  continue
+              file = Path(path)
+              if not file.is_file():
+                  continue
+              rows.append(f"{hashlib.sha256(file.read_bytes()).hexdigest()}  {path}")
+          Path('SOURCE-SHA256SUMS').write_text('\n'.join(rows) + '\n', encoding='utf-8', newline='\n')
+          PY
+
+          git add -A
+          git diff --cached --check
+          git config user.name 'SG-Gateway CI'
+          git config user.email 'actions@users.noreply.github.com'
+          git commit -m 'Fix updater migration to production WSGI'
+          git push origin HEAD:fix-update-production-wsgi-02204e
