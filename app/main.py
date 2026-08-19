@@ -3,6 +3,7 @@ import re
 import shutil
 import time
 from pathlib import Path
+from urllib.parse import urlsplit
 from flask import Flask, Response, abort, flash, jsonify, redirect, render_template, request, send_file, url_for
 
 from app.clients.access import build_access_cards
@@ -158,6 +159,18 @@ def normalize_country_code(value: str | None) -> str:
 
 def country_name(code: str | None) -> str:
     return COUNTRY_NAMES.get(normalize_country_code(code), COUNTRY_NAMES["unknown"])
+
+
+def _safe_login_next(value: str | None) -> str:
+    target = str(value or "/").strip() or "/"
+    parsed = urlsplit(target)
+    if parsed.scheme or parsed.netloc or not target.startswith("/") or target.startswith("//"):
+        return "/"
+
+    stale_client = re.fullmatch(r"/clients/(\d+)", parsed.path)
+    if stale_client and get_client(int(stale_client.group(1))) is None:
+        return "/clients"
+    return target
 
 
 def _format_bytes(value: int) -> str:
@@ -577,7 +590,7 @@ def create_app() -> Flask:
 
     @app.post("/login")
     def login_post():
-        next_url = request.form.get("next") or "/"
+        next_url = _safe_login_next(request.form.get("next"))
         if verify_password(request.form.get("password", "")):
             login_user()
             return redirect(next_url)

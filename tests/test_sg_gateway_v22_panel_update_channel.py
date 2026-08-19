@@ -84,7 +84,9 @@ def test_staged_validation_and_shell_fallback_use_production_wsgi() -> None:
     update = (ROOT / "deploy" / "update-from-github.sh").read_text(encoding="utf-8")
     assert '"app/production.py"' in runtime
     assert "import app.production; import sg_hostd.commands" in runtime
-    assert 'print(items[-1] if items else "app.production:app")' in update
+    assert 'PANEL_PRODUCTION_WSGI="app.production:app"' in update
+    assert 'printf \'%s\\n\' "$PANEL_PRODUCTION_WSGI"' in update
+    assert "migrate_panel_wsgi_service()" in update
     assert '[[ -f "$SOURCE_DIR/app/production.py" ]]' in update
     assert "wsgi-validation" in runtime
     assert 'env["SG_GATEWAY_DATA_DIR"] = str(validation_root / "data")' in runtime
