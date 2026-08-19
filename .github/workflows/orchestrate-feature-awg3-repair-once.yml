@@ -8,19 +8,22 @@ on:
 
 permissions:
   contents: write
+  statuses: write
 
 jobs:
   integrate:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-24.04
     steps:
-      - name: Checkout current dev-02206
+      - id: checkout
+        name: Checkout current dev-02206
         uses: actions/checkout@v4
         with:
           ref: dev-02206
           fetch-depth: 0
 
-      - name: Lock expected branch and production freeze
+      - id: lock
+        name: Lock expected branch and production freeze
         run: |
           set -Eeuo pipefail
           BASE_SHA="$(git rev-parse HEAD)"
@@ -29,17 +32,14 @@ jobs:
           test "$(git ls-remote origin refs/heads/main | cut -f1)" = "56df9a7b4fe509282e37374dd6ef3bccdc1b1100"
           test "$(git ls-remote origin refs/heads/stable-02204 | cut -f1)" = "56df9a7b4fe509282e37374dd6ef3bccdc1b1100"
 
-      - name: Apply AWG3 repair integration and clean temporary files
+      - id: apply
+        name: Apply AWG3 repair integration and clean temporary files
         run: |
           set -Eeuo pipefail
           python3 scripts/dev-02206-awg3-repair-integrate.py
           chmod 0755 deploy/repair-awg3-runtime.sh
           rm -f scripts/dev-02206-awg3-repair-integrate.py
           rm -f .github/workflows/orchestrate-feature-awg3-repair-once.yml
-
-          # First make the index equal to the candidate tree. New AWG3 files
-          # must already be visible to git ls-files before SOURCE-SHA256SUMS
-          # is generated.
           git add -A
           python3 - <<'PY'
           import hashlib
@@ -54,7 +54,8 @@ jobs:
           git add SOURCE-SHA256SUMS
           git diff --cached --check
 
-      - name: Verify source integrity
+      - id: integrity
+        name: Verify source integrity
         run: |
           set -Eeuo pipefail
           python3 -B - <<'PY'
@@ -85,17 +86,20 @@ jobs:
           print(f'Source integrity OK: {len(tracked)} files')
           PY
 
-      - name: Set up Python
+      - id: setup
+        name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
-      - name: Install dependencies
+      - id: deps
+        name: Install dependencies
         run: |
           python -m pip install --upgrade pip >/dev/null
           python -m pip install -r requirements-dev.txt >/dev/null
 
-      - name: Shell and Python syntax
+      - id: syntax
+        name: Shell and Python syntax
         run: |
           set -Eeuo pipefail
           bash -n deploy/repair-awg3-runtime.sh
@@ -112,7 +116,8 @@ jobs:
           print(f'Python syntax OK: {len(files)} files')
           PY
 
-      - name: Focused AWG3 and dev regressions
+      - id: focused
+        name: Focused AWG3 and dev regressions
         run: |
           python -m pytest \
             tests/test_sg_gateway_v22_awg3_runtime_repair.py \
@@ -122,10 +127,12 @@ jobs:
             tests/test_sg_gateway_v22_router_subscription.py \
             tests/test_sg_gateway_v22_sg_subscription_dual_ui.py
 
-      - name: Full pytest
+      - id: full
+        name: Full pytest
         run: python -m pytest tests
 
-      - name: Commit tested candidate locally
+      - id: candidate
+        name: Commit tested candidate locally
         run: |
           set -Eeuo pipefail
           git fetch origin dev-02206
@@ -137,7 +144,8 @@ jobs:
           git commit -m "Add safe AWG3 runtime repair"
           echo "CANDIDATE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
 
-      - name: Build and verify FULL package from candidate HEAD
+      - id: package
+        name: Build and verify FULL package from candidate HEAD
         run: |
           set -Eeuo pipefail
           test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"
@@ -146,7 +154,8 @@ jobs:
           bash build-run.sh "$OUT"
           bash "$OUT" --verify-only
 
-      - name: Push verified integration to dev-02206
+      - id: push
+        name: Push verified integration to dev-02206
         run: |
           set -Eeuo pipefail
           git fetch origin dev-02206
@@ -155,3 +164,52 @@ jobs:
           test "$(git ls-remote origin refs/heads/stable-02204 | cut -f1)" = "56df9a7b4fe509282e37374dd6ef3bccdc1b1100"
           test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"
           git push origin HEAD:dev-02206
+
+      - name: Publish AWG3 gate diagnostics
+        if: always()
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          CHECKOUT: ${{ steps.checkout.outcome }}
+          LOCK: ${{ steps.lock.outcome }}
+          APPLY: ${{ steps.apply.outcome }}
+          INTEGRITY: ${{ steps.integrity.outcome }}
+          SETUP: ${{ steps.setup.outcome }}
+          DEPS: ${{ steps.deps.outcome }}
+          SYNTAX: ${{ steps.syntax.outcome }}
+          FOCUSED: ${{ steps.focused.outcome }}
+          FULL: ${{ steps.full.outcome }}
+          CANDIDATE: ${{ steps.candidate.outcome }}
+          PACKAGE: ${{ steps.package.outcome }}
+          PUSH: ${{ steps.push.outcome }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import urllib.request
+
+          repo = os.environ['GITHUB_REPOSITORY']
+          sha = os.environ['GITHUB_SHA']
+          token = os.environ['GITHUB_TOKEN']
+          for stage in ('checkout','lock','apply','integrity','setup','deps','syntax','focused','full','candidate','package','push'):
+              outcome = os.environ.get(stage.upper(), 'skipped')
+              state = {'success':'success','failure':'failure','cancelled':'error','skipped':'error'}.get(outcome, 'error')
+              payload = json.dumps({
+                  'state': state,
+                  'context': f'dev-02206/awg3-{stage}',
+                  'description': f'AWG3 integration gate: {outcome}',
+              }).encode('utf-8')
+              request = urllib.request.Request(
+                  f'https://api.github.com/repos/{repo}/statuses/{sha}',
+                  data=payload,
+                  method='POST',
+                  headers={
+                      'Authorization': f'Bearer {token}',
+                      'Accept': 'application/vnd.github+json',
+                      'X-GitHub-Api-Version': '2022-11-28',
+                      'Content-Type': 'application/json',
+                  },
+              )
+              with urllib.request.urlopen(request, timeout=30) as response:
+                  print(stage, outcome, response.status)
+          PY
