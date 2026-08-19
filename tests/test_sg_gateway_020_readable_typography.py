@@ -69,7 +69,6 @@ def test_standalone_login_and_recovery_load_readable_typography() -> None:
 def test_release_preserves_approved_typography_contract_in_020() -> None:
     version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
     manifest = json.loads((ROOT / "release-manifest.json").read_text(encoding="utf-8"))
-    assert version == "0.1.0-022.04"
     assert manifest["version"] == version
     assert manifest["rebuild_policy"]["baseline"] == "0.1.0-021.12"
     update = manifest["installer_update"]

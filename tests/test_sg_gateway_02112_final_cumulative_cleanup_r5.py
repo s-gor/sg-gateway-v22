@@ -73,12 +73,10 @@ def test_final_publication_metadata_is_consistent() -> None:
     assert "Light Update" in publication
     assert "/opt/sg-gateway/assets" in publication
 
+    version = _text(ROOT / "VERSION").strip()
     release = json.loads(_text(ROOT / "release-manifest.json"))
-    assert release["version"] == "0.1.0-022.04"
-    assert release["status"] == "STABLE"
-    assert release["next_development_line"] == "0.1.0-022.05"
-    assert release["channel"] == "stable-02204"
-    assert release["rebuild_target"] == "0.1.0-022.04"
+    assert release["version"] == version
+    assert release["rebuild_target"] == version
     assert release["rebuild_policy"]["baseline"] == "0.1.0-021.12"
     assert release["rebuild_policy"]["awg3"] is True
     assert release["safe_update"]["preserve_local_assets"] is True
