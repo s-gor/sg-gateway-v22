@@ -1,0 +1,118 @@
+name: DEV 02206 Runtime + DATA Hardening Apply
+
+on:
+  push:
+    branches: [dev-02206]
+    paths:
+      - scripts/dev-02206-runtime-data-hardening.py
+      - .github/workflows/dev-02206-runtime-data-hardening-apply.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout dev-02206
+        uses: actions/checkout@v4
+        with:
+          ref: dev-02206
+          fetch-depth: 0
+
+      - name: Wait for integrity guard refresh
+        run: |
+          sleep 45
+          git fetch origin dev-02206
+          git rebase origin/dev-02206
+
+      - name: Apply hardening patch
+        run: python3 scripts/dev-02206-runtime-data-hardening.py
+
+      - name: Remove one-shot patch machinery
+        run: |
+          git rm scripts/dev-02206-runtime-data-hardening.py
+          git rm .github/workflows/dev-02206-runtime-data-hardening-apply.yml
+
+      - name: Refresh source integrity
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import subprocess
+          from pathlib import Path
+
+          tracked = subprocess.check_output(['git', 'ls-files'], text=True, encoding='utf-8').splitlines()
+          tracked = [p for p in tracked if p != 'SOURCE-SHA256SUMS']
+          rows = []
+          for path in tracked:
+              rows.append(f"{hashlib.sha256(Path(path).read_bytes()).hexdigest()}  {path}")
+          Path('SOURCE-SHA256SUMS').write_text('\n'.join(rows) + '\n', encoding='utf-8')
+          PY
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+
+      - name: Python syntax
+        run: |
+          python -B - <<'PY'
+          from pathlib import Path
+          files = (
+              list(Path('app').rglob('*.py'))
+              + list(Path('hostd').rglob('*.py'))
+              + list(Path('engines').rglob('*.py'))
+              + list(Path('tests').rglob('*.py'))
+          )
+          for path in files:
+              compile(path.read_text(encoding='utf-8'), str(path), 'exec')
+          print(f'syntax ok: {len(files)} files')
+          PY
+
+      - name: Targeted runtime and DATA backup tests
+        run: python -m pytest -q tests/test_sg_gateway_v22_runtime_contract_data_backup.py
+
+      - name: Full regression suite
+        run: python -m pytest tests
+
+      - name: Verify source integrity
+        run: |
+          python3 -B - <<'PY'
+          import hashlib
+          import re
+          import subprocess
+          from pathlib import Path
+
+          expected = {}
+          for line_no, raw in enumerate(Path('SOURCE-SHA256SUMS').read_text(encoding='utf-8').splitlines(), 1):
+              if not raw.strip():
+                  continue
+              match = re.fullmatch(r'([0-9a-f]{64})  (.+)', raw)
+              if match is None:
+                  raise SystemExit(f'invalid SOURCE-SHA256SUMS line {line_no}: {raw!r}')
+              digest, path = match.groups()
+              expected[path] = digest
+          tracked = set(subprocess.check_output(['git', 'ls-files'], text=True, encoding='utf-8').splitlines())
+          tracked.discard('SOURCE-SHA256SUMS')
+          if tracked != set(expected):
+              raise SystemExit(f'checksum inventory mismatch: missing={sorted(tracked-set(expected))} extra={sorted(set(expected)-tracked)}')
+          for path in sorted(tracked):
+              actual = hashlib.sha256(Path(path).read_bytes()).hexdigest()
+              if actual != expected[path]:
+                  raise SystemExit(f'source hash mismatch: {path}')
+          print(f'Source integrity OK: {len(tracked)} files')
+          PY
+
+      - name: Commit generated hardening
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Add runtime contracts and portable DATA backups"
+          git push origin HEAD:dev-02206
