@@ -145,7 +145,7 @@ JOBS="$(nproc 2>/dev/null || echo 1)"
 make -C "$TOOLS_SRC/src" PLATFORM=linux -j"$JOBS"
 make -C "$TOOLS_SRC/src" \
   PLATFORM=linux WITH_WGQUICK=yes WITH_BASHCOMPLETION=no WITH_SYSTEMDUNITS=no \
-  PREFIX="$STAGE_ROOT" install
+  PREFIX="$STAGE_ROOT" SYSCONFDIR="$STAGE_ROOT/etc" install
 install -m 0755 "$TMP/$GO_FILE" "$STAGE_ROOT/bin/amneziawg-go"
 
 log "3/6 · Проверяю новый runtime до переключения"

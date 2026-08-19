@@ -20,7 +20,7 @@ def test_awg3_repair_is_pinned_verified_local_first_and_runtime_only() -> None:
     assert 'GO_SHA256="131110027db6d5dc0e35b19eb5b8a2692676081366c34112088dc68bbb050bcd"' in body
     assert "stage_vendor_file" in body
     assert "sha256sum -c -" in body
-    assert 'PREFIX="$STAGE_ROOT" install' in body
+    assert 'PREFIX="$STAGE_ROOT" SYSCONFDIR="$STAGE_ROOT/etc" install' in body
     assert 'mv -- "$AWG3_ROOT" "$BACKUP_ROOT"' in body
     assert 'mv -- "$STAGE_ROOT" "$AWG3_ROOT"' in body
     assert "AWG3 Runtime Contract: OK" in body
@@ -135,8 +135,6 @@ def test_02204_missing_awg3_can_update_then_repair_without_blocking_other_client
     commands = (ROOT / "hostd" / "sg_hostd" / "commands.py").read_text(encoding="utf-8")
     repair = (ROOT / "deploy" / "repair-awg3-runtime.sh").read_text(encoding="utf-8")
 
-    # Panel Update is deliberately source-only. A missing AWG3 runtime must not
-    # prevent 22.04 from receiving the 22.06 panel code and Maintenance repair.
     assert "sparse-checkout set app hostd deploy" in updater
     assert '".venv"|"awg3") continue ;;' in updater
     assert "clients.apply" not in updater
@@ -144,19 +142,12 @@ def test_02204_missing_awg3_can_update_then_repair_without_blocking_other_client
     assert 'env["SG_GATEWAY_GITHUB_BRANCH"] = GITHUB_BRANCH' in panel_runtime
     assert '["/bin/bash", str(script)]' in panel_runtime
 
-    # Applying ordinary clients checks only engines that are actually active;
-    # missing unused AWG3 therefore does not break Xray/AWG2 operations.
     apply_all = client_runtime.split("def apply_all_clients()", 1)[1]
     assert "include_all_critical=False" in apply_all
 
-    # Maintenance intentionally checks all critical runtimes so it can expose
-    # the missing AWG3 before any AWG3 client exists.
     runtime_status = commands.split("def _runtime_contract_status()", 1)[1].split("def ", 1)[0]
     assert "include_all_critical=True" in runtime_status
 
-    # Repair remains available even when vendor/cores was never installed by
-    # the panel-only update: local verified files are preferred, pinned 22.04
-    # files are the fallback, and no client/settings rows are modified.
     assert 'VENDOR_DIR="$PREFIX/vendor/cores"' in repair
     assert 'RAW_BASE="https://raw.githubusercontent.com/s-gor/sg-gateway-v22/${VENDOR_COMMIT}/vendor/cores"' in repair
     assert "stage_vendor_file" in repair

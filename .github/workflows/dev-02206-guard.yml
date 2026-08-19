@@ -104,12 +104,13 @@ jobs:
           make -C "$AWG3_TOOLS_SRC/src" PLATFORM=linux -j2
           make -C "$AWG3_TOOLS_SRC/src" \
             PLATFORM=linux WITH_WGQUICK=yes WITH_BASHCOMPLETION=no WITH_SYSTEMDUNITS=no \
-            PREFIX="$AWG3_TEST_ROOT/runtime" install
+            PREFIX="$AWG3_TEST_ROOT/runtime" SYSCONFDIR="$AWG3_TEST_ROOT/runtime/etc" install
           test -x "$AWG3_TEST_ROOT/runtime/bin/awg"
           test -x "$AWG3_TEST_ROOT/runtime/bin/awg-quick"
           "$AWG3_TEST_ROOT/runtime/bin/awg" --version
           install -m 0755 "$GO" "$AWG3_TEST_ROOT/runtime/bin/amneziawg-go"
           test -x "$AWG3_TEST_ROOT/runtime/bin/amneziawg-go"
+          test -d "$AWG3_TEST_ROOT/runtime/etc/amnezia/amneziawg"
           rm -rf -- "$AWG3_TEST_ROOT"
           trap - EXIT
 
