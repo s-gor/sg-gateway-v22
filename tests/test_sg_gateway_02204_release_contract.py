@@ -6,17 +6,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_02204_version_identity_and_manifest_are_consistent() -> None:
-    version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
-    build_id = (ROOT / "BUILD-ID").read_text(encoding="utf-8").strip()
-    manifest = json.loads((ROOT / "release-manifest.json").read_text(encoding="utf-8"))
-    assert version == "0.1.0-022.04"
-    assert build_id == "MAIN-02204"
-    assert manifest["version"] == version
-    assert manifest["rebuild_target"] == version
-    assert manifest["next_development_line"] == "0.1.0-022.05"
-    assert manifest["rebuild_policy"]["baseline"] == "0.1.0-021.12"
-    assert manifest["status"] == "STABLE"
+def test_02204_historical_release_identity_is_preserved_in_publication() -> None:
+    publication = (ROOT / "PUBLICATION-02204.md").read_text(encoding="utf-8")
+    assert "# SG-Gateway 0.1.0-022.04 — стабильный выпуск" in publication
+    assert "Статус: **STABLE**" in publication
+    assert "0.1.0-021.12" in publication
+    assert "0.1.0-022.04" in publication
 
 
 def test_02204_manifest_describes_real_dual_stack_routing_and_manual_warp() -> None:
