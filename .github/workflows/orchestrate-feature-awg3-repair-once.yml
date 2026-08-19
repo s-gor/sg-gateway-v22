@@ -36,21 +36,22 @@ jobs:
           chmod 0755 deploy/repair-awg3-runtime.sh
           rm -f scripts/dev-02206-awg3-repair-integrate.py
           rm -f .github/workflows/orchestrate-feature-awg3-repair-once.yml
+
+          # First make the index equal to the candidate tree. New AWG3 files
+          # must already be visible to git ls-files before SOURCE-SHA256SUMS
+          # is generated.
+          git add -A
           python3 - <<'PY'
           import hashlib
           import subprocess
           from pathlib import Path
 
           tracked = subprocess.check_output(['git', 'ls-files'], text=True, encoding='utf-8').splitlines()
-          removed = {
-              'scripts/dev-02206-awg3-repair-integrate.py',
-              '.github/workflows/orchestrate-feature-awg3-repair-once.yml',
-          }
-          tracked = [p for p in tracked if p != 'SOURCE-SHA256SUMS' and p not in removed]
+          tracked = [p for p in tracked if p != 'SOURCE-SHA256SUMS']
           rows = [f"{hashlib.sha256(Path(p).read_bytes()).hexdigest()}  {p}" for p in tracked]
           Path('SOURCE-SHA256SUMS').write_text('\n'.join(rows) + '\n', encoding='utf-8')
           PY
-          git add -A
+          git add SOURCE-SHA256SUMS
           git diff --cached --check
 
       - name: Verify source integrity
@@ -75,8 +76,6 @@ jobs:
               expected[path] = digest
           tracked = set(subprocess.check_output(['git', 'ls-files'], text=True, encoding='utf-8').splitlines())
           tracked.discard('SOURCE-SHA256SUMS')
-          tracked.discard('scripts/dev-02206-awg3-repair-integrate.py')
-          tracked.discard('.github/workflows/orchestrate-feature-awg3-repair-once.yml')
           if tracked != set(expected):
               raise SystemExit(f'checksum inventory mismatch: missing={sorted(tracked-set(expected))} extra={sorted(set(expected)-tracked)}')
           for path in sorted(tracked):
@@ -126,9 +125,22 @@ jobs:
       - name: Full pytest
         run: python -m pytest tests
 
-      - name: Build and verify FULL package
+      - name: Commit tested candidate locally
         run: |
           set -Eeuo pipefail
+          git fetch origin dev-02206
+          test "$(git rev-parse origin/dev-02206)" = "$BASE_SHA"
+          test "$(git ls-remote origin refs/heads/main | cut -f1)" = "56df9a7b4fe509282e37374dd6ef3bccdc1b1100"
+          test "$(git ls-remote origin refs/heads/stable-02204 | cut -f1)" = "56df9a7b4fe509282e37374dd6ef3bccdc1b1100"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Add safe AWG3 runtime repair"
+          echo "CANDIDATE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Build and verify FULL package from candidate HEAD
+        run: |
+          set -Eeuo pipefail
+          test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"
           VERSION="$(tr -d '[:space:]' < VERSION)"
           OUT="/tmp/SG-Gateway-${VERSION}-DEV-02206-AWG3-REPAIR-FULL.run"
           bash build-run.sh "$OUT"
@@ -141,7 +153,5 @@ jobs:
           test "$(git rev-parse origin/dev-02206)" = "$BASE_SHA"
           test "$(git ls-remote origin refs/heads/main | cut -f1)" = "56df9a7b4fe509282e37374dd6ef3bccdc1b1100"
           test "$(git ls-remote origin refs/heads/stable-02204 | cut -f1)" = "56df9a7b4fe509282e37374dd6ef3bccdc1b1100"
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "Add safe AWG3 runtime repair"
+          test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"
           git push origin HEAD:dev-02206
