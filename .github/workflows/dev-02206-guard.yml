@@ -31,6 +31,39 @@ jobs:
           assert 'dev-02206' in panel, 'panel update channel is not pinned to dev-02206'
           PY
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+
+      - name: Shell and Python syntax
+        run: |
+          bash -n deploy/repair-awg3-runtime.sh
+          python -B -c "from pathlib import Path; files=list(Path('app').rglob('*.py'))+list(Path('hostd').rglob('*.py'))+list(Path('engines').rglob('*.py'))+list(Path('tests').rglob('*.py')); [compile(p.read_text(encoding='utf-8'), str(p), 'exec') for p in files]; print(f'syntax ok: {len(files)} files')"
+
+      - name: Check release manifest baseline
+        run: |
+          python -B -c "import json, pathlib; manifest=json.loads(pathlib.Path('release-manifest.json').read_text(encoding='utf-8')); version=pathlib.Path('VERSION').read_text(encoding='utf-8').strip(); assert manifest['version']==version; assert manifest['source_integrity']['mode']=='git-blob-sha256'; assert manifest['safe_update']['preserve_local_assets'] is True; print('manifest baseline ok')"
+
+      - name: Run focused dev-02206 regressions
+        run: |
+          python -m pytest \
+            tests/test_sg_gateway_v22_awg3_runtime_repair.py \
+            tests/test_sg_gateway_v22_runtime_contract_data_backup.py \
+            tests/test_sg_gateway_v22_02206_hardening.py \
+            tests/test_sg_gateway_v22_production_entrypoint_v4.py \
+            tests/test_sg_gateway_v22_router_subscription.py \
+            tests/test_sg_gateway_v22_sg_subscription_dual_ui.py \
+            tests/test_sg_gateway_02111_backup_domain_release.py
+
+      - name: Run full panel test suite
+        run: python -m pytest tests
+
       - name: Refresh source integrity for dev branch
         if: github.event_name == 'push' && github.actor != 'github-actions[bot]'
         run: |
@@ -86,46 +119,18 @@ jobs:
           print(f'Source integrity OK: {len(tracked)} files')
           PY
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -r requirements-dev.txt
-
-      - name: Shell and Python syntax
-        run: |
-          bash -n deploy/repair-awg3-runtime.sh
-          python -B -c "from pathlib import Path; files=list(Path('app').rglob('*.py'))+list(Path('hostd').rglob('*.py'))+list(Path('engines').rglob('*.py'))+list(Path('tests').rglob('*.py')); [compile(p.read_text(encoding='utf-8'), str(p), 'exec') for p in files]; print(f'syntax ok: {len(files)} files')"
-
-      - name: Check release manifest baseline
-        run: |
-          python -B -c "import json, pathlib; manifest=json.loads(pathlib.Path('release-manifest.json').read_text(encoding='utf-8')); version=pathlib.Path('VERSION').read_text(encoding='utf-8').strip(); assert manifest['version']==version; assert manifest['source_integrity']['mode']=='git-blob-sha256'; assert manifest['safe_update']['preserve_local_assets'] is True; print('manifest baseline ok')"
-
-      - name: Run focused dev-02206 regressions
-        run: |
-          python -m pytest \
-            tests/test_sg_gateway_v22_awg3_runtime_repair.py \
-            tests/test_sg_gateway_v22_runtime_contract_data_backup.py \
-            tests/test_sg_gateway_v22_02206_hardening.py \
-            tests/test_sg_gateway_v22_production_entrypoint_v4.py \
-            tests/test_sg_gateway_v22_router_subscription.py \
-            tests/test_sg_gateway_v22_sg_subscription_dual_ui.py \
-            tests/test_sg_gateway_02111_backup_domain_release.py
-
-      - name: Run full panel test suite
-        run: python -m pytest tests
-
-      - name: Build and verify current FULL package
+      - name: Build current FULL package
         run: |
           command -v zip
           command -v unzip
           VERSION="$(tr -d '[:space:]' < VERSION)"
           OUT="/tmp/SG-Gateway-${VERSION}-DEV-02206-FULL.run"
           bash build-run.sh "$OUT"
+
+      - name: Verify current FULL package
+        run: |
+          VERSION="$(tr -d '[:space:]' < VERSION)"
+          OUT="/tmp/SG-Gateway-${VERSION}-DEV-02206-FULL.run"
           bash "$OUT" --verify-only
 
       - name: Publish acceptance status
@@ -147,7 +152,7 @@ jobs:
           payload = json.dumps({
               'state': state,
               'context': 'dev-02206/acceptance',
-              'description': 'focused + full pytest + source integrity + FULL verify',
+              'description': 'focused + full pytest + source integrity + FULL build + verify-only',
           }).encode('utf-8')
           request = urllib.request.Request(
               f'https://api.github.com/repos/{repo}/statuses/{sha}',
