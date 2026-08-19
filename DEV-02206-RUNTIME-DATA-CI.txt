@@ -1,0 +1,9 @@
+DEV 02206 Runtime Contract + DATA Backup verification
+isolation=success
+integrity=success
+dependencies=success
+syntax=success
+focused_tests=success
+full_tests=failure
+release_manifest=success
+full_package=success
