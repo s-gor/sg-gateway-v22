@@ -46,6 +46,16 @@ def test_awg3_repair_respects_empty_client_state() -> None:
     assert "Активных AWG3-клиентов нет" in body
 
 
+def test_awg3_userspace_helper_splits_dual_stack_address_values() -> None:
+    body = (ROOT / "deploy/sg-gateway-awg3-userspace.sh").read_text(encoding="utf-8")
+    assert 'done < <(config_values Address)' in body
+    assert "IFS=',' read -r -a addresses <<< \"$address_line\"" in body
+    assert 'for address in "${addresses[@]}"' in body
+    assert 'if [[ "$address" == *:* ]]' in body
+    assert 'ip -6 address add "$address" dev "$IFACE"' in body
+    assert 'ip -4 address add "$address" dev "$IFACE"' in body
+
+
 def test_awg3_repair_is_background_job_and_maintenance_route() -> None:
     jobs = (ROOT / "hostd" / "sg_hostd" / "operation_jobs.py").read_text(encoding="utf-8")
     commands = (ROOT / "hostd" / "sg_hostd" / "commands.py").read_text(encoding="utf-8")
