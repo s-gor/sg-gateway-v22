@@ -1,0 +1,58 @@
+name: DEV 02206 Full Tests Diagnose 2 Once
+
+on:
+  push:
+    branches: [dev-02206]
+    paths:
+      - .github/workflows/dev-02206-fulltests-diagnose2-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: dev-02206
+          fetch-depth: 0
+      - name: Absorb integrity refresh
+        run: |
+          sleep 20
+          git fetch origin dev-02206
+          git reset --hard origin/dev-02206
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: |
+          python -m pip install --upgrade pip >/dev/null
+          python -m pip install -r requirements-dev.txt >/dev/null
+      - name: Run until first failure and persist tail
+        shell: bash
+        run: |
+          set +e
+          python -m pytest tests -x -vv > /tmp/full-tests.log 2>&1
+          RC=$?
+          set -e
+          {
+            echo "DEV 02206 full test diagnostic 2"
+            echo "exit_code=${RC}"
+            echo "--- tail ---"
+            tail -n 260 /tmp/full-tests.log
+          } > DEV-02206-FULLTEST-FAILURE-2.txt
+          git rm .github/workflows/dev-02206-fulltests-diagnose2-once.yml
+          python3 - <<'PY'
+          import hashlib, subprocess
+          from pathlib import Path
+          tracked = subprocess.check_output(['git','ls-files'], text=True, encoding='utf-8').splitlines()
+          tracked = [p for p in tracked if p != 'SOURCE-SHA256SUMS']
+          Path('SOURCE-SHA256SUMS').write_text('\n'.join(f"{hashlib.sha256(Path(p).read_bytes()).hexdigest()}  {p}" for p in tracked) + '\n', encoding='utf-8')
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Record remaining dev-02206 regression failure"
+          git push origin HEAD:dev-02206
+          exit "$RC"
