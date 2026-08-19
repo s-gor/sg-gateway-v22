@@ -31,6 +31,29 @@ jobs:
           assert 'dev-02206' in panel, 'panel update channel is not pinned to dev-02206'
           PY
 
+      - name: Synchronize dev installer identity
+        if: github.event_name == 'push'
+        run: |
+          python3 scripts/sync-dev-installer-identity.py
+          if git diff --quiet -- install.sh; then
+            exit 0
+          fi
+          python3 - <<'PY'
+          import hashlib
+          import subprocess
+          from pathlib import Path
+
+          tracked = subprocess.check_output(['git', 'ls-files'], text=True, encoding='utf-8').splitlines()
+          tracked = [p for p in tracked if p != 'SOURCE-SHA256SUMS']
+          rows = [f"{hashlib.sha256(Path(path).read_bytes()).hexdigest()}  {path}" for path in tracked]
+          Path('SOURCE-SHA256SUMS').write_text('\n'.join(rows) + '\n', encoding='utf-8')
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add install.sh SOURCE-SHA256SUMS
+          git commit -m "Sync dev-02206 installer identity"
+          git push origin HEAD:dev-02206
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -44,7 +67,8 @@ jobs:
       - name: Shell and Python syntax
         run: |
           bash -n deploy/repair-awg3-runtime.sh
-          python -B -c "from pathlib import Path; files=list(Path('app').rglob('*.py'))+list(Path('hostd').rglob('*.py'))+list(Path('engines').rglob('*.py'))+list(Path('tests').rglob('*.py')); [compile(p.read_text(encoding='utf-8'), str(p), 'exec') for p in files]; print(f'syntax ok: {len(files)} files')"
+          python3 scripts/sync-dev-installer-identity.py --check
+          python -B -c "from pathlib import Path; files=list(Path('app').rglob('*.py'))+list(Path('hostd').rglob('*.py'))+list(Path('engines').rglob('*.py'))+list(Path('tests').rglob('*.py'))+list(Path('scripts').rglob('*.py')); [compile(p.read_text(encoding='utf-8'), str(p), 'exec') for p in files]; print(f'syntax ok: {len(files)} files')"
 
       - name: Check release manifest baseline
         run: |

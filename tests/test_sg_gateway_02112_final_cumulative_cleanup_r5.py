@@ -17,12 +17,21 @@ def _text(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def test_current_installer_identity_is_02204_and_has_no_02111_tail() -> None:
+def test_current_installer_identity_matches_version_and_has_no_02111_tail() -> None:
     text = _text(INSTALLER)
-    assert 'VERSION="0.1.0-022.04"' in text
-    assert 'INSTALLER_BUILD="02204-full-clean-dual-stack"' in text
-    assert 'INSTALL_LOG="/var/log/sg-gateway-installer-02204.log"' in text
-    assert 'RESUME_FILE="/root/sg-gateway-02204-installer-resume.env"' in text
+    version = _text(ROOT / "VERSION").strip()
+    match = re.fullmatch(r"0\.1\.0-(\d{3})\.(\d{2})", version)
+    assert match is not None, version
+    token = "".join(match.groups())
+
+    assert f'VERSION="{version}"' in text
+    assert f'INSTALLER_BUILD="{token}-full-clean-dual-stack"' in text
+    assert f'INSTALL_LOG="/var/log/sg-gateway-installer-{token}.log"' in text
+    assert f'RESUME_FILE="/root/sg-gateway-{token}-installer-resume.env"' in text
+    assert f'Запускаю полный мастер SG-Gateway {version}' in text
+    assert f'Мастер установки SG-Gateway {version} запущен' in text
+    assert text.count(f'before-sg-gateway-{token}') == 2
+    assert "SG-Gateway V22 vendor bundle:" in text
 
     assert 'INSTALLER_BUILD="02111-full-clean-backup-domain"' not in text
     assert 'INSTALL_LOG="/var/log/sg-gateway-installer-02111.log"' not in text
