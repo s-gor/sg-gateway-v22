@@ -121,3 +121,5 @@ restore_operation_jobs_after_rollback() {
           fi
           git commit -m "Preserve update job logs and isolate client exporters"
           git push origin HEAD:fix-update-joblog-card-isolation-20260819
+
+# trigger after workflow existed on branch
