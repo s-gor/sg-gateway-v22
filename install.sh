@@ -1344,8 +1344,13 @@ install_wgcf_from_vendor() {
 
 amneziawg_runtime_ready() {
   command -v awg >/dev/null 2>&1 || return 1
-  awg --version >/dev/null 2>&1 || return 1
-  modinfo amneziawg >/dev/null 2>&1 || return 1
+  local tools_version="" module_version="" loaded_version=""
+  tools_version="$(awg --version 2>/dev/null || true)"
+  module_version="$(modinfo -F version amneziawg 2>/dev/null || true)"
+  loaded_version="$(cat /sys/module/amneziawg/version 2>/dev/null || true)"
+  [[ "$tools_version" == *"v1."* ]] || return 1
+  [[ "$module_version" =~ ^1\. ]] || return 1
+  [[ -z "$loaded_version" || "$loaded_version" =~ ^1\. ]] || return 1
   return 0
 }
 
@@ -1384,20 +1389,48 @@ install_amneziawg_from_vendor() {
   awg --version
 
   echo "AmneziaWG kernel module ${AMNEZIAWG_KMOD_VERSION}: DKMS из локального source"
+
+  # A failed/experimental AWG3 installation can leave a 3.x module file
+  # after DKMS bookkeeping has disappeared.  DKMS then reports our 1.0.0
+  # package as already installed and silently keeps that incompatible
+  # module.  Frozen AWG2 userspace later fails with EINVAL on setconf.
+  systemctl stop sg-gateway-awg.service sg-gateway-awg3.service >/dev/null 2>&1 || true
+  ip link delete awg0 >/dev/null 2>&1 || true
+  ip link delete awg3 >/dev/null 2>&1 || true
+  modprobe -r amneziawg >/dev/null 2>&1 || true
+  if grep -q '^amneziawg ' /proc/modules 2>/dev/null; then
+    echo "AmneziaWG kernel module is still loaded; refusing to reuse an unknown runtime" >&2
+    rm -rf "$temp"
+    return 1
+  fi
+
   local dkms_existing=""
   dkms_existing="$(dkms status -m amneziawg -v "$AMNEZIAWG_DKMS_VERSION" 2>/dev/null || true)"
   if [[ -n "$dkms_existing" ]]; then
     dkms remove -m amneziawg -v "$AMNEZIAWG_DKMS_VERSION" --all || true
   fi
-  # DKMS can leave this directory behind even when `dkms status` is empty.
-  # Removing only our pinned module/version makes repeated clean installs idempotent.
   rm -rf "/var/lib/dkms/amneziawg/${AMNEZIAWG_DKMS_VERSION}"
   rm -rf "/usr/src/amneziawg-${AMNEZIAWG_DKMS_VERSION}"
+  find "/lib/modules/$(uname -r)" -type f \
+    \( -name 'amneziawg.ko' -o -name 'amneziawg.ko.*' \) \
+    -path '*/updates/dkms/*' -delete
+  depmod -a
+
   make -C "$kmod_src/src" dkms-install PREFIX=/usr
   dkms add -m amneziawg -v "$AMNEZIAWG_DKMS_VERSION"
   dkms build -m amneziawg -v "$AMNEZIAWG_DKMS_VERSION"
-  dkms install -m amneziawg -v "$AMNEZIAWG_DKMS_VERSION"
+  dkms install -m amneziawg -v "$AMNEZIAWG_DKMS_VERSION" --force
+  depmod -a
   modprobe amneziawg
+
+  local module_version="" loaded_version=""
+  module_version="$(modinfo -F version amneziawg 2>/dev/null || true)"
+  loaded_version="$(cat /sys/module/amneziawg/version 2>/dev/null || true)"
+  if [[ ! "$module_version" =~ ^1\. ]] || [[ -n "$loaded_version" && ! "$loaded_version" =~ ^1\. ]]; then
+    echo "AmneziaWG 2 kernel mismatch: expected frozen 1.x; file=${module_version:-unknown}, loaded=${loaded_version:-unknown}" >&2
+    rm -rf "$temp"
+    return 1
+  fi
   modinfo amneziawg
   rm -rf "$temp"
 }
