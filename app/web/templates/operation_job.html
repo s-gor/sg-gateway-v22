@@ -4,6 +4,8 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='sg-operation-job-v13.css') }}">
 {% endblock %}
 {% block content %}
+{% set is_panel_update = job.kind == 'panel_update_channel' %}
+{% set update = job.update_result if is_panel_update and job.update_result else {} %}
 <section class="opjob-page"
          data-kind="{{ job.kind }}"
          data-restart-expected="{{ '1' if job.restart_expected else '0' }}"
@@ -13,20 +15,51 @@
     <div>
       <div class="opjob-kicker">ЖИВОЙ ТЕРМИНАЛ</div>
       <h1>{{ job.title }}</h1>
-      <p>{% if job.restart_expected %}Во время восстановления панель может кратко перезапуститься. Если связь пропадёт, появится кнопка обновления страницы.{% else %}Не закрывайте вкладку. Журнал обновляется автоматически; при ошибке конфигурация откатывается.{% endif %}</p>
+      <p>{% if job.restart_expected %}Во время обновления панель может кратко перезапуститься. Журнал задачи хранится отдельно от rollback и не пропадёт при восстановлении.{% else %}Не закрывайте вкладку. Журнал обновляется автоматически; при ошибке конфигурация откатывается.{% endif %}</p>
     </div>
     <span id="opjob-status" class="opjob-status is-{{ job.status }}">{{ job.status }}</span>
   </header>
+
   <div class="opjob-steps sg-ljd-nested"><span class="is-active">Подготовка</span><i></i><span>Проверка</span><i></i><span>Применение</span><i></i><span>Готово</span></div>
+
+  {% if is_panel_update %}
+  <article id="opjob-summary" class="opjob-summary {{ 'is-success' if job.status == 'success' else 'is-failed' if job.status == 'failed' else 'is-hidden' }}">
+    <div class="opjob-summary-head">
+      <div>
+        <span id="opjob-summary-kicker">{{ 'ГОТОВО' if job.status == 'success' else 'ОШИБКА ОБНОВЛЕНИЯ' }}</span>
+        <h2 id="opjob-summary-title">{{ 'Обновление завершено' if job.status == 'success' else 'Обновление не применено' }}</h2>
+        <p id="opjob-summary-build">
+          {% if update.version %}{{ update.version }}{% endif %}
+          {% if update.commit %} · commit {{ update.commit[:12] }}{% endif %}
+        </p>
+      </div>
+      <strong id="opjob-summary-exit">{% if update.exit_code is not none %}код {{ update.exit_code }}{% endif %}</strong>
+    </div>
+    <div id="opjob-checks" class="opjob-checks">
+      <span data-check="panel" class="{{ 'ok' if update.checks and update.checks.panel == 'ok' else '' }}">Панель: <b>{{ 'OK' if update.checks and update.checks.panel == 'ok' else '—' }}</b></span>
+      <span data-check="clients" class="{{ 'ok' if update.checks and update.checks.clients == 'ok' else '' }}">Clients: <b>{{ 'OK' if update.checks and update.checks.clients == 'ok' else '—' }}</b></span>
+      <span data-check="https" class="{{ 'ok' if update.checks and update.checks.https == 'ok' else '' }}">HTTPS: <b>{{ 'OK' if update.checks and update.checks.https == 'ok' else '—' }}</b></span>
+    </div>
+    <div id="opjob-failure" class="opjob-failure {{ 'is-hidden' if job.status != 'failed' else '' }}">
+      <strong id="opjob-failure-stage">{% if update.stage_number %}Этап {{ update.stage_number }}/6 · {{ update.stage_label }}{% endif %}</strong>
+      <span id="opjob-failure-reason">{{ update.reason or 'Причина находится в последних строках журнала.' }}</span>
+      <span id="opjob-rollback">{{ update.restored or '' }}</span>
+      {% if update.backup %}<small id="opjob-backup">Safety Backup: {{ update.backup }}</small>{% else %}<small id="opjob-backup"></small>{% endif %}
+    </div>
+  </article>
+  {% endif %}
+
   <article class="opjob-terminal">
     <div class="opjob-terminal-bar"><span></span><span></span><span></span><strong>SG-Gateway task · {{ job.job_id }}</strong></div>
     <pre id="opjob-log">{{ job.log }}</pre>
   </article>
+
   <footer class="opjob-actions">
-    <a class="button" href="{{ job.back_url or url_for('security') }}">Вернуться</a>
+    <a id="opjob-back" class="button" href="{{ job.back_url or url_for('security') }}">Вернуться</a>
     <a id="opjob-target" class="button primary{% if job.status != 'success' %} is-hidden{% endif %}" href="{{ job.target_url or '#' }}">Открыть результат</a>
     <button id="opjob-refresh" class="button primary is-hidden" type="button">Открыть панель заново</button>
-    <span id="opjob-message">{% if job.status == 'success' %}Готово. Выполняется переход…{% elif job.status == 'failed' %}Задача завершилась ошибкой. Подробности выше.{% else %}Задача выполняется…{% endif %}</span>
+    {% if is_panel_update %}<a id="opjob-return-gateway" class="button primary opjob-return-gateway {{ 'is-hidden' if job.status not in ['success', 'failed'] else '' }}" href="/">Вернуться в SG-Gateway</a>{% endif %}
+    <span id="opjob-message">{% if job.status == 'success' %}Готово.{% elif job.status == 'failed' %}Задача завершилась ошибкой. Причина и rollback показаны выше.{% else %}Задача выполняется…{% endif %}</span>
   </footer>
 </section>
 <script>
@@ -36,8 +69,12 @@
   const badge = document.getElementById('opjob-status');
   const message = document.getElementById('opjob-message');
   const target = document.getElementById('opjob-target');
+  const back = document.getElementById('opjob-back');
   const refresh = document.getElementById('opjob-refresh');
+  const returnGateway = document.getElementById('opjob-return-gateway');
+  const summary = document.getElementById('opjob-summary');
   const isTlsSwitch = root.dataset.kind === 'tls_issue';
+  const isPanelUpdate = root.dataset.kind === 'panel_update_channel';
   const restartExpected = root.dataset.restartExpected === '1';
   const targetUrl = root.dataset.targetUrl || target.href;
   let finished = false;
@@ -45,11 +82,59 @@
   let redirectScheduled = false;
   let consecutiveFailures = 0;
 
-  function markSuccess(text) {
+  function setCheck(name, state) {
+    const item = summary?.querySelector(`[data-check="${name}"]`);
+    if (!item) return;
+    const ok = state === 'ok';
+    item.classList.toggle('ok', ok);
+    item.querySelector('b').textContent = ok ? 'OK' : '—';
+  }
+
+  function renderPanelResult(data) {
+    if (!isPanelUpdate || !summary) return;
+    const result = data.update_result || {};
+    const success = data.status === 'success';
+    const failed = data.status === 'failed';
+    if (!success && !failed) return;
+
+    summary.classList.remove('is-hidden', 'is-success', 'is-failed');
+    summary.classList.add(success ? 'is-success' : 'is-failed');
+    document.getElementById('opjob-summary-kicker').textContent = success ? 'ГОТОВО' : 'ОШИБКА ОБНОВЛЕНИЯ';
+    document.getElementById('opjob-summary-title').textContent = success ? 'Обновление завершено' : 'Обновление не применено';
+
+    const build = [result.version || '', result.commit ? `commit ${String(result.commit).slice(0, 12)}` : ''].filter(Boolean).join(' · ');
+    document.getElementById('opjob-summary-build').textContent = build;
+    document.getElementById('opjob-summary-exit').textContent = result.exit_code === null || result.exit_code === undefined ? '' : `код ${result.exit_code}`;
+
+    setCheck('panel', result.checks?.panel);
+    setCheck('clients', result.checks?.clients);
+    setCheck('https', result.checks?.https);
+
+    const failure = document.getElementById('opjob-failure');
+    failure?.classList.toggle('is-hidden', !failed);
+    if (failed) {
+      document.getElementById('opjob-failure-stage').textContent = result.stage_number ? `Этап ${result.stage_number}/6 · ${result.stage_label || ''}` : 'Этап обновления не определён';
+      document.getElementById('opjob-failure-reason').textContent = result.reason || 'Причина находится в последних строках журнала.';
+      document.getElementById('opjob-rollback').textContent = result.restored || 'Rollback не подтверждён.';
+      document.getElementById('opjob-backup').textContent = result.backup ? `Safety Backup: ${result.backup}` : '';
+    }
+
+    back?.classList.add('is-hidden');
+    target?.classList.add('is-hidden');
+    refresh?.classList.add('is-hidden');
+    returnGateway?.classList.remove('is-hidden');
+    message.textContent = success ? 'Проверки завершены. Можно вернуться в SG-Gateway.' : 'Причина сохранена. При необходимости скопируйте последние строки терминала.';
+  }
+
+  function markSuccess(text, data) {
     if (finished) return;
     finished = true;
     badge.textContent = 'success';
     badge.className = 'opjob-status is-success';
+    if (isPanelUpdate) {
+      renderPanelResult(data || {status: 'success'});
+      return;
+    }
     target.classList.remove('is-hidden');
     refresh.classList.add('is-hidden');
     target.href = targetUrl;
@@ -82,13 +167,17 @@
       badge.className = 'opjob-status is-' + data.status;
       if (data.status === 'success') {
         if (data.target_url) target.href = data.target_url;
-        markSuccess('Готово. Терминал завершён; результат откроется только по кнопке.');
+        markSuccess('Готово. Терминал завершён; результат откроется только по кнопке.', data);
         return;
       }
       if (data.status === 'failed') {
         finished = true;
-        refresh.classList.remove('is-hidden');
-        message.textContent = 'Ошибка. Предыдущая конфигурация восстановлена. Обновите страницу, чтобы вернуться в панель.';
+        if (isPanelUpdate) {
+          renderPanelResult(data);
+        } else {
+          refresh.classList.remove('is-hidden');
+          message.textContent = 'Задача завершилась ошибкой. Подробности сохранены в терминале.';
+        }
         return;
       }
       refresh.classList.add('is-hidden');
@@ -101,7 +190,7 @@
       }
       if (restartExpected && consecutiveFailures >= 2) {
         refresh.classList.remove('is-hidden');
-        message.textContent = 'Панель перезапускается. Это нормально во время восстановления. Подождите несколько секунд и нажмите «Открыть панель заново».';
+        message.textContent = 'Панель перезапускается. Журнал задачи сохранён отдельно. Подождите несколько секунд и нажмите «Открыть панель заново».';
       } else {
         message.textContent = 'Связь с задачей временно потеряна; повторяю…';
       }
@@ -112,7 +201,10 @@
   target.href = targetUrl || '#';
   refresh.addEventListener('click', () => window.location.reload());
   log.scrollTop = log.scrollHeight;
-  if (!['success', 'failed'].includes(badge.textContent.trim())) {
+  if (isPanelUpdate && ['success', 'failed'].includes(badge.textContent.trim())) {
+    renderPanelResult({status: badge.textContent.trim(), update_result: {{ update|tojson if is_panel_update else '{}' }}});
+    finished = true;
+  } else if (!['success', 'failed'].includes(badge.textContent.trim())) {
     window.setTimeout(update, 500);
   }
 })();
