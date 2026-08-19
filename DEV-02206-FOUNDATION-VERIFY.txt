@@ -1,5 +1,0 @@
-DEV 02206 foundation final verify
-integrity=success
-focused_tests=success
-full_tests=failure
-full_package=success
