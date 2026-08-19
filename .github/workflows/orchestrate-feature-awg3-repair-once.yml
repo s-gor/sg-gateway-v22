@@ -33,7 +33,7 @@ jobs:
           test "$(git ls-remote origin refs/heads/stable-02204 | cut -f1)" = "56df9a7b4fe509282e37374dd6ef3bccdc1b1100"
 
       - id: apply
-        name: Apply AWG3 integration and clean temporary files
+        name: Apply AWG3 integration without workflow mutations
         run: |
           set -Eeuo pipefail
           python3 scripts/dev-02206-awg3-repair-integrate.py
@@ -76,7 +76,13 @@ jobs:
 
           chmod 0755 deploy/repair-awg3-runtime.sh
           rm -f scripts/dev-02206-awg3-repair-integrate.py
-          rm -f .github/workflows/orchestrate-feature-awg3-repair-once.yml
+
+          # The patcher also hardens the Guard, but a GITHUB_TOKEN push is not
+          # allowed to modify workflow files. Keep both workflows byte-identical
+          # to this trigger commit; the normal Guard will still run the full suite
+          # on the final product commit.
+          git checkout HEAD -- .github/workflows/dev-02206-guard.yml
+          git checkout HEAD -- .github/workflows/orchestrate-feature-awg3-repair-once.yml
           git add -A
 
           python3 - <<'PY'
@@ -93,6 +99,7 @@ jobs:
           PY
           git add SOURCE-SHA256SUMS
           git diff --cached --check
+          test -z "$(git diff --cached --name-only -- '.github/workflows/*')"
 
       - id: integrity
         name: Verify candidate source integrity
@@ -128,7 +135,7 @@ jobs:
           PY
 
       - id: setup
-        name: Set up Python and dependencies
+        name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -219,13 +226,14 @@ jobs:
 
       - id: candidate
         if: steps.full.outcome == 'success'
-        name: Commit tested candidate locally
+        name: Commit tested product candidate locally
         run: |
           set -Eeuo pipefail
           git fetch origin dev-02206
           test "$(git rev-parse origin/dev-02206)" = "$BASE_SHA"
           test "$(git ls-remote origin refs/heads/main | cut -f1)" = "56df9a7b4fe509282e37374dd6ef3bccdc1b1100"
           test "$(git ls-remote origin refs/heads/stable-02204 | cut -f1)" = "56df9a7b4fe509282e37374dd6ef3bccdc1b1100"
+          test -z "$(git diff --cached --name-only -- '.github/workflows/*')"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -m "Add safe AWG3 runtime repair"
@@ -244,7 +252,8 @@ jobs:
 
       - id: push
         if: steps.full.outcome == 'success' && steps.package.outcome == 'success'
-        name: Push verified integration to dev-02206
+        continue-on-error: true
+        name: Push verified product candidate to dev-02206
         run: |
           set -Eeuo pipefail
           git fetch origin dev-02206
@@ -252,7 +261,43 @@ jobs:
           test "$(git ls-remote origin refs/heads/main | cut -f1)" = "56df9a7b4fe509282e37374dd6ef3bccdc1b1100"
           test "$(git ls-remote origin refs/heads/stable-02204 | cut -f1)" = "56df9a7b4fe509282e37374dd6ef3bccdc1b1100"
           test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"
-          git push origin HEAD:dev-02206
+          git push origin HEAD:dev-02206 2>&1 | tee /tmp/sg-awg3-push.log
+
+      - name: Publish exact push failure
+        if: steps.push.outcome == 'failure'
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+          import urllib.request
+          from pathlib import Path
+
+          lines = Path("/tmp/sg-awg3-push.log").read_text(encoding="utf-8", errors="replace").splitlines()
+          detail = next((line.strip() for line in reversed(lines) if line.strip()), "push failed")
+          clean = re.sub(r"[^A-Za-z0-9_.:/=+() -]+", "?", detail)[:70]
+          payload = json.dumps({
+              "state": "failure",
+              "context": f"dev-02206/pushfail-{clean}"[:100],
+              "description": detail[:140],
+          }).encode("utf-8")
+          request = urllib.request.Request(
+              f"https://api.github.com/repos/{os.environ['GITHUB_REPOSITORY']}/statuses/{os.environ['GITHUB_SHA']}",
+              data=payload,
+              method="POST",
+              headers={
+                  "Authorization": f"Bearer {os.environ['GITHUB_TOKEN']}",
+                  "Accept": "application/vnd.github+json",
+                  "X-GitHub-Api-Version": "2022-11-28",
+                  "Content-Type": "application/json",
+              },
+          )
+          with urllib.request.urlopen(request, timeout=30) as response:
+              print(detail, response.status)
+          PY
 
       - name: Publish AWG3 gate diagnostics
         if: always()
