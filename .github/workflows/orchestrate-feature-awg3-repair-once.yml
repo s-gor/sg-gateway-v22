@@ -23,7 +23,7 @@ jobs:
           fetch-depth: 0
 
       - id: lock
-        name: Lock expected branch and production freeze
+        name: Lock dev branch and frozen production refs
         run: |
           set -Eeuo pipefail
           BASE_SHA="$(git rev-parse HEAD)"
@@ -33,73 +33,70 @@ jobs:
           test "$(git ls-remote origin refs/heads/stable-02204 | cut -f1)" = "56df9a7b4fe509282e37374dd6ef3bccdc1b1100"
 
       - id: apply
-        name: Apply AWG3 repair integration and preserve frozen contracts
+        name: Apply AWG3 integration and clean temporary files
         run: |
           set -Eeuo pipefail
           python3 scripts/dev-02206-awg3-repair-integrate.py
 
-          # Keep the exact frozen 22.04 full-restore source contract while
-          # extending the maintenance navigation for new 22.06 job kinds.
           python3 - <<'PY'
           from pathlib import Path
 
-          path = Path('app/main.py')
-          body = path.read_text(encoding='utf-8')
-          old = '''        elif (
-              kind in {"full_backup_restore", "awg3_runtime_repair", "panel_update_channel"}
-              or kind.startswith("xray_update_")
-              or kind.startswith("core_update_")
-          ):
-              active = "maintenance"
-'''
-          # The integration patch uses normal 8-space indentation; keep a
-          # second exact spelling to make the compatibility fix deterministic.
-          old2 = '''        elif (
-            kind in {"full_backup_restore", "awg3_runtime_repair", "panel_update_channel"}
-            or kind.startswith("xray_update_")
-            or kind.startswith("core_update_")
-        ):
-            active = "maintenance"
-'''
-          new = '''        elif kind == "full_backup_restore":
-            active = "maintenance"
-        elif (
-            kind in {"awg3_runtime_repair", "panel_update_channel"}
-            or kind.startswith("xray_update_")
-            or kind.startswith("core_update_")
-        ):
-            active = "maintenance"
-'''
+          path = Path("app/main.py")
+          body = path.read_text(encoding="utf-8")
+          old = "\n".join([
+              '        elif (',
+              '            kind in {"full_backup_restore", "awg3_runtime_repair", "panel_update_channel"}',
+              '            or kind.startswith("xray_update_")',
+              '            or kind.startswith("core_update_")',
+              '        ):',
+              '            active = "maintenance"',
+              '',
+          ])
+          new = "\n".join([
+              '        elif kind == "full_backup_restore":',
+              '            active = "maintenance"',
+              '        elif (',
+              '            kind in {"awg3_runtime_repair", "panel_update_channel"}',
+              '            or kind.startswith("xray_update_")',
+              '            or kind.startswith("core_update_")',
+              '        ):',
+              '            active = "maintenance"',
+              '',
+          ])
           if old in body:
               body = body.replace(old, new, 1)
-          elif old2 in body:
-              body = body.replace(old2, new, 1)
-          elif 'kind == "full_backup_restore"' not in body or '"awg3_runtime_repair", "panel_update_channel"' not in body:
-              raise SystemExit('operation-job maintenance compatibility anchor not found')
-          path.write_text(body, encoding='utf-8', newline='\n')
+          elif not (
+              'kind == "full_backup_restore"' in body
+              and '"awg3_runtime_repair", "panel_update_channel"' in body
+              and 'kind.startswith("core_update_")' in body
+          ):
+              raise SystemExit("operation-job maintenance compatibility anchor not found")
+          path.write_text(body, encoding="utf-8", newline="\n")
           PY
 
           chmod 0755 deploy/repair-awg3-runtime.sh
           rm -f scripts/dev-02206-awg3-repair-integrate.py
           rm -f .github/workflows/orchestrate-feature-awg3-repair-once.yml
           git add -A
+
           python3 - <<'PY'
           import hashlib
           import subprocess
           from pathlib import Path
 
-          tracked = subprocess.check_output(['git', 'ls-files'], text=True, encoding='utf-8').splitlines()
-          tracked = [p for p in tracked if p != 'SOURCE-SHA256SUMS']
+          tracked = subprocess.check_output(
+              ["git", "ls-files"], text=True, encoding="utf-8"
+          ).splitlines()
+          tracked = [p for p in tracked if p != "SOURCE-SHA256SUMS"]
           rows = [f"{hashlib.sha256(Path(p).read_bytes()).hexdigest()}  {p}" for p in tracked]
-          Path('SOURCE-SHA256SUMS').write_text('\n'.join(rows) + '\n', encoding='utf-8')
+          Path("SOURCE-SHA256SUMS").write_text("\n".join(rows) + "\n", encoding="utf-8")
           PY
           git add SOURCE-SHA256SUMS
           git diff --cached --check
 
       - id: integrity
-        name: Verify source integrity
+        name: Verify candidate source integrity
         run: |
-          set -Eeuo pipefail
           python3 -B - <<'PY'
           import hashlib
           import re
@@ -107,35 +104,37 @@ jobs:
           from pathlib import Path
 
           expected = {}
-          for line_no, raw in enumerate(Path('SOURCE-SHA256SUMS').read_text(encoding='utf-8').splitlines(), 1):
+          for line_no, raw in enumerate(Path("SOURCE-SHA256SUMS").read_text(encoding="utf-8").splitlines(), 1):
               if not raw.strip():
                   continue
-              match = re.fullmatch(r'([0-9a-f]{64})  (.+)', raw)
+              match = re.fullmatch(r"([0-9a-f]{64})  (.+)", raw)
               if match is None:
-                  raise SystemExit(f'invalid SOURCE-SHA256SUMS line {line_no}: {raw!r}')
+                  raise SystemExit(f"invalid SOURCE-SHA256SUMS line {line_no}: {raw!r}")
               digest, path = match.groups()
               if path in expected:
-                  raise SystemExit(f'duplicate checksum path: {path}')
+                  raise SystemExit(f"duplicate checksum path: {path}")
               expected[path] = digest
-          tracked = set(subprocess.check_output(['git', 'ls-files'], text=True, encoding='utf-8').splitlines())
-          tracked.discard('SOURCE-SHA256SUMS')
+          tracked = set(subprocess.check_output(["git", "ls-files"], text=True, encoding="utf-8").splitlines())
+          tracked.discard("SOURCE-SHA256SUMS")
           if tracked != set(expected):
-              raise SystemExit(f'checksum inventory mismatch: missing={sorted(tracked-set(expected))} extra={sorted(set(expected)-tracked)}')
+              raise SystemExit(
+                  f"checksum inventory mismatch: missing={sorted(tracked-set(expected))} extra={sorted(set(expected)-tracked)}"
+              )
           for path in sorted(tracked):
               actual = hashlib.sha256(Path(path).read_bytes()).hexdigest()
               if actual != expected[path]:
-                  raise SystemExit(f'source hash mismatch: {path}')
-          print(f'Source integrity OK: {len(tracked)} files')
+                  raise SystemExit(f"source hash mismatch: {path}")
+          print(f"Source integrity OK: {len(tracked)} files")
           PY
 
       - id: setup
-        name: Set up Python
+        name: Set up Python and dependencies
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
       - id: deps
-        name: Install dependencies
+        name: Install test dependencies
         run: |
           python -m pip install --upgrade pip >/dev/null
           python -m pip install -r requirements-dev.txt >/dev/null
@@ -148,18 +147,18 @@ jobs:
           python -B - <<'PY'
           from pathlib import Path
           files = (
-              list(Path('app').rglob('*.py'))
-              + list(Path('hostd').rglob('*.py'))
-              + list(Path('engines').rglob('*.py'))
-              + list(Path('tests').rglob('*.py'))
+              list(Path("app").rglob("*.py"))
+              + list(Path("hostd").rglob("*.py"))
+              + list(Path("engines").rglob("*.py"))
+              + list(Path("tests").rglob("*.py"))
           )
           for path in files:
-              compile(path.read_text(encoding='utf-8'), str(path), 'exec')
-          print(f'Python syntax OK: {len(files)} files')
+              compile(path.read_text(encoding="utf-8"), str(path), "exec")
+          print(f"Python syntax OK: {len(files)} files")
           PY
 
       - id: focused
-        name: Focused AWG3 and frozen-regression suite
+        name: Focused AWG3 and frozen regression suite
         run: |
           python -m pytest \
             tests/test_sg_gateway_v22_awg3_runtime_repair.py \
@@ -172,9 +171,54 @@ jobs:
 
       - id: full
         name: Full pytest
-        run: python -m pytest tests
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          python -m pytest tests 2>&1 | tee /tmp/sg-awg3-full-pytest.log
+
+      - name: Publish exact full-suite failure
+        if: steps.full.outcome == 'failure'
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+          import urllib.request
+          from pathlib import Path
+
+          lines = Path("/tmp/sg-awg3-full-pytest.log").read_text(
+              encoding="utf-8", errors="replace"
+          ).splitlines()
+          markers = [line.strip() for line in lines if line.strip().startswith("FAILED ")]
+          if not markers:
+              markers = ["full pytest failed without FAILED summary"]
+          for index, marker in enumerate(markers[:12], 1):
+              clean = re.sub(r"[^A-Za-z0-9_.:/=+() -]+", "?", marker)[:68]
+              payload = json.dumps({
+                  "state": "failure",
+                  "context": f"dev-02206/fullfail-{index:02d}-{clean}"[:100],
+                  "description": marker[:140],
+              }).encode("utf-8")
+              request = urllib.request.Request(
+                  f"https://api.github.com/repos/{os.environ['GITHUB_REPOSITORY']}/statuses/{os.environ['GITHUB_SHA']}",
+                  data=payload,
+                  method="POST",
+                  headers={
+                      "Authorization": f"Bearer {os.environ['GITHUB_TOKEN']}",
+                      "Accept": "application/vnd.github+json",
+                      "X-GitHub-Api-Version": "2022-11-28",
+                      "Content-Type": "application/json",
+                  },
+              )
+              with urllib.request.urlopen(request, timeout=30) as response:
+                  print(marker, response.status)
+          PY
 
       - id: candidate
+        if: steps.full.outcome == 'success'
         name: Commit tested candidate locally
         run: |
           set -Eeuo pipefail
@@ -188,6 +232,7 @@ jobs:
           echo "CANDIDATE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
 
       - id: package
+        if: steps.full.outcome == 'success' && steps.candidate.outcome == 'success'
         name: Build and verify FULL package from candidate HEAD
         run: |
           set -Eeuo pipefail
@@ -198,6 +243,7 @@ jobs:
           bash "$OUT" --verify-only
 
       - id: push
+        if: steps.full.outcome == 'success' && steps.package.outcome == 'success'
         name: Push verified integration to dev-02206
         run: |
           set -Eeuo pipefail
@@ -231,26 +277,35 @@ jobs:
           import os
           import urllib.request
 
-          repo = os.environ['GITHUB_REPOSITORY']
-          sha = os.environ['GITHUB_SHA']
-          token = os.environ['GITHUB_TOKEN']
-          for stage in ('checkout','lock','apply','integrity','setup','deps','syntax','focused','full','candidate','package','push'):
-              outcome = os.environ.get(stage.upper(), 'skipped')
-              state = {'success':'success','failure':'failure','cancelled':'error','skipped':'error'}.get(outcome, 'error')
+          repo = os.environ["GITHUB_REPOSITORY"]
+          sha = os.environ["GITHUB_SHA"]
+          token = os.environ["GITHUB_TOKEN"]
+          stages = (
+              "checkout", "lock", "apply", "integrity", "setup", "deps",
+              "syntax", "focused", "full", "candidate", "package", "push",
+          )
+          for stage in stages:
+              outcome = os.environ.get(stage.upper(), "skipped")
+              state = {
+                  "success": "success",
+                  "failure": "failure",
+                  "cancelled": "error",
+                  "skipped": "error",
+              }.get(outcome, "error")
               payload = json.dumps({
-                  'state': state,
-                  'context': f'dev-02206/awg3-{stage}',
-                  'description': f'AWG3 integration gate: {outcome}',
-              }).encode('utf-8')
+                  "state": state,
+                  "context": f"dev-02206/awg3-{stage}",
+                  "description": f"AWG3 integration gate: {outcome}",
+              }).encode("utf-8")
               request = urllib.request.Request(
-                  f'https://api.github.com/repos/{repo}/statuses/{sha}',
+                  f"https://api.github.com/repos/{repo}/statuses/{sha}",
                   data=payload,
-                  method='POST',
+                  method="POST",
                   headers={
-                      'Authorization': f'Bearer {token}',
-                      'Accept': 'application/vnd.github+json',
-                      'X-GitHub-Api-Version': '2022-11-28',
-                      'Content-Type': 'application/json',
+                      "Authorization": f"Bearer {token}",
+                      "Accept": "application/vnd.github+json",
+                      "X-GitHub-Api-Version": "2022-11-28",
+                      "Content-Type": "application/json",
                   },
               )
               with urllib.request.urlopen(request, timeout=30) as response:
