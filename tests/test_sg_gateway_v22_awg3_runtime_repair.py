@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 from app.engines import provisioning
+from app import runtime_ui
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -81,6 +83,39 @@ def test_awg3_credential_preflight_stops_before_subprocess(tmp_path: Path, monke
         provisioning._awg3_keypair()
 
     assert "Откройте Maintenance → AWG3 Runtime" in str(error.value)
+
+
+def test_runtime_ui_blocks_only_explicit_missing_awg3(monkeypatch) -> None:
+    missing = SimpleNamespace(
+        payload={"checks": [{"engine": "amneziawg3", "ready": False, "missing": ["/opt/sg-gateway/awg3/bin/awg"]}]},
+        message="Runtime Contract failed",
+    )
+    monkeypatch.setattr(runtime_ui, "run_hostd_command", lambda command, timeout=2: missing)
+    state = runtime_ui.runtime_engine_state("amneziawg3")
+    assert state["known"] is True
+    assert state["ready"] is False
+    assert state["missing"] == ["/opt/sg-gateway/awg3/bin/awg"]
+
+    unknown = SimpleNamespace(payload={}, message="sg-hostd unavailable")
+    monkeypatch.setattr(runtime_ui, "run_hostd_command", lambda command, timeout=2: unknown)
+    state = runtime_ui.runtime_engine_state("amneziawg3")
+    assert state["known"] is False
+    assert state["ready"] is True
+
+
+def test_awg3_runtime_ui_prevents_new_access_but_preserves_selected_access() -> None:
+    production = (ROOT / "app" / "production.py").read_text(encoding="utf-8")
+    clients = (ROOT / "app" / "web" / "templates" / "clients.html").read_text(encoding="utf-8")
+    dialogs = (ROOT / "app" / "web" / "templates" / "_client_edit_dialogs.html").read_text(encoding="utf-8")
+    detail = (ROOT / "app" / "web" / "templates" / "client_detail.html").read_text(encoding="utf-8")
+    assert "runtime_engine_state" in production
+    assert "runtime_engine_state('amneziawg3')" in clients
+    assert "AWG3 runtime требует восстановления в Maintenance" in clients
+    assert "data-awg3-runtime-warning" in clients
+    assert "runtime_engine_state('amneziawg3')" in dialogs
+    assert "if (input.checked) return;" in dialogs
+    assert "input.disabled = true;" in dialogs
+    assert 'value="amneziawg3"' in detail
 
 
 def test_awg3_repair_is_background_job_and_maintenance_route() -> None:
