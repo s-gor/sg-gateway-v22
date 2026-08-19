@@ -13,12 +13,12 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def test_update_channel_defaults_are_consistent_and_old_repo_is_gone() -> None:
     assert panel_updates.GITHUB_REPO == "s-gor/sg-gateway-v22"
-    assert panel_updates.GITHUB_BRANCH == "dev-v22"
+    assert panel_updates.GITHUB_BRANCH == "main"
     update = (ROOT / "deploy" / "update-from-github.sh").read_text(encoding="utf-8")
     bootstrap = (ROOT / "deploy" / "install-from-github.sh").read_text(encoding="utf-8")
     assert 'REPOSITORY="s-gor/sg-gateway-v22"' in update
-    assert '${SG_GATEWAY_GITHUB_BRANCH:-${SG_GATEWAY_UPDATE_BRANCH:-dev-v22}}' in update
-    assert '${SG_GATEWAY_GITHUB_BRANCH:-${SG_GATEWAY_UPDATE_BRANCH:-dev-v22}}' in bootstrap
+    assert '${SG_GATEWAY_GITHUB_BRANCH:-${SG_GATEWAY_UPDATE_BRANCH:-main}}' in update
+    assert '${SG_GATEWAY_GITHUB_BRANCH:-${SG_GATEWAY_UPDATE_BRANCH:-main}}' in bootstrap
     assert "raw.githubusercontent.com/%s/%s/deploy/update-from-github.sh" in bootstrap
     assert "sudo env SG_GATEWAY_GITHUB_BRANCH=%s bash" in bootstrap
     assert "raw.githubusercontent.com/s-gor/sg-gateway/main/deploy/update-from-github.sh" not in bootstrap
@@ -52,7 +52,7 @@ def test_operation_job_passes_explicit_channel_to_safe_shell_updater(tmp_path, m
     monkeypatch.setattr(operation_jobs, "_start", fake_start)
     operation_jobs.start_panel_update_job()
     assert captured["kind"] == "panel_update_channel"
-    assert "dev-v22" in captured["title"]
+    assert captured["title"] == "Безопасное обновление SG-Gateway из GitHub"
     assert captured["extra"]["channel"] == "dev-v22"
     assert captured["command"][:2] == ("/usr/bin/env", "SG_GATEWAY_GITHUB_BRANCH=dev-v22")
     assert captured["command"][-2:] == ("/bin/bash", str(script))

@@ -15,7 +15,7 @@ from app.version import ROOT as APP_ROOT, get_version
 
 
 GITHUB_REPO = os.getenv("SG_GATEWAY_UPDATE_REPO", "s-gor/sg-gateway-v22").strip() or "s-gor/sg-gateway-v22"
-GITHUB_BRANCH = os.getenv("SG_GATEWAY_UPDATE_BRANCH", "dev-v22").strip() or "dev-v22"
+GITHUB_BRANCH = os.getenv("SG_GATEWAY_UPDATE_BRANCH", "main").strip() or "main"
 GITHUB_API = f"https://api.github.com/repos/{GITHUB_REPO}"
 STATE_FILE = Path(os.getenv("SG_GATEWAY_PANEL_UPDATE_STATE", "/var/lib/sg-gateway/updates/panel-state.json"))
 CACHE_TTL_SECONDS = 300
@@ -188,11 +188,11 @@ def overview(*, refresh: bool = False) -> dict[str, Any]:
             if installed_commit == latest_commit:
                 cached["state"] = "current"
                 cached["can_install"] = False
-                cached["message"] = f"Локальная база уже соответствует проверенному GitHub {GITHUB_BRANCH}."
+                cached["message"] = "Локальная база уже соответствует проверенному GitHub."
             elif latest_commit:
                 cached["state"] = "available"
                 cached["can_install"] = True
-                cached["message"] = f"GitHub {GITHUB_BRANCH} содержит новый commit. Можно выполнить безопасное обновление панели."
+                cached["message"] = "GitHub содержит новый commit. Можно выполнить безопасное обновление панели."
         elif state_empty and _version_key(latest_version) > _version_key(installed_version):
             cached["state"] = "available"
             cached["can_install"] = True
@@ -253,6 +253,6 @@ def overview(*, refresh: bool = False) -> dict[str, Any]:
             "html_url": "",
             "state": "unavailable",
             "can_install": False,
-            "message": f"Проверка GitHub {GITHUB_BRANCH} не выполнена.",
+            "message": "Проверка GitHub не выполнена.",
         }
 

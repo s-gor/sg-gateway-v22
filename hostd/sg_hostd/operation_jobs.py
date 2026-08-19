@@ -259,7 +259,7 @@ def start_panel_update_job() -> dict[str, Any]:
         raise RuntimeError(f"Не найден {PANEL_UPDATE_SCRIPT}")
     return _start(
         "panel_update_channel",
-        f"Безопасное обновление SG-Gateway из GitHub {GITHUB_BRANCH}",
+        "Безопасное обновление SG-Gateway из GitHub",
         "/maintenance?tab=updates&refresh=1",
         "/maintenance?tab=updates",
         {"channel": GITHUB_BRANCH, "restart_expected": True},
