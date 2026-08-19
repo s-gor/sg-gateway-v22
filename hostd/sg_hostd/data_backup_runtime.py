@@ -27,6 +27,12 @@ def _data_backup_dir() -> Path:
     root = full._data_dir() / "backups" / "data"
     root.mkdir(parents=True, exist_ok=True)
     os.chmod(root, 0o700)
+    # Hostd creates DATA archives as root, while the panel lists/downloads and
+    # stages uploads from this directory as sg-gateway. Keep the directory
+    # owned by the panel account just like the established FULL backup store.
+    if os.geteuid() == 0:
+        uid, gid = full._panel_ids()
+        os.chown(root, uid, gid)
     return root
 
 
