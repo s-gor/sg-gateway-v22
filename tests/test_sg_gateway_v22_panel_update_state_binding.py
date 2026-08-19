@@ -53,12 +53,29 @@ def test_state_binding_occurs_after_final_verification_while_rollback_is_still_a
     assert 'if (( BACKUP_READY == 1 )); then' in error
     assert 'rollback_update || true' in error
 
-def test_fix19_channel_and_production_invariants_survive_state_binding() -> None:
+def test_02204_stable_channel_and_production_invariants_survive_state_binding() -> None:
     body = UPDATER.read_text(encoding="utf-8")
     assert 'REPOSITORY="s-gor/sg-gateway-v22"' in body
-    assert '${SG_GATEWAY_GITHUB_BRANCH:-${SG_GATEWAY_UPDATE_BRANCH:-dev-v22}}' in body
+    assert '${SG_GATEWAY_GITHUB_BRANCH:-${SG_GATEWAY_UPDATE_BRANCH:-stable-02204}}' in body
     assert 'print(items[-1] if items else "app.production:app")' in body
     assert '[[ -f "$SOURCE_DIR/app/production.py" ]]' in body
     assert 'REPOSITORY="s-gor/sg-gateway"' not in body
+    assert "dev-v22" not in body
     assert "dev-02205" not in body
     assert "app.main:app" not in body
+
+
+def test_shell_updater_blocks_lower_version_but_allows_same_version_hotfix() -> None:
+    body = UPDATER.read_text(encoding="utf-8")
+    assert "validate_source_version()" in body
+    assert 'installed_version="$(tr -d' in body
+    assert 'target_version="$(tr -d' in body
+    assert 'if target < installed:' in body
+    assert 'if target == installed:' in body
+    assert "Same-version hotfix is allowed" in body
+    main = body[body.index("main() {"):]
+    source = main.index('run_stage 1 "Проверка установленного SG-Gateway и HTTPS" preflight')
+    prepare = main.index("prepare_source", source)
+    guard = main.index("validate_source_version", prepare)
+    backup = main.index('run_stage 2 "Safety Backup: SG state + TLS + AWG3 runtime" create_safety_backup', guard)
+    assert source < prepare < guard < backup
