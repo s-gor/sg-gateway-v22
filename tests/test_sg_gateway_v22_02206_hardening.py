@@ -25,6 +25,7 @@ def test_dev_02206_identity_is_consistent_and_not_stable() -> None:
     assert manifest["channel"] == "dev-02206"
     assert manifest["status"] == "DEVELOPMENT"
     assert manifest["maintenance_updates"]["panel"]["channel"] == "dev-02206"
+    assert manifest["next_development_line"] == "0.1.0-022.07"
 
 
 def test_mieru_router_uri_uses_compact_router_contract() -> None:
