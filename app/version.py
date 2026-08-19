@@ -4,6 +4,10 @@ import json
 from functools import lru_cache
 from pathlib import Path
 
+from app.production_compat import install_production_compat
+
+
+install_production_compat()
 
 ROOT = Path(__file__).resolve().parents[1]
 
