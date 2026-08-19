@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import os
+from pathlib import Path
 import secrets
 import subprocess
 import uuid
@@ -13,17 +15,30 @@ from app.xray.profiles import REALITY_TCP_FLOW
 ANYTLS_PORT = 9443
 TUIC_PORT = 10443
 AWG3_AWG = "/opt/sg-gateway/awg3/bin/awg"
+AWG3_AWG_QUICK = "/opt/sg-gateway/awg3/bin/awg-quick"
+AWG3_GO = "/opt/sg-gateway/awg3/bin/amneziawg-go"
+AWG3_HELPER = "/opt/sg-gateway/deploy/sg-gateway-awg3-userspace.sh"
+AWG3_UNIT_PATHS = (
+    "/etc/systemd/system/sg-gateway-awg3.service",
+    "/usr/lib/systemd/system/sg-gateway-awg3.service",
+    "/lib/systemd/system/sg-gateway-awg3.service",
+)
 
 
 def _run(command: list[str], input_text: str | None = None) -> str:
-    result = subprocess.run(
-        command,
-        input=input_text,
-        capture_output=True,
-        text=True,
-        timeout=30,
-        check=False,
-    )
+    try:
+        result = subprocess.run(
+            command,
+            input=input_text,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise RuntimeError(
+            f"Не удалось запустить обязательный runtime {command[0]}: {exc}"
+        ) from exc
     if result.returncode != 0:
         raise RuntimeError(
             (result.stderr or result.stdout).strip()
@@ -38,7 +53,35 @@ def _awg_keypair() -> tuple[str, str]:
     return private_key, public_key
 
 
+def _awg3_runtime_missing() -> list[str]:
+    missing: list[str] = []
+    for label, raw in (
+        ("awg", AWG3_AWG),
+        ("awg-quick", AWG3_AWG_QUICK),
+        ("amneziawg-go", AWG3_GO),
+        ("AWG3 helper", AWG3_HELPER),
+    ):
+        path = Path(raw)
+        if not path.is_file() or not os.access(path, os.X_OK):
+            missing.append(f"{label}: {path}")
+    if not any(Path(raw).is_file() for raw in AWG3_UNIT_PATHS):
+        missing.append(f"sg-gateway-awg3.service: {AWG3_UNIT_PATHS[0]}")
+    return missing
+
+
+def _require_awg3_runtime() -> None:
+    missing = _awg3_runtime_missing()
+    if not missing:
+        return
+    raise RuntimeError(
+        "AWG3 требует восстановления — отсутствует "
+        + ", ".join(missing)
+        + ". Откройте Maintenance → AWG3 Runtime и запустите восстановление."
+    )
+
+
 def _awg3_keypair() -> tuple[str, str]:
+    _require_awg3_runtime()
     private_key = _run([AWG3_AWG, "genkey"])
     public_key = _run([AWG3_AWG, "pubkey"], private_key + "\n")
     return private_key, public_key
