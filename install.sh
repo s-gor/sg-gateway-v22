@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-VERSION="0.1.0-022.04"
-INSTALLER_BUILD="02204-full-clean-dual-stack"
+VERSION="0.1.0-022.06"
+INSTALLER_BUILD="02206-full-clean-dual-stack"
 SOURCE_DIR="${SG_GATEWAY_SOURCE_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)}"
 PREFIX="/opt/sg-gateway"
 CONFIG_DIR="/etc/sg-gateway"
 DATA_DIR="/var/lib/sg-gateway"
 LOG_DIR="/var/log/sg-gateway"
-INSTALL_LOG="/var/log/sg-gateway-installer-02204.log"
+INSTALL_LOG="/var/log/sg-gateway-installer-02206.log"
 BACKUP_ROOT="/root/sg-gateway-backups"
-RESUME_FILE="/root/sg-gateway-02204-installer-resume.env"
+RESUME_FILE="/root/sg-gateway-02206-installer-resume.env"
 MIHOMO_VERSION="v1.19.29"
 SING_BOX_VERSION="1.13.14"
 WGCF_CLI_VERSION="v0.3.6"
@@ -1098,7 +1098,7 @@ collect_automatic_parameters() {
 
 create_backup() {
   install -d -m 0700 "$BACKUP_ROOT"
-  [[ -n "$BACKUP_DIR" ]] || BACKUP_DIR="$BACKUP_ROOT/$(date +%Y%m%d-%H%M%S)-before-sg-gateway-016"
+  [[ -n "$BACKUP_DIR" ]] || BACKUP_DIR="$BACKUP_ROOT/$(date +%Y%m%d-%H%M%S)-before-sg-gateway-02206"
   install -d -m 0700 "$BACKUP_DIR"
   local existing=()
   local relative
@@ -1186,7 +1186,7 @@ verify_vendor_core_set() {
   case "$machine" in
     x86_64|amd64) ;;
     *)
-      echo "SG-Gateway 021 vendor bundle: unsupported architecture $machine; this bundle is linux/amd64." >&2
+      echo "SG-Gateway V22 vendor bundle: unsupported architecture $machine; this bundle is linux/amd64." >&2
       return 1
       ;;
   esac
@@ -2859,8 +2859,8 @@ main() {
   umask 022
   prepare_log
   export DEBIAN_FRONTEND=noninteractive LANG=C.UTF-8 LC_ALL=C.UTF-8
-  printf '\n%s[SG-Gateway]%s Запускаю полный мастер SG-Gateway 0.1.0-021.12\n' "$CYAN" "$RESET"
-  printf '%s[SG-Gateway] [OK]%s Мастер установки SG-Gateway 0.1.0-021.12 запущен (0 сек.)\n' "$GREEN" "$RESET"
+  printf '\n%s[SG-Gateway]%s Запускаю полный мастер SG-Gateway 0.1.0-022.06\n' "$CYAN" "$RESET"
+  printf '%s[SG-Gateway] [OK]%s Мастер установки SG-Gateway 0.1.0-022.06 запущен (0 сек.)\n' "$GREEN" "$RESET"
   printf '[SG-Gateway] Технический журнал: %s\n' "$INSTALL_LOG"
   printf '[SG-Gateway] Повторный запуск выполняется на этом же EC2. Домен не обязателен.\n\n'
 
@@ -2901,7 +2901,7 @@ main() {
   AWG_PORT="$DEFAULT_AWG_PORT"
   AWG3_PORT="$DEFAULT_AWG3_PORT"
 
-  BACKUP_DIR="$BACKUP_ROOT/$(date +%Y%m%d-%H%M%S)-before-sg-gateway-021"
+  BACKUP_DIR="$BACKUP_ROOT/$(date +%Y%m%d-%H%M%S)-before-sg-gateway-02206"
   MUTATION_STARTED=1
   run_stage 2 "Резервная копия и подготовка исходника" stage_backup_and_prepare
   run_stage 3 "Системные пакеты, Nginx и Certbot" stage_system_packages
