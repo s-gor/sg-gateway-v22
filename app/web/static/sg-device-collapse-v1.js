@@ -1,4 +1,4 @@
-/* SG-Gateway 0.1.0-021.9 — collapsed device cards, clean single-surface V3 */
+/* SG-Gateway 0.1.0-022.06 dev — collapsed device cards + Mieru action polish */
 (() => {
   'use strict';
 
@@ -54,7 +54,7 @@
       setAvailableNote(byValue.get('xray_hysteria2'), 'Отдельный профиль и QR');
       setAvailableNote(byValue.get('amneziawg'), 'UDP 585 · отдельная конфигурация и QR');
       setAvailableNote(byValue.get('amneziawg3'), 'UDP 586 · userspace-конфигурация и QR');
-      setAvailableNote(byValue.get('mihomo'), 'Mieru-ссылка и Mihomo YAML');
+      setAvailableNote(byValue.get('mihomo'), 'Mieru-ссылка, Router / ZB и JSON для iPhone');
       setAvailableNote(byValue.get('anytls'), 'Отдельный TLS-профиль и QR');
       setAvailableNote(byValue.get('tuic'), 'Отдельный QUIC/UDP-профиль и QR');
     }
@@ -107,6 +107,109 @@
     });
   }
 
+  function smartQr(details, title, subtitle = 'Сканируйте в приложении') {
+    const popover = details?.querySelector('.dv16-qr-popover');
+    if (!popover || popover.querySelector('.sg-smart-qr-meta')) return;
+    const meta = document.createElement('div');
+    meta.className = 'sg-smart-qr-meta';
+    const strong = document.createElement('strong');
+    strong.textContent = title;
+    const small = document.createElement('small');
+    small.textContent = subtitle;
+    meta.append(strong, small);
+    const image = popover.querySelector('img');
+    popover.insertBefore(meta, image || null);
+  }
+
+  function routerQrUrl(mieruQr) {
+    const source = mieruQr?.querySelector('img')?.getAttribute('src') || '';
+    if (!source) return '';
+    return source.replace(/\/protocols\/mieru\/qr(?:\?.*)?$/, '/mieru-router/qr');
+  }
+
+  function createRouterQr(mieruQr) {
+    const src = routerQrUrl(mieruQr);
+    if (!src || src === mieruQr?.querySelector('img')?.getAttribute('src')) return null;
+    const details = document.createElement('details');
+    details.className = 'dv16-qr sg-mieru-router-qr';
+    details.innerHTML = `
+      <summary class="button">QR · Router / ZB</summary>
+      <div class="dv16-qr-popover">
+        <button type="button" aria-label="Закрыть QR · Router / ZB">×</button>
+        <img src="${src}" alt="QR Mieru · Router / ZB">
+      </div>`;
+    details.querySelector('.dv16-qr-popover > button')?.addEventListener('click', () => details.removeAttribute('open'));
+    smartQr(details, 'Router / ZB');
+    return details;
+  }
+
+  function normalizeMieruActions() {
+    document.querySelectorAll('.dv16-technical-row').forEach(row => {
+      const routerButton = row.querySelector('[data-mieru-router-source]');
+      if (!routerButton || row.dataset.sgMieruActionsReady === '1') return;
+      const actions = row.querySelector('.dv16-technical-actions');
+      if (!actions) return;
+
+      const buttons = Array.from(actions.querySelectorAll(':scope > button'));
+      const qrs = Array.from(actions.querySelectorAll(':scope > details.dv16-qr'));
+      const links = Array.from(actions.querySelectorAll(':scope > a.button'));
+
+      const linkButton = buttons.find(button => /Скопировать ссылку/i.test(button.textContent)) || buttons.find(button => button.dataset.copyValue);
+      const iphoneButton = buttons.find(button => /iPhone/i.test(button.textContent));
+      const mieruQr = qrs.find(details => /Mieru/i.test(details.querySelector('summary')?.textContent || '') && !/iPhone/i.test(details.querySelector('summary')?.textContent || '')) || qrs[0];
+      const iphoneQr = qrs.find(details => /iPhone/i.test(details.querySelector('summary')?.textContent || ''));
+      const downloadLink = links.find(link => /Скачать ссылку/i.test(link.textContent));
+      const jsonDownload = links.find(link => /Mieru JSON/i.test(link.textContent));
+      const yamlDownload = links.find(link => /Mihomo YAML/i.test(link.textContent));
+
+      if (linkButton) linkButton.textContent = 'Ссылка';
+      routerButton.textContent = 'Router / ZB';
+      if (iphoneButton) iphoneButton.textContent = 'JSON · iPhone';
+
+      if (mieruQr) {
+        const summary = mieruQr.querySelector('summary');
+        if (summary) summary.textContent = 'QR · Mieru';
+        smartQr(mieruQr, 'Mieru');
+      }
+      if (iphoneQr) {
+        const summary = iphoneQr.querySelector('summary');
+        if (summary) summary.textContent = 'QR · iPhone';
+        smartQr(iphoneQr, 'iPhone JSON');
+      }
+
+      const routerQr = createRouterQr(mieruQr);
+      const advancedItems = [downloadLink, jsonDownload, yamlDownload].filter(Boolean);
+      let more = null;
+      if (advancedItems.length) {
+        more = document.createElement('details');
+        more.className = 'sg-mieru-more';
+        const summary = document.createElement('summary');
+        summary.className = 'button';
+        summary.textContent = 'Другие форматы';
+        const menu = document.createElement('div');
+        menu.className = 'sg-mieru-more-menu';
+        advancedItems.forEach(item => menu.appendChild(item));
+        more.append(summary, menu);
+      }
+
+      [linkButton, mieruQr, routerButton, routerQr, iphoneButton, iphoneQr, more].filter(Boolean).forEach(item => actions.appendChild(item));
+      row.dataset.sgMieruActionsReady = '1';
+    });
+  }
+
+  function markExporterErrors() {
+    document.querySelectorAll('.dv16-technical-row.state-error').forEach(row => {
+      const status = row.querySelector(':scope > div:first-child small');
+      if (status) status.textContent = 'Ошибка генерации';
+      const actions = row.querySelector('.dv16-technical-actions');
+      if (!actions || actions.querySelector('.sg-export-error')) return;
+      const note = document.createElement('span');
+      note.className = 'sg-export-error';
+      note.textContent = 'Остальные профили устройства доступны';
+      actions.appendChild(note);
+    });
+  }
+
   function initDevice(card) {
     if (card.dataset.sgCollapseReady === '1') return;
 
@@ -156,6 +259,8 @@
     normalizeProtocolPickers();
     document.querySelectorAll('.dv16-devices > .dv16-device').forEach(initDevice);
     prepareDisableActions();
+    normalizeMieruActions();
+    markExporterErrors();
 
     const hash = String(location.hash || '');
     if (hash.startsWith('#device-')) {
