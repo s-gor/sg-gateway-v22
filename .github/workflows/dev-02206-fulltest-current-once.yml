@@ -1,0 +1,66 @@
+name: DEV 02206 Full Pytest Diagnostic Once
+
+on:
+  push:
+    branches: [dev-02206]
+    paths:
+      - .github/workflows/dev-02206-fulltest-current-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: dev-02206
+          fetch-depth: 0
+      - name: Absorb DEV integrity refresh
+        run: |
+          sleep 20
+          git fetch origin dev-02206
+          git reset --hard origin/dev-02206
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip >/dev/null
+          python -m pip install -r requirements-dev.txt >/dev/null
+      - id: full
+        continue-on-error: true
+        run: |
+          set +e
+          python -m pytest tests > /tmp/dev-02206-fulltest-current.log 2>&1
+          code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit "$code"
+      - name: Persist diagnostic result
+        if: always()
+        env:
+          FULL: ${{ steps.full.outcome }}
+          EXIT_CODE: ${{ steps.full.outputs.exit_code }}
+        run: |
+          {
+            printf 'DEV 02206 current full pytest diagnostic\n'
+            printf 'full_tests=%s\n' "$FULL"
+            printf 'exit_code=%s\n' "${EXIT_CODE:-unknown}"
+            printf '%s\n' '--- tail ---'
+            tail -n 220 /tmp/dev-02206-fulltest-current.log || true
+          } > DEV-02206-FULLTEST-CURRENT.txt
+          git rm .github/workflows/dev-02206-fulltest-current-once.yml
+          python3 - <<'PY'
+          import hashlib, subprocess
+          from pathlib import Path
+          tracked = subprocess.check_output(['git','ls-files'], text=True, encoding='utf-8').splitlines()
+          tracked = [p for p in tracked if p != 'SOURCE-SHA256SUMS']
+          Path('SOURCE-SHA256SUMS').write_text('\n'.join(f"{hashlib.sha256(Path(p).read_bytes()).hexdigest()}  {p}" for p in tracked) + '\n', encoding='utf-8')
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Record current dev-02206 full pytest diagnostic"
+          git push origin HEAD:dev-02206
