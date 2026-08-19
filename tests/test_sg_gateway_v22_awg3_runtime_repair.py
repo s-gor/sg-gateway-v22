@@ -53,13 +53,14 @@ def test_awg3_repair_stops_before_swap_and_rolls_back_runtime_unit_and_service_s
     assert "WAS_ENABLED" in body
 
 
-def test_awg3_repair_respects_empty_client_state() -> None:
+def test_awg3_repair_respects_empty_client_state_and_guides_partial_recovery() -> None:
     body = (ROOT / "deploy/repair-awg3-runtime.sh").read_text(encoding="utf-8")
     assert "ACTIVE_CLIENTS" in body
     assert "dc.engine = 'amneziawg3'" in body
     assert "if (( ACTIVE_CLIENTS > 0 ))" in body
     assert 'systemctl disable "$SERVICE"' in body
     assert "Активных AWG3-клиентов нет" in body
+    assert "Откройте Clients и нажмите «Проверить и применить»" in body
 
 
 def test_awg3_userspace_helper_splits_dual_stack_address_values() -> None:
@@ -95,9 +96,24 @@ def test_awg3_credential_preflight_stops_before_subprocess(tmp_path: Path, monke
     assert "Откройте Maintenance → AWG3 Runtime" in str(error.value)
 
 
-def test_runtime_ui_blocks_only_explicit_missing_awg3(monkeypatch) -> None:
+def test_runtime_ui_blocks_only_explicit_missing_awg3_and_exposes_deployment(monkeypatch) -> None:
     missing = SimpleNamespace(
-        payload={"checks": [{"engine": "amneziawg3", "ready": False, "missing": ["/opt/sg-gateway/awg3/bin/awg"]}]},
+        payload={
+            "checks": [
+                {
+                    "engine": "amneziawg3",
+                    "ready": False,
+                    "missing": ["/opt/sg-gateway/awg3/bin/awg"],
+                    "deployment": {
+                        "required": True,
+                        "ready": False,
+                        "missing": ["generated config", "active service"],
+                        "config_ready": False,
+                        "service_active": False,
+                    },
+                }
+            ]
+        },
         message="Runtime Contract failed",
     )
     monkeypatch.setattr(runtime_ui, "run_hostd_command", lambda command, timeout=2: missing)
@@ -105,12 +121,20 @@ def test_runtime_ui_blocks_only_explicit_missing_awg3(monkeypatch) -> None:
     assert state["known"] is True
     assert state["ready"] is False
     assert state["missing"] == ["/opt/sg-gateway/awg3/bin/awg"]
+    assert state["deployment"] == {
+        "required": True,
+        "ready": False,
+        "missing": ["generated config", "active service"],
+        "config_ready": False,
+        "service_active": False,
+    }
 
     unknown = SimpleNamespace(payload={}, message="sg-hostd unavailable")
     monkeypatch.setattr(runtime_ui, "run_hostd_command", lambda command, timeout=2: unknown)
     state = runtime_ui.runtime_engine_state("amneziawg3")
     assert state["known"] is False
     assert state["ready"] is True
+    assert state["deployment"] == {}
 
 
 def test_awg3_runtime_ui_prevents_new_access_but_preserves_selected_access() -> None:
@@ -129,7 +153,7 @@ def test_awg3_runtime_ui_prevents_new_access_but_preserves_selected_access() -> 
 
 
 def test_02204_missing_awg3_can_update_then_repair_without_blocking_other_clients() -> None:
-    updater = (ROOT / "deploy" / "update-from-github.sh").read_text(encoding="utf-8")
+    updater = (ROOT / "deploy/update-from-github.sh").read_text(encoding="utf-8")
     panel_runtime = (ROOT / "hostd" / "sg_hostd" / "panel_update_runtime.py").read_text(encoding="utf-8")
     client_runtime = (ROOT / "hostd" / "sg_hostd" / "client_runtime.py").read_text(encoding="utf-8")
     commands = (ROOT / "hostd" / "sg_hostd" / "commands.py").read_text(encoding="utf-8")

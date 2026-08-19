@@ -178,7 +178,7 @@ if (( ACTIVE_CLIENTS > 0 )); then
     "$AWG3_ROOT/bin/awg" show awg3 >/dev/null
     log "AWG3 runtime запущен для активных клиентов: $ACTIVE_CLIENTS"
   else
-    log "Активные AWG3-клиенты есть, но конфигурация отсутствует; runtime восстановлен, конфигурацию создаст штатный Client Apply"
+    log "AWG3 runtime восстановлен. Активные AWG3-клиенты есть, но generated-конфигурация отсутствует. Откройте Clients и нажмите «Проверить и применить»."
   fi
 else
   systemctl stop "$SERVICE" >/dev/null 2>&1 || true
