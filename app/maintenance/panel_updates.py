@@ -208,11 +208,19 @@ def overview(*, refresh: bool = False) -> dict[str, Any]:
                 cached["state"] = "available"
                 cached["can_install"] = True
                 cached["message"] = f"GitHub {GITHUB_BRANCH} содержит новый commit. Можно выполнить безопасное обновление панели."
-        elif state_empty and _version_key(latest_version) > _version_key(installed_version):
+        elif state_empty and latest_commit and latest_key and (
+            not installed_key or latest_key >= installed_key
+        ):
             cached["state"] = "available"
             cached["can_install"] = True
             cached["bootstrap_allowed"] = True
-            cached["message"] = f"Доступна VERSION {latest_version}. Можно выполнить безопасное обновление SG-Gateway."
+            if installed_key and latest_key == installed_key:
+                cached["message"] = (
+                    f"GitHub {GITHUB_BRANCH} содержит hotfix текущей VERSION {latest_version}. "
+                    "Можно выполнить безопасное обновление SG-Gateway."
+                )
+            else:
+                cached["message"] = f"Доступна VERSION {latest_version}. Можно выполнить безопасное обновление SG-Gateway."
         else:
             cached["state"] = "uninitialized"
             cached["can_install"] = False
