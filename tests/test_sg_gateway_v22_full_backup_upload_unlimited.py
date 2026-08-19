@@ -33,8 +33,15 @@ def test_verify_ui_uses_same_restore_upload_path_without_size_warning():
 
 def test_panel_route_dispatches_verify_before_restore_job():
     text = Path("app/main.py").read_text(encoding="utf-8")
-    assert 'backup_action == "restore_verified"' in text
-    assert 'backup_action != "verify"' in text
-    assert 'run_hostd_command("backup.full.verify", timeout=180)' in text
-    assert 'run_hostd_command("backup.full.restore.start", timeout=20)' in text
-    assert text.index("stage_verified_full_backup_for_restore()") < text.index('run_hostd_command("backup.full.restore.start", timeout=20)')
+    # Scope this regression to the FULL restore route. DATA restore has its own
+    # independent promotion path and legitimately starts the same background
+    # full-restore job before this function appears in the source file.
+    route = text.split("def restore_full_backup_route():", 1)[1]
+    route = route.split("\n    @app.", 1)[0]
+    assert 'backup_action == "restore_verified"' in route
+    assert 'backup_action != "verify"' in route
+    assert 'run_hostd_command("backup.full.verify", timeout=180)' in route
+    assert 'run_hostd_command("backup.full.restore.start", timeout=20)' in route
+    assert route.index("stage_verified_full_backup_for_restore()") < route.index(
+        'run_hostd_command("backup.full.restore.start", timeout=20)'
+    )
