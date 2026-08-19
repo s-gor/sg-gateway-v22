@@ -1,0 +1,61 @@
+name: DEV 02206 Guard
+
+on:
+  push:
+    branches: [dev-02206]
+  pull_request:
+    branches: [dev-02206]
+
+permissions:
+  contents: write
+
+jobs:
+  guard:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout dev-02206
+        uses: actions/checkout@v4
+        with:
+          ref: dev-02206
+          fetch-depth: 1
+
+      - name: Enforce development channel isolation
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          install = Path('deploy/install-from-github.sh').read_text(encoding='utf-8')
+          panel = Path('app/maintenance/panel_updates.py').read_text(encoding='utf-8')
+          assert 'dev-02206' in install, 'dev installer is not pinned to dev-02206'
+          assert 'SG_GATEWAY_ALLOW_DEVELOPMENT' in install, 'dev installer lacks explicit opt-in guard'
+          assert 'dev-02206' in panel, 'panel update channel is not pinned to dev-02206'
+          PY
+
+      - name: Refresh source integrity for dev branch
+        if: github.event_name == 'push' && github.actor != 'github-actions[bot]'
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import subprocess
+          from pathlib import Path
+
+          tracked = subprocess.check_output(['git', 'ls-files'], text=True, encoding='utf-8').splitlines()
+          tracked = [p for p in tracked if p != 'SOURCE-SHA256SUMS']
+          rows = []
+          for path in tracked:
+              data = Path(path).read_bytes()
+              rows.append(f"{hashlib.sha256(data).hexdigest()}  {path}")
+          Path('SOURCE-SHA256SUMS').write_text('\n'.join(rows) + '\n', encoding='utf-8')
+          PY
+          if git diff --quiet -- SOURCE-SHA256SUMS; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add SOURCE-SHA256SUMS
+          git commit -m "Refresh dev-02206 source integrity"
+          git push origin HEAD:dev-02206
+
+      - name: Python syntax
+        run: |
+          python3 -B -c "from pathlib import Path; files=list(Path('app').rglob('*.py'))+list(Path('engines').rglob('*.py'))+list(Path('tests').rglob('*.py')); [compile(p.read_text(encoding='utf-8'), str(p), 'exec') for p in files]; print(f'syntax ok: {len(files)} files')"
