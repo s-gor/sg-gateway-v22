@@ -1,0 +1,6 @@
+foundation2 isolated verify
+integrity=success
+syntax=success
+focused_tests=success
+full_tests=failure
+full_package=success
