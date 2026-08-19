@@ -15,7 +15,7 @@ from app.version import ROOT as APP_ROOT, get_version
 
 
 GITHUB_REPO = os.getenv("SG_GATEWAY_UPDATE_REPO", "s-gor/sg-gateway-v22").strip() or "s-gor/sg-gateway-v22"
-GITHUB_BRANCH = os.getenv("SG_GATEWAY_UPDATE_BRANCH", "main").strip() or "main"
+GITHUB_BRANCH = os.getenv("SG_GATEWAY_UPDATE_BRANCH", "dev-02206").strip() or "dev-02206"
 GITHUB_API = f"https://api.github.com/repos/{GITHUB_REPO}"
 STATE_FILE = Path(os.getenv("SG_GATEWAY_PANEL_UPDATE_STATE", "/var/lib/sg-gateway/updates/panel-state.json"))
 CACHE_TTL_SECONDS = 300
@@ -255,4 +255,3 @@ def overview(*, refresh: bool = False) -> dict[str, Any]:
             "can_install": False,
             "message": "Проверка GitHub не выполнена.",
         }
-
