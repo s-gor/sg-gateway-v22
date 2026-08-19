@@ -107,6 +107,21 @@ def test_bound_panel_update_allows_same_version_hotfix(monkeypatch) -> None:
     assert result["can_install"] is True
 
 
+def test_unbound_panel_update_allows_same_version_hotfix_bootstrap(monkeypatch) -> None:
+    panel_updates._CACHE = None
+    monkeypatch.setattr(panel_updates, "GITHUB_BRANCH", "stable-02204")
+    monkeypatch.setattr(panel_updates, "_read_state", lambda: {})
+    monkeypatch.setattr(panel_updates, "source_fingerprint", lambda: "f" * 64)
+    monkeypatch.setattr(panel_updates, "get_version", lambda: "0.1.0-022.04")
+    monkeypatch.setattr(panel_updates, "_latest_channel", lambda: ("2" * 40, "2026-08-19T00:00:00Z", "x"))
+    monkeypatch.setattr(panel_updates, "_remote_version", lambda _commit: "0.1.0-022.04")
+    result = panel_updates.overview(refresh=True)
+    assert result["state"] == "available"
+    assert result["can_install"] is True
+    assert result["bootstrap_allowed"] is True
+    assert "hotfix" in result["message"]
+
+
 def test_bound_panel_update_allows_higher_version_from_channel(monkeypatch) -> None:
     result = _overview_for_versions(monkeypatch, installed="0.1.0-022.04", remote="0.1.0-023.00")
     assert result["state"] == "available"
