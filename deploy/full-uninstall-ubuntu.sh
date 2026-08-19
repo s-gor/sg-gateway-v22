@@ -5,7 +5,7 @@ PREFIX="/opt/sg-gateway"
 CONFIG_DIR="/etc/sg-gateway"
 DATA_DIR="/var/lib/sg-gateway"
 LOG_DIR="/var/log/sg-gateway"
-UNINSTALL_LOG="/var/log/sg-gateway-full-uninstall-02204.log"
+UNINSTALL_LOG="/var/log/sg-gateway-full-uninstall-02206.log"
 
 PANEL_PORT="63443"
 XRAY_PORT="443"
@@ -62,7 +62,7 @@ if [[ ! "$TLS_DOMAIN" =~ ^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$ ]]
   TLS_DOMAIN=""
 fi
 
-printf '\n%sSG-Gateway 0.1.0-022.04 · ПОЛНОЕ УДАЛЕНИЕ%s\n' "$CYAN" "$RESET"
+printf '\n%sSG-Gateway 0.1.0-022.06 · ПОЛНОЕ УДАЛЕНИЕ%s\n' "$CYAN" "$RESET"
 printf 'Будут удалены приложение, база, настройки, backups, SG-службы и установленные SG runtime.\n'
 printf 'Системные пакеты Ubuntu (nginx, certbot, ufw, Python и т.п.) останутся установленными.\n'
 if [[ -n "$TLS_DOMAIN" ]]; then
