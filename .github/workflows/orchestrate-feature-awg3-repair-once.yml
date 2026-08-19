@@ -1,4 +1,4 @@
-name: Orchestrate AWG3 Repair Feature Once
+name: Integrate AWG3 Runtime Repair Once
 
 on:
   push:
@@ -10,34 +10,84 @@ permissions:
   contents: write
 
 jobs:
-  feature:
+  integrate:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout current dev-02206
+        uses: actions/checkout@v4
         with:
-          ref: feature-dev02206-awg3-repair-20260819
+          ref: dev-02206
           fetch-depth: 0
 
-      - name: Apply feature patch
+      - name: Lock expected branch and production freeze
         run: |
-          python3 scripts/feature-awg3-runtime-repair.py
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git rm scripts/feature-awg3-runtime-repair.py
-          git rm .github/workflows/feature-awg3-runtime-repair-verify.yml
+          set -Eeuo pipefail
+          BASE_SHA="$(git rev-parse HEAD)"
+          echo "BASE_SHA=$BASE_SHA" >> "$GITHUB_ENV"
+          test "$(git branch --show-current)" = "dev-02206"
+          test "$(git ls-remote origin refs/heads/main | cut -f1)" = "56df9a7b4fe509282e37374dd6ef3bccdc1b1100"
+          test "$(git ls-remote origin refs/heads/stable-02204 | cut -f1)" = "56df9a7b4fe509282e37374dd6ef3bccdc1b1100"
+
+      - name: Apply AWG3 repair integration and clean temporary files
+        run: |
+          set -Eeuo pipefail
+          python3 scripts/dev-02206-awg3-repair-integrate.py
           chmod 0755 deploy/repair-awg3-runtime.sh
+          rm -f scripts/dev-02206-awg3-repair-integrate.py
+          rm -f .github/workflows/orchestrate-feature-awg3-repair-once.yml
           python3 - <<'PY'
-          import hashlib, subprocess
+          import hashlib
+          import subprocess
           from pathlib import Path
-          tracked=subprocess.check_output(['git','ls-files'],text=True,encoding='utf-8').splitlines()
-          tracked=[p for p in tracked if p!='SOURCE-SHA256SUMS']
-          Path('SOURCE-SHA256SUMS').write_text('\n'.join(f"{hashlib.sha256(Path(p).read_bytes()).hexdigest()}  {p}" for p in tracked)+'\n',encoding='utf-8')
+
+          tracked = subprocess.check_output(['git', 'ls-files'], text=True, encoding='utf-8').splitlines()
+          removed = {
+              'scripts/dev-02206-awg3-repair-integrate.py',
+              '.github/workflows/orchestrate-feature-awg3-repair-once.yml',
+          }
+          tracked = [p for p in tracked if p != 'SOURCE-SHA256SUMS' and p not in removed]
+          rows = [f"{hashlib.sha256(Path(p).read_bytes()).hexdigest()}  {p}" for p in tracked]
+          Path('SOURCE-SHA256SUMS').write_text('\n'.join(rows) + '\n', encoding='utf-8')
           PY
           git add -A
-          git commit -m "Add safe AWG3 runtime repair workflow"
+          git diff --cached --check
 
-      - uses: actions/setup-python@v5
+      - name: Verify source integrity
+        run: |
+          set -Eeuo pipefail
+          python3 -B - <<'PY'
+          import hashlib
+          import re
+          import subprocess
+          from pathlib import Path
+
+          expected = {}
+          for line_no, raw in enumerate(Path('SOURCE-SHA256SUMS').read_text(encoding='utf-8').splitlines(), 1):
+              if not raw.strip():
+                  continue
+              match = re.fullmatch(r'([0-9a-f]{64})  (.+)', raw)
+              if match is None:
+                  raise SystemExit(f'invalid SOURCE-SHA256SUMS line {line_no}: {raw!r}')
+              digest, path = match.groups()
+              if path in expected:
+                  raise SystemExit(f'duplicate checksum path: {path}')
+              expected[path] = digest
+          tracked = set(subprocess.check_output(['git', 'ls-files'], text=True, encoding='utf-8').splitlines())
+          tracked.discard('SOURCE-SHA256SUMS')
+          tracked.discard('scripts/dev-02206-awg3-repair-integrate.py')
+          tracked.discard('.github/workflows/orchestrate-feature-awg3-repair-once.yml')
+          if tracked != set(expected):
+              raise SystemExit(f'checksum inventory mismatch: missing={sorted(tracked-set(expected))} extra={sorted(set(expected)-tracked)}')
+          for path in sorted(tracked):
+              actual = hashlib.sha256(Path(path).read_bytes()).hexdigest()
+              if actual != expected[path]:
+                  raise SystemExit(f'source hash mismatch: {path}')
+          print(f'Source integrity OK: {len(tracked)} files')
+          PY
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
@@ -46,54 +96,52 @@ jobs:
           python -m pip install --upgrade pip >/dev/null
           python -m pip install -r requirements-dev.txt >/dev/null
 
-      - id: shell
-        continue-on-error: true
-        run: bash -n deploy/repair-awg3-runtime.sh
-      - id: syntax
-        continue-on-error: true
+      - name: Shell and Python syntax
         run: |
+          set -Eeuo pipefail
+          bash -n deploy/repair-awg3-runtime.sh
           python -B - <<'PY'
           from pathlib import Path
-          files=list(Path('app').rglob('*.py'))+list(Path('hostd').rglob('*.py'))+list(Path('engines').rglob('*.py'))+list(Path('tests').rglob('*.py'))
-          for p in files: compile(p.read_text(encoding='utf-8'),str(p),'exec')
-          print(f'syntax ok: {len(files)}')
+          files = (
+              list(Path('app').rglob('*.py'))
+              + list(Path('hostd').rglob('*.py'))
+              + list(Path('engines').rglob('*.py'))
+              + list(Path('tests').rglob('*.py'))
+          )
+          for path in files:
+              compile(path.read_text(encoding='utf-8'), str(path), 'exec')
+          print(f'Python syntax OK: {len(files)} files')
           PY
-      - id: focused
-        continue-on-error: true
-        run: python -m pytest -q tests/test_sg_gateway_v22_awg3_runtime_repair.py tests/test_sg_gateway_v22_runtime_contract_data_backup.py
-      - id: full
-        continue-on-error: true
-        run: python -m pytest tests
-      - id: package
-        continue-on-error: true
+
+      - name: Focused AWG3 and dev regressions
         run: |
+          python -m pytest \
+            tests/test_sg_gateway_v22_awg3_runtime_repair.py \
+            tests/test_sg_gateway_v22_runtime_contract_data_backup.py \
+            tests/test_sg_gateway_v22_02206_hardening.py \
+            tests/test_sg_gateway_v22_production_entrypoint_v4.py \
+            tests/test_sg_gateway_v22_router_subscription.py \
+            tests/test_sg_gateway_v22_sg_subscription_dual_ui.py
+
+      - name: Full pytest
+        run: python -m pytest tests
+
+      - name: Build and verify FULL package
+        run: |
+          set -Eeuo pipefail
           VERSION="$(tr -d '[:space:]' < VERSION)"
           OUT="/tmp/SG-Gateway-${VERSION}-DEV-02206-AWG3-REPAIR-FULL.run"
           bash build-run.sh "$OUT"
           bash "$OUT" --verify-only
 
-      - name: Persist report and push feature branch
-        if: always()
-        env:
-          SHELL: ${{ steps.shell.outcome }}
-          SYNTAX: ${{ steps.syntax.outcome }}
-          FOCUSED: ${{ steps.focused.outcome }}
-          FULL: ${{ steps.full.outcome }}
-          PACKAGE: ${{ steps.package.outcome }}
+      - name: Push verified integration to dev-02206
         run: |
-          printf 'AWG3 runtime repair feature verify\nshell=%s\nsyntax=%s\nfocused_tests=%s\nfull_tests=%s\nfull_package=%s\n' "$SHELL" "$SYNTAX" "$FOCUSED" "$FULL" "$PACKAGE" > FEATURE-AWG3-REPAIR-VERIFY.txt
-          python3 - <<'PY'
-          import hashlib, subprocess
-          from pathlib import Path
-          tracked=subprocess.check_output(['git','ls-files'],text=True,encoding='utf-8').splitlines()
-          tracked=[p for p in tracked if p!='SOURCE-SHA256SUMS']
-          Path('SOURCE-SHA256SUMS').write_text('\n'.join(f"{hashlib.sha256(Path(p).read_bytes()).hexdigest()}  {p}" for p in tracked)+'\n',encoding='utf-8')
-          PY
-          git add -A
-          git commit -m "Record AWG3 runtime repair feature verification"
-          git push origin HEAD:feature-dev02206-awg3-repair-20260819
-          test "$SHELL" = success
-          test "$SYNTAX" = success
-          test "$FOCUSED" = success
-          test "$FULL" = success
-          test "$PACKAGE" = success
+          set -Eeuo pipefail
+          git fetch origin dev-02206
+          test "$(git rev-parse origin/dev-02206)" = "$BASE_SHA"
+          test "$(git ls-remote origin refs/heads/main | cut -f1)" = "56df9a7b4fe509282e37374dd6ef3bccdc1b1100"
+          test "$(git ls-remote origin refs/heads/stable-02204 | cut -f1)" = "56df9a7b4fe509282e37374dd6ef3bccdc1b1100"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Add safe AWG3 runtime repair"
+          git push origin HEAD:dev-02206
