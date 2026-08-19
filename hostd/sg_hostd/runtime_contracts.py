@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import sqlite3
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping
@@ -103,6 +104,9 @@ ENGINE_ALIASES = {
     "mieru": "mihomo",
 }
 
+AWG3_CONFIG_PATH = Path("/etc/amnezia/amneziawg/awg3.conf")
+AWG3_SERVICE = "sg-gateway-awg3.service"
+
 
 def _active_engines(database_path: Path) -> set[str]:
     if not database_path.is_file():
@@ -150,6 +154,57 @@ def _requirement_ready(requirement: Requirement) -> tuple[bool, str]:
     return False, requirement.alternatives[0]
 
 
+def _service_active(unit: str) -> bool:
+    try:
+        result = subprocess.run(
+            ["systemctl", "is-active", "--quiet", unit],
+            capture_output=True,
+            check=False,
+            timeout=5,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return result.returncode == 0
+
+
+def _awg3_deployment_state(*, active: bool) -> dict:
+    """Operational AWG3 state that never blocks the prerequisite contract.
+
+    Runtime files/unit are prerequisites for Client Apply. Generated awg3.conf
+    and an active service are outputs of Client Apply, so folding them into the
+    base `ready` flag would create a circular recovery dependency.
+    """
+
+    if not active:
+        return {
+            "required": False,
+            "ready": True,
+            "missing": [],
+            "config_ready": False,
+            "service_active": False,
+        }
+
+    config_ready = False
+    try:
+        config_ready = AWG3_CONFIG_PATH.is_file() and AWG3_CONFIG_PATH.stat().st_size > 0
+    except OSError:
+        config_ready = False
+    service_active = _service_active(AWG3_SERVICE)
+
+    missing: list[str] = []
+    if not config_ready:
+        missing.append(f"generated config: {AWG3_CONFIG_PATH}")
+    if not service_active:
+        missing.append(f"active service: {AWG3_SERVICE}")
+    return {
+        "required": True,
+        "ready": not missing,
+        "missing": missing,
+        "config_ready": config_ready,
+        "service_active": service_active,
+    }
+
+
 def inspect_runtime_contract(
     *,
     database_path: Path | str = "/var/lib/sg-gateway/sg-gateway.sqlite",
@@ -188,6 +243,8 @@ def inspect_runtime_contract(
             "missing": missing,
             "resolved": resolved,
         }
+        if engine == "amneziawg3":
+            item["deployment"] = _awg3_deployment_state(active=engine in active)
         checks.append(item)
         if missing:
             if spec.critical or strict_optional:

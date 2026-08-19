@@ -77,6 +77,58 @@ def test_runtime_contract_blocks_missing_awg3_before_apply(tmp_path: Path) -> No
     assert result["ok"] is True
 
 
+def test_awg3_deployment_state_does_not_block_client_apply_recovery(tmp_path: Path, monkeypatch) -> None:
+    db = tmp_path / "sg-gateway.sqlite"
+    _active_engine_db(db, "amneziawg3")
+    files = [tmp_path / name for name in ("awg", "awg-quick", "amneziawg-go", "helper", "unit")]
+    for path in files:
+        path.write_text("x\n", encoding="utf-8")
+    for path in files[:4]:
+        os.chmod(path, 0o755)
+
+    specs = {
+        "amneziawg3": runtime_contracts.RuntimeSpec(
+            "amneziawg3",
+            "AWG3",
+            True,
+            (
+                runtime_contracts.Requirement("awg", (str(files[0]),), True),
+                runtime_contracts.Requirement("awg-quick", (str(files[1]),), True),
+                runtime_contracts.Requirement("amneziawg-go", (str(files[2]),), True),
+                runtime_contracts.Requirement("helper", (str(files[3]),), True),
+                runtime_contracts.Requirement("unit", (str(files[4]),)),
+            ),
+        )
+    }
+    config = tmp_path / "awg3.conf"
+    monkeypatch.setattr(runtime_contracts, "AWG3_CONFIG_PATH", config)
+    monkeypatch.setattr(runtime_contracts, "_service_active", lambda unit: False)
+
+    result = runtime_contracts.inspect_runtime_contract(database_path=db, specs=specs)
+    check = result["checks"][0]
+    assert result["ok"] is True
+    assert check["ready"] is True
+    assert check["deployment"]["required"] is True
+    assert check["deployment"]["ready"] is False
+    assert check["deployment"]["config_ready"] is False
+    assert check["deployment"]["service_active"] is False
+    assert len(check["deployment"]["missing"]) == 2
+
+    config.write_text("[Interface]\n", encoding="utf-8")
+    monkeypatch.setattr(runtime_contracts, "_service_active", lambda unit: True)
+    result = runtime_contracts.inspect_runtime_contract(database_path=db, specs=specs)
+    check = result["checks"][0]
+    assert result["ok"] is True
+    assert check["ready"] is True
+    assert check["deployment"] == {
+        "required": True,
+        "ready": True,
+        "missing": [],
+        "config_ready": True,
+        "service_active": True,
+    }
+
+
 def test_apply_contract_runs_before_engine_mutation_and_awg3_empty_is_safe() -> None:
     client_source = (ROOT / "hostd/sg_hostd/client_runtime.py").read_text(encoding="utf-8")
     apply_all = client_source.split("def apply_all_clients()", 1)[1]
