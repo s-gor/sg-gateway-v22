@@ -5,6 +5,7 @@ REPOSITORY="s-gor/sg-gateway-v22"
 BRANCH="${SG_GATEWAY_GITHUB_BRANCH:-${SG_GATEWAY_UPDATE_BRANCH:-dev-02206}}"
 ARCHIVE_URL="https://github.com/${REPOSITORY}/archive/refs/heads/${BRANCH}.tar.gz"
 TEMP_DIR=""
+MIN_FREE_MIB="${SG_GATEWAY_INSTALL_MIN_FREE_MIB:-1024}"
 
 fail() {
   printf '[SG-Gateway] ERROR: %s\n' "$*" >&2
@@ -43,8 +44,24 @@ require_supported_ubuntu() {
   printf '[SG-Gateway] Supported system: %s\n' "${PRETTY_NAME:-Ubuntu 24.04}"
 }
 
-# Reject an unsupported release before apt or any other server mutation.
+require_free_space() {
+  local path="$1" label="$2" available_kib required_kib available_mib
+  [[ "$MIN_FREE_MIB" =~ ^[0-9]+$ ]] || fail "SG_GATEWAY_INSTALL_MIN_FREE_MIB must be a non-negative integer"
+  available_kib="$(df -Pk "$path" 2>/dev/null | awk 'NR == 2 {print $4}')"
+  [[ "$available_kib" =~ ^[0-9]+$ ]] || fail "cannot determine free disk space for $label ($path)"
+  required_kib=$(( MIN_FREE_MIB * 1024 ))
+  available_mib=$(( available_kib / 1024 ))
+  if (( available_kib < required_kib )); then
+    fail "not enough free disk space for clean install on $label: need at least ${MIN_FREE_MIB} MiB, available ${available_mib} MiB"
+  fi
+  printf '[SG-Gateway] Disk preflight %s: %s MiB free (minimum %s MiB).\n' "$label" "$available_mib" "$MIN_FREE_MIB"
+}
+
+# Reject an unsupported release and a disk that cannot hold the downloaded
+# archive + extracted source before apt, curl or tar can partially fill it.
 require_supported_ubuntu
+require_free_space /tmp "temporary storage"
+require_free_space /opt "installation storage"
 
 missing_packages=()
 command -v curl >/dev/null 2>&1 || missing_packages+=(curl)

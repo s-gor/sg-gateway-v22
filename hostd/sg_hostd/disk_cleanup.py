@@ -141,7 +141,7 @@ def run_disk_cleanup() -> int:
         flush=True,
     )
     print(f"[Disk Cleanup] Освобождено: {_format_bytes(freed)}", flush=True)
-    print("[Disk Cleanup] Готово. Можно вернуться в System.", flush=True)
+    print("[Disk Cleanup] Готово. Можно вернуться в Maintenance.", flush=True)
     return 0
 
 
@@ -149,7 +149,7 @@ def start_disk_cleanup_job() -> dict:
     return _start(
         "disk_cleanup",
         "Очистка диска SG-Gateway",
-        "/system?disk_refresh=1",
-        "/system",
+        "/maintenance?tab=backups",
+        "/maintenance?tab=backups",
         {"restart_expected": False},
     )

@@ -21,12 +21,12 @@ def register_system_disk_cleanup(app: Flask) -> None:
                 f"Очистка диска не запущена: {result.message or 'sg-hostd отклонил задачу'}",
                 "error",
             )
-            return redirect(url_for("system") + "?disk_refresh=1")
+            return redirect(url_for("maintenance", tab="backups"))
 
         job_id = str(result.payload.get("job_id") or "")
         if not job_id:
             flash("Очистка диска не запущена: sg-hostd не вернул ID задачи.", "error")
-            return redirect(url_for("system") + "?disk_refresh=1")
+            return redirect(url_for("maintenance", tab="backups"))
 
         return redirect(url_for("system_disk_cleanup_job", job_id=job_id))
 
@@ -40,6 +40,6 @@ def register_system_disk_cleanup(app: Flask) -> None:
             abort(404)
         return render_template(
             "operation_job.html",
-            active_page="system",
+            active_page="maintenance",
             job=job,
         )

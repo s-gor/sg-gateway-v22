@@ -62,6 +62,9 @@
   <!-- SG_DEVICE_EXPANDED_CLEANUP_V1_LAST_CSS -->
   <link rel="stylesheet" href="{{ url_for('static', filename='sg-device-expanded-cleanup-v1.css') }}?v={{ app_version }}-device-expanded-cleanup-v1">
   {% endif %}
+  {% if active_page|default('') == 'maintenance' %}
+  <script src="{{ url_for('static', filename='sg-maintenance-recovery-v1.js') }}?v={{ app_version }}" defer></script>
+  {% endif %}
 </head>
 <body class="sg-body page-{{ active_page|default('system') }}">
   <div class="sg-shell" id="sg-shell">

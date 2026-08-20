@@ -80,6 +80,8 @@ def test_disk_cleanup_job_uses_shared_operation_runner(monkeypatch) -> None:
 
     assert result["job_id"] == "20260820150000-abcdef123456"
     assert captured["args"][0] == "disk_cleanup"
+    assert captured["args"][2] == "/maintenance?tab=backups"
+    assert captured["args"][3] == "/maintenance?tab=backups"
     assert captured["kwargs"] == {}
 
 
@@ -112,11 +114,17 @@ def test_operation_job_runner_dispatches_disk_cleanup(monkeypatch, tmp_path: Pat
     assert called["count"] == 1
 
 
-def test_disk_cleanup_ui_is_wired_to_safe_post_action() -> None:
-    javascript = (
+def test_disk_cleanup_ui_is_moved_from_system_to_maintenance() -> None:
+    system_javascript = (
         ROOT / "app" / "web" / "static" / "sg-disk-breakdown-v2.js"
     ).read_text(encoding="utf-8")
+    maintenance_javascript = (
+        ROOT / "app" / "web" / "static" / "sg-maintenance-recovery-v1.js"
+    ).read_text(encoding="utf-8")
     production = (ROOT / "app" / "production.py").read_text(encoding="utf-8")
+    http_source = (
+        ROOT / "app" / "system_disk_cleanup_http.py"
+    ).read_text(encoding="utf-8")
     hostd = (ROOT / "hostd" / "sg_hostd" / "app.py").read_text(encoding="utf-8")
     cleanup_source = (
         ROOT / "hostd" / "sg_hostd" / "disk_cleanup.py"
@@ -125,8 +133,14 @@ def test_disk_cleanup_ui_is_wired_to_safe_post_action() -> None:
         ROOT / "hostd" / "sg_hostd" / "operation_job_runner.py"
     ).read_text(encoding="utf-8")
 
-    assert 'form.action = "/system/disk/cleanup"' in javascript
-    assert "window.confirm" in javascript
+    assert '/system/disk/cleanup' not in system_javascript
+    assert "ensureCleanupButton" not in system_javascript
+    assert 'action="/system/disk/cleanup"' in maintenance_javascript
+    assert "data-sg-maintenance-disk-cleanup" in maintenance_javascript
+    assert "Безопасная очистка диска" in maintenance_javascript
+    assert 'active_page="maintenance"' in http_source
+    assert 'url_for("maintenance", tab="backups")' in http_source
+    assert '"/maintenance?tab=backups"' in cleanup_source
     assert "register_system_disk_cleanup(app)" in production
     assert 'SYSTEM_DISK_CLEANUP_COMMAND = "system.disk.cleanup.start"' in hostd
     assert "autoremove" not in cleanup_source
