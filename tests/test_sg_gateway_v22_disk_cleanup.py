@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 import os
 import sys
 import time
@@ -9,7 +10,7 @@ from types import SimpleNamespace
 from flask import Flask
 
 import app.system_disk_cleanup_http as cleanup_http
-from sg_hostd import disk_cleanup, operation_job_runner
+from sg_hostd import disk_cleanup
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -82,7 +83,18 @@ def test_disk_cleanup_job_uses_shared_operation_runner(monkeypatch) -> None:
     assert captured["kwargs"] == {}
 
 
-def test_operation_job_runner_dispatches_disk_cleanup(monkeypatch) -> None:
+def test_operation_job_runner_dispatches_disk_cleanup(monkeypatch, tmp_path: Path) -> None:
+    # operation_job_runner is an executable module that intentionally installs
+    # production defaults at import time. Import it only inside this isolated
+    # test after replacing every runtime path, so collection cannot leak
+    # production paths into the rest of the test suite.
+    monkeypatch.setenv("SG_GATEWAY_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setenv("SG_GATEWAY_LOG_DIR", str(tmp_path / "log"))
+    monkeypatch.setenv("SG_GATEWAY_SECURITY_STATE_DIR", str(tmp_path / "security"))
+    monkeypatch.setenv("SG_GATEWAY_OPERATION_JOB_DIR", str(tmp_path / "jobs"))
+
+    sys.modules.pop("sg_hostd.operation_job_runner", None)
+    operation_job_runner = importlib.import_module("sg_hostd.operation_job_runner")
     called = {"count": 0}
 
     def fake_cleanup() -> int:
