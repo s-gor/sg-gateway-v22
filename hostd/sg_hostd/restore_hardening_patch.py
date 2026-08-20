@@ -6,6 +6,7 @@ import shutil
 import sqlite3
 import tarfile
 import tempfile
+import time
 from pathlib import Path
 from types import ModuleType
 
@@ -15,6 +16,9 @@ from types import ModuleType
 # rollback extraction. Keep a fixed emergency margin on top of that estimate.
 RESTORE_MARGIN_MIN_BYTES = 128 * 1024 * 1024
 RESTORE_MARGIN_RATIO = 0.10
+PANEL_RESTART_GRACE_SECONDS = 4.0
+PANEL_RESTART_HEALTH_TIMEOUT_SECONDS = 45.0
+PANEL_RESTART_HEALTH_POLL_SECONDS = 1.0
 
 
 def _format_bytes(value: int) -> str:
@@ -191,6 +195,28 @@ def _local_panel_health(full: ModuleType) -> None:
         raise RuntimeError("Local HTTPS health status is not ok")
 
 
+def _wait_for_panel_after_scheduled_restart(full: ModuleType) -> None:
+    # _schedule_panel_restart() uses --on-active=3s. A probe before that delay
+    # would only prove the old panel process is healthy, which is exactly the
+    # false-positive that hid the 022.04 terminal/restart failure. Wait beyond
+    # the scheduled restart and then require the new panel process to answer.
+    time.sleep(PANEL_RESTART_GRACE_SECONDS)
+    deadline = time.monotonic() + PANEL_RESTART_HEALTH_TIMEOUT_SECONDS
+    last_error: Exception | None = None
+    while True:
+        try:
+            _local_panel_health(full)
+            return
+        except Exception as exc:
+            last_error = exc
+        if time.monotonic() >= deadline:
+            raise RuntimeError(
+                "Panel did not become healthy after scheduled restart: "
+                f"{last_error}"
+            ) from last_error
+        time.sleep(PANEL_RESTART_HEALTH_POLL_SECONDS)
+
+
 def _restore_uploaded_full_backup(full: ModuleType) -> dict:
     full._ensure_dirs()
     archive = full._backup_dir() / full.RESTORE_UPLOAD_NAME
@@ -279,11 +305,15 @@ def _restore_uploaded_full_backup(full: ModuleType) -> dict:
                     f"Restored certificate validation failed for {cert_domain}"
                 )
 
-            full._restore_progress("[Restore 7/8] Проверяю локальный backend и Nginx/HTTPS")
+            full._restore_progress("[Restore 7/8] Проверяю backend и Nginx/HTTPS до restart панели")
             _local_panel_health(full)
             full._schedule_panel_restart()
             full._restore_progress(
-                f"[Restore 8/8] {restore_done}: runtime и доступ к панели проверены"
+                "[Restore 7/8] Панель перезапускается; жду post-restart health-check"
+            )
+            _wait_for_panel_after_scheduled_restart(full)
+            full._restore_progress(
+                f"[Restore 8/8] {restore_done}: runtime и доступ к панели после restart проверены"
             )
         except Exception as restore_exc:
             full._restore_progress(
@@ -304,6 +334,11 @@ def _restore_uploaded_full_backup(full: ModuleType) -> dict:
                     full._restart_runtime(schedule_panel=False)
                     _local_panel_health(full)
                 full._schedule_panel_restart()
+                full._restore_progress(
+                    "[Restore] Safety Rollback: панель перезапускается; "
+                    "жду post-restart health-check"
+                )
+                _wait_for_panel_after_scheduled_restart(full)
             except Exception as rollback_exc:
                 full._restore_progress(
                     f"[Restore] КРИТИЧЕСКАЯ ОШИБКА: Safety Rollback не прошёл "
@@ -316,10 +351,11 @@ def _restore_uploaded_full_backup(full: ModuleType) -> dict:
                 ) from rollback_exc
 
             full._restore_progress(
-                "[Restore] Safety Rollback выполнен и проверен: SQLite, runtime и панель доступны"
+                "[Restore] Safety Rollback выполнен и проверен после restart: "
+                "SQLite, runtime и панель доступны"
             )
             raise RuntimeError(
-                f"{restore_failed}; Safety Rollback выполнен и проверен. "
+                f"{restore_failed}; Safety Rollback выполнен и проверен после restart. "
                 f"Причина Restore: {restore_exc}"
             ) from restore_exc
 
@@ -338,13 +374,14 @@ def _restore_uploaded_full_backup(full: ModuleType) -> dict:
         "portable_runtime_regenerated": True,
         "restore_space_preflight": plan,
         "panel_health_validated": True,
+        "panel_post_restart_health_validated": True,
         "restore_profile": restore_profile,
         "message": (
             "Clients & Keys restored; destination server settings preserved; "
-            "client runtime regenerated and local panel health validated"
+            "client runtime regenerated and panel health validated after restart"
             if clients_keys_profile
             else "Full backup restored; destination public IP preserved; all runtime "
-            "regenerated and local panel health validated"
+            "regenerated and panel health validated after restart"
         ),
     }
 
