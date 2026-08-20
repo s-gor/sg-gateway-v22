@@ -7,6 +7,7 @@ import secrets
 import shlex
 import shutil
 import subprocess
+import tarfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Sequence
@@ -233,13 +234,47 @@ def run_tls_maintenance(action: str) -> dict[str, Any]:
     }
 
 
+def _pending_restore_job_context() -> tuple[str, dict[str, Any]]:
+    title = "Полное восстановление SG-Gateway"
+    extra: dict[str, Any] = {
+        "restart_expected": True,
+        "restore_profile": "full",
+    }
+    try:
+        from sg_hostd import full_backup_runtime as full
+
+        archive = full._backup_dir() / full.RESTORE_UPLOAD_NAME
+        if not archive.is_file():
+            return title, extra
+        with tarfile.open(archive, "r:gz") as tar:
+            member = tar.getmember("manifest.json")
+            if member.size > 1024 * 1024:
+                return title, extra
+            stream = tar.extractfile(member)
+            if stream is None:
+                return title, extra
+            manifest = json.loads(stream.read().decode("utf-8"))
+        if isinstance(manifest, dict) and manifest.get("clients_keys_profile") is True:
+            return (
+                "Восстановление клиентов и ключей",
+                {
+                    "restart_expected": True,
+                    "restore_profile": "clients-and-keys",
+                },
+            )
+    except (OSError, KeyError, tarfile.TarError, ValueError, json.JSONDecodeError):
+        pass
+    return title, extra
+
+
 def start_full_backup_restore_job() -> dict[str, Any]:
+    title, extra = _pending_restore_job_context()
     return _start(
         "full_backup_restore",
-        "Полное восстановление SG-Gateway",
+        title,
         "/maintenance?tab=backups",
         "/maintenance?tab=backups",
-        {"restart_expected": True},
+        extra,
     )
 
 
