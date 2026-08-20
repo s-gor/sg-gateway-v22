@@ -90,20 +90,41 @@ def test_full_restore_space_preflight_blocks_without_mutating_server(
     assert "Сервер не изменён" in str(exc.value)
 
 
-def test_safety_rollback_is_validated_before_panel_restart_and_reports_outcome() -> None:
+def test_post_restart_health_wait_does_not_accept_pre_restart_process(monkeypatch) -> None:
+    attempts: list[str] = []
+    sleeps: list[float] = []
+
+    def health(full) -> None:
+        attempts.append("health")
+        if len(attempts) == 1:
+            raise RuntimeError("panel is still restarting")
+
+    monkeypatch.setattr(restore_hardening_patch, "_local_panel_health", health)
+    monkeypatch.setattr(
+        restore_hardening_patch.time,
+        "sleep",
+        lambda seconds: sleeps.append(float(seconds)),
+    )
+
+    restore_hardening_patch._wait_for_panel_after_scheduled_restart(SimpleNamespace())
+
+    assert attempts == ["health", "health"]
+    assert sleeps[0] == restore_hardening_patch.PANEL_RESTART_GRACE_SECONDS
+    assert sleeps[1] == restore_hardening_patch.PANEL_RESTART_HEALTH_POLL_SECONDS
+
+
+def test_safety_rollback_is_validated_before_and_after_panel_restart() -> None:
     source = inspect.getsource(restore_hardening_patch._restore_uploaded_full_backup)
     rollback = source.split("except Exception as restore_exc:", 1)[1]
-    assert rollback.index("full._validate_runtime_after_restore()") < rollback.index(
-        "full._restart_runtime(schedule_panel=False)"
-    )
-    assert rollback.index("full._restart_runtime(schedule_panel=False)") < rollback.index(
-        "_local_panel_health(full)"
-    )
-    assert rollback.index("_local_panel_health(full)") < rollback.index(
-        "full._schedule_panel_restart()"
-    )
-    assert "Safety Rollback выполнен и проверен" in rollback
-    assert "Rollback также не прошёл проверку" in rollback
+    validate = rollback.index("full._validate_runtime_after_restore()")
+    runtime_restart = rollback.index("full._restart_runtime(schedule_panel=False)")
+    pre_health = rollback.index("_local_panel_health(full)")
+    schedule = rollback.index("full._schedule_panel_restart()")
+    post_health = rollback.index("_wait_for_panel_after_scheduled_restart(full)")
+    assert validate < runtime_restart < pre_health < schedule < post_health
+    assert "Safety Rollback выполнен и проверен после restart" in rollback
+    assert "Safety Rollback также" in rollback
+    assert "не прошёл проверку" in rollback
 
 
 def test_restore_failure_after_mutation_executes_and_validates_safety_rollback(
@@ -190,23 +211,41 @@ def test_restore_failure_after_mutation_executes_and_validates_safety_rollback(
     monkeypatch.setattr(
         restore_hardening_patch,
         "_local_panel_health",
-        lambda full: events.append(("panel_health",)),
+        lambda full: events.append(("panel_health_pre",)),
+    )
+    monkeypatch.setattr(
+        restore_hardening_patch,
+        "_wait_for_panel_after_scheduled_restart",
+        lambda full: events.append(("panel_health_post",)),
     )
 
-    with pytest.raises(RuntimeError, match="Safety Rollback выполнен и проверен"):
+    with pytest.raises(RuntimeError, match="Safety Rollback выполнен и проверен после restart"):
         restore_hardening_patch._restore_uploaded_full_backup(fake)
 
     assert ("restore_payload", True) in events
     assert ("restore_payload", False) in events
     rollback_restore = events.index(("restore_payload", False))
     runtime_restart = events.index(("restart_runtime", False))
-    panel_health = events.index(("panel_health",))
+    pre_health = events.index(("panel_health_pre",))
     panel_restart = events.index(("schedule_panel",))
-    assert rollback_restore < runtime_restart < panel_health < panel_restart
+    post_health = events.index(("panel_health_post",))
+    assert rollback_restore < runtime_restart < pre_health < panel_restart < post_health
     assert any(
-        item[0] == "progress" and "Safety Rollback выполнен и проверен" in item[1]
+        item[0] == "progress"
+        and "Safety Rollback выполнен и проверен после restart" in item[1]
         for item in events
     )
+
+
+def test_success_path_requires_post_restart_health_before_final_success() -> None:
+    source = inspect.getsource(restore_hardening_patch._restore_uploaded_full_backup)
+    success = source.split("try:", 1)[1].split("except Exception as restore_exc:", 1)[0]
+    pre_health = success.index("_local_panel_health(full)")
+    schedule = success.index("full._schedule_panel_restart()")
+    post_health = success.index("_wait_for_panel_after_scheduled_restart(full)")
+    final = success.index("[Restore 8/8]")
+    assert pre_health < schedule < post_health < final
+    assert '"panel_post_restart_health_validated": True' in source
 
 
 def test_restore_outcome_and_errors_are_profile_aware() -> None:
