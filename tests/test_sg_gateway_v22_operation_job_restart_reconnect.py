@@ -14,7 +14,10 @@ def test_full_restore_restart_reconnects_same_terminal_over_https():
 
     assert 'data-restart-expected="{{ \'1\' if job.restart_expected else \'0\' }}"' in template
     assert '"full_backup_restore"' in jobs
-    assert '{"restart_expected": True}' in jobs
+    assert '"restart_expected": True' in jobs
+    assert '"restore_profile": "full"' in jobs
+    assert '"restore_profile": "clients-and-keys"' in jobs
+    assert '"Восстановление клиентов и ключей"' in jobs
 
     assert 'opjob-page[data-restart-expected="1"]' in script
     assert 'window.location.protocol !== "http:"' not in script
