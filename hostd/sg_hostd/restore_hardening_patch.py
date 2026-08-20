@@ -209,6 +209,18 @@ def _restore_uploaded_full_backup(full: ModuleType) -> dict:
     with tempfile.TemporaryDirectory(prefix="restore-", dir=full._work_dir()) as temp_name:
         temp = Path(temp_name)
         manifest = full._extract_archive(archive, temp)
+        clients_keys_profile = bool(manifest.get("clients_keys_profile") is True)
+        restore_profile = "clients-and-keys" if clients_keys_profile else "full"
+        restore_done = (
+            "Восстановление клиентов и ключей завершено"
+            if clients_keys_profile
+            else "Full Restore завершён"
+        )
+        restore_failed = (
+            "Восстановление клиентов и ключей завершилось ошибкой"
+            if clients_keys_profile
+            else "Full Restore завершился ошибкой"
+        )
         payload = temp / "payload"
         db_path = payload / full._data_dir().relative_to("/") / "sg-gateway.sqlite"
         if not db_path.is_file():
@@ -271,7 +283,7 @@ def _restore_uploaded_full_backup(full: ModuleType) -> dict:
             _local_panel_health(full)
             full._schedule_panel_restart()
             full._restore_progress(
-                "[Restore 8/8] Full Restore завершён: runtime и доступ к панели проверены"
+                f"[Restore 8/8] {restore_done}: runtime и доступ к панели проверены"
             )
         except Exception as restore_exc:
             full._restore_progress(
@@ -298,8 +310,8 @@ def _restore_uploaded_full_backup(full: ModuleType) -> dict:
                     f"проверку: {rollback_exc}"
                 )
                 raise RuntimeError(
-                    "Full Restore завершился ошибкой, и автоматический Safety "
-                    f"Rollback также не прошёл проверку. Restore: {restore_exc}; "
+                    f"{restore_failed}, и автоматический Safety Rollback также "
+                    f"не прошёл проверку. Restore: {restore_exc}; "
                     f"Rollback: {rollback_exc}"
                 ) from rollback_exc
 
@@ -307,8 +319,8 @@ def _restore_uploaded_full_backup(full: ModuleType) -> dict:
                 "[Restore] Safety Rollback выполнен и проверен: SQLite, runtime и панель доступны"
             )
             raise RuntimeError(
-                "Full Restore завершился ошибкой; Safety Rollback выполнен и "
-                f"проверен. Причина Restore: {restore_exc}"
+                f"{restore_failed}; Safety Rollback выполнен и проверен. "
+                f"Причина Restore: {restore_exc}"
             ) from restore_exc
 
     archive.unlink(missing_ok=True)
@@ -326,8 +338,12 @@ def _restore_uploaded_full_backup(full: ModuleType) -> dict:
         "portable_runtime_regenerated": True,
         "restore_space_preflight": plan,
         "panel_health_validated": True,
+        "restore_profile": restore_profile,
         "message": (
-            "Full backup restored; destination public IP preserved; all runtime "
+            "Clients & Keys restored; destination server settings preserved; "
+            "client runtime regenerated and local panel health validated"
+            if clients_keys_profile
+            else "Full backup restored; destination public IP preserved; all runtime "
             "regenerated and local panel health validated"
         ),
     }
