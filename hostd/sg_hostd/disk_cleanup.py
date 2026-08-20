@@ -7,14 +7,13 @@ import time
 from pathlib import Path
 from typing import Sequence
 
-from sg_hostd.operation_jobs import PYTHON, _start
+from sg_hostd.operation_jobs import _start
 
 
 DATA_DIR = Path(os.getenv("SG_GATEWAY_DATA_DIR", "/var/lib/sg-gateway"))
 JOB_DIR = Path(
     os.getenv("SG_GATEWAY_OPERATION_JOB_DIR", "/var/log/sg-gateway/operation-jobs")
 )
-RUNNER = Path("/opt/sg-gateway/hostd/sg_hostd/disk_cleanup.py")
 STALE_JOB_DAYS = 14
 
 
@@ -147,17 +146,10 @@ def run_disk_cleanup() -> int:
 
 
 def start_disk_cleanup_job() -> dict:
-    if not RUNNER.is_file():
-        raise RuntimeError(f"Не найден {RUNNER}")
     return _start(
         "disk_cleanup",
         "Очистка диска SG-Gateway",
         "/system?disk_refresh=1",
         "/system",
         {"restart_expected": False},
-        command=(str(PYTHON), str(RUNNER)),
     )
-
-
-if __name__ == "__main__":
-    raise SystemExit(run_disk_cleanup())

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import sys
 import time
 from pathlib import Path
 from types import SimpleNamespace
@@ -8,7 +9,7 @@ from types import SimpleNamespace
 from flask import Flask
 
 import app.system_disk_cleanup_http as cleanup_http
-from sg_hostd import disk_cleanup
+from sg_hostd import disk_cleanup, operation_job_runner
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -65,17 +66,57 @@ def test_disk_cleanup_removes_only_stale_operation_job_files(
     assert unrelated.exists()
 
 
+def test_disk_cleanup_job_uses_shared_operation_runner(monkeypatch) -> None:
+    captured: dict = {}
+
+    def fake_start(*args, **kwargs):
+        captured["args"] = args
+        captured["kwargs"] = kwargs
+        return {"job_id": "20260820150000-abcdef123456"}
+
+    monkeypatch.setattr(disk_cleanup, "_start", fake_start)
+    result = disk_cleanup.start_disk_cleanup_job()
+
+    assert result["job_id"] == "20260820150000-abcdef123456"
+    assert captured["args"][0] == "disk_cleanup"
+    assert captured["kwargs"] == {}
+
+
+def test_operation_job_runner_dispatches_disk_cleanup(monkeypatch) -> None:
+    called = {"count": 0}
+
+    def fake_cleanup() -> int:
+        called["count"] += 1
+        return 0
+
+    monkeypatch.setattr(disk_cleanup, "run_disk_cleanup", fake_cleanup)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["operation_job_runner.py", "disk_cleanup", "20260820150000-abcdef123456"],
+    )
+
+    assert operation_job_runner.main() == 0
+    assert called["count"] == 1
+
+
 def test_disk_cleanup_ui_is_wired_to_safe_post_action() -> None:
     javascript = (
         ROOT / "app" / "web" / "static" / "sg-disk-breakdown-v2.js"
     ).read_text(encoding="utf-8")
     production = (ROOT / "app" / "production.py").read_text(encoding="utf-8")
     hostd = (ROOT / "hostd" / "sg_hostd" / "app.py").read_text(encoding="utf-8")
+    cleanup_source = (
+        ROOT / "hostd" / "sg_hostd" / "disk_cleanup.py"
+    ).read_text(encoding="utf-8")
+    runner_source = (
+        ROOT / "hostd" / "sg_hostd" / "operation_job_runner.py"
+    ).read_text(encoding="utf-8")
 
     assert 'form.action = "/system/disk/cleanup"' in javascript
     assert "window.confirm" in javascript
     assert "register_system_disk_cleanup(app)" in production
     assert 'SYSTEM_DISK_CLEANUP_COMMAND = "system.disk.cleanup.start"' in hostd
-    assert "autoremove" not in (ROOT / "hostd" / "sg_hostd" / "disk_cleanup.py").read_text(
-        encoding="utf-8"
-    )
+    assert "autoremove" not in cleanup_source
+    assert "command=(str(PYTHON)" not in cleanup_source
+    assert 'if sys.argv[1] == "disk_cleanup"' in runner_source
