@@ -1143,6 +1143,7 @@ stage_backup_and_prepare() {
   chmod -R go-w "$PREFIX"
   chmod 0755 "$PREFIX"
   chmod 0755 "$PREFIX/deploy/configure-panel-access.sh"
+chmod 0755 "$PREFIX/deploy/sg-gateway-awg3-userspace.sh"
 }
 
 snapshot_nginx_package_baseline() {
