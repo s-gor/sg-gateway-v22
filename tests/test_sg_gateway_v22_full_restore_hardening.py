@@ -104,6 +104,17 @@ def test_safety_rollback_is_validated_before_panel_restart_and_reports_outcome()
     assert "Rollback также не прошёл проверку" in rollback
 
 
+def test_restore_outcome_and_errors_are_profile_aware() -> None:
+    source = inspect.getsource(restore_hardening_patch._restore_uploaded_full_backup)
+    assert 'manifest.get("clients_keys_profile") is True' in source
+    assert 'restore_profile = "clients-and-keys" if clients_keys_profile else "full"' in source
+    assert "Восстановление клиентов и ключей завершено" in source
+    assert "Восстановление клиентов и ключей завершилось ошибкой" in source
+    assert '"restore_profile": restore_profile' in source
+    assert "Clients & Keys restored; destination server settings preserved" in source
+    assert "Full backup restored; destination public IP preserved" in source
+
+
 def test_dev_full_restore_runtime_is_replaced_by_hardened_contract() -> None:
     assert hasattr(full_backup_runtime, "restore_space_plan")
     assert hasattr(full_backup_runtime, "validate_local_panel_health")
