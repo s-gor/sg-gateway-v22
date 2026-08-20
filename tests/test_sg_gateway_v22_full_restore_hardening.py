@@ -90,38 +90,58 @@ def test_full_restore_space_preflight_blocks_without_mutating_server(
     assert "Сервер не изменён" in str(exc.value)
 
 
-def test_post_restart_health_wait_does_not_accept_pre_restart_process(monkeypatch) -> None:
-    attempts: list[str] = []
+def test_required_panel_restart_rejects_systemd_run_failure() -> None:
+    fake = SimpleNamespace(
+        _probe=lambda command, timeout=0: SimpleNamespace(
+            returncode=1,
+            stdout="",
+            stderr="failed to schedule",
+        )
+    )
+    with pytest.raises(RuntimeError, match="Cannot schedule required panel restart"):
+        restore_hardening_patch._schedule_panel_restart_required(fake)
+
+
+def test_post_restart_health_requires_new_panel_generation(monkeypatch) -> None:
+    generations = iter((100, 200))
+    health_calls: list[str] = []
     sleeps: list[float] = []
 
-    def health(full) -> None:
-        attempts.append("health")
-        if len(attempts) == 1:
-            raise RuntimeError("panel is still restarting")
-
-    monkeypatch.setattr(restore_hardening_patch, "_local_panel_health", health)
+    monkeypatch.setattr(
+        restore_hardening_patch,
+        "_panel_service_generation",
+        lambda full: next(generations),
+    )
+    monkeypatch.setattr(
+        restore_hardening_patch,
+        "_local_panel_health",
+        lambda full: health_calls.append("health"),
+    )
     monkeypatch.setattr(
         restore_hardening_patch.time,
         "sleep",
         lambda seconds: sleeps.append(float(seconds)),
     )
 
-    restore_hardening_patch._wait_for_panel_after_scheduled_restart(SimpleNamespace())
+    restore_hardening_patch._wait_for_panel_after_scheduled_restart(
+        SimpleNamespace(), 100
+    )
 
-    assert attempts == ["health", "health"]
+    assert health_calls == ["health"]
     assert sleeps[0] == restore_hardening_patch.PANEL_RESTART_GRACE_SECONDS
     assert sleeps[1] == restore_hardening_patch.PANEL_RESTART_HEALTH_POLL_SECONDS
 
 
-def test_safety_rollback_is_validated_before_and_after_panel_restart() -> None:
+def test_safety_rollback_is_validated_before_and_after_new_panel_process() -> None:
     source = inspect.getsource(restore_hardening_patch._restore_uploaded_full_backup)
     rollback = source.split("except Exception as restore_exc:", 1)[1]
     validate = rollback.index("full._validate_runtime_after_restore()")
     runtime_restart = rollback.index("full._restart_runtime(schedule_panel=False)")
     pre_health = rollback.index("_local_panel_health(full)")
-    schedule = rollback.index("full._schedule_panel_restart()")
-    post_health = rollback.index("_wait_for_panel_after_scheduled_restart(full)")
-    assert validate < runtime_restart < pre_health < schedule < post_health
+    generation = rollback.index("_panel_service_generation(full)")
+    schedule = rollback.index("_schedule_panel_restart_required(full)")
+    post_health = rollback.index("_wait_for_panel_after_scheduled_restart(")
+    assert validate < runtime_restart < pre_health < generation < schedule < post_health
     assert "Safety Rollback выполнен и проверен после restart" in rollback
     assert "Safety Rollback также" in rollback
     assert "не прошёл проверку" in rollback
@@ -187,7 +207,6 @@ def test_restore_failure_after_mutation_executes_and_validates_safety_rollback(
         _normalize_xray_full_access=lambda: events.append(("normalize_xray",)),
         _restart_xray_required=lambda: events.append(("restart_xray",)),
         _validate_runtime_after_restore=lambda: events.append(("validate_runtime",)),
-        _schedule_panel_restart=lambda: events.append(("schedule_panel",)),
         _restart_runtime=lambda schedule_panel=False: events.append(
             ("restart_runtime", schedule_panel)
         ),
@@ -215,8 +234,20 @@ def test_restore_failure_after_mutation_executes_and_validates_safety_rollback(
     )
     monkeypatch.setattr(
         restore_hardening_patch,
+        "_panel_service_generation",
+        lambda full: events.append(("panel_generation",)) or 100,
+    )
+    monkeypatch.setattr(
+        restore_hardening_patch,
+        "_schedule_panel_restart_required",
+        lambda full: events.append(("schedule_panel",)),
+    )
+    monkeypatch.setattr(
+        restore_hardening_patch,
         "_wait_for_panel_after_scheduled_restart",
-        lambda full: events.append(("panel_health_post",)),
+        lambda full, previous_generation: events.append(
+            ("panel_health_post", previous_generation)
+        ),
     )
 
     with pytest.raises(RuntimeError, match="Safety Rollback выполнен и проверен после restart"):
@@ -227,9 +258,10 @@ def test_restore_failure_after_mutation_executes_and_validates_safety_rollback(
     rollback_restore = events.index(("restore_payload", False))
     runtime_restart = events.index(("restart_runtime", False))
     pre_health = events.index(("panel_health_pre",))
-    panel_restart = events.index(("schedule_panel",))
-    post_health = events.index(("panel_health_post",))
-    assert rollback_restore < runtime_restart < pre_health < panel_restart < post_health
+    generation = events.index(("panel_generation",))
+    schedule = events.index(("schedule_panel",))
+    post_health = events.index(("panel_health_post", 100))
+    assert rollback_restore < runtime_restart < pre_health < generation < schedule < post_health
     assert any(
         item[0] == "progress"
         and "Safety Rollback выполнен и проверен после restart" in item[1]
@@ -237,15 +269,17 @@ def test_restore_failure_after_mutation_executes_and_validates_safety_rollback(
     )
 
 
-def test_success_path_requires_post_restart_health_before_final_success() -> None:
+def test_success_path_requires_new_panel_process_before_final_success() -> None:
     source = inspect.getsource(restore_hardening_patch._restore_uploaded_full_backup)
     success = source.split("try:", 1)[1].split("except Exception as restore_exc:", 1)[0]
     pre_health = success.index("_local_panel_health(full)")
-    schedule = success.index("full._schedule_panel_restart()")
-    post_health = success.index("_wait_for_panel_after_scheduled_restart(full)")
+    generation = success.index("_panel_service_generation(full)")
+    schedule = success.index("_schedule_panel_restart_required(full)")
+    post_health = success.index("_wait_for_panel_after_scheduled_restart(")
     final = success.index("[Restore 8/8]")
-    assert pre_health < schedule < post_health < final
+    assert pre_health < generation < schedule < post_health < final
     assert '"panel_post_restart_health_validated": True' in source
+    assert '"panel_restart_generation_changed": True' in source
 
 
 def test_restore_outcome_and_errors_are_profile_aware() -> None:
