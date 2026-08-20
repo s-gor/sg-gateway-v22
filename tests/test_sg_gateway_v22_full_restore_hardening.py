@@ -101,7 +101,7 @@ def test_safety_rollback_is_validated_before_panel_restart_and_reports_outcome()
         "full._schedule_panel_restart()"
     )
     assert "Safety Rollback выполнен и проверен" in rollback
-    assert "Safety Rollback также не прошёл проверку" in rollback
+    assert "Rollback также не прошёл проверку" in rollback
 
 
 def test_dev_full_restore_runtime_is_replaced_by_hardened_contract() -> None:
