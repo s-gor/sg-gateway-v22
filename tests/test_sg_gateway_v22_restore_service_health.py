@@ -25,27 +25,53 @@ def _restore_module(events: list[str]) -> ModuleType:
     return module
 
 
-def test_restore_health_requires_panel_then_active_hostd() -> None:
+def test_restore_health_requires_panel_active_hostd_and_hostd_http(monkeypatch) -> None:
     events: list[str] = []
     restore = _restore_module(events)
     restore_service_health_patch.install(restore)
+    monkeypatch.setattr(
+        restore_service_health_patch.shutil,
+        "which",
+        lambda command: "/usr/bin/curl" if command == "curl" else None,
+    )
 
     def probe(command, timeout=0):
-        events.append("hostd-health")
+        if command[0] == "systemctl":
+            events.append("hostd-unit")
+            assert command == [
+                "systemctl",
+                "is-active",
+                "--quiet",
+                "sg-hostd.service",
+            ]
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+        events.append("hostd-http")
         assert command == [
-            "systemctl",
-            "is-active",
-            "--quiet",
-            "sg-hostd.service",
+            "/usr/bin/curl",
+            "-fsS",
+            "--max-time",
+            "8",
+            "http://127.0.0.1:8090/health",
         ]
-        return SimpleNamespace(returncode=0, stdout="", stderr="")
+        return SimpleNamespace(
+            returncode=0,
+            stdout='{"service":"sg-hostd","status":"ok"}',
+            stderr="",
+        )
 
-    restore._local_panel_health(SimpleNamespace(_probe=probe))
+    full = SimpleNamespace(
+        CONFIG_DIR=Path("/etc/sg-gateway"),
+        _read_env=lambda path: {
+            "SG_GATEWAY_HOSTD_URL": "http://127.0.0.1:8090"
+        },
+        _probe=probe,
+    )
+    restore._local_panel_health(full)
 
-    assert events == ["panel-health", "hostd-health"]
+    assert events == ["panel-health", "hostd-unit", "hostd-http"]
 
 
-def test_restore_health_fails_when_hostd_is_not_active() -> None:
+def test_restore_health_fails_when_hostd_unit_is_not_active() -> None:
     events: list[str] = []
     restore = _restore_module(events)
     restore_service_health_patch.install(restore)
@@ -61,6 +87,34 @@ def test_restore_health_fails_when_hostd_is_not_active() -> None:
         restore._local_panel_health(full)
 
     assert events == ["panel-health"]
+
+
+def test_restore_health_rejects_bad_hostd_http_status(monkeypatch) -> None:
+    events: list[str] = []
+    restore = _restore_module(events)
+    restore_service_health_patch.install(restore)
+    monkeypatch.setattr(
+        restore_service_health_patch.shutil,
+        "which",
+        lambda command: "/usr/bin/curl" if command == "curl" else None,
+    )
+
+    def probe(command, timeout=0):
+        if command[0] == "systemctl":
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+        return SimpleNamespace(
+            returncode=0,
+            stdout='{"service":"sg-hostd","status":"starting"}',
+            stderr="",
+        )
+
+    full = SimpleNamespace(
+        CONFIG_DIR=Path("/etc/sg-gateway"),
+        _read_env=lambda path: {},
+        _probe=probe,
+    )
+    with pytest.raises(RuntimeError, match="hostd health status is not ok"):
+        restore._local_panel_health(full)
 
 
 def test_package_installs_service_health_after_restore_hardening() -> None:
