@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 VERSION_FILE = ROOT / "VERSION"
 INSTALLER = ROOT / "install.sh"
 UNINSTALLER = ROOT / "deploy" / "full-uninstall-ubuntu.sh"
+AWG3_HELPER_CHMOD = 'chmod 0755 "$PREFIX/deploy/sg-gateway-awg3-userspace.sh"'
 
 
 def _version_token(version: str) -> str:
@@ -77,6 +78,17 @@ def normalized_installer(text: str, version: str, token: str) -> str:
         "vendor bundle label",
     )
 
+    # systemd executes the AWG3 userspace helper directly. Keep an explicit
+    # install-time chmod even when the Git executable bit is already correct,
+    # so archive/copy mode drift cannot turn this into status=203/EXEC.
+    if AWG3_HELPER_CHMOD not in text:
+        anchor = 'chmod 0755 "$PREFIX/deploy/configure-panel-access.sh"'
+        if text.count(anchor) != 1:
+            raise SystemExit("AWG3 helper chmod: configure-panel-access chmod anchor is not unique")
+        text = text.replace(anchor, f"{anchor}\n{AWG3_HELPER_CHMOD}", 1)
+    if text.count(AWG3_HELPER_CHMOD) != 1:
+        raise SystemExit("AWG3 helper chmod: expected exactly one executable-mode enforcement")
+
     required = (
         f'VERSION="{version}"',
         f'INSTALLER_BUILD="{token}-full-clean-dual-stack"',
@@ -86,6 +98,7 @@ def normalized_installer(text: str, version: str, token: str) -> str:
         f'Мастер установки SG-Gateway {version} запущен',
         f'before-sg-gateway-{token}',
         'SG-Gateway V22 vendor bundle:',
+        AWG3_HELPER_CHMOD,
     )
     missing = [marker for marker in required if marker not in text]
     if missing:
