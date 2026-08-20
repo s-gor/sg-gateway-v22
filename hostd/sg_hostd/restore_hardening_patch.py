@@ -195,23 +195,74 @@ def _local_panel_health(full: ModuleType) -> None:
         raise RuntimeError("Local HTTPS health status is not ok")
 
 
-def _wait_for_panel_after_scheduled_restart(full: ModuleType) -> None:
-    # _schedule_panel_restart() uses --on-active=3s. A probe before that delay
-    # would only prove the old panel process is healthy, which is exactly the
-    # false-positive that hid the 022.04 terminal/restart failure. Wait beyond
-    # the scheduled restart and then require the new panel process to answer.
+def _panel_service_generation(full: ModuleType) -> int:
+    result = full._probe(
+        [
+            "systemctl",
+            "show",
+            "sg-gateway.service",
+            "--property=ActiveEnterTimestampMonotonic",
+            "--value",
+        ],
+        timeout=10,
+    )
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout or "").strip()[-800:]
+        raise RuntimeError("Cannot read panel service generation: " + detail)
+    try:
+        generation = int((result.stdout or "").strip())
+    except (TypeError, ValueError) as exc:
+        raise RuntimeError("Panel service generation is invalid") from exc
+    if generation <= 0:
+        raise RuntimeError("Panel service is not active before restart")
+    return generation
+
+
+def _schedule_panel_restart_required(full: ModuleType) -> None:
+    unit = (
+        f"sg-gateway-full-restore-restart-{os.getpid()}-"
+        f"{time.monotonic_ns()}"
+    )
+    result = full._probe(
+        [
+            "systemd-run",
+            f"--unit={unit}",
+            "--collect",
+            "--on-active=3s",
+            "/bin/systemctl",
+            "restart",
+            "sg-hostd.service",
+            "sg-gateway.service",
+        ],
+        timeout=15,
+    )
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout or "").strip()[-800:]
+        raise RuntimeError("Cannot schedule required panel restart: " + detail)
+
+
+def _wait_for_panel_after_scheduled_restart(
+    full: ModuleType,
+    previous_generation: int,
+) -> None:
+    # A health response alone is insufficient: if the scheduled restart failed,
+    # it could still come from the old process. Require systemd's active-enter
+    # generation to change first, then validate backend + Nginx/HTTPS.
     time.sleep(PANEL_RESTART_GRACE_SECONDS)
     deadline = time.monotonic() + PANEL_RESTART_HEALTH_TIMEOUT_SECONDS
     last_error: Exception | None = None
     while True:
         try:
+            generation = _panel_service_generation(full)
+            if generation == previous_generation:
+                raise RuntimeError("Panel service has not restarted yet")
             _local_panel_health(full)
             return
         except Exception as exc:
             last_error = exc
         if time.monotonic() >= deadline:
             raise RuntimeError(
-                "Panel did not become healthy after scheduled restart: "
+                "Panel did not become healthy after required restart: "
                 f"{last_error}"
             ) from last_error
         time.sleep(PANEL_RESTART_HEALTH_POLL_SECONDS)
@@ -307,13 +358,14 @@ def _restore_uploaded_full_backup(full: ModuleType) -> dict:
 
             full._restore_progress("[Restore 7/8] Проверяю backend и Nginx/HTTPS до restart панели")
             _local_panel_health(full)
-            full._schedule_panel_restart()
+            panel_generation = _panel_service_generation(full)
+            _schedule_panel_restart_required(full)
             full._restore_progress(
-                "[Restore 7/8] Панель перезапускается; жду post-restart health-check"
+                "[Restore 7/8] Панель перезапускается; жду новый процесс и post-restart health-check"
             )
-            _wait_for_panel_after_scheduled_restart(full)
+            _wait_for_panel_after_scheduled_restart(full, panel_generation)
             full._restore_progress(
-                f"[Restore 8/8] {restore_done}: runtime и доступ к панели после restart проверены"
+                f"[Restore 8/8] {restore_done}: новый процесс панели и доступ после restart проверены"
             )
         except Exception as restore_exc:
             full._restore_progress(
@@ -333,12 +385,15 @@ def _restore_uploaded_full_backup(full: ModuleType) -> dict:
                     full._validate_runtime_after_restore()
                     full._restart_runtime(schedule_panel=False)
                     _local_panel_health(full)
-                full._schedule_panel_restart()
+                rollback_panel_generation = _panel_service_generation(full)
+                _schedule_panel_restart_required(full)
                 full._restore_progress(
                     "[Restore] Safety Rollback: панель перезапускается; "
-                    "жду post-restart health-check"
+                    "жду новый процесс и post-restart health-check"
                 )
-                _wait_for_panel_after_scheduled_restart(full)
+                _wait_for_panel_after_scheduled_restart(
+                    full, rollback_panel_generation
+                )
             except Exception as rollback_exc:
                 full._restore_progress(
                     f"[Restore] КРИТИЧЕСКАЯ ОШИБКА: Safety Rollback не прошёл "
@@ -352,7 +407,7 @@ def _restore_uploaded_full_backup(full: ModuleType) -> dict:
 
             full._restore_progress(
                 "[Restore] Safety Rollback выполнен и проверен после restart: "
-                "SQLite, runtime и панель доступны"
+                "SQLite, runtime и новый процесс панели доступны"
             )
             raise RuntimeError(
                 f"{restore_failed}; Safety Rollback выполнен и проверен после restart. "
@@ -375,13 +430,14 @@ def _restore_uploaded_full_backup(full: ModuleType) -> dict:
         "restore_space_preflight": plan,
         "panel_health_validated": True,
         "panel_post_restart_health_validated": True,
+        "panel_restart_generation_changed": True,
         "restore_profile": restore_profile,
         "message": (
             "Clients & Keys restored; destination server settings preserved; "
-            "client runtime regenerated and panel health validated after restart"
+            "client runtime regenerated and new panel process validated after restart"
             if clients_keys_profile
             else "Full backup restored; destination public IP preserved; all runtime "
-            "regenerated and panel health validated after restart"
+            "regenerated and new panel process validated after restart"
         ),
     }
 
