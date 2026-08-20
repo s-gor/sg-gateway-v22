@@ -1,13 +1,12 @@
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import sqlite3
 import sys
 import tarfile
 from pathlib import Path
-
-import pytest
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -33,6 +32,137 @@ def _active_engine_db(path: Path, engine: str) -> None:
         con.execute(
             "INSERT INTO device_credentials(device_id, engine, status) VALUES (1, ?, 'applied')",
             (engine,),
+        )
+        con.commit()
+    finally:
+        con.close()
+
+
+def _clients_database(path: Path, *, server_host: str, server_key: str, client_private: str) -> None:
+    con = sqlite3.connect(path)
+    try:
+        con.executescript(
+            """
+            CREATE TABLE clients (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                enabled INTEGER NOT NULL,
+                expires_at TEXT,
+                created_at TEXT NOT NULL
+            );
+            CREATE TABLE devices (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                client_id INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                enabled INTEGER NOT NULL,
+                expires_at TEXT,
+                is_primary INTEGER NOT NULL,
+                last_seen_at TEXT,
+                created_at TEXT NOT NULL
+            );
+            CREATE TABLE client_deployments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                client_id INTEGER NOT NULL,
+                engine TEXT NOT NULL,
+                status TEXT NOT NULL,
+                engine_object_id TEXT,
+                config_json TEXT,
+                created_at TEXT NOT NULL
+            );
+            CREATE TABLE device_credentials (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                device_id INTEGER NOT NULL,
+                engine TEXT NOT NULL,
+                status TEXT NOT NULL,
+                engine_object_id TEXT,
+                config_json TEXT,
+                rotated_at TEXT,
+                created_at TEXT NOT NULL
+            );
+            CREATE TABLE connection_settings (
+                engine TEXT PRIMARY KEY,
+                enabled INTEGER NOT NULL,
+                host TEXT NOT NULL,
+                port INTEGER NOT NULL,
+                config_json TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            CREATE TABLE operation_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                action TEXT NOT NULL,
+                target TEXT NOT NULL,
+                status TEXT NOT NULL,
+                message TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            );
+            CREATE TABLE runtime_settings_transactions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                engine TEXT NOT NULL,
+                previous_host TEXT NOT NULL,
+                previous_port INTEGER NOT NULL,
+                previous_config_json TEXT NOT NULL,
+                candidate_host TEXT NOT NULL,
+                candidate_port INTEGER NOT NULL,
+                candidate_config_json TEXT NOT NULL,
+                status TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                finished_at TEXT
+            );
+            CREATE TABLE sg_subscription_tokens (
+                client_id INTEGER PRIMARY KEY,
+                token TEXT NOT NULL UNIQUE,
+                created_at TEXT NOT NULL
+            );
+            CREATE TABLE router_subscription_tokens (
+                device_id INTEGER PRIMARY KEY,
+                token TEXT NOT NULL UNIQUE,
+                created_at TEXT NOT NULL
+            );
+            """
+        )
+        con.execute(
+            "INSERT INTO clients VALUES (1, 'Alice', 1, NULL, '2026-08-20 10:00:00')"
+        )
+        con.execute(
+            "INSERT INTO devices VALUES (1, 1, 'Основной доступ', 1, NULL, 1, NULL, '2026-08-20 10:00:00')"
+        )
+        credential = {
+            "client_name": "Alice",
+            "private_key": client_private,
+            "public_key": "CLIENT-PUBLIC",
+            "address": "10.66.0.3/32",
+            "server_public_key": server_key,
+            "endpoint": f"{server_host}:585",
+            "dns": "1.1.1.1",
+            "allowed_ips": "0.0.0.0/0, ::/0",
+            "persistent_keepalive": 25,
+        }
+        con.execute(
+            "INSERT INTO device_credentials VALUES (1, 1, 'amneziawg', 'applied', 'CLIENT-PUBLIC', ?, NULL, '2026-08-20 10:00:00')",
+            (json.dumps(credential),),
+        )
+        con.execute(
+            "INSERT INTO client_deployments VALUES (1, 1, 'amneziawg', 'applied', 'CLIENT-PUBLIC', ?, '2026-08-20 10:00:00')",
+            (json.dumps(credential),),
+        )
+        settings = {
+            "dns": "1.1.1.1",
+            "server_public_key": server_key,
+            "allowed_ips": "0.0.0.0/0, ::/0",
+            "persistent_keepalive": 25,
+        }
+        con.execute(
+            "INSERT INTO connection_settings VALUES ('amneziawg', 1, ?, 585, ?, '2026-08-20 10:00:00')",
+            (server_host, json.dumps(settings)),
+        )
+        con.execute(
+            "INSERT INTO operation_log VALUES (1, 'secret.server.action', 'server', 'ok', 'server history', '2026-08-20 10:00:00')"
+        )
+        con.execute(
+            "INSERT INTO sg_subscription_tokens VALUES (1, 'sg1_keep_me', '2026-08-20 10:00:00')"
+        )
+        con.execute(
+            "INSERT INTO router_subscription_tokens VALUES (1, 'sgr1_keep_me', '2026-08-20 10:00:00')"
         )
         con.commit()
     finally:
@@ -146,35 +276,26 @@ def test_full_restore_contract_is_before_safety_backup() -> None:
     assert restore.index("assert_runtime_contract(") < restore.index("create_full_backup_archive(prefix=\"SG-Gateway-SAFETY\")")
 
 
-def test_data_backup_contains_only_portable_source_of_truth(tmp_path: Path) -> None:
+def test_clients_keys_backup_physically_excludes_server_state(tmp_path: Path) -> None:
     data = tmp_path / "data"
     config = tmp_path / "config"
     letsencrypt = tmp_path / "letsencrypt"
     output = tmp_path / "out"
     data.mkdir()
     config.mkdir()
-    (data / "security").mkdir()
-    (data / "security" / "backups").mkdir()
-    (data / "security" / "jobs").mkdir()
-    (data / "warp").mkdir()
-    (data / "geoip").mkdir()
     letsencrypt.mkdir()
-
-    db = data / "sg-gateway.sqlite"
-    con = sqlite3.connect(db)
-    try:
-        con.execute("CREATE TABLE clients(id INTEGER PRIMARY KEY, enabled INTEGER)")
-        con.execute("INSERT INTO clients(id, enabled) VALUES (1, 1)")
-        con.commit()
-    finally:
-        con.close()
-
-    (config / "engine-secrets.env").write_text("TEST=1\n", encoding="utf-8")
-    (data / "security" / "tls-state.json").write_text("{}\n", encoding="utf-8")
-    (data / "security" / "backups" / "old.db").write_text("no\n", encoding="utf-8")
-    (data / "security" / "jobs" / "job.json").write_text("no\n", encoding="utf-8")
-    (data / "warp" / "account.toml").write_text("test\n", encoding="utf-8")
-    (data / "geoip" / "cache.dat").write_text("no\n", encoding="utf-8")
+    (data / "security").mkdir()
+    (data / "warp").mkdir()
+    _clients_database(
+        data / "sg-gateway.sqlite",
+        server_host="old.example",
+        server_key="OLD-SERVER-KEY",
+        client_private="CLIENT-PRIVATE-KEEP",
+    )
+    (config / "engine-secrets.env").write_text("SERVER_SECRET=do-not-copy\n", encoding="utf-8")
+    (data / "security" / "tls-state.json").write_text('{"domain":"old.example"}\n', encoding="utf-8")
+    (data / "warp" / "account.toml").write_text("do-not-copy\n", encoding="utf-8")
+    (letsencrypt / "private.pem").write_text("do-not-copy\n", encoding="utf-8")
 
     created = data_backup_runtime.create_data_backup_archive(
         source_data_dir=data,
@@ -182,44 +303,81 @@ def test_data_backup_contains_only_portable_source_of_truth(tmp_path: Path) -> N
         source_letsencrypt_dir=letsencrypt,
         destination_dir=output,
     )
+    assert Path(created["path"]).name.startswith("SG-Gateway-CLIENTS-")
+    assert created["profile"] == "clients-and-keys"
+
     archive = Path(created["path"])
+    extracted = tmp_path / "extracted"
+    extracted.mkdir()
     with tarfile.open(archive, "r:gz") as tar:
         names = set(tar.getnames())
-    assert "payload/var/lib/sg-gateway/sg-gateway.sqlite" in names
-    assert "payload/etc/sg-gateway/engine-secrets.env" in names
-    assert "payload/var/lib/sg-gateway/security/tls-state.json" in names
-    assert "payload/var/lib/sg-gateway/warp/account.toml" in names
-    assert not any("security/backups" in name for name in names)
-    assert not any("security/jobs" in name for name in names)
-    assert not any("/geoip" in name for name in names)
-    assert not any("/usr/local/etc/xray" in name for name in names)
-    assert not any("/etc/amnezia/amneziawg" in name for name in names)
+        assert names == {
+            "manifest.json",
+            "payload/var/lib/sg-gateway/sg-gateway.sqlite",
+        }
+        tar.extractall(extracted)
 
+    manifest = json.loads((extracted / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["profile"] == "clients-and-keys"
+    assert manifest["contains_letsencrypt"] is False
 
-def test_data_promotion_is_accepted_by_full_restore_validator(tmp_path: Path, monkeypatch) -> None:
-    data = tmp_path / "source-data"
-    config = tmp_path / "source-config"
-    letsencrypt = tmp_path / "source-letsencrypt"
-    source_out = tmp_path / "source-out"
-    data.mkdir()
-    config.mkdir()
-    letsencrypt.mkdir()
-    db = data / "sg-gateway.sqlite"
+    db = extracted / "payload/var/lib/sg-gateway/sg-gateway.sqlite"
     con = sqlite3.connect(db)
     try:
-        con.execute("CREATE TABLE clients(id INTEGER PRIMARY KEY, enabled INTEGER)")
-        con.execute("INSERT INTO clients(id, enabled) VALUES (1, 1)")
+        assert con.execute("SELECT name FROM clients").fetchone()[0] == "Alice"
+        assert con.execute("SELECT token FROM sg_subscription_tokens").fetchone()[0] == "sg1_keep_me"
+        assert con.execute("SELECT token FROM router_subscription_tokens").fetchone()[0] == "sgr1_keep_me"
+        assert con.execute("SELECT COUNT(*) FROM connection_settings").fetchone()[0] == 0
+        assert con.execute("SELECT COUNT(*) FROM operation_log").fetchone()[0] == 0
+        payload = json.loads(con.execute("SELECT config_json FROM device_credentials").fetchone()[0])
+        assert con.execute("SELECT COUNT(*) FROM client_deployments").fetchone()[0] == 0
+    finally:
+        con.close()
+    assert payload["private_key"] == "CLIENT-PRIVATE-KEEP"
+    assert payload["public_key"] == "CLIENT-PUBLIC"
+    assert "server_public_key" not in payload
+    assert "endpoint" not in payload
+    assert "dns" not in payload
+    assert b"OLD-SERVER-KEY" not in db.read_bytes()
+    assert b"old.example" not in db.read_bytes()
+
+
+def test_clients_keys_promotion_preserves_destination_server_settings(tmp_path: Path, monkeypatch) -> None:
+    source_data = tmp_path / "source-data"
+    source_out = tmp_path / "source-out"
+    source_data.mkdir()
+    _clients_database(
+        source_data / "sg-gateway.sqlite",
+        server_host="old.example",
+        server_key="OLD-SERVER-KEY",
+        client_private="CLIENT-PRIVATE-KEEP",
+    )
+    created = data_backup_runtime.create_data_backup_archive(
+        source_data_dir=source_data,
+        destination_dir=source_out,
+    )
+
+    destination_data = tmp_path / "destination-data"
+    destination_data.mkdir()
+    _clients_database(
+        destination_data / "sg-gateway.sqlite",
+        server_host="new.example",
+        server_key="NEW-SERVER-KEY",
+        client_private="DESTINATION-OLD-CLIENT",
+    )
+    con = sqlite3.connect(destination_data / "sg-gateway.sqlite")
+    try:
+        con.execute("UPDATE connection_settings SET config_json = ? WHERE engine = 'amneziawg'", (
+            json.dumps({
+                "dns": "9.9.9.9",
+                "server_public_key": "NEW-SERVER-KEY",
+                "allowed_ips": "0.0.0.0/0, ::/0",
+                "persistent_keepalive": 31,
+            }),
+        ))
         con.commit()
     finally:
         con.close()
-    (config / "engine-secrets.env").write_text("TEST=1\n", encoding="utf-8")
-
-    created = data_backup_runtime.create_data_backup_archive(
-        source_data_dir=data,
-        source_config_dir=config,
-        source_letsencrypt_dir=letsencrypt,
-        destination_dir=source_out,
-    )
 
     data_store = tmp_path / "data-store"
     work = tmp_path / "work"
@@ -232,36 +390,61 @@ def test_data_promotion_is_accepted_by_full_restore_validator(tmp_path: Path, mo
     monkeypatch.setattr(data_backup_runtime, "_data_backup_dir", lambda: data_store)
     monkeypatch.setattr(data_backup_runtime, "_work_dir", lambda: work)
     monkeypatch.setattr(data_backup_runtime, "assert_runtime_contract", lambda **kwargs: {"ok": True})
+    monkeypatch.setattr(data_backup_runtime.full, "_data_dir", lambda: destination_data)
+    monkeypatch.setattr(data_backup_runtime.full, "_destination_public_address", lambda: "new.example")
+    monkeypatch.setattr(data_backup_runtime.full, "_restored_tls_state", lambda: {"domain": "new.example"})
     monkeypatch.setattr(data_backup_runtime.full, "_ensure_dirs", lambda: None)
     monkeypatch.setattr(data_backup_runtime.full, "_backup_dir", lambda: full_store)
 
     result = data_backup_runtime.promote_uploaded_data_backup()
     promoted = Path(result["full_restore_upload"])
-    with tarfile.open(promoted, "r:gz") as tar:
-        names = tar.getnames()
-    assert "payload" not in names
-    assert all(name == "manifest.json" or name.startswith("payload/") for name in names)
-
-    extracted = tmp_path / "full-extracted"
+    extracted = tmp_path / "promoted"
     extracted.mkdir()
     manifest = data_backup_runtime.full._extract_archive(promoted, extracted)
-    assert manifest["format"] == data_backup_runtime.full.FORMAT
     assert manifest["data_profile"] is True
-    assert (extracted / "payload/var/lib/sg-gateway/sg-gateway.sqlite").is_file()
+    assert manifest["clients_keys_profile"] is True
+
+    db = extracted / "payload/var/lib/sg-gateway/sg-gateway.sqlite"
+    con = sqlite3.connect(db)
+    try:
+        settings = con.execute(
+            "SELECT host, port, config_json FROM connection_settings WHERE engine = 'amneziawg'"
+        ).fetchone()
+        payload = json.loads(con.execute("SELECT config_json FROM device_credentials").fetchone()[0])
+        sg_token = con.execute("SELECT token FROM sg_subscription_tokens").fetchone()[0]
+    finally:
+        con.close()
+
+    assert settings[0] == "new.example"
+    assert settings[1] == 585
+    assert json.loads(settings[2])["server_public_key"] == "NEW-SERVER-KEY"
+    assert payload["private_key"] == "CLIENT-PRIVATE-KEEP"
+    assert payload["server_public_key"] == "NEW-SERVER-KEY"
+    assert payload["endpoint"] == "new.example:585"
+    assert payload["dns"] == "9.9.9.9"
+    assert payload["persistent_keepalive"] == 31
+    assert sg_token == "sg1_keep_me"
+    assert b"OLD-SERVER-KEY" not in db.read_bytes()
+    assert b"old.example" not in db.read_bytes()
 
 
-def test_data_backup_ui_and_hostd_commands_are_wired() -> None:
+def test_clients_keys_ui_and_hostd_commands_are_wired() -> None:
     main = (ROOT / "app/main.py").read_text(encoding="utf-8")
     template = (ROOT / "app/web/templates/maintenance.html").read_text(encoding="utf-8")
     commands = (ROOT / "hostd/sg_hostd/commands.py").read_text(encoding="utf-8")
     data_source = (ROOT / "hostd/sg_hostd/data_backup_runtime.py").read_text(encoding="utf-8")
+    ui = (ROOT / "app/web/static/sg-maintenance-recovery-v1.js").read_text(encoding="utf-8")
     assert '"/maintenance/data-backups"' in main
     assert '"/maintenance/data-backups/restore"' in main
     assert "backup.data.promote" in main
-    assert "Клиенты и настройки" in template
-    assert "Runtime Contract" in template
+    assert "sg-data-backup-card" in template
+    assert "CLIENTS & KEYS" in ui
+    assert "Клиенты и ключи" in ui
+    assert "Настройки сервера не меняются" in ui
     assert '"runtime.contract": _runtime_contract_status' in commands
     assert '"backup.data.create": _data_backup_create' in commands
     assert '"backup.data.verify": _data_backup_verify' in commands
     assert '"backup.data.promote": _data_backup_promote' in commands
-    assert "os.chown(root, uid, gid)" in data_source
+    assert 'FORMAT = "sg-gateway-clients-keys-backup"' in data_source
+    assert '"profile": "clients-and-keys"' in data_source
+    assert 'database.execute("VACUUM")' in data_source
