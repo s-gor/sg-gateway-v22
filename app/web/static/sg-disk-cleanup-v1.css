@@ -1,0 +1,56 @@
+/* SG-Gateway dev-02206 — System disk cleanup action. */
+
+[data-sg-disk-card="1"] .sg-resource-refresh-slot {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+[data-sg-disk-card="1"] .sg-resource-refresh-slot > form {
+  display: inline-flex !important;
+  align-items: center !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+[data-sg-disk-card="1"] .sg-resource-refresh-slot > form > .sv1-disk-cleanup {
+  position: static !important;
+  inset: auto !important;
+  transform: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 7px !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  height: 38px !important;
+  min-height: 38px !important;
+  max-height: 38px !important;
+  margin: 0 !important;
+  padding: 0 12px !important;
+  border-radius: 10px !important;
+  white-space: nowrap !important;
+  font: 750 11px/1 Inter, "Segoe UI", system-ui, sans-serif !important;
+}
+
+[data-sg-disk-card="1"] .sg-resource-refresh-slot > form > .sv1-disk-cleanup > span {
+  font: 400 16px/1 Inter, "Segoe UI", system-ui, sans-serif !important;
+}
+
+[data-sg-disk-card="1"] .sv1-disk-cleanup.is-loading {
+  opacity: .7;
+  cursor: wait;
+}
+
+@media (max-width: 1179px) {
+  [data-sg-disk-card="1"] .sg-resource-refresh-slot {
+    flex-wrap: wrap !important;
+  }
+
+  [data-sg-disk-card="1"] .sg-resource-refresh-slot > form > .sv1-disk-cleanup {
+    height: 34px !important;
+    min-height: 34px !important;
+    max-height: 34px !important;
+  }
+}
