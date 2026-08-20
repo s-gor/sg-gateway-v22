@@ -11,5 +11,17 @@ def _install_clients_keys_contract() -> None:
     install(data_backup_runtime)
 
 
+# SG_GATEWAY_02206_FULL_RESTORE_HARDENING_V1
+# dev-02206 adds restore-specific disk preflight and validated Safety Rollback
+# without changing the frozen stable implementation.
+def _install_full_restore_hardening() -> None:
+    from sg_hostd import full_backup_runtime as full_backup_runtime
+    from sg_hostd.restore_hardening_patch import install
+
+    install(full_backup_runtime)
+
+
 _install_clients_keys_contract()
+_install_full_restore_hardening()
 del _install_clients_keys_contract
+del _install_full_restore_hardening
