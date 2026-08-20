@@ -16,9 +16,12 @@ def _install_clients_keys_contract() -> None:
 # without changing the frozen stable implementation.
 def _install_full_restore_hardening() -> None:
     from sg_hostd import full_backup_runtime as full_backup_runtime
-    from sg_hostd.restore_hardening_patch import install
+    from sg_hostd import restore_hardening_patch as restore_hardening_patch
+    from sg_hostd.restore_hardening_patch import install as install_restore
+    from sg_hostd.restore_service_health_patch import install as install_service_health
 
-    install(full_backup_runtime)
+    install_restore(full_backup_runtime)
+    install_service_health(restore_hardening_patch)
 
 
 _install_clients_keys_contract()
