@@ -206,7 +206,7 @@
   function operationSecureUrl(root) {
     const log = document.getElementById("opjob-log");
     const restoreAddress = String(log?.textContent || "").match(
-      /\[Restore 6\/7\] Адрес панели после переключения: (https:\/\/[^\s]+)/
+      /\[Restore 6\/\d+\] Адрес панели после переключения: (https:\/\/[^\s]+)/
     );
     const secure = restoreAddress ? new URL(restoreAddress[1]) : new URL(window.location.href);
     secure.protocol = "https:";
@@ -218,7 +218,7 @@
 
   function enhanceOperationRestartReconnect() {
     const root = document.querySelector('.opjob-page[data-restart-expected="1"]');
-    if (!root || window.location.protocol !== "http:") return;
+    if (!root) return;
 
     let redirecting = false;
     let stopped = false;
@@ -239,6 +239,18 @@
         window.setTimeout(probe, 1800);
         return;
       }
+
+      const currentUrl = new URL(window.location.href);
+      const crossOrigin = secureJobUrl.origin !== currentUrl.origin;
+      const protocolUpgrade = currentUrl.protocol !== "https:";
+      if (!crossOrigin && !protocolUpgrade) {
+        // Same HTTPS origin: the built-in status poll already retries across a
+        // short service restart. Keep watching the log for a possible new
+        // restored HTTPS address instead of reloading the page in a loop.
+        window.setTimeout(probe, 1800);
+        return;
+      }
+
       const secureStatusUrl = new URL(root.dataset.statusUrl || window.location.pathname, secureJobUrl);
       secureStatusUrl.protocol = "https:";
       secureStatusUrl.hostname = secureJobUrl.hostname;

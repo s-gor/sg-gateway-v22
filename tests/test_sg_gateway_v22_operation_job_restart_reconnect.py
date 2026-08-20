@@ -17,9 +17,13 @@ def test_full_restore_restart_reconnects_same_terminal_over_https():
     assert '{"restart_expected": True}' in jobs
 
     assert 'opjob-page[data-restart-expected="1"]' in script
-    assert 'window.location.protocol !== "http:"' in script
+    assert 'window.location.protocol !== "http:"' not in script
+    assert r"\[Restore 6\/\d+\]" in script
     assert "Адрес панели после переключения" in script
     assert "restoreAddress" in script
+    assert "secureJobUrl.origin !== currentUrl.origin" in script
+    assert 'currentUrl.protocol !== "https:"' in script
+    assert "if (!crossOrigin && !protocolUpgrade)" in script
     assert 'secureStatusUrl.protocol = "https:"' in script
     assert 'mode: "no-cors"' in script
     assert "window.location.replace(secureJobUrl.toString())" in script
