@@ -7,8 +7,10 @@
 def _install_clients_keys_contract() -> None:
     from sg_hostd import data_backup_runtime as data_backup_runtime
     from sg_hostd.clients_keys_backup_patch import install
+    from sg_hostd.clients_keys_tls_backup_patch import install as install_tls
 
     install(data_backup_runtime)
+    install_tls(data_backup_runtime)
 
 
 # SG_GATEWAY_02206_FULL_RESTORE_HARDENING_V1
@@ -19,9 +21,11 @@ def _install_full_restore_hardening() -> None:
     from sg_hostd import restore_hardening_patch as restore_hardening_patch
     from sg_hostd.restore_hardening_patch import install as install_restore
     from sg_hostd.restore_service_health_patch import install as install_service_health
+    from sg_hostd.clients_keys_portable_restore_patch import install as install_clients_restore
 
     install_restore(full_backup_runtime)
     install_service_health(restore_hardening_patch)
+    install_clients_restore(restore_hardening_patch, full_backup_runtime)
 
 
 _install_clients_keys_contract()
