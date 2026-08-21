@@ -25,7 +25,10 @@ def _bool(value: object, default: bool = False) -> bool:
     return str(value).strip().lower() in {"1", "true", "yes", "on", "enabled"}
 
 
-def _destination_policy(tls: ModuleType, database: sqlite3.Connection) -> tuple[dict[str, bool], set[str]]:
+def _destination_policy(
+    tls: ModuleType,
+    database: sqlite3.Connection,
+) -> tuple[dict[str, bool], set[str]]:
     enabled: dict[str, bool] = {}
     xray_profiles = {"reality_tcp", "xhttp_reality"}
     try:
@@ -46,7 +49,9 @@ def _destination_policy(tls: ModuleType, database: sqlite3.Connection) -> tuple[
             config = {}
 
         if engine == "xray":
-            flags_present = any(flag in config for flag in tls.XRAY_PROFILE_FLAGS.values())
+            flags_present = any(
+                flag in config for flag in tls.XRAY_PROFILE_FLAGS.values()
+            )
             if flags_present:
                 xray_profiles = {
                     profile
@@ -59,9 +64,15 @@ def _destination_policy(tls: ModuleType, database: sqlite3.Connection) -> tuple[
             continue
 
         if engine == "mihomo":
-            enabled["mihomo"] = row_enabled and _bool(config.get("mieru_enabled"), True)
-            enabled["anytls"] = row_enabled and _bool(config.get("anytls_enabled"), False)
-            enabled["tuic"] = row_enabled and _bool(config.get("tuic_enabled"), False)
+            enabled["mihomo"] = row_enabled and _bool(
+                config.get("mieru_enabled"), True
+            )
+            enabled["anytls"] = row_enabled and _bool(
+                config.get("anytls_enabled"), False
+            )
+            enabled["tuic"] = row_enabled and _bool(
+                config.get("tuic_enabled"), False
+            )
             continue
 
         enabled[engine] = row_enabled
@@ -71,11 +82,11 @@ def _destination_policy(tls: ModuleType, database: sqlite3.Connection) -> tuple[
 
 @contextmanager
 def _destination_protocol_policy(tls: ModuleType, database_path: Path):
-    """Expose only protocols enabled by the destination server during checks/apply.
+    """Expose only protocols enabled by the destination during check/apply.
 
-    Imported credentials and profile selections are restored byte-for-byte after
-    the temporary runtime view is used, so a later manual protocol enable can
-    reuse the migrated client identity.
+    Imported credential status and Xray profile selections are restored exactly
+    after the temporary runtime view. A later manual protocol enable therefore
+    reuses the migrated client identity instead of generating new credentials.
     """
 
     db = sqlite3.connect(database_path, timeout=15)
@@ -83,7 +94,8 @@ def _destination_protocol_policy(tls: ModuleType, database_path: Path):
     try:
         enabled, enabled_xray_profiles = _destination_policy(tls, db)
         rows = db.execute(
-            "SELECT id, engine, status, config_json FROM device_credentials ORDER BY id"
+            "SELECT id, engine, status, config_json "
+            "FROM device_credentials ORDER BY id"
         ).fetchall()
         for row_id, engine_raw, status, raw in rows:
             engine = str(engine_raw or "").strip().lower()
@@ -91,7 +103,9 @@ def _destination_protocol_policy(tls: ModuleType, database_path: Path):
                 continue
             snapshots.append((int(row_id), status, raw))
 
-            if not enabled.get(engine, True):
+            # Missing destination settings are treated as disabled. Portable
+            # restore must never invent server protocol enablement.
+            if not enabled.get(engine, False):
                 db.execute(
                     "UPDATE device_credentials SET status = 'disabled' WHERE id = ?",
                     (int(row_id),),
@@ -123,7 +137,10 @@ def _destination_protocol_policy(tls: ModuleType, database_path: Path):
                 payload["profiles"] = active
                 db.execute(
                     "UPDATE device_credentials SET config_json = ? WHERE id = ?",
-                    (json.dumps(payload, ensure_ascii=False, sort_keys=True), int(row_id)),
+                    (
+                        json.dumps(payload, ensure_ascii=False, sort_keys=True),
+                        int(row_id),
+                    ),
                 )
 
         db.commit()
@@ -135,7 +152,8 @@ def _destination_protocol_policy(tls: ModuleType, database_path: Path):
         try:
             for row_id, status, raw in snapshots:
                 db.execute(
-                    "UPDATE device_credentials SET status = ?, config_json = ? WHERE id = ?",
+                    "UPDATE device_credentials "
+                    "SET status = ?, config_json = ? WHERE id = ?",
                     (status, raw, int(row_id)),
                 )
             db.commit()
@@ -154,11 +172,12 @@ def _runtime_contract_for_destination(
         enabled = policy["enabled_engines"]
         specs = dict(runtime_contracts.DEFAULT_SPECS)
         for engine, spec in list(specs.items()):
-            if spec.critical and not enabled.get(engine, True):
+            # include_all_critical is still requested from the established
+            # contract, but only for critical engines explicitly enabled on
+            # the destination. Missing/off protocols are intentionally skipped.
+            if spec.critical and not enabled.get(engine, False):
                 specs.pop(engine, None)
 
-        # Keep the established hook. Tests, diagnostics and future contract
-        # extensions must all pass through the same data-backup entry point.
         result = data.assert_runtime_contract(
             database_path=database_path,
             strict_optional=True,
@@ -173,8 +192,29 @@ def _runtime_contract_for_destination(
     return payload
 
 
+def _raw_tls_state(
+    data: ModuleType,
+    tls: ModuleType,
+    *,
+    source_data_dir: Path | None,
+) -> dict:
+    data_dir = Path(source_data_dir or data.full._data_dir())
+    state_path = data_dir / "security" / tls.TLS_STATE_NAME
+    if source_data_dir is None and not state_path.is_file():
+        try:
+            candidate = (
+                data.full._security_state_dir_from_current_env()
+                / tls.TLS_STATE_NAME
+            )
+        except Exception:
+            candidate = state_path
+        if candidate.is_file():
+            state_path = candidate
+    return tls._read_json(state_path)
+
+
 def install(data: ModuleType, tls: ModuleType) -> None:
-    if getattr(tls, "_portable_contract_fix_v2_installed", False):
+    if getattr(tls, "_portable_contract_fix_v3_installed", False):
         return
 
     original_tls_source = tls._tls_source
@@ -185,19 +225,32 @@ def install(data: ModuleType, tls: ModuleType) -> None:
         source_data_dir: Path | None,
         source_letsencrypt_dir: Path | None,
     ):
-        state, domain, letsencrypt = original_tls_source(
+        raw_state = _raw_tls_state(
+            data_module,
+            tls,
+            source_data_dir=source_data_dir,
+        )
+        letsencrypt = Path(
+            source_letsencrypt_dir or tls.CANONICAL_LETSENCRYPT
+        )
+        # The legacy helper normalizes a discovered certificate to
+        # https_ready=True. Check the source state before that normalization so
+        # stale certificate files can never become a portable HTTPS identity.
+        if raw_state and raw_state.get("https_ready") is False:
+            return {}, "", letsencrypt
+
+        return original_tls_source(
             data_module,
             source_data_dir=source_data_dir,
             source_letsencrypt_dir=source_letsencrypt_dir,
         )
-        # Stale certificate files are not an active HTTPS identity. Only an
-        # explicitly ready SG-Gateway HTTPS state is portable.
-        if state and state.get("https_ready") is False:
-            return {}, "", letsencrypt
-        return state, domain, letsencrypt
 
     def runtime_contract(data_module: ModuleType, database_path: Path) -> dict:
-        return _runtime_contract_for_destination(data_module, tls, database_path)
+        return _runtime_contract_for_destination(
+            data_module,
+            tls,
+            database_path,
+        )
 
     def destination_policy(database_path: Path):
         return _destination_protocol_policy(tls, database_path)
@@ -206,3 +259,4 @@ def install(data: ModuleType, tls: ModuleType) -> None:
     tls._runtime_contract_for_destination = runtime_contract
     tls.destination_protocol_policy = destination_policy
     tls._portable_contract_fix_v2_installed = True
+    tls._portable_contract_fix_v3_installed = True

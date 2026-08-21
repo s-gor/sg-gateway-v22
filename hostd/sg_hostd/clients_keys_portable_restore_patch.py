@@ -4,10 +4,11 @@ import json
 import sqlite3
 import tarfile
 import tempfile
+from functools import wraps
 from pathlib import Path
 from types import ModuleType
 
-from sg_hostd.clients_keys_tls_backup_patch import destination_protocol_policy
+from sg_hostd import clients_keys_tls_backup_patch as tls_backup_patch
 
 
 def _is_clients_keys_restore(full: ModuleType, archive: Path) -> bool:
@@ -68,13 +69,22 @@ def _restore_clients_keys(full: ModuleType, hard: ModuleType) -> dict:
         f"{hard._format_bytes(plan['required_free_bytes'])}"
     )
 
-    with tempfile.TemporaryDirectory(prefix="restore-clients-", dir=full._work_dir()) as temp_name:
+    with tempfile.TemporaryDirectory(
+        prefix="restore-clients-",
+        dir=full._work_dir(),
+    ) as temp_name:
         temp = Path(temp_name)
         manifest = full._extract_archive(archive, temp)
         if manifest.get("clients_keys_profile") is not True:
-            raise RuntimeError("Uploaded backup is not a Clients & Keys restore profile")
+            raise RuntimeError(
+                "Uploaded backup is not a Clients & Keys restore profile"
+            )
         payload = temp / "payload"
-        db_path = payload / full._data_dir().relative_to("/") / "sg-gateway.sqlite"
+        db_path = (
+            payload
+            / full._data_dir().relative_to("/")
+            / "sg-gateway.sqlite"
+        )
         if not db_path.is_file():
             raise RuntimeError("Backup does not contain the SG-Gateway database")
         db = sqlite3.connect(db_path)
@@ -86,7 +96,8 @@ def _restore_clients_keys(full: ModuleType, hard: ModuleType) -> dict:
             db.close()
 
         full._restore_progress(
-            "[Restore 2/8] Backup и SQLite проверены; выключенные протоколы нового сервера будут пропущены"
+            "[Restore 2/8] Backup и SQLite проверены; выключенные протоколы "
+            "нового сервера будут пропущены"
         )
         full._restore_progress(
             "[Restore 3/8] Создаю страховочный Full Backup текущего сервера"
@@ -99,25 +110,32 @@ def _restore_clients_keys(full: ModuleType, hard: ModuleType) -> dict:
             )
             full._restore_payload(payload, preserve_machine_env=True)
             full._restore_progress(
-                "[Restore 5/8] Проверяю SQLite и права; настройки нового сервера сохранены"
+                "[Restore 5/8] Проверяю SQLite и права; настройки нового "
+                "сервера сохранены"
             )
             full._normalize_panel_data_permissions()
             full._validate_database_as_panel_user()
 
             full._restore_progress(
-                "[Restore 6/8] Возвращаю HTTPS и пересобираю только разрешённый runtime нового сервера"
+                "[Restore 6/8] Возвращаю HTTPS и пересобираю только "
+                "разрешённый runtime нового сервера"
             )
             cert_ready, cert_domain = full._restored_certificate_ready()
             if cert_domain:
                 state = full._restored_tls_state()
-                panel_port = int(state.get("public_port") or state.get("panel_port") or 443)
+                panel_port = int(
+                    state.get("public_port")
+                    or state.get("panel_port")
+                    or 443
+                )
                 suffix = "" if panel_port == 443 else f":{panel_port}"
                 full._restore_progress(
-                    f"[Restore 6/8] Адрес панели после переключения: https://{cert_domain}{suffix}"
+                    f"[Restore 6/8] Адрес панели после переключения: "
+                    f"https://{cert_domain}{suffix}"
                 )
 
             live_database = full._data_dir() / "sg-gateway.sqlite"
-            with destination_protocol_policy(live_database):
+            with tls_backup_patch.destination_protocol_policy(live_database):
                 if cert_domain:
                     full._refresh_restored_https_from_local_files(
                         allow_xray_inactive=True
@@ -138,26 +156,34 @@ def _restore_clients_keys(full: ModuleType, hard: ModuleType) -> dict:
             panel_generation = hard._panel_service_generation(full)
             hard._schedule_panel_restart_required(full)
             full._restore_progress(
-                "[Restore 7/8] Панель перезапускается; жду новый процесс и post-restart health-check"
+                "[Restore 7/8] Панель перезапускается; жду новый процесс и "
+                "post-restart health-check"
             )
-            hard._wait_for_panel_after_scheduled_restart(full, panel_generation)
+            hard._wait_for_panel_after_scheduled_restart(
+                full,
+                panel_generation,
+            )
             full._restore_progress(
-                "[Restore 8/8] Восстановление клиентов, ключей и HTTPS завершено: "
-                "настройки и выключенные протоколы нового сервера сохранены"
+                "[Restore 8/8] Восстановление клиентов, ключей и HTTPS "
+                "завершено: настройки и выключенные протоколы нового сервера "
+                "сохранены"
             )
         except Exception as restore_exc:
             full._restore_progress(
-                f"[Restore] ОШИБКА: {restore_exc}. Автоматически возвращаю страховочный backup"
+                f"[Restore] ОШИБКА: {restore_exc}. Автоматически возвращаю "
+                "страховочный backup"
             )
             safety_path = Path(str(safety["path"]))
             try:
                 with tempfile.TemporaryDirectory(
-                    prefix="rollback-", dir=full._work_dir()
+                    prefix="rollback-",
+                    dir=full._work_dir(),
                 ) as rollback_name:
                     rollback = Path(rollback_name)
                     full._extract_archive(safety_path, rollback)
                     full._restore_payload(
-                        rollback / "payload", preserve_machine_env=False
+                        rollback / "payload",
+                        preserve_machine_env=False,
                     )
                     full._normalize_panel_data_permissions()
                     full._validate_runtime_after_restore()
@@ -170,7 +196,8 @@ def _restore_clients_keys(full: ModuleType, hard: ModuleType) -> dict:
                     "жду новый процесс и post-restart health-check"
                 )
                 hard._wait_for_panel_after_scheduled_restart(
-                    full, rollback_panel_generation
+                    full,
+                    rollback_panel_generation,
                 )
             except Exception as rollback_exc:
                 full._restore_progress(
@@ -200,9 +227,12 @@ def _restore_clients_keys(full: ModuleType, hard: ModuleType) -> dict:
         "safety_backup": str(safety.get("name") or ""),
         "certificates": cert_ready,
         "certificate_domain": cert_domain,
-        "certificate_policy": str(manifest.get("certificate_policy") or "none"),
+        "certificate_policy": str(
+            manifest.get("certificate_policy") or "none"
+        ),
         "xray_active": full._probe(
-            ["systemctl", "is-active", "--quiet", "xray.service"], timeout=20
+            ["systemctl", "is-active", "--quiet", "xray.service"],
+            timeout=20,
         ).returncode
         == 0,
         "client_runtime_applied": True,
@@ -222,12 +252,21 @@ def _restore_clients_keys(full: ModuleType, hard: ModuleType) -> dict:
 
 
 def install(hard: ModuleType, full: ModuleType) -> None:
-    original = hard._restore_uploaded_full_backup
+    if getattr(full, "_clients_keys_portable_restore_v2_installed", False):
+        return
 
-    def dispatch(full_module: ModuleType) -> dict:
-        archive = full_module._backup_dir() / full_module.RESTORE_UPLOAD_NAME
-        if _is_clients_keys_restore(full_module, archive):
-            return _restore_clients_keys(full_module, hard)
-        return original(full_module)
+    # Wrap only the public restore entry point. The hardened Full Restore
+    # implementation remains untouched and is still used byte-for-byte for
+    # every non-Clients&Keys archive. functools.wraps deliberately preserves
+    # the established restore_hardening_patch identity/metadata.
+    original = full.restore_uploaded_full_backup
 
-    hard._restore_uploaded_full_backup = dispatch
+    @wraps(original)
+    def dispatch() -> dict:
+        archive = full._backup_dir() / full.RESTORE_UPLOAD_NAME
+        if _is_clients_keys_restore(full, archive):
+            return _restore_clients_keys(full, hard)
+        return original()
+
+    full.restore_uploaded_full_backup = dispatch
+    full._clients_keys_portable_restore_v2_installed = True
