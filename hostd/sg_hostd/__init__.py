@@ -6,11 +6,14 @@
 # hostd entry point (service, commands and tests) uses the same archive rules.
 def _install_clients_keys_contract() -> None:
     from sg_hostd import data_backup_runtime as data_backup_runtime
+    from sg_hostd import clients_keys_tls_backup_patch as tls_backup_patch
     from sg_hostd.clients_keys_backup_patch import install
     from sg_hostd.clients_keys_tls_backup_patch import install as install_tls
+    from sg_hostd.clients_keys_tls_contract_fix import install as install_tls_fix
 
     install(data_backup_runtime)
     install_tls(data_backup_runtime)
+    install_tls_fix(data_backup_runtime, tls_backup_patch)
 
 
 # SG_GATEWAY_02206_FULL_RESTORE_HARDENING_V1
