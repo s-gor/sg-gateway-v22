@@ -14,88 +14,6 @@
     }) || null;
   }
 
-  function enhanceClientsKeysBackup() {
-    const card = document.querySelector(".sg-data-backup-card");
-    if (!card) return;
-
-    const kicker = card.querySelector(".mtv2-card-kicker");
-    const title = card.querySelector("h2");
-    const intro = card.querySelector(".sg-full-backup-head p");
-    const createButton = card.querySelector('.sg-full-backup-head form button span');
-    if (kicker) kicker.textContent = "CLIENTS & KEYS";
-    if (title) title.textContent = "Клиенты и ключи";
-    if (intro) intro.textContent = "Переносимая копия клиентов, устройств и их ключей. Настройки сервера не меняются.";
-    if (createButton) createButton.textContent = "Создать Clients & Keys";
-
-    const sections = card.querySelectorAll(".sg-full-section-title");
-    const contents = sections[0];
-    if (contents) {
-      const strong = contents.querySelector("strong");
-      const small = contents.querySelector("small");
-      if (strong) strong.textContent = "Что переносится";
-      if (small) small.textContent = "Только клиентские данные и реквизиты доступа.";
-    }
-
-    const components = card.querySelector(".sg-full-backup-components");
-    if (components) {
-      components.innerHTML = "<em>Клиенты</em><em>Устройства</em><em>Ключи</em><em>UUID</em><em>Пароли</em><em>SG SUB</em><em>Router SUB</em>";
-    }
-    const detail = card.querySelector(".sg-full-backup-detail");
-    if (detail) {
-      detail.textContent = "Routing, WARP, HTTPS, сертификаты, адреса и серверные ключи не копируются.";
-    }
-    const warning = card.querySelector(".sg-full-backup-warning span");
-    if (warning) {
-      warning.innerHTML = "<strong>Без настроек сервера.</strong> При Restore клиенты сохраняют свои ключи, а серверные параметры берутся с текущей SG-Gateway.";
-    }
-
-    const restoreSection = sections[1];
-    if (restoreSection) {
-      const strong = restoreSection.querySelector("strong");
-      const small = restoreSection.querySelector("small");
-      if (strong) strong.textContent = "Восстановить клиентов и ключи";
-      if (small) small.textContent = "Файл проверяется до изменения данных; настройки текущего сервера сохраняются.";
-    }
-
-    const form = card.querySelector("[data-sg-full-upload]");
-    if (form) {
-      form.dataset.sgConfirm = "Восстановить клиентов и ключи из проверенного файла? Настройки текущего сервера останутся без изменений.";
-      form.dataset.sgConfirmTitle = "Восстановить клиентов и ключи";
-      const pickerName = form.querySelector("[data-sg-full-file-name]");
-      const note = form.querySelector(".sg-full-restore-note");
-      const verifyText = form.querySelector("[data-sg-full-verify-button] span");
-      const restoreText = form.querySelector("[data-sg-full-restore-button] span");
-      if (pickerName) pickerName.textContent = "Выберите Clients & Keys .sgbackup";
-      if (note) note.textContent = "Restore заменяет только клиентов и их реквизиты. Перед изменением создаётся страховочный Full Backup.";
-      if (verifyText) verifyText.textContent = "Проверить backup";
-      if (restoreText) restoreText.textContent = "Восстановить клиентов";
-    }
-
-    const latest = card.querySelector(".sg-full-latest-label");
-    const download = card.querySelector(".sg-full-download span");
-    if (latest) latest.textContent = "ПОСЛЕДНИЙ CLIENTS & KEYS BACKUP";
-    if (download) download.textContent = "Скачать Clients & Keys";
-
-    // Server-side route names remain stable for compatibility. Normalize only
-    // the visible wording on the Maintenance page and operation history.
-    const replacements = [
-      ["Backup клиентов и настроек", "Backup клиентов и ключей"],
-      ["backup клиентов и настроек", "backup клиентов и ключей"],
-      ["DATA backup", "Clients & Keys backup"],
-      ["DATA restore", "Clients & Keys restore"],
-      ["DATA .sgbackup", "Clients & Keys .sgbackup"],
-      ["сертификаты: нет", "серверные настройки: не включены"],
-    ];
-    const walker = document.createTreeWalker(card.ownerDocument.body, NodeFilter.SHOW_TEXT);
-    let node;
-    while ((node = walker.nextNode())) {
-      let value = node.nodeValue || "";
-      let next = value;
-      for (const [from, to] of replacements) next = next.split(from).join(to);
-      if (next !== value) node.nodeValue = next;
-    }
-  }
-
   function enhanceFullRestore() {
     const form = fullRestoreForm();
     if (!form) return;
@@ -198,7 +116,7 @@
       </header>
       <div class="mtv31-safety-note sg-ljd-nested">
         <strong>Данные SG-Gateway не затрагиваются</strong>
-        <span>Full Backup, Clients & Keys Backup, SQLite, GeoFiles, клиенты, ключи и рабочие конфигурации остаются без изменений.</span>
+        <span>Full Backup, Clients, Keys & HTTPS Backup, SQLite, GeoFiles, клиенты, ключи и рабочие конфигурации остаются без изменений.</span>
       </div>`;
     mainGrid.insertAdjacentElement("afterend", card);
   }
@@ -278,7 +196,6 @@
     window.setTimeout(probe, 2500);
   }
 
-  enhanceClientsKeysBackup();
   enhanceFullRestore();
   addDiskCleanupCard();
   enhanceOperationRestartReconnect();
