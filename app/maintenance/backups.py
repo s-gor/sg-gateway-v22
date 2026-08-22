@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import os
 import shutil
+import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -47,6 +49,14 @@ class BackupCleanupResult:
 
 
 BACKUP_RETENTION = 2
+UPLOAD_RESTORE_NAME = "__upload__"
+_REQUIRED_UPLOAD_TABLES = frozenset(
+    {
+        "clients",
+        "connection_settings",
+        "operation_log",
+    }
+)
 
 
 def get_backup_dir() -> Path:
@@ -146,6 +156,106 @@ def get_backup(name: str) -> BackupInfo | None:
     return _backup_info(path)
 
 
+def _validate_uploaded_sqlite(path: Path) -> None:
+    if not path.is_file() or path.stat().st_size <= 0:
+        raise ValueError("Загруженный SQLite backup пуст")
+
+    try:
+        with path.open("rb") as handle:
+            header = handle.read(16)
+    except OSError as exc:
+        raise ValueError(f"Не удалось прочитать SQLite backup: {exc}") from exc
+
+    if header != b"SQLite format 3\x00":
+        raise ValueError("Выбранный файл не является SQLite backup SG-Gateway")
+
+    try:
+        database = sqlite3.connect(f"{path.resolve().as_uri()}?mode=ro", uri=True, timeout=15)
+        try:
+            row = database.execute("PRAGMA integrity_check").fetchone()
+            if not row or str(row[0]).strip().lower() != "ok":
+                raise ValueError("SQLite backup повреждён: integrity_check не прошёл")
+
+            tables = {
+                str(item[0])
+                for item in database.execute(
+                    "SELECT name FROM sqlite_master WHERE type = 'table'"
+                ).fetchall()
+            }
+        finally:
+            database.close()
+    except sqlite3.Error as exc:
+        raise ValueError(f"SQLite backup не открывается: {exc}") from exc
+
+    missing = sorted(_REQUIRED_UPLOAD_TABLES - tables)
+    if missing:
+        raise ValueError(
+            "SQLite backup не похож на базу SG-Gateway: отсутствуют таблицы "
+            + ", ".join(missing)
+        )
+
+
+def stage_uploaded_backup(upload: object) -> BackupInfo:
+    filename = str(getattr(upload, "filename", "") or "").strip()
+    if not filename:
+        raise ValueError("Выберите файл .sqlite")
+    if not filename.lower().endswith(".sqlite"):
+        raise ValueError("Для восстановления базы выберите файл с расширением .sqlite")
+
+    stream = getattr(upload, "stream", upload)
+    if not hasattr(stream, "read"):
+        raise ValueError("Загруженный SQLite backup недоступен для чтения")
+
+    destination = _next_backup_path("sg-gateway-uploaded")
+    temporary = destination.with_name(destination.name + ".part")
+    total = 0
+    try:
+        if hasattr(stream, "seek"):
+            stream.seek(0)
+        with temporary.open("wb") as target:
+            while True:
+                chunk = stream.read(1024 * 1024)
+                if not chunk:
+                    break
+                target.write(chunk)
+                total += len(chunk)
+            target.flush()
+            os.fsync(target.fileno())
+
+        if total <= 0:
+            raise ValueError("Загруженный SQLite backup пуст")
+
+        _validate_uploaded_sqlite(temporary)
+        os.replace(temporary, destination)
+    except Exception:
+        temporary.unlink(missing_ok=True)
+        destination.unlink(missing_ok=True)
+        raise
+
+    backup = _backup_info(destination)
+    log_operation(
+        "backup.upload",
+        f"backup:{backup.name}",
+        f"Загружена и проверена SQLite-копия {backup.name}",
+    )
+    return backup
+
+
+def _uploaded_backup_from_request() -> BackupInfo:
+    try:
+        from flask import has_request_context, request
+    except ImportError as exc:
+        raise ValueError("Загрузка SQLite backup доступна только через панель") from exc
+
+    if not has_request_context():
+        raise ValueError("Загрузка SQLite backup доступна только через панель")
+
+    upload = request.files.get("backup")
+    if upload is None:
+        raise ValueError("Выберите файл .sqlite")
+    return stage_uploaded_backup(upload)
+
+
 def restore_backup_transaction(name: str) -> RestoreResult:
     """Restore the database and return the pre-restore safety copy.
 
@@ -153,7 +263,21 @@ def restore_backup_transaction(name: str) -> RestoreResult:
     rebuilt Xray candidate fails, restore_safety_backup() returns the database
     to the exact state that existed before this restore attempt.
     """
-    backup = get_backup(name)
+    if name == UPLOAD_RESTORE_NAME:
+        try:
+            backup = _uploaded_backup_from_request()
+        except (OSError, ValueError) as exc:
+            message = str(exc)
+            log_operation(
+                "backup.restore.upload",
+                "backup:upload",
+                message,
+                status="error",
+            )
+            return RestoreResult(False, None, None, message)
+    else:
+        backup = get_backup(name)
+
     if backup is None:
         message = "Резервная копия не найдена"
         log_operation("backup.restore", f"backup:{name}", message, status="error")
@@ -225,6 +349,8 @@ def restore_backup(name: str) -> bool:
 def _backup_kind(path: Path) -> str:
     if path.name.startswith("pre-restore-"):
         return "Страховочная копия перед восстановлением"
+    if path.name.startswith("sg-gateway-uploaded-"):
+        return "Загруженная резервная копия"
     return "Ручная резервная копия"
 
 
