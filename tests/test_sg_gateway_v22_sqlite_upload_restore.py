@@ -108,6 +108,9 @@ def test_uploaded_foreign_sqlite_is_rejected_by_sg_gateway_schema_check(
 
 def test_maintenance_ui_exposes_clients_keys_https_and_sqlite_file_restore() -> None:
     base = (ROOT / "app/web/templates/base.html").read_text(encoding="utf-8")
+    recovery = (ROOT / "app/web/static/sg-maintenance-recovery-v1.js").read_text(
+        encoding="utf-8"
+    )
     ui = (ROOT / "app/web/static/sg-clients-keys-download-v1.js").read_text(
         encoding="utf-8"
     )
@@ -117,6 +120,13 @@ def test_maintenance_ui_exposes_clients_keys_https_and_sqlite_file_restore() -> 
     assert base.index("sg-maintenance-recovery-v1.js") < base.index(
         "sg-clients-keys-download-v1.js"
     )
+    assert "?v={{ app_version }}-maintenance-recovery-v2" in base
+    assert "?v={{ app_version }}-clients-keys-https-sqlite-v2" in base
+
+    assert "enhanceClientsKeysBackup" not in recovery
+    assert "CLIENTS & KEYS" not in recovery
+    assert "HTTPS, сертификаты" not in recovery
+    assert "Clients, Keys & HTTPS Backup" in recovery
 
     assert 'MAINTENANCE_UI_REVISION = "clients-keys-https-sqlite-v2"' in ui
     assert "CLIENTS, KEYS & HTTPS" in ui
