@@ -339,7 +339,7 @@
       const tone = source.dataset.sgConfirmTone || "warning";
       card.dataset.tone = tone;
       title.textContent = source.dataset.sgConfirmTitle || (tone === "danger" ? "Подтвердите опасное действие" : "Подтвердите действие");
-      kicker.textContent = source.dataset.sgConfirmKicker || (tone === "danger" ? "Требуется подтверждение" : "Подтвердите действие");
+      kicker.textContent = source.dataset.sgConfirmKicker || (tone === "danger" ? "Требуется подтверждение" : "Подтверждение действия");
       message.textContent = source.dataset.sgConfirm || "Продолжить выполнение действия?";
       accept.textContent = source.dataset.sgConfirmButton || (tone === "danger" ? "Подтвердить" : "Продолжить");
       layer.hidden = false;
