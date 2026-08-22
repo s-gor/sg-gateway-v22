@@ -108,6 +108,8 @@ def test_uploaded_foreign_sqlite_is_rejected_by_sg_gateway_schema_check(
 
 def test_maintenance_ui_exposes_clients_keys_https_and_sqlite_file_restore() -> None:
     base = (ROOT / "app/web/templates/base.html").read_text(encoding="utf-8")
+    template = (ROOT / "app/web/templates/maintenance.html").read_text(encoding="utf-8")
+    backup_source = (ROOT / "app/maintenance/full_backups.py").read_text(encoding="utf-8")
     recovery = (ROOT / "app/web/static/sg-maintenance-recovery-v1.js").read_text(
         encoding="utf-8"
     )
@@ -122,6 +124,18 @@ def test_maintenance_ui_exposes_clients_keys_https_and_sqlite_file_restore() -> 
     )
     assert "?v={{ app_version }}-maintenance-recovery-v2" in base
     assert "?v={{ app_version }}-clients-keys-https-sqlite-v2" in base
+
+    assert "CLIENTS, KEYS & HTTPS" in template
+    assert "Клиенты, ключи и HTTPS" in template
+    assert "активный HTTPS-домен, сертификат и private key" in template
+    assert "Настройки сервера и состояние протоколов не переносятся" in template
+    assert "CLIENTS & SETTINGS" not in template
+    assert "Создать DATA backup" not in template
+    assert "ПОСЛЕДНИЙ DATA BACKUP" not in template
+    assert "FULL SERVER BACKUP" in template
+
+    assert '"contains_letsencrypt_certificates": bool(payload.get("contains_letsencrypt_certificates"))' in backup_source
+    assert '"contains_letsencrypt_certificates": False' not in backup_source
 
     assert "enhanceClientsKeysBackup" not in recovery
     assert "CLIENTS & KEYS" not in recovery
