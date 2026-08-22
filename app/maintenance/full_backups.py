@@ -193,8 +193,9 @@ def stage_verified_full_backup_for_restore() -> dict:
 
 
 # SG_GATEWAY_02206_CLIENTS_KEYS_BACKUP_PROFILE_V1
-# Internal route/function names retain DATA for compatibility with 22.06 code,
-# while the actual archive profile is now Clients & Keys.
+# Internal route/function/profile identifiers retain DATA / clients-and-keys for
+# compatibility with 22.06 code. The portable archive may also include the
+# currently active HTTPS identity when hostd verifies it as ready.
 DATA_BACKUP_SUFFIX = ".sgbackup"
 DATA_VERIFY_UPLOAD_NAME = "verify-upload.sgbackup"
 DATA_VERIFIED_UPLOAD_NAME = "verified-upload.sgbackup"
@@ -271,12 +272,12 @@ def save_verified_data_backup(original_name: str, payload: dict) -> dict:
     directory = get_data_backup_dir()
     archive = directory / DATA_VERIFIED_UPLOAD_NAME
     if not archive.is_file():
-        raise RuntimeError("Проверенный Clients & Keys backup не найден")
+        raise RuntimeError("Проверенный Clients, Keys & HTTPS backup не найден")
     expected_sha256 = str(payload.get("sha256") or "").strip().lower()
     actual_sha256 = _sha256(archive)
     if not expected_sha256 or actual_sha256 != expected_sha256:
         clear_verified_data_backup()
-        raise RuntimeError("SHA-256 проверенного Clients & Keys backup не совпал")
+        raise RuntimeError("SHA-256 проверенного Clients, Keys & HTTPS backup не совпал")
     metadata = {
         "original_name": str(original_name or DATA_VERIFIED_UPLOAD_NAME),
         "size_bytes": archive.stat().st_size,
@@ -285,7 +286,7 @@ def save_verified_data_backup(original_name: str, payload: dict) -> dict:
         "created_at": str(payload.get("created_at") or "не указано"),
         "database_tables": int(payload.get("database_tables") or 0),
         "database_size_bytes": int(payload.get("database_size_bytes") or 0),
-        "contains_letsencrypt_certificates": False,
+        "contains_letsencrypt_certificates": bool(payload.get("contains_letsencrypt_certificates")),
         "profile": "clients-and-keys",
     }
     destination = directory / DATA_VERIFIED_METADATA_NAME
@@ -325,13 +326,13 @@ def get_verified_data_backup() -> dict | None:
 def stage_verified_data_backup_for_restore() -> dict:
     metadata = get_verified_data_backup()
     if metadata is None:
-        raise RuntimeError("Сначала выберите и проверьте Clients & Keys .sgbackup")
+        raise RuntimeError("Сначала выберите и проверьте Clients, Keys & HTTPS .sgbackup")
     directory = get_data_backup_dir()
     archive = directory / DATA_VERIFIED_UPLOAD_NAME
     actual_sha256 = _sha256(archive)
     if actual_sha256 != str(metadata.get("sha256") or ""):
         clear_verified_data_backup()
-        raise RuntimeError("Проверенный Clients & Keys backup изменился: выберите файл заново")
+        raise RuntimeError("Проверенный Clients, Keys & HTTPS backup изменился: выберите файл заново")
     os.replace(archive, directory / DATA_RESTORE_UPLOAD_NAME)
     (directory / DATA_VERIFIED_METADATA_NAME).unlink(missing_ok=True)
     return metadata
