@@ -63,8 +63,8 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='sg-device-expanded-cleanup-v1.css') }}?v={{ app_version }}-device-expanded-cleanup-v1">
   {% endif %}
   {% if active_page|default('') == 'maintenance' %}
-  <script src="{{ url_for('static', filename='sg-maintenance-recovery-v1.js') }}?v={{ app_version }}" defer></script>
-  <script src="{{ url_for('static', filename='sg-clients-keys-download-v1.js') }}?v={{ app_version }}-clients-keys-download-v1" defer></script>
+  <script src="{{ url_for('static', filename='sg-maintenance-recovery-v1.js') }}?v={{ app_version }}-maintenance-recovery-v2" defer></script>
+  <script src="{{ url_for('static', filename='sg-clients-keys-download-v1.js') }}?v={{ app_version }}-clients-keys-https-sqlite-v2" defer></script>
   {% endif %}
 </head>
 <body class="sg-body page-{{ active_page|default('system') }}">
@@ -339,7 +339,7 @@
       const tone = source.dataset.sgConfirmTone || "warning";
       card.dataset.tone = tone;
       title.textContent = source.dataset.sgConfirmTitle || (tone === "danger" ? "Подтвердите опасное действие" : "Подтвердите действие");
-      kicker.textContent = source.dataset.sgConfirmKicker || (tone === "danger" ? "Требуется подтверждение" : "Подтверждение действия");
+      kicker.textContent = source.dataset.sgConfirmKicker || (tone === "danger" ? "Требуется подтверждение" : "Подтвердите действие");
       message.textContent = source.dataset.sgConfirm || "Продолжить выполнение действия?";
       accept.textContent = source.dataset.sgConfirmButton || (tone === "danger" ? "Подтвердить" : "Продолжить");
       layer.hidden = false;
