@@ -433,14 +433,16 @@ def test_clients_keys_ui_and_hostd_commands_are_wired() -> None:
     template = (ROOT / "app/web/templates/maintenance.html").read_text(encoding="utf-8")
     commands = (ROOT / "hostd/sg_hostd/commands.py").read_text(encoding="utf-8")
     data_source = (ROOT / "hostd/sg_hostd/data_backup_runtime.py").read_text(encoding="utf-8")
-    ui = (ROOT / "app/web/static/sg-maintenance-recovery-v1.js").read_text(encoding="utf-8")
+    recovery_ui = (ROOT / "app/web/static/sg-maintenance-recovery-v1.js").read_text(encoding="utf-8")
+    portable_ui = (ROOT / "app/web/static/sg-clients-keys-download-v1.js").read_text(encoding="utf-8")
     assert '"/maintenance/data-backups"' in main
     assert '"/maintenance/data-backups/restore"' in main
     assert "backup.data.promote" in main
     assert "sg-data-backup-card" in template
-    assert "CLIENTS & KEYS" in ui
-    assert "Клиенты и ключи" in ui
-    assert "Настройки сервера не меняются" in ui
+    assert "enhanceClientsKeysBackup" not in recovery_ui
+    assert "CLIENTS, KEYS & HTTPS" in portable_ui
+    assert "Клиенты, ключи и HTTPS" in portable_ui
+    assert "Настройки сервера не переносятся" in portable_ui
     assert '"runtime.contract": _runtime_contract_status' in commands
     assert '"backup.data.create": _data_backup_create' in commands
     assert '"backup.data.verify": _data_backup_verify' in commands
