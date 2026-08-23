@@ -57,39 +57,6 @@ require_free_space() {
   printf '[SG-Gateway] Disk preflight %s: %s MiB free (minimum %s MiB).\n' "$label" "$available_mib" "$MIN_FREE_MIB"
 }
 
-# A signed DKMS module can be built and installed successfully yet still be
-# rejected by a Secure-Boot enforcing kernel.  AWG's own awg-quick supports a
-# userspace implementation in that case.  Keep the frozen AWG2 kernel module as
-# the first choice, but do not abort the whole clean install when modprobe is
-# rejected: Engine 2 installs the vendored amneziawg-go binary used by the AWG2
-# service as its userspace fallback.
-enable_awg2_userspace_fallback() {
-  local installer="$1"
-  python3 - "$installer" <<'PYAWGFALLBACK'
-from pathlib import Path
-import sys
-
-path = Path(sys.argv[1])
-text = path.read_text(encoding="utf-8")
-old = '''  dkms install -m amneziawg -v "$AMNEZIAWG_DKMS_VERSION" --force
-  modprobe amneziawg
-  modinfo amneziawg
-'''
-new = '''  dkms install -m amneziawg -v "$AMNEZIAWG_DKMS_VERSION" --force
-  if modprobe amneziawg; then
-    echo "AmneziaWG 2 runtime: kernel module loaded"
-  else
-    echo "AmneziaWG 2 runtime: kernel module unavailable; userspace fallback will be used"
-  fi
-  modinfo amneziawg
-'''
-count = text.count(old)
-if count != 1:
-    raise SystemExit(f"AWG2 fallback patch contract mismatch: expected 1 target, found {count}")
-path.write_text(text.replace(old, new, 1), encoding="utf-8")
-PYAWGFALLBACK
-}
-
 # Reject an unsupported release and a disk that cannot hold the downloaded
 # archive + extracted source before apt, curl or tar can partially fill it.
 require_supported_ubuntu
@@ -100,7 +67,6 @@ missing_packages=()
 command -v curl >/dev/null 2>&1 || missing_packages+=(curl)
 command -v tar >/dev/null 2>&1 || missing_packages+=(tar)
 command -v gzip >/dev/null 2>&1 || missing_packages+=(gzip)
-command -v python3 >/dev/null 2>&1 || missing_packages+=(python3)
 [[ -s /etc/ssl/certs/ca-certificates.crt ]] || missing_packages+=(ca-certificates)
 
 if (( ${#missing_packages[@]} > 0 )); then
@@ -111,7 +77,7 @@ if (( ${#missing_packages[@]} > 0 )); then
     apt-get -o Dpkg::Use-Pty=0 install -y -qq --no-install-recommends "${missing_packages[@]}"
 fi
 
-for command in curl tar gzip python3; do
+for command in curl tar gzip; do
   command -v "$command" >/dev/null 2>&1 || fail "missing command after bootstrap: $command"
 done
 
@@ -131,13 +97,9 @@ tar -xzf "$ARCHIVE" -C "$SOURCE_DIR" --strip-components=1
 [[ -f "$SOURCE_DIR/VERSION" ]] || fail "VERSION is missing from the GitHub archive"
 [[ -f "$SOURCE_DIR/requirements.txt" ]] || fail "requirements.txt is missing from the GitHub archive"
 [[ -d "$SOURCE_DIR/app" ]] || fail "application source is missing from the GitHub archive"
-[[ -x "$SOURCE_DIR/vendor/cores/amneziawg-go-linux-amd64-v3.0.0" ]] || fail "vendored amneziawg-go userspace fallback is missing or not executable"
-
-enable_awg2_userspace_fallback "$SOURCE_DIR/install.sh"
 
 printf '[SG-Gateway] GitHub source version: %s\n' "$(tr -d '\r\n' < "$SOURCE_DIR/VERSION")"
 printf '[SG-Gateway] DEVELOPMENT channel: dev-02206\n'
-printf '[SG-Gateway] AWG2 runtime: kernel-first with vendored userspace fallback\n'
 printf '[SG-Gateway] Starting the native Ubuntu CLEAN installer...\n'
 SG_GATEWAY_SOURCE_DIR="$SOURCE_DIR" bash "$SOURCE_DIR/install.sh"
 

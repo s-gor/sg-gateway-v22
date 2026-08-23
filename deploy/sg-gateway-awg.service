@@ -7,7 +7,6 @@ ConditionPathExists=/etc/amnezia/amneziawg/awg0.conf
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-Environment=WG_QUICK_USERSPACE_IMPLEMENTATION=/opt/sg-gateway/awg3/bin/amneziawg-go
 ExecStartPre=-/usr/bin/awg-quick down /etc/amnezia/amneziawg/awg0.conf
 ExecStart=/usr/bin/awg-quick up /etc/amnezia/amneziawg/awg0.conf
 ExecStop=/usr/bin/awg-quick down /etc/amnezia/amneziawg/awg0.conf
