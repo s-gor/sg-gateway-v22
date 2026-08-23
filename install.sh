@@ -2546,11 +2546,15 @@ http_wait_json() {
   local url="$1"
   local expected_service="$2"
   local attempts="${3:-60}"
-  local body code attempt
+  local body code attempt rc=0
   for attempt in $(seq 1 "$attempts"); do
     body="$(mktemp)"
-    code="$(curl -sS --max-time 5 -o "$body" -w '%{http_code}' "$url" 2>>"$INSTALL_LOG" || true)"
-    if [[ "$code" == "200" ]] && python3 - "$body" "$expected_service" <<'PY'
+    if code="$(curl -sS --connect-timeout 2 --max-time 5 -o "$body" -w '%{http_code}' "$url" 2>>"$INSTALL_LOG")"; then
+      rc=0
+    else
+      rc=$?
+    fi
+    if (( rc == 0 )) && [[ "$code" == "200" ]] && python3 - "$body" "$expected_service" <<'PYHEALTH'
 import json, sys
 path, expected = sys.argv[1:]
 try:
@@ -2561,21 +2565,99 @@ if value.get("service") != expected:
     raise SystemExit(1)
 if value.get("status") not in {"ok", "warning"}:
     raise SystemExit(1)
-PY
+PYHEALTH
     then
       rm -f "$body"
+      printf '[SG-Gateway] Health OK: HTTP %s from %s (attempt %s/%s)\n' \
+        "$code" "$url" "$attempt" "$attempts" >> "$INSTALL_LOG"
       return 0
     fi
+    printf '[SG-Gateway] Health attempt %s/%s: HTTP %s; curl rc=%s; url=%s\n' \
+      "$attempt" "$attempts" "${code:-000}" "$rc" "$url" >> "$INSTALL_LOG"
     if [[ -s "$body" && "$code" != "000" ]]; then
-      {
-        echo "Health attempt $attempt: HTTP $code from $url"
-        head -c 1000 "$body"; echo
-      } >> "$INSTALL_LOG"
+      head -c 1000 "$body" >> "$INSTALL_LOG"
+      printf '\n' >> "$INSTALL_LOG"
     fi
     rm -f "$body"
-    sleep 2
+    (( attempt < attempts )) && sleep 2
   done
   return 1
+}
+
+http_wait_login() {
+  # SG_GATEWAY_02206_PANEL_STARTUP_RETRY_FIX1
+  # /health may be ready before the login view has finished warming up.
+  # Treat transient curl timeouts as startup latency, not as an immediate
+  # reason to roll the complete installation back.
+  local url="$1"
+  local attempts="${2:-${SG_GATEWAY_LOGIN_RETRY_ATTEMPTS:-15}}"
+  local retry_delay="${SG_GATEWAY_LOGIN_RETRY_DELAY:-2}"
+  local request_timeout="${SG_GATEWAY_LOGIN_REQUEST_TIMEOUT:-2}"
+  local attempt code rc=0 service_state="unknown"
+  for attempt in $(seq 1 "$attempts"); do
+    if code="$(curl -sS --connect-timeout 1 --max-time "$request_timeout" \
+      -o /dev/null -w '%{http_code}' "$url" 2>>"$INSTALL_LOG")"; then
+      rc=0
+    else
+      rc=$?
+    fi
+    service_state="$(systemctl is-active sg-gateway.service 2>/dev/null || true)"
+    [[ -n "$service_state" ]] || service_state="unknown"
+    if (( rc == 0 )) && [[ "$code" =~ ^[23][0-9][0-9]$ ]]; then
+      printf '[SG-Gateway] Login OK: service=%s; HTTP %s; curl rc=0; attempt %s/%s; url=%s\n' \
+        "$service_state" "$code" "$attempt" "$attempts" "$url" >> "$INSTALL_LOG"
+      return 0
+    fi
+    printf '[SG-Gateway] Login attempt %s/%s: service=%s; HTTP %s; curl rc=%s; url=%s\n' \
+      "$attempt" "$attempts" "$service_state" "${code:-000}" "$rc" "$url" >> "$INSTALL_LOG"
+    (( attempt < attempts )) && sleep "$retry_delay"
+  done
+  return 1
+}
+
+panel_startup_final_recheck() {
+  local base_url="$1"
+  local port="$2"
+  local attempts="${SG_GATEWAY_FINAL_RECHECK_ATTEMPTS:-3}"
+  local service_state="unknown" socket_state="not-listening" socket_dump=""
+  service_state="$(systemctl is-active sg-gateway.service 2>/dev/null || true)"
+  [[ -n "$service_state" ]] || service_state="unknown"
+  socket_dump="$(ss -lnt 2>/dev/null || true)"
+  if grep -Eq "(^|[[:space:]])[^[:space:]]*:${port}[[:space:]]" <<<"$socket_dump"; then
+    socket_state="listening"
+  fi
+  printf '[SG-Gateway] Final panel startup recheck: service=%s; socket=%s; port=%s; attempts=%s\n' \
+    "$service_state" "$socket_state" "$port" "$attempts" >> "$INSTALL_LOG"
+
+  [[ "$service_state" == "active" ]] || return 1
+  [[ "$socket_state" == "listening" ]] || return 1
+  if ! http_wait_json "${base_url}/health" "sg-gateway-panel" "$attempts"; then
+    printf '[SG-Gateway] Final panel startup recheck: /health failed after %s attempts\n' \
+      "$attempts" >> "$INSTALL_LOG"
+    return 1
+  fi
+  if ! http_wait_login "${base_url}/login" "$attempts"; then
+    printf '[SG-Gateway] Final panel startup recheck: /login failed after %s attempts\n' \
+      "$attempts" >> "$INSTALL_LOG"
+    return 1
+  fi
+  printf '[SG-Gateway] Final panel startup recheck: recovered; service=active; socket=listening; /health=ok; /login=ok\n' \
+    >> "$INSTALL_LOG"
+  return 0
+}
+
+panel_startup_verify() {
+  local base_url="$1"
+  local port="$2"
+  local health_attempts="${3:-20}"
+  if http_wait_json "${base_url}/health" "sg-gateway-panel" "$health_attempts"; then
+    if http_wait_login "${base_url}/login"; then
+      return 0
+    fi
+  fi
+  printf '[SG-Gateway] Primary panel startup check did not settle; running final recheck before rollback.\n' \
+    >> "$INSTALL_LOG"
+  panel_startup_final_recheck "$base_url" "$port"
 }
 
 stage9_start_hostd() {
@@ -2716,8 +2798,7 @@ PYWARPAUTO
 
 stage9_start_panel() {
   systemctl_with_retry enable --now sg-gateway.service
-  http_wait_json "http://127.0.0.1:${BACKEND_PORT}/health" "sg-gateway-panel" 20
-  curl -fsS --max-time 8 "http://127.0.0.1:${BACKEND_PORT}/login" >/dev/null
+  panel_startup_verify "http://127.0.0.1:${BACKEND_PORT}" "$BACKEND_PORT" 20
 }
 
 service_was_active_before_update() {
@@ -2760,8 +2841,7 @@ stage9_verify_nginx() {
   else
     nginx -t
     systemctl_with_retry enable --now nginx.service
-    http_wait_json "http://127.0.0.1:${PANEL_PORT}/health" "sg-gateway-panel" 15
-    curl -fsS --max-time 8 "http://127.0.0.1:${PANEL_PORT}/login" >/dev/null
+    panel_startup_verify "http://127.0.0.1:${PANEL_PORT}" "$PANEL_PORT" 15
   fi
   systemctl is-active --quiet sg-hostd.service
   systemctl is-active --quiet sg-gateway.service
