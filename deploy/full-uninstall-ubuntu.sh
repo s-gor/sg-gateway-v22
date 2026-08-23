@@ -227,6 +227,7 @@ remove_application_and_state(){
     /root/sg-gateway-02110-installer-resume.env \
     /root/sg-gateway-02111-installer-resume.env \
     /root/sg-gateway-02112-installer-resume.env \
+    /root/sg-gateway-02206-installer-resume.env \
     /root/sg-gateway-preview48-installer-resume.env \
     /root/sg-gateway-preview50-installer-resume.env \
     /root/sg-gateway-preview51-installer-resume.env \
@@ -324,6 +325,10 @@ remove_account_and_verify(){
   fi
   if [[ -e /root/sg-gateway-02111-installer-resume.env ]]; then
     echo "Остаток после удаления: /root/sg-gateway-02111-installer-resume.env" >&2
+    bad=1
+  fi
+  if [[ -e /root/sg-gateway-02206-installer-resume.env ]]; then
+    echo "Остаток после удаления: /root/sg-gateway-02206-installer-resume.env" >&2
     bad=1
   fi
   (( bad == 0 )) || return 1
