@@ -44,6 +44,19 @@ require_supported_ubuntu() {
   printf '[SG-Gateway] Supported system: %s\n' "${PRETTY_NAME:-Ubuntu 24.04}"
 }
 
+wait_for_cloud_init() {
+  if ! command -v cloud-init >/dev/null 2>&1; then
+    printf '[SG-Gateway] cloud-init not present; continuing with local Ubuntu state.\n'
+    return 0
+  fi
+
+  printf '[SG-Gateway] Waiting for cloud-init to finish...\n'
+  if ! cloud-init status --wait; then
+    fail "cloud-init did not finish successfully; resolve the Ubuntu first-boot state and rerun the installer"
+  fi
+  printf '[SG-Gateway] cloud-init: ready.\n'
+}
+
 require_free_space() {
   local path="$1" label="$2" available_kib required_kib available_mib
   [[ "$MIN_FREE_MIB" =~ ^[0-9]+$ ]] || fail "SG_GATEWAY_INSTALL_MIN_FREE_MIB must be a non-negative integer"
@@ -57,11 +70,36 @@ require_free_space() {
   printf '[SG-Gateway] Disk preflight %s: %s MiB free (minimum %s MiB).\n' "$label" "$available_mib" "$MIN_FREE_MIB"
 }
 
-# Reject an unsupported release and a disk that cannot hold the downloaded
-# archive + extracted source before apt, curl or tar can partially fill it.
+prepare_clean_ubuntu() {
+  command -v apt-get >/dev/null 2>&1 || fail "apt-get is required to prepare Ubuntu"
+
+  printf '[SG-Gateway] Updating clean Ubuntu before SG-Gateway installation...\n'
+  apt-get -o Dpkg::Use-Pty=0 update
+  env DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a \
+    apt-get -o Dpkg::Use-Pty=0 full-upgrade -y
+  env DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a \
+    apt-get -o Dpkg::Use-Pty=0 autoremove -y
+
+  if [[ -e /var/run/reboot-required ]]; then
+    printf '[SG-Gateway] Ubuntu update completed, but a reboot is required before SG-Gateway can be installed.\n'
+    printf '[SG-Gateway] Run: reboot\n'
+    printf '[SG-Gateway] After login, repeat the same SG-Gateway install command.\n'
+    exit 10
+  fi
+
+  printf '[SG-Gateway] Ubuntu update: complete; reboot not required.\n'
+}
+
+# A fresh cloud image can still be expanding its disk or applying first-boot
+# package changes when SSH becomes available. Wait for that work first, then
+# fully update Ubuntu before downloading or mutating any SG-Gateway state.
 require_supported_ubuntu
+wait_for_cloud_init
 require_free_space /tmp "temporary storage"
 require_free_space /opt "installation storage"
+prepare_clean_ubuntu
+require_free_space /tmp "temporary storage after Ubuntu update"
+require_free_space /opt "installation storage after Ubuntu update"
 
 missing_packages=()
 command -v curl >/dev/null 2>&1 || missing_packages+=(curl)
