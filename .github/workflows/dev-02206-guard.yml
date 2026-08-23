@@ -81,6 +81,8 @@ jobs:
             tests/test_sg_gateway_v22_awg3_runtime_repair.py \
             tests/test_sg_gateway_v22_runtime_contract_data_backup.py \
             tests/test_sg_gateway_v22_02206_hardening.py \
+            tests/test_sg_gateway_v22_02206_panel_startup_retry.py \
+            tests/test_sg_gateway_v22_02206_installer_readiness.py \
             tests/test_sg_gateway_v22_production_entrypoint_v4.py \
             tests/test_sg_gateway_v22_router_subscription.py \
             tests/test_sg_gateway_v22_sg_subscription_dual_ui.py \

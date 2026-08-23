@@ -2660,17 +2660,22 @@ panel_startup_verify() {
   panel_startup_final_recheck "$base_url" "$port"
 }
 
-stage9_start_hostd() {
-  verify_xray_version
-  systemctl_with_retry enable --now sg-hostd.service
-  http_wait_json "http://127.0.0.1:${HOSTD_PORT}/health" "sg-hostd" 20
-}
-
-stage9_verify_hostd() {
-  local commands_file
-  commands_file="$(mktemp)"
-  curl -fsS --max-time 8 "http://127.0.0.1:${HOSTD_PORT}/commands" -o "$commands_file"
-  python3 - "$commands_file" <<'PYHOSTDCMDS'
+http_wait_hostd_commands() {
+  # SG_GATEWAY_02206_STARTUP_READINESS_FIX1
+  local url="$1"
+  local attempts="${2:-${SG_GATEWAY_HOSTD_COMMANDS_RETRY_ATTEMPTS:-20}}"
+  local retry_delay="${SG_GATEWAY_STARTUP_RETRY_DELAY:-2}"
+  local request_timeout="${SG_GATEWAY_STARTUP_REQUEST_TIMEOUT:-3}"
+  local body code attempt rc=0
+  for attempt in $(seq 1 "$attempts"); do
+    body="$(mktemp)"
+    if code="$(curl -sS --connect-timeout 1 --max-time "$request_timeout" \
+      -o "$body" -w '%{http_code}' "$url" 2>>"$INSTALL_LOG")"; then
+      rc=0
+    else
+      rc=$?
+    fi
+    if (( rc == 0 )) && [[ "$code" == "200" ]] && python3 - "$body" <<'PYHOSTDWAIT' 2>>"$INSTALL_LOG"
 import json, sys
 value = json.load(open(sys.argv[1], encoding="utf-8"))
 commands = set(value.get("commands", []))
@@ -2678,9 +2683,105 @@ required = {"clients.apply", "tls.issue.start", "xray.apply", "xray.apply.start"
 missing = sorted(required - commands)
 if missing:
     raise SystemExit("Missing hostd commands: " + ", ".join(missing))
-print("hostd commands: OK")
-PYHOSTDCMDS
-  rm -f "$commands_file"
+PYHOSTDWAIT
+    then
+      rm -f "$body"
+      printf '[SG-Gateway] Hostd commands OK: HTTP %s; curl rc=0; attempt %s/%s; url=%s\n' \
+        "$code" "$attempt" "$attempts" "$url" >> "$INSTALL_LOG"
+      return 0
+    fi
+    printf '[SG-Gateway] Hostd commands attempt %s/%s: HTTP %s; curl rc=%s; url=%s\n' \
+      "$attempt" "$attempts" "${code:-000}" "$rc" "$url" >> "$INSTALL_LOG"
+    if [[ -s "$body" && "$code" != "000" ]]; then
+      head -c 1000 "$body" >> "$INSTALL_LOG"
+      printf '\n' >> "$INSTALL_LOG"
+    fi
+    rm -f "$body"
+    (( attempt < attempts )) && sleep "$retry_delay"
+  done
+  return 1
+}
+
+http_wait_resolved_https_json() {
+  local domain="$1"
+  local port="$2"
+  local expected_service="$3"
+  local attempts="${4:-15}"
+  local retry_delay="${SG_GATEWAY_STARTUP_RETRY_DELAY:-2}"
+  local request_timeout="${SG_GATEWAY_STARTUP_REQUEST_TIMEOUT:-3}"
+  local url="https://${domain}:${port}/health"
+  local body code attempt rc=0
+  for attempt in $(seq 1 "$attempts"); do
+    body="$(mktemp)"
+    if code="$(curl --noproxy '*' -ksS --connect-timeout 1 --max-time "$request_timeout" \
+      --resolve "${domain}:${port}:127.0.0.1" -o "$body" -w '%{http_code}' "$url" 2>>"$INSTALL_LOG")"; then
+      rc=0
+    else
+      rc=$?
+    fi
+    if (( rc == 0 )) && [[ "$code" == "200" ]] && python3 - "$body" "$expected_service" <<'PYHTTPSWAIT' 2>>"$INSTALL_LOG"
+import json, sys
+path, expected = sys.argv[1:]
+value = json.load(open(path, encoding="utf-8"))
+if value.get("service") != expected or value.get("status") not in {"ok", "warning"}:
+    raise SystemExit(1)
+PYHTTPSWAIT
+    then
+      rm -f "$body"
+      printf '[SG-Gateway] HTTPS health OK: HTTP %s; curl rc=0; attempt %s/%s; url=%s\n' \
+        "$code" "$attempt" "$attempts" "$url" >> "$INSTALL_LOG"
+      return 0
+    fi
+    printf '[SG-Gateway] HTTPS health attempt %s/%s: HTTP %s; curl rc=%s; url=%s\n' \
+      "$attempt" "$attempts" "${code:-000}" "$rc" "$url" >> "$INSTALL_LOG"
+    if [[ -s "$body" && "$code" != "000" ]]; then
+      head -c 1000 "$body" >> "$INSTALL_LOG"
+      printf '\n' >> "$INSTALL_LOG"
+    fi
+    rm -f "$body"
+    (( attempt < attempts )) && sleep "$retry_delay"
+  done
+  return 1
+}
+
+http_wait_file_match() {
+  local url="$1"
+  local expected_file="$2"
+  local attempts="${3:-15}"
+  local retry_delay="${SG_GATEWAY_STARTUP_RETRY_DELAY:-2}"
+  local request_timeout="${SG_GATEWAY_STARTUP_REQUEST_TIMEOUT:-3}"
+  local body code attempt rc=0
+  for attempt in $(seq 1 "$attempts"); do
+    body="$(mktemp)"
+    if code="$(curl --noproxy '*' -sS --connect-timeout 1 --max-time "$request_timeout" \
+      -o "$body" -w '%{http_code}' "$url" 2>>"$INSTALL_LOG")"; then
+      rc=0
+    else
+      rc=$?
+    fi
+    if (( rc == 0 )) && [[ "$code" == "200" ]] && cmp -s "$body" "$expected_file"; then
+      rm -f "$body"
+      printf '[SG-Gateway] HTTP body OK: HTTP %s; curl rc=0; attempt %s/%s; url=%s\n' \
+        "$code" "$attempt" "$attempts" "$url" >> "$INSTALL_LOG"
+      return 0
+    fi
+    printf '[SG-Gateway] HTTP body attempt %s/%s: HTTP %s; curl rc=%s; url=%s\n' \
+      "$attempt" "$attempts" "${code:-000}" "$rc" "$url" >> "$INSTALL_LOG"
+    rm -f "$body"
+    (( attempt < attempts )) && sleep "$retry_delay"
+  done
+  return 1
+}
+
+stage9_start_hostd() {
+  verify_xray_version
+  systemctl_with_retry enable --now sg-hostd.service
+  http_wait_json "http://127.0.0.1:${HOSTD_PORT}/health" "sg-hostd" 20
+}
+
+stage9_verify_hostd() {
+  http_wait_hostd_commands "http://127.0.0.1:${HOSTD_PORT}/commands" 20
+  echo "hostd commands: OK"
 }
 
 stage9_apply_runtime() {
@@ -2836,7 +2937,7 @@ stage9_verify_nginx() {
   https_domain="$(saved_https_access)"
   if [[ -n "$https_domain" ]]; then
     /bin/bash "$PREFIX/deploy/configure-panel-access.sh" --mode refresh
-    curl --noproxy '*' -kfsS --max-time 15       --resolve "${https_domain}:${PANEL_PORT}:127.0.0.1"       "https://${https_domain}:${PANEL_PORT}/health"       | python3 -c 'import json,sys; value=json.load(sys.stdin); assert value.get("service")=="sg-gateway-panel"'
+    http_wait_resolved_https_json "$https_domain" "$PANEL_PORT" "sg-gateway-panel" 15
     echo "HTTPS domain, certificate and Nginx config preserved: $https_domain"
   else
     nginx -t
@@ -2847,9 +2948,7 @@ stage9_verify_nginx() {
   systemctl is-active --quiet sg-gateway.service
   systemctl is-active --quiet nginx.service
   cmp -s /var/www/sg-gateway-placeholder/index.html "$PREFIX/assets/placeholder/index.html"
-  curl --noproxy '*' -fsS --max-time 8 http://127.0.0.1/ -o /tmp/sg-gateway-placeholder-check.html
-  cmp -s /tmp/sg-gateway-placeholder-check.html /var/www/sg-gateway-placeholder/index.html
-  rm -f /tmp/sg-gateway-placeholder-check.html
+  http_wait_file_match "http://127.0.0.1/" /var/www/sg-gateway-placeholder/index.html 15
 
   # SG_GATEWAY_02110_INSTALLER_SAFETY_FIX1
   # Never put a producer in front of grep -q while pipefail is enabled.
