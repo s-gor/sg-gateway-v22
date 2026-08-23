@@ -32,7 +32,7 @@ def test_awg2_service_uses_vendored_userspace_only_as_fallback():
 
     assert "Environment=WG_QUICK_USERSPACE_IMPLEMENTATION=/opt/sg-gateway/awg3/bin/amneziawg-go" in service
     assert 'AWG3_GO_VENDOR_FILE="amneziawg-go-linux-amd64-v3.0.0"' in installer
-    assert 'install -m 0755 "$go_src" "$PREFIX/bin/amneziawg-go"' in installer
+    assert 'install -m 0755 "$VENDOR_CORES_DIR/$AWG3_GO_VENDOR_FILE" "$PREFIX/awg3/bin/amneziawg-go"' in installer
 
     # The frozen AWG2 kernel module remains installed and preferred.  This fix
     # adds a fallback; it does not replace AWG2 with the AWG3 service/runtime.
