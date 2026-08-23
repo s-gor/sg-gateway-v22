@@ -59,6 +59,27 @@ XHTTP_MODE_OPTIONS = (
         "note": "Совместимый режим для CDN и прокси с reassembly на сервере.",
     },
 )
+
+# Same client fingerprint contract as SG-Panel. Firefox is the default for
+# fresh/missing values. An unknown value already stored by an older version is
+# preserved and shown by the UI, but new arbitrary values are rejected.
+FINGERPRINT_VALUES = (
+    "chrome",
+    "brave",
+    "edge",
+    "firefox",
+    "safari",
+    "ios",
+    "android",
+    "opera",
+    "vivaldi",
+    "360",
+    "qq",
+    "random",
+    "randomized",
+    "unsafe",
+)
+FINGERPRINT_DEFAULT = "firefox"
 VLESS_ENCRYPTION_PLACEHOLDER = "PLACEHOLDER_VLESS_ENCRYPTION"
 
 # Client-only XHTTP XMUX preset confirmed for Russian networks.
@@ -144,6 +165,14 @@ def _mode(value: Any, default: str) -> str:
     return mode
 
 
+def _fingerprint(value: Any, default: str = FINGERPRINT_DEFAULT) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return default
+    normalized = raw.lower()
+    return normalized if normalized in FINGERPRINT_VALUES else raw
+
+
 def _installed_xray_version() -> str:
     for binary in ("/usr/local/bin/xray", "xray"):
         try:
@@ -215,6 +244,7 @@ def _values(config: dict[str, Any], legacy_port: int) -> dict[str, Any]:
     if uri_scheme not in {"hysteria2", "hy2"}:
         uri_scheme = "hysteria2"
     return {
+        "fingerprint": _fingerprint(config.get("fingerprint")),
         "reality_tcp_enabled": _bool(config.get("reality_tcp_enabled"), True),
         "reality_tcp_port": _port(config.get("reality_tcp_port"), legacy_port or 443),
         "xhttp_reality_enabled": _bool(config.get("xhttp_reality_enabled"), True),
@@ -245,7 +275,20 @@ def _prepare(form: Any) -> PreparedXraySettings:
     current = _values(config, int(settings.port or 443))
     tls_ready = bool(tls.get("https_ready"))
 
+    current_fingerprint = str(current["fingerprint"])
+    requested_fingerprint = _fingerprint(
+        form.get("fingerprint", current_fingerprint), current_fingerprint
+    )
+    if (
+        requested_fingerprint not in FINGERPRINT_VALUES
+        and requested_fingerprint != current_fingerprint
+    ):
+        raise XrayProfilesError(
+            "Некорректный Fingerprint. Выберите значение из списка SG-Panel."
+        )
+
     values: dict[str, Any] = {
+        "fingerprint": requested_fingerprint,
         "reality_tcp_enabled": bool(form.get("reality_tcp_enabled")),
         "reality_tcp_port": _port(form.get("reality_tcp_port"), int(settings.port or 443)),
         "xhttp_reality_enabled": bool(form.get("xhttp_reality_enabled")),
@@ -524,6 +567,9 @@ def overview() -> dict[str, Any]:
     return {
         "host": settings.host,
         "profiles": profiles,
+        "fingerprint": str(values["fingerprint"]),
+        "fingerprint_values": FINGERPRINT_VALUES,
+        "fingerprint_default": FINGERPRINT_DEFAULT,
         "tls_ready": tls_ready,
         "tls_domain": str(tls.get("domain") or ""),
         "certificate_path": str(tls.get("certificate_path") or ""),
