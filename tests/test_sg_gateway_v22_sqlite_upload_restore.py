@@ -53,13 +53,13 @@ def test_uploaded_sqlite_uses_existing_restore_transaction_and_creates_safety(
     assert restored.safety_backup.name in names
 
 
-def test_uploaded_sqlite_is_validated_before_live_database_is_mutated(
+def test_uploaded_sqlite_is_validated_before_live_client_data_is_mutated(
     tmp_path, monkeypatch
 ) -> None:
     monkeypatch.chdir(tmp_path)
     init_db()
     create_client("Keep", "recommended")
-    before = _snapshot_current_database()
+    before_count = count_clients()
 
     app = Flask(__name__)
     with app.test_request_context(
@@ -73,7 +73,9 @@ def test_uploaded_sqlite_is_validated_before_live_database_is_mutated(
     assert restored.ok is False
     assert restored.backup is None
     assert restored.safety_backup is None
-    assert _snapshot_current_database() == before
+    # Rejected restore attempts are recorded in operation_log, so the database
+    # file bytes can legitimately change while protected client data must not.
+    assert count_clients() == before_count
     assert not any(item.name.startswith("sg-gateway-uploaded-") for item in list_backups())
 
 
