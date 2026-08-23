@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from flask import has_request_context, request
+
 from app.config import load_config
 from app.connections.settings import get_connection_settings
 from app.db import get_database_path
@@ -54,6 +56,15 @@ def collect_health_checks() -> list[HealthCheck]:
 
 
 def health_summary() -> str:
+    # The login template does not display runtime health, but Flask still runs
+    # context processors before rendering it. Full health may perform multiple
+    # hostd round-trips (2s + 5s + 5s timeouts), which can exceed the installer's
+    # 8-second /login smoke check on a slower VM even though the panel is already
+    # serving. Keep login rendering local and non-blocking; Maintenance and the
+    # authenticated UI continue to use the full health summary.
+    if has_request_context() and request.endpoint in {"login", "login_post"}:
+        return "ok"
+
     statuses = {check.status for check in collect_health_checks()}
     if "error" in statuses:
         return "error"
