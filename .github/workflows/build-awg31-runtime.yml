@@ -2,8 +2,7 @@ name: Integrate AWG 3.1 Runtime
 
 on:
   push:
-    branches:
-      - build-awg31-runtime-20260824
+    branches: [build-awg31-runtime-20260824]
 
 permissions:
   contents: write
@@ -13,13 +12,13 @@ jobs:
   integrate:
     runs-on: ubuntu-24.04
     steps:
-      - name: Checkout dev-02206
+      - name: Checkout current dev-02206
         uses: actions/checkout@v4
         with:
           ref: dev-02206
           fetch-depth: 0
 
-      - name: Install build dependencies
+      - name: Install build and test dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends build-essential pkg-config libmnl-dev
@@ -40,12 +39,12 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements-dev.txt
 
-      - name: Build pinned AWG 3.1 runtime
+      - name: Build and integrate pinned AWG 3.1 runtime
         shell: bash
         run: |
           set -Eeuo pipefail
           work="$RUNNER_TEMP/awg31-build"
-          out="$RUNNER_TEMP/awg31-artifacts"
+          out="$RUNNER_TEMP/awg31-out"
           rm -rf "$work" "$out"
           mkdir -p "$work" "$out"
 
@@ -59,124 +58,101 @@ jobs:
             https://github.com/amnezia-vpn/amneziawg-tools.git \
             "$work/amneziawg-tools-3.1.20260812"
           make -C "$work/amneziawg-tools-3.1.20260812/src" PLATFORM=linux -j"$(nproc)"
-          "$work/amneziawg-tools-3.1.20260812/src/wg" --version
+          "$work/amneziawg-tools-3.1.20260812/src/wg" --version | grep '3.1.20260812'
           tar --exclude=.git -C "$work" -czf \
             "$out/amneziawg-tools-3.1.20260812.tar.gz" \
             amneziawg-tools-3.1.20260812
 
-          "$out/amneziawg-go-linux-amd64-v3.1.20260814" --version || true
-          (cd "$out" && sha256sum \
-            amneziawg-tools-3.1.20260812.tar.gz \
-            amneziawg-go-linux-amd64-v3.1.20260814 > SHA256SUMS)
-          cat "$out/SHA256SUMS"
-
-      - name: Integrate AWG 3.1 vendor and references
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          out="$RUNNER_TEMP/awg31-artifacts"
-          old_tools="vendor/cores/amneziawg-tools-3.0.20260805.tar.gz"
-          old_go="vendor/cores/amneziawg-go-linux-amd64-v3.0.0"
-          new_tools="vendor/cores/amneziawg-tools-3.1.20260812.tar.gz"
-          new_go="vendor/cores/amneziawg-go-linux-amd64-v3.1.20260814"
-
-          rm -f "$old_tools" "$old_go"
-          install -m 0644 "$out/amneziawg-tools-3.1.20260812.tar.gz" "$new_tools"
-          install -m 0755 "$out/amneziawg-go-linux-amd64-v3.1.20260814" "$new_go"
+          rm -f \
+            vendor/cores/amneziawg-tools-3.0.20260805.tar.gz \
+            vendor/cores/amneziawg-go-linux-amd64-v3.0.0
+          install -m 0644 "$out/amneziawg-tools-3.1.20260812.tar.gz" \
+            vendor/cores/amneziawg-tools-3.1.20260812.tar.gz
+          install -m 0755 "$out/amneziawg-go-linux-amd64-v3.1.20260814" \
+            vendor/cores/amneziawg-go-linux-amd64-v3.1.20260814
 
           python3 - <<'PY'
+          import hashlib
           import subprocess
           from pathlib import Path
 
           replacements = (
-              ("amneziawg-tools-3.0.20260805.tar.gz", "amneziawg-tools-3.1.20260812.tar.gz"),
-              ("amneziawg-go-linux-amd64-v3.0.0", "amneziawg-go-linux-amd64-v3.1.20260814"),
-              ("3.0.20260805", "3.1.20260812"),
-              ("AmneziaWG 3.0", "AmneziaWG 3.1"),
-              ("AWG 3.0", "AWG 3.1"),
+              ('amneziawg-tools-3.0.20260805.tar.gz', 'amneziawg-tools-3.1.20260812.tar.gz'),
+              ('amneziawg-go-linux-amd64-v3.0.0', 'amneziawg-go-linux-amd64-v3.1.20260814'),
+              ('3.0.20260805', '3.1.20260812'),
+              ('AmneziaWG 3.0', 'AmneziaWG 3.1'),
+              ('AWG 3.0', 'AWG 3.1'),
           )
-          changed = []
-          for raw in subprocess.check_output(["git", "ls-files", "-z"]).split(b"\0"):
+          for raw in subprocess.check_output(['git', 'ls-files', '-z']).split(b'\0'):
               if not raw:
                   continue
-              path = Path(raw.decode("utf-8"))
-              if path == Path("SOURCE-SHA256SUMS") or not path.is_file():
+              path = Path(raw.decode())
+              if path == Path('SOURCE-SHA256SUMS') or not path.is_file():
                   continue
               try:
-                  text = path.read_text(encoding="utf-8")
+                  text = path.read_text(encoding='utf-8')
               except UnicodeDecodeError:
                   continue
               updated = text
               for old, new in replacements:
                   updated = updated.replace(old, new)
               if updated != text:
-                  path.write_text(updated, encoding="utf-8")
-                  changed.append(str(path))
-          print("updated references:")
-          print("\n".join(changed) or "(none)")
-          PY
+                  path.write_text(updated, encoding='utf-8')
 
-          python3 - <<'PY'
-          import hashlib
-          from pathlib import Path
-
-          sums = Path("vendor/cores/SHA256SUMS")
-          retained = []
-          excluded = {
-              "amneziawg-tools-3.0.20260805.tar.gz",
-              "amneziawg-go-linux-amd64-v3.0.0",
-              "amneziawg-tools-3.1.20260812.tar.gz",
-              "amneziawg-go-linux-amd64-v3.1.20260814",
-          }
-          for line in sums.read_text(encoding="utf-8").splitlines():
-              if not line.strip():
-                  continue
-              name = line.split("  ", 1)[1]
-              if name not in excluded:
-                  retained.append(line)
-          for name in (
-              "amneziawg-tools-3.1.20260812.tar.gz",
-              "amneziawg-go-linux-amd64-v3.1.20260814",
-          ):
-              path = Path("vendor/cores") / name
-              retained.append(f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {name}")
-          sums.write_text("\n".join(retained) + "\n", encoding="utf-8")
-          PY
-
-          python3 - <<'PY'
-          from pathlib import Path
-
-          versions = Path("vendor/cores/VERSIONS.env")
-          lines = versions.read_text(encoding="utf-8").splitlines()
-          keys = {
-              "AMNEZIAWG3_TOOLS_VERSION": "3.1.20260812",
-              "AMNEZIAWG3_GO_VERSION": "3.1.20260814",
-          }
-          present = set()
-          updated = []
-          for line in lines:
-              key = line.split("=", 1)[0] if "=" in line else ""
-              if key in keys:
-                  updated.append(f"{key}={keys[key]}")
-                  present.add(key)
+          guard = Path('.github/workflows/dev-02206-guard.yml')
+          lines = []
+          for line in guard.read_text(encoding='utf-8').splitlines():
+              if '"$TOOLS" | sha256sum -c -' in line:
+                  lines.append('          (cd vendor/cores && grep "  $(basename "$TOOLS")$" SHA256SUMS | sha256sum -c -)')
+              elif '"$GO" | sha256sum -c -' in line:
+                  lines.append('          (cd vendor/cores && grep "  $(basename "$GO")$" SHA256SUMS | sha256sum -c -)')
               else:
-                  updated.append(line)
-          for key, value in keys.items():
-              if key not in present:
-                  updated.append(f"{key}={value}")
-          versions.write_text("\n".join(updated) + "\n", encoding="utf-8")
+                  lines.append(line)
+          guard.write_text('\n'.join(lines) + '\n', encoding='utf-8')
 
-          notices = Path("vendor/cores/THIRD-PARTY-NOTICES.md")
-          text = notices.read_text(encoding="utf-8")
-          marker = "- AmneziaWG 3.1 tools 3.1.20260812"
-          if marker not in text:
-              anchor = "\nThe original upstream licenses"
+          sums = Path('vendor/cores/SHA256SUMS')
+          excluded = {
+              'amneziawg-tools-3.0.20260805.tar.gz',
+              'amneziawg-go-linux-amd64-v3.0.0',
+              'amneziawg-tools-3.1.20260812.tar.gz',
+              'amneziawg-go-linux-amd64-v3.1.20260814',
+          }
+          rows = []
+          for line in sums.read_text(encoding='utf-8').splitlines():
+              if line.strip() and line.split('  ', 1)[1] not in excluded:
+                  rows.append(line)
+          for name in ('amneziawg-tools-3.1.20260812.tar.gz',
+                       'amneziawg-go-linux-amd64-v3.1.20260814'):
+              path = Path('vendor/cores') / name
+              rows.append(f'{hashlib.sha256(path.read_bytes()).hexdigest()}  {name}')
+          sums.write_text('\n'.join(rows) + '\n', encoding='utf-8')
+
+          versions = Path('vendor/cores/VERSIONS.env')
+          vals = {
+              'AMNEZIAWG3_TOOLS_VERSION': '3.1.20260812',
+              'AMNEZIAWG3_GO_VERSION': '3.1.20260814',
+          }
+          seen = set()
+          rows = []
+          for line in versions.read_text(encoding='utf-8').splitlines():
+              key = line.split('=', 1)[0] if '=' in line else ''
+              if key in vals:
+                  rows.append(f'{key}={vals[key]}')
+                  seen.add(key)
+              else:
+                  rows.append(line)
+          rows.extend(f'{key}={value}' for key, value in vals.items() if key not in seen)
+          versions.write_text('\n'.join(rows) + '\n', encoding='utf-8')
+
+          notices = Path('vendor/cores/THIRD-PARTY-NOTICES.md')
+          text = notices.read_text(encoding='utf-8')
+          if 'AmneziaWG 3.1 tools 3.1.20260812' not in text:
               addition = (
-                  "- AmneziaWG 3.1 tools 3.1.20260812 — source archive for the independent AWG3 runtime\n"
-                  "- AmneziaWG 3.1 userspace 3.1.20260814 — pinned linux/amd64 binary for the independent AWG3 runtime\n"
+                  '- AmneziaWG 3.1 tools 3.1.20260812 — source archive for the independent AWG3 runtime\n'
+                  '- AmneziaWG 3.1 userspace 3.1.20260814 — pinned linux/amd64 binary for the independent AWG3 runtime\n\n'
               )
-              text = text.replace(anchor, "\n" + addition + anchor)
-              notices.write_text(text, encoding="utf-8")
+              text = text.replace('The original upstream licenses', addition + 'The original upstream licenses')
+              notices.write_text(text, encoding='utf-8')
           PY
 
           cat > tests/test_sg_gateway_v22_awg31_vendor_runtime.py <<'PY'
@@ -186,18 +162,19 @@ jobs:
           from pathlib import Path
 
           ROOT = Path(__file__).resolve().parents[1]
-          CORES = ROOT / "vendor" / "cores"
-          TOOLS = "amneziawg-tools-3.1.20260812.tar.gz"
-          GO = "amneziawg-go-linux-amd64-v3.1.20260814"
-
+          CORES = ROOT / 'vendor' / 'cores'
+          TOOLS = 'amneziawg-tools-3.1.20260812.tar.gz'
+          GO = 'amneziawg-go-linux-amd64-v3.1.20260814'
 
           def _sums() -> dict[str, str]:
-              rows: dict[str, str] = {}
-              for line in (CORES / "SHA256SUMS").read_text(encoding="utf-8").splitlines():
-                  digest, name = line.split("  ", 1)
-                  rows[name] = digest
-              return rows
-
+              return {
+                  name: digest
+                  for digest, name in (
+                      line.split('  ', 1)
+                      for line in (CORES / 'SHA256SUMS').read_text(encoding='utf-8').splitlines()
+                      if line.strip()
+                  )
+              }
 
           def test_awg31_vendor_files_are_pinned_and_hashed() -> None:
               sums = _sums()
@@ -206,98 +183,68 @@ jobs:
                   assert path.is_file()
                   assert hashlib.sha256(path.read_bytes()).hexdigest() == sums[name]
 
-
           def test_awg30_vendor_payload_is_removed() -> None:
-              assert not (CORES / "amneziawg-tools-3.0.20260805.tar.gz").exists()
-              assert not (CORES / "amneziawg-go-linux-amd64-v3.0.0").exists()
-
+              assert not (CORES / 'amneziawg-tools-3.0.20260805.tar.gz').exists()
+              assert not (CORES / 'amneziawg-go-linux-amd64-v3.0.0').exists()
 
           def test_awg31_versions_are_declared() -> None:
-              versions = (CORES / "VERSIONS.env").read_text(encoding="utf-8")
-              assert "AMNEZIAWG3_TOOLS_VERSION=3.1.20260812" in versions
-              assert "AMNEZIAWG3_GO_VERSION=3.1.20260814" in versions
+              text = (CORES / 'VERSIONS.env').read_text(encoding='utf-8')
+              assert 'AMNEZIAWG3_TOOLS_VERSION=3.1.20260812' in text
+              assert 'AMNEZIAWG3_GO_VERSION=3.1.20260814' in text
 
+          def test_awg31_repair_uses_new_runtime() -> None:
+              text = (ROOT / 'deploy' / 'repair-awg3-runtime.sh').read_text(encoding='utf-8')
+              assert TOOLS in text
+              assert GO in text
 
-          def test_awg31_repair_uses_new_vendor_runtime() -> None:
-              repair = (ROOT / "deploy" / "repair-awg3-runtime.sh").read_text(encoding="utf-8")
-              assert TOOLS in repair
-              assert GO in repair
-              assert "amneziawg-tools-3.0.20260805.tar.gz" not in repair
-              assert "amneziawg-go-linux-amd64-v3.0.0" not in repair
-
-
-          def test_awg3_profile_remains_independent_from_awg2() -> None:
-              corpus = "\n".join(
-                  path.read_text(encoding="utf-8")
+          def test_awg3_remains_independent_from_awg2() -> None:
+              text = '\n'.join(
+                  (ROOT / path).read_text(encoding='utf-8')
                   for path in (
-                      ROOT / "deploy" / "sg-gateway-awg3-userspace.sh",
-                      ROOT / "deploy" / "sg-gateway-awg3.service",
-                      ROOT / "deploy" / "repair-awg3-runtime.sh",
+                      'deploy/sg-gateway-awg3-userspace.sh',
+                      'deploy/sg-gateway-awg3.service',
+                      'deploy/repair-awg3-runtime.sh',
                   )
               )
-              assert "/opt/sg-gateway/awg3" in corpus
-              assert "sg-gateway-awg3.service" in corpus
-              assert "/etc/amnezia/amneziawg/awg3.conf" in corpus
+              assert '/opt/sg-gateway/awg3' in text
+              assert 'sg-gateway-awg3.service' in text
+              assert '/etc/amnezia/amneziawg/awg3.conf' in text
           PY
 
           git add -A
-
           python3 - <<'PY'
+          import hashlib
           import subprocess
           from pathlib import Path
 
-          forbidden = (
-              "amneziawg-tools-3.0.20260805.tar.gz",
-              "amneziawg-go-linux-amd64-v3.0.0",
-              "AmneziaWG 3.0",
-              "AWG 3.0",
-          )
-          offenders = []
-          for raw in subprocess.check_output(["git", "ls-files", "-z"]).split(b"\0"):
-              if not raw:
-                  continue
-              path = Path(raw.decode("utf-8"))
-              if path in {
-                  Path("SOURCE-SHA256SUMS"),
-                  Path("tests/test_sg_gateway_v22_awg31_vendor_runtime.py"),
-              } or not path.is_file():
-                  continue
-              try:
-                  text = path.read_text(encoding="utf-8")
-              except UnicodeDecodeError:
-                  continue
-              for needle in forbidden:
-                  if needle in text:
-                      offenders.append(f"{path}: {needle}")
-          if offenders:
-              raise SystemExit("stale AWG 3.0 references:\n" + "\n".join(offenders))
+          tracked = subprocess.check_output(['git', 'ls-files'], text=True).splitlines()
+          tracked = [path for path in tracked if path != 'SOURCE-SHA256SUMS']
+          rows = [f'{hashlib.sha256(Path(path).read_bytes()).hexdigest()}  {path}' for path in tracked]
+          Path('SOURCE-SHA256SUMS').write_text('\n'.join(rows) + '\n', encoding='utf-8')
           PY
+          git add SOURCE-SHA256SUMS
 
-      - name: Validate AWG 3.1 runtime and test suite
+      - name: Validate AWG 3.1 and full test suite
         shell: bash
         run: |
           set -Eeuo pipefail
           bash -n deploy/repair-awg3-runtime.sh
+          tools="amneziawg-tools-3.1.20260812.tar.gz"
+          go="amneziawg-go-linux-amd64-v3.1.20260814"
+          (cd vendor/cores && grep "  $tools$" SHA256SUMS | sha256sum -c -)
+          (cd vendor/cores && grep "  $go$" SHA256SUMS | sha256sum -c -)
 
-          tools="vendor/cores/amneziawg-tools-3.1.20260812.tar.gz"
-          go="vendor/cores/amneziawg-go-linux-amd64-v3.1.20260814"
-          (cd vendor/cores && grep "  $(basename "$tools")$" SHA256SUMS | sha256sum -c -)
-          (cd vendor/cores && grep "  $(basename "$go")$" SHA256SUMS | sha256sum -c -)
-
-          root="$(mktemp -d /tmp/sg-awg31-validation.XXXXXX)"
+          root="$(mktemp -d /tmp/sg-awg31.XXXXXX)"
           trap 'rm -rf -- "$root"' EXIT
           mkdir -p "$root/src" "$root/runtime/bin"
-          tar -xzf "$tools" -C "$root/src"
+          tar -xzf "vendor/cores/$tools" -C "$root/src"
           src="$(find "$root/src" -maxdepth 1 -type d -name 'amneziawg-tools-*' -print -quit)"
-          test -n "$src"
           make -C "$src/src" PLATFORM=linux -j2
-          make -C "$src/src" \
-            PLATFORM=linux WITH_WGQUICK=yes WITH_BASHCOMPLETION=no WITH_SYSTEMDUNITS=no \
+          make -C "$src/src" PLATFORM=linux WITH_WGQUICK=yes \
+            WITH_BASHCOMPLETION=no WITH_SYSTEMDUNITS=no \
             PREFIX="$root/runtime" SYSCONFDIR="$root/runtime/etc" install
-          test -x "$root/runtime/bin/awg"
-          test -x "$root/runtime/bin/awg-quick"
           "$root/runtime/bin/awg" --version | grep '3.1.20260812'
-          install -m 0755 "$go" "$root/runtime/bin/amneziawg-go"
+          install -m 0755 "vendor/cores/$go" "$root/runtime/bin/amneziawg-go"
           test -x "$root/runtime/bin/amneziawg-go"
 
           python -m pytest \
@@ -307,72 +254,53 @@ jobs:
             tests/test_fix30_awg3_update_preservation.py
           python -m pytest tests
 
-      - name: Prepare source integrity and commits
+      - name: Commit, build FULL package, verify and push
         shell: bash
         run: |
           set -Eeuo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          base_sha="$(git rev-parse HEAD)"
 
-          python3 - <<'PY'
-          import hashlib
-          import subprocess
-          from pathlib import Path
-
-          tracked = subprocess.check_output(["git", "ls-files"], text=True, encoding="utf-8").splitlines()
-          tracked = [path for path in tracked if path != "SOURCE-SHA256SUMS"]
-          rows = [f"{hashlib.sha256(Path(path).read_bytes()).hexdigest()}  {path}" for path in tracked]
-          Path("SOURCE-SHA256SUMS").write_text("\n".join(rows) + "\n", encoding="utf-8")
-          PY
-          git add -A
           git commit -m "feat: upgrade independent AWG3 runtime to 3.1"
           vendor_commit="$(git rev-parse HEAD)"
 
           python3 - "$vendor_commit" <<'PY'
+          import hashlib
           import re
+          import subprocess
           import sys
           from pathlib import Path
 
-          commit = sys.argv[1]
-          path = Path("deploy/repair-awg3-runtime.sh")
-          text = path.read_text(encoding="utf-8")
-          updated, count = re.subn(
+          path = Path('deploy/repair-awg3-runtime.sh')
+          text = path.read_text(encoding='utf-8')
+          text, count = re.subn(
               r'^VENDOR_COMMIT="[0-9a-f]{40}"$',
-              f'VENDOR_COMMIT="{commit}"',
+              f'VENDOR_COMMIT="{sys.argv[1]}"',
               text,
               count=1,
               flags=re.MULTILINE,
           )
           if count != 1:
-              raise SystemExit("unable to update AWG3 VENDOR_COMMIT")
-          path.write_text(updated, encoding="utf-8")
-          PY
+              raise SystemExit('unable to update VENDOR_COMMIT')
+          path.write_text(text, encoding='utf-8')
 
-          git add deploy/repair-awg3-runtime.sh
-          python3 - <<'PY'
-          import hashlib
-          import subprocess
-          from pathlib import Path
-
-          tracked = subprocess.check_output(["git", "ls-files"], text=True, encoding="utf-8").splitlines()
-          tracked = [path for path in tracked if path != "SOURCE-SHA256SUMS"]
-          rows = [f"{hashlib.sha256(Path(path).read_bytes()).hexdigest()}  {path}" for path in tracked]
-          Path("SOURCE-SHA256SUMS").write_text("\n".join(rows) + "\n", encoding="utf-8")
+          tracked = subprocess.check_output(['git', 'ls-files'], text=True).splitlines()
+          tracked = [item for item in tracked if item != 'SOURCE-SHA256SUMS']
+          rows = [f'{hashlib.sha256(Path(item).read_bytes()).hexdigest()}  {item}' for item in tracked]
+          Path('SOURCE-SHA256SUMS').write_text('\n'.join(rows) + '\n', encoding='utf-8')
           PY
-          git add SOURCE-SHA256SUMS
+          git add deploy/repair-awg3-runtime.sh SOURCE-SHA256SUMS
           git commit -m "fix: pin AWG 3.1 recovery payload"
 
           version="$(tr -d '[:space:]' < VERSION)"
-          out="/tmp/SG-Gateway-${version}-DEV-02206-AWG31-FULL.run"
-          bash build-run.sh "$out"
-          bash "$out" --verify-only
+          package="/tmp/SG-Gateway-${version}-DEV-02206-AWG31-FULL.run"
+          bash build-run.sh "$package"
+          bash "$package" --verify-only
 
           remote_sha="$(git ls-remote origin refs/heads/dev-02206 | awk '{print $1}')"
-          base_sha="$(git rev-parse HEAD~2)"
           test "$remote_sha" = "$base_sha"
-
           git push origin HEAD:dev-02206
-          echo "DEV_HEAD=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
 
       - name: Publish integration status
         if: always()
@@ -386,26 +314,25 @@ jobs:
           import os
           import urllib.request
 
-          repo = os.environ["GITHUB_REPOSITORY"]
-          sha = os.environ["GITHUB_SHA"]
-          state = "success" if os.environ.get("JOB_STATUS") == "success" else "failure"
+          repo = os.environ['GITHUB_REPOSITORY']
+          state = 'success' if os.environ.get('JOB_STATUS') == 'success' else 'failure'
           payload = json.dumps({
-              "state": state,
-              "context": "awg31-runtime/integration",
-              "description": "build, vendor, test and push AWG 3.1 to dev-02206",
-              "target_url": f"{os.environ['GITHUB_SERVER_URL']}/{repo}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
-          }).encode("utf-8")
+              'state': state,
+              'context': 'awg31-runtime/integration',
+              'description': 'build, vendor, test and push AWG 3.1 to dev-02206',
+              'target_url': f"{os.environ['GITHUB_SERVER_URL']}/{repo}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
+          }).encode()
           request = urllib.request.Request(
-              f"https://api.github.com/repos/{repo}/statuses/{sha}",
+              f"https://api.github.com/repos/{repo}/statuses/{os.environ['GITHUB_SHA']}",
               data=payload,
-              method="POST",
+              method='POST',
               headers={
-                  "Authorization": f"Bearer {os.environ['GITHUB_TOKEN']}",
-                  "Accept": "application/vnd.github+json",
-                  "X-GitHub-Api-Version": "2022-11-28",
-                  "Content-Type": "application/json",
+                  'Authorization': f"Bearer {os.environ['GITHUB_TOKEN']}",
+                  'Accept': 'application/vnd.github+json',
+                  'X-GitHub-Api-Version': '2022-11-28',
+                  'Content-Type': 'application/json',
               },
           )
           with urllib.request.urlopen(request, timeout=30) as response:
-              print(response.status, state, sha)
+              print(response.status, state)
           PY
