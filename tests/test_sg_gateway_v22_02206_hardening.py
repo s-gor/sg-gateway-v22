@@ -147,7 +147,7 @@ def test_mieru_router_http_registration_is_idempotent() -> None:
     assert endpoints.count("device_mieru_router_qr") == 1
 
 
-def test_mieru_ui_has_six_primary_actions_and_smart_qr_metadata() -> None:
+def test_mieru_ui_keeps_all_actions_visible_and_smart_qr_metadata() -> None:
     script = (ROOT / "app" / "web" / "static" / "sg-device-collapse-v1.js").read_text(encoding="utf-8")
     css = (ROOT / "app" / "web" / "static" / "sg-client-qr-modal-v1.css").read_text(encoding="utf-8")
     assert "QR · Mieru" in script
@@ -155,7 +155,8 @@ def test_mieru_ui_has_six_primary_actions_and_smart_qr_metadata() -> None:
     assert "QR · Router / ZB" in script
     assert "JSON · iPhone" in script
     assert "QR · iPhone" in script
-    assert "Другие форматы" in script
+    assert "Другие форматы" not in script
+    assert "...advancedItems" in script
     assert "iPhone JSON" in script
     assert "Сканируйте в приложении" in script
     assert ".sg-smart-qr-meta" in css
