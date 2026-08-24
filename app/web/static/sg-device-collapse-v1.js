@@ -179,20 +179,8 @@
 
       const routerQr = createRouterQr(mieruQr);
       const advancedItems = [downloadLink, jsonDownload, yamlDownload].filter(Boolean);
-      let more = null;
-      if (advancedItems.length) {
-        more = document.createElement('details');
-        more.className = 'sg-mieru-more';
-        const summary = document.createElement('summary');
-        summary.className = 'button';
-        summary.textContent = 'Другие форматы';
-        const menu = document.createElement('div');
-        menu.className = 'sg-mieru-more-menu';
-        advancedItems.forEach(item => menu.appendChild(item));
-        more.append(summary, menu);
-      }
 
-      [linkButton, mieruQr, routerButton, routerQr, iphoneButton, iphoneQr, more].filter(Boolean).forEach(item => actions.appendChild(item));
+      [linkButton, mieruQr, routerButton, routerQr, iphoneButton, iphoneQr, ...advancedItems].filter(Boolean).forEach(item => actions.appendChild(item));
       row.dataset.sgMieruActionsReady = '1';
     });
   }
