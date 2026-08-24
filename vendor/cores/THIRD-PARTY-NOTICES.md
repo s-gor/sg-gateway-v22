@@ -11,5 +11,8 @@ Pinned set:
 - AmneziaWG tools 1.0.20260618-2 — source archive
 - AmneziaWG Linux kernel module 1.0.20260329-2 — source archive, installed through DKMS
 
+- AmneziaWG 3.1 tools 3.1.20260812 — source archive for the independent AWG3 runtime
+- AmneziaWG 3.1 userspace 3.1.20260814 — pinned linux/amd64 binary for the independent AWG3 runtime
+
 The original upstream licenses and notices contained in each project remain applicable.
 SHA-256 values used by SG-Gateway are stored in `SHA256SUMS`.

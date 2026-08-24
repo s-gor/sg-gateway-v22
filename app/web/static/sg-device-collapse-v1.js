@@ -45,7 +45,7 @@
     });
 
     setLabelTitle(byValue.get('amneziawg'), 'AmneziaWG 2.0');
-    setLabelTitle(byValue.get('amneziawg3'), 'AmneziaWG 3.0');
+    setLabelTitle(byValue.get('amneziawg3'), 'AmneziaWG 3.1');
 
     if (addMode) {
       setAvailableNote(byValue.get('xray_reality_tcp'), 'Отдельный профиль и QR');

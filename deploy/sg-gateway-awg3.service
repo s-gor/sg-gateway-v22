@@ -1,5 +1,5 @@
 [Unit]
-Description=SG-Gateway AmneziaWG 3.0 userspace awg3
+Description=SG-Gateway AmneziaWG 3.1 userspace awg3
 After=network-online.target
 Wants=network-online.target
 ConditionPathExists=/etc/amnezia/amneziawg/awg3.conf

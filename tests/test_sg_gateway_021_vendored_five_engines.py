@@ -37,8 +37,8 @@ def test_all_eight_vendor_files_are_required():
         "wgcf-cli-linux-64.tar.zstd",
         "amneziawg-tools-1.0.20260618-2.tar.gz",
         "amneziawg-linux-kernel-module-1.0.20260329-2.tar.gz",
-        "amneziawg-tools-3.0.20260805.tar.gz",
-        "amneziawg-go-linux-amd64-v3.0.0",
+        "amneziawg-tools-3.1.20260812.tar.gz",
+        "amneziawg-go-linux-amd64-v3.1.20260814",
     ):
         assert name in installer
         assert (ROOT / "vendor" / "cores" / name).is_file()

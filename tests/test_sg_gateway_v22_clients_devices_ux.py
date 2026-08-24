@@ -15,7 +15,7 @@ def test_protocol_picker_is_unified_for_current_eight_protocols_only() -> None:
     assert 'normalizeProtocolPickers()' in body
     assert 'picker.open = true' in body
     assert "setLabelTitle(byValue.get('amneziawg'), 'AmneziaWG 2.0')" in body
-    assert "setLabelTitle(byValue.get('amneziawg3'), 'AmneziaWG 3.0')" in body
+    assert "setLabelTitle(byValue.get('amneziawg3'), 'AmneziaWG 3.1')" in body
     assert "setAvailableNote(byValue.get('amneziawg3'), 'UDP 586 · userspace-конфигурация и QR')" in body
 
 def test_device_cards_start_collapsed_without_layout_jump() -> None:

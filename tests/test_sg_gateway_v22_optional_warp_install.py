@@ -30,7 +30,7 @@ def test_optional_warp_fix_preserves_awg2_xmux_and_isolates_awg3() -> None:
     installer = (ROOT / 'install.sh').read_text(encoding='utf-8').lower()
     assert 'amneziawg_tools_version="1.0.20260618-2"' in installer
     assert 'amneziawg_kmod_version="1.0.20260329-2"' in installer
-    assert 'awg3_tools_version="3.0.20260805"' in installer
+    assert 'awg3_tools_version="3.1.20260812"' in installer
     assert 'prefix="$prefix/awg3" install' in installer
     assert 'amneziawg-linux-kernel-module-3.0' not in installer
     assert (ROOT / 'app/xray/xmux.py').is_file()

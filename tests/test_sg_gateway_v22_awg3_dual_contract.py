@@ -56,9 +56,9 @@ def test_awg3_installer_is_userspace_only_and_awg2_stays_frozen():
     text = Path("install.sh").read_text(encoding="utf-8")
     assert 'AMNEZIAWG_TOOLS_VERSION="1.0.20260618-2"' in text
     assert 'AMNEZIAWG_KMOD_VERSION="1.0.20260329-2"' in text
-    assert 'AWG3_TOOLS_VERSION="3.0.20260805"' in text
+    assert 'AWG3_TOOLS_VERSION="3.1.20260812"' in text
     assert 'PREFIX="$PREFIX/awg3" install' in text
-    assert 'amneziawg-go-linux-amd64-v3.0.0' in text
+    assert 'amneziawg-go-linux-amd64-v3.1.20260814' in text
     assert 'amneziawg-linux-kernel-module-3.0' not in text
     assert 'AMNEZIAWG_KMOD_VERSION="3.' not in text
 
@@ -92,5 +92,5 @@ def test_client_dataclass_keeps_pre_awg3_constructor_compatible():
 def test_device_picker_orders_both_awg_generations():
     body = Path("app/web/static/sg-device-collapse-v1.js").read_text(encoding="utf-8")
     assert "'amneziawg3'" in body
-    assert "AmneziaWG 3.0" in body
+    assert "AmneziaWG 3.1" in body
     assert "UDP 586 · userspace-конфигурация и QR" in body

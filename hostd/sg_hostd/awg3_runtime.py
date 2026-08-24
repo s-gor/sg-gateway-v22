@@ -447,7 +447,7 @@ def apply_awg3() -> cr.EngineResult:
             raise cr.ClientRuntimeError("AWG3: runtime не слушает заданный endpoint после запуска")
 
         cr._set_engine_status(ENGINE, ids, "applied")
-        return cr.EngineResult(ENGINE, True, f"AmneziaWG 3.0 userspace применён; клиентов: {len(rows)}", len(rows))
+        return cr.EngineResult(ENGINE, True, f"AmneziaWG 3.1 userspace применён; клиентов: {len(rows)}", len(rows))
     except Exception as exc:
         if backup.is_file():
             shutil.copy2(backup, AWG3_CONFIG)

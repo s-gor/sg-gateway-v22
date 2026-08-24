@@ -170,7 +170,7 @@ def build_awg3_config(client: Client, device: Device | None = None) -> ClientExp
             endpoint = _format_endpoint(endpoint_host, endpoint_port)
     except Exception:
         pass
-    body = f"""# SG-Gateway AmneziaWG 3.0
+    body = f"""# SG-Gateway AmneziaWG 3.1
 # Access: {label}
 
 [Interface]
