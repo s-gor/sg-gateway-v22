@@ -43,7 +43,7 @@ jobs:
 
           git clone --depth 1 --branch v3.1.20260812 https://github.com/amnezia-vpn/amneziawg-tools.git "$work/amneziawg-tools-3.1.20260812"
           make -C "$work/amneziawg-tools-3.1.20260812/src" PLATFORM=linux -j"$(nproc)"
-          "$work/amneziawg-tools-3.1.20260812/src/awg" --version
+          "$work/amneziawg-tools-3.1.20260812/src/wg" --version
           tar --exclude=.git -C "$work" -czf "$out/amneziawg-tools-3.1.20260812.tar.gz" amneziawg-tools-3.1.20260812
 
           "$out/amneziawg-go-linux-amd64-v3.1.20260814" --version || true
