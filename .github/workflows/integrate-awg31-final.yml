@@ -18,9 +18,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Preserve driver and checkout dev-02206
+      - name: Preserve drivers and checkout dev-02206
         run: |
           cp .ci/integrate-awg31-final.sh "$RUNNER_TEMP/integrate-awg31-final.sh"
+          cp .ci/run-awg31-final-v2.sh "$RUNNER_TEMP/run-awg31-final-v2.sh"
           git fetch origin dev-02206
           git checkout -B dev-02206 origin/dev-02206
 
@@ -47,7 +48,7 @@ jobs:
 
       - name: Build, test, commit and push AWG 3.1
         shell: bash
-        run: bash "$RUNNER_TEMP/integrate-awg31-final.sh"
+        run: bash "$RUNNER_TEMP/run-awg31-final-v2.sh"
 
       - name: Publish integration status
         if: always()
