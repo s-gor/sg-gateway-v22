@@ -93,10 +93,17 @@ jobs:
           command -v cc
           command -v pkg-config
           command -v sha256sum
-          TOOLS="vendor/cores/amneziawg-tools-3.0.20260805.tar.gz"
-          GO="vendor/cores/amneziawg-go-linux-amd64-v3.0.0"
-          printf '%s  %s\n' '090f9383532822a756d078890b447e00af7f46bd30a10f9f47c46d633d807b19' "$TOOLS" | sha256sum -c -
-          printf '%s  %s\n' '131110027db6d5dc0e35b19eb5b8a2692676081366c34112088dc68bbb050bcd' "$GO" | sha256sum -c -
+          if [[ -f vendor/cores/amneziawg-tools-3.1.20260812.tar.gz ]]; then
+            TOOLS="vendor/cores/amneziawg-tools-3.1.20260812.tar.gz"
+            GO="vendor/cores/amneziawg-go-linux-amd64-v3.1.20260814"
+            EXPECTED_TOOLS_VERSION="3.1.20260812"
+          else
+            TOOLS="vendor/cores/amneziawg-tools-3.0.20260805.tar.gz"
+            GO="vendor/cores/amneziawg-go-linux-amd64-v3.0.0"
+            EXPECTED_TOOLS_VERSION="3.0.20260805"
+          fi
+          (cd vendor/cores && grep "  $(basename "$TOOLS")$" SHA256SUMS | sha256sum -c -)
+          (cd vendor/cores && grep "  $(basename "$GO")$" SHA256SUMS | sha256sum -c -)
           AWG3_TEST_ROOT="$(mktemp -d /tmp/sg-awg3-focused.XXXXXX)"
           trap 'rm -rf -- "$AWG3_TEST_ROOT"' EXIT
           mkdir -p "$AWG3_TEST_ROOT/src" "$AWG3_TEST_ROOT/runtime/bin"
@@ -109,7 +116,7 @@ jobs:
             PREFIX="$AWG3_TEST_ROOT/runtime" SYSCONFDIR="$AWG3_TEST_ROOT/runtime/etc" install
           test -x "$AWG3_TEST_ROOT/runtime/bin/awg"
           test -x "$AWG3_TEST_ROOT/runtime/bin/awg-quick"
-          "$AWG3_TEST_ROOT/runtime/bin/awg" --version
+          "$AWG3_TEST_ROOT/runtime/bin/awg" --version | grep "$EXPECTED_TOOLS_VERSION"
           install -m 0755 "$GO" "$AWG3_TEST_ROOT/runtime/bin/amneziawg-go"
           test -x "$AWG3_TEST_ROOT/runtime/bin/amneziawg-go"
           test -d "$AWG3_TEST_ROOT/runtime/etc/amnezia/amneziawg"
