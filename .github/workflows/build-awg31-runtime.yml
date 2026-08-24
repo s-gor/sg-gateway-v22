@@ -11,56 +11,23 @@ jobs:
   align:
     runs-on: ubuntu-24.04
     steps:
-      - name: Checkout repository
+      - name: Checkout helper branch
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Align test and source integrity on dev-02206
+      - name: Publish aligned test and source integrity
         shell: bash
         run: |
           set -Eeuo pipefail
+          cp .github/scripts/align_awg31_pin.py /tmp/align_awg31_pin.py
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           for attempt in 1 2 3; do
             git fetch origin dev-02206
             git checkout -B dev-02206 origin/dev-02206
-
-            python3 - <<'PY'
-            import hashlib
-            import re
-            import subprocess
-            from pathlib import Path
-
-            repair = Path('deploy/repair-awg3-runtime.sh').read_text(encoding='utf-8')
-            match = re.search(r'^VENDOR_COMMIT="([0-9a-f]{40})"$', repair, re.MULTILINE)
-            if match is None:
-                raise SystemExit('AWG3 VENDOR_COMMIT not found')
-            vendor_commit = match.group(1)
-
-            test_path = Path('tests/test_sg_gateway_v22_awg3_runtime_repair.py')
-            test_text = test_path.read_text(encoding='utf-8')
-            updated, count = re.subn(
-                r'assert \'VENDOR_COMMIT="[0-9a-f]{40}"\' in body',
-                f'assert \'VENDOR_COMMIT="{vendor_commit}"\' in body',
-                test_text,
-                count=1,
-            )
-            if count != 1:
-                raise SystemExit('pinned VENDOR_COMMIT assertion not found')
-            test_path.write_text(updated, encoding='utf-8')
-
-            tracked = subprocess.check_output(['git', 'ls-files'], text=True, encoding='utf-8').splitlines()
-            tracked = [path for path in tracked if path != 'SOURCE-SHA256SUMS']
-            rows = [
-                f'{hashlib.sha256(Path(path).read_bytes()).hexdigest()}  {path}'
-                for path in tracked
-            ]
-            Path('SOURCE-SHA256SUMS').write_text('\n'.join(rows) + '\n', encoding='utf-8')
-            print(f'aligned recovery pin test to {vendor_commit}')
-            PY
-
+            python3 /tmp/align_awg31_pin.py
             git add tests/test_sg_gateway_v22_awg3_runtime_repair.py SOURCE-SHA256SUMS
             if git diff --cached --quiet; then
               echo "No alignment change required"
