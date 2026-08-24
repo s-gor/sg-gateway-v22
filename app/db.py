@@ -318,7 +318,8 @@ def _migrate_clients_to_devices(connection: sqlite3.Connection) -> None:
             """,
             (client_id,),
         ).fetchone()
-        if primary is None:
+        created_primary = primary is None
+        if created_primary:
             cursor = connection.execute(
                 """
                 INSERT INTO devices (
@@ -332,15 +333,20 @@ def _migrate_clients_to_devices(connection: sqlite3.Connection) -> None:
         else:
             primary_id = int(primary["id"])
 
-        legacy = connection.execute(
-            """
-            SELECT engine, status, engine_object_id, config_json, created_at
-            FROM client_deployments
-            WHERE client_id = ?
-            ORDER BY id
-            """,
-            (client_id,),
-        ).fetchall()
+        # Import the legacy table only while creating the primary device.
+        # init_db() runs repeatedly; re-importing missing rows on every call
+        # would resurrect protocols that the user intentionally removed later.
+        legacy = []
+        if created_primary:
+            legacy = connection.execute(
+                """
+                SELECT engine, status, engine_object_id, config_json, created_at
+                FROM client_deployments
+                WHERE client_id = ?
+                ORDER BY id
+                """,
+                (client_id,),
+            ).fetchall()
         for item in legacy:
             config_json = item["config_json"]
             if str(item["engine"]) == "xray":
