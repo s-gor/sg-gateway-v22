@@ -173,7 +173,7 @@ cf19d31658c99240b87335618e9bc3af9cd02c9384c9d5a98a1e5bc4956edde0  app/web/static
 857eed44e9ee368863e3675dca7c0539da32dee960113ffecea4254186202894  app/web/static/sg-device-collapse-v1.js
 a272b19b5a40407b134c1715c06eac930b1fd1395e47d8f8175c43365865f5c6  app/web/static/sg-device-collapse-v4.css
 c81d7e058061474e528581748960fc0789b1b1d78ca253b823463e9b959d3914  app/web/static/sg-device-expanded-cleanup-v1.css
-a9505a1384cd4a81c3317becc1e72c803abf3db30de5a892852d7f23053872a9  app/web/static/sg-devices-v46.css
+5d8df8073eda173adc64aecd06f71750babec5a9cb56ccb8d84af41cb9df6230  app/web/static/sg-devices-v46.css
 d7c3c7b304f9c1ee1a5e22b699d72fe13690acc4ff5ae8c2cdeeebe4237e8e0c  app/web/static/sg-disk-breakdown-v1.css
 80234fcd5b768ade00119457d17ae72fd78c7bf3704d276ecc6d181fd9ab9ef8  app/web/static/sg-disk-breakdown-v2.js
 fe1dee88a7f2a57b71181542fae1165b8b9b166fe0b213094d469699a1fff959  app/web/static/sg-disk-cleanup-v1.css
