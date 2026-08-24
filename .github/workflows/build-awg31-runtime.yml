@@ -4,9 +4,6 @@ on:
   push:
     branches:
       - build-awg31-runtime-20260824
-  pull_request:
-    branches:
-      - build-awg31-runtime-20260824
 
 permissions:
   contents: read
@@ -30,6 +27,16 @@ jobs:
           go-version: '1.25.0'
           cache: false
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Package Python test dependencies
+        run: |
+          python -m pip install --target "$RUNNER_TEMP/python-deps" -r requirements-dev.txt
+          tar -C "$RUNNER_TEMP/python-deps" -czf "$RUNNER_TEMP/python-deps-py313.tar.gz" .
+
       - name: Build pinned AWG 3.1 artifacts
         shell: bash
         run: |
@@ -37,44 +44,29 @@ jobs:
           work="$RUNNER_TEMP/awg31-build"
           out="$RUNNER_TEMP/awg31-artifacts"
           mkdir -p "$work" "$out"
-
           git clone --depth 1 --branch v3.1.20260814 https://github.com/amnezia-vpn/amneziawg-go.git "$work/amneziawg-go"
           make -C "$work/amneziawg-go" amneziawg-go
           install -m 0755 "$work/amneziawg-go/amneziawg-go" "$out/amneziawg-go-linux-amd64-v3.1.20260814"
-
           git clone --depth 1 --branch v3.1.20260812 https://github.com/amnezia-vpn/amneziawg-tools.git "$work/amneziawg-tools-3.1.20260812"
           make -C "$work/amneziawg-tools-3.1.20260812/src" PLATFORM=linux -j"$(nproc)"
           "$work/amneziawg-tools-3.1.20260812/src/wg" --version
           tar --exclude=.git -C "$work" -czf "$out/amneziawg-tools-3.1.20260812.tar.gz" amneziawg-tools-3.1.20260812
-
           "$out/amneziawg-go-linux-amd64-v3.1.20260814" --version || true
           (cd "$out" && sha256sum amneziawg-tools-3.1.20260812.tar.gz amneziawg-go-linux-amd64-v3.1.20260814 > SHA256SUMS)
-          cat "$out/SHA256SUMS"
 
       - name: Package current dev-02206 source
-        shell: bash
         run: |
-          set -Eeuo pipefail
           git fetch --depth=1 origin dev-02206
           git archive --format=tar.gz --output "$RUNNER_TEMP/dev-02206-source.tar.gz" origin/dev-02206
-          test -s "$RUNNER_TEMP/dev-02206-source.tar.gz"
 
-      - name: Upload AWG 3.1 artifacts
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: awg31-runtime-linux-amd64
+          name: awg31-build-bundle
           path: |
-            ${{ runner.temp }}/awg31-artifacts/amneziawg-tools-3.1.20260812.tar.gz
-            ${{ runner.temp }}/awg31-artifacts/amneziawg-go-linux-amd64-v3.1.20260814
-            ${{ runner.temp }}/awg31-artifacts/SHA256SUMS
-          if-no-files-found: error
-          retention-days: 1
-
-      - name: Upload dev-02206 source
-        uses: actions/upload-artifact@v4
-        with:
-          name: dev-02206-source
-          path: ${{ runner.temp }}/dev-02206-source.tar.gz
+            ${{ runner.temp }}/awg31-artifacts/*
+            ${{ runner.temp }}/dev-02206-source.tar.gz
+            ${{ runner.temp }}/python-deps-py313.tar.gz
           if-no-files-found: error
           retention-days: 1
 
@@ -86,30 +78,12 @@ jobs:
           JOB_STATUS: ${{ job.status }}
         run: |
           python3 - <<'PY'
-          import json
-          import os
-          import urllib.request
-
+          import json, os, urllib.request
           repo = os.environ['GITHUB_REPOSITORY']
           sha = os.environ['GITHUB_SHA']
           state = 'success' if os.environ.get('JOB_STATUS') == 'success' else 'failure'
-          payload = json.dumps({
-              'state': state,
-              'context': 'awg31-runtime/build',
-              'description': 'pinned AWG 3.1 runtime artifacts + dev source',
-              'target_url': f"{os.environ['GITHUB_SERVER_URL']}/{repo}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
-          }).encode('utf-8')
-          request = urllib.request.Request(
-              f'https://api.github.com/repos/{repo}/statuses/{sha}',
-              data=payload,
-              method='POST',
-              headers={
-                  'Authorization': f"Bearer {os.environ['GITHUB_TOKEN']}",
-                  'Accept': 'application/vnd.github+json',
-                  'X-GitHub-Api-Version': '2022-11-28',
-                  'Content-Type': 'application/json',
-              },
-          )
+          payload = json.dumps({'state': state, 'context': 'awg31-runtime/build', 'description': 'AWG 3.1 artifacts + Python deps', 'target_url': f"{os.environ['GITHUB_SERVER_URL']}/{repo}/actions/runs/{os.environ['GITHUB_RUN_ID']}"}).encode()
+          request = urllib.request.Request(f'https://api.github.com/repos/{repo}/statuses/{sha}', data=payload, method='POST', headers={'Authorization': f"Bearer {os.environ['GITHUB_TOKEN']}", 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28', 'Content-Type': 'application/json'})
           with urllib.request.urlopen(request, timeout=30) as response:
-              print(f'build status published: {response.status} {state} {sha}')
+              print(response.status, state, sha)
           PY
