@@ -45,9 +45,17 @@ def test_final_update_check_uses_real_https_domain() -> None:
         "stage9_verify_nginx() {",
         "\nrun_final_stage() {",
     )
+    helper = _section(
+        "http_wait_resolved_https_json() {",
+        "\nhttp_wait_file_match() {",
+    )
 
-    assert "https://${https_domain}:${PANEL_PORT}/health" in check
-    assert "--resolve" in check
+    assert (
+        'http_wait_resolved_https_json "$https_domain" "$PANEL_PORT" '
+        '"sg-gateway-panel" 15'
+    ) in check
+    assert 'local url="https://${domain}:${port}/health"' in helper
+    assert '--resolve "${domain}:${port}:127.0.0.1"' in helper
     assert "domain, certificate and Nginx config preserved" in check
 
 
