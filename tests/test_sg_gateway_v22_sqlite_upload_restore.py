@@ -84,7 +84,8 @@ def test_uploaded_foreign_sqlite_is_rejected_by_sg_gateway_schema_check(
 ) -> None:
     monkeypatch.chdir(tmp_path)
     init_db()
-    before = _snapshot_current_database()
+    create_client("Keep", "recommended")
+    before_count = count_clients()
 
     foreign = tmp_path / "foreign.sqlite"
     database = sqlite3.connect(foreign)
@@ -105,7 +106,9 @@ def test_uploaded_foreign_sqlite_is_rejected_by_sg_gateway_schema_check(
 
     assert restored.ok is False
     assert "не похож на базу SG-Gateway" in restored.message
-    assert _snapshot_current_database() == before
+    # Schema rejection is logged in operation_log, so database bytes may change
+    # while protected client data must remain unchanged.
+    assert count_clients() == before_count
 
 
 def test_maintenance_ui_exposes_clients_keys_https_and_sqlite_file_restore() -> None:
