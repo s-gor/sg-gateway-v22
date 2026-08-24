@@ -281,8 +281,8 @@ jobs:
 
           tools="vendor/cores/amneziawg-tools-3.1.20260812.tar.gz"
           go="vendor/cores/amneziawg-go-linux-amd64-v3.1.20260814"
-          grep "  $(basename "$tools")$" vendor/cores/SHA256SUMS | sha256sum -c --ignore-missing -
-          grep "  $(basename "$go")$" vendor/cores/SHA256SUMS | sha256sum -c --ignore-missing -
+          (cd vendor/cores && grep "  $(basename "$tools")$" SHA256SUMS | sha256sum -c -)
+          (cd vendor/cores && grep "  $(basename "$go")$" SHA256SUMS | sha256sum -c -)
 
           root="$(mktemp -d /tmp/sg-awg31-validation.XXXXXX)"
           trap 'rm -rf -- "$root"' EXIT
