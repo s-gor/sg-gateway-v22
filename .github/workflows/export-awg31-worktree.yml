@@ -31,6 +31,26 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Build local verification wheelhouse
+        run: |
+          python -m pip install --upgrade pip
+          mkdir -p /tmp/wheelhouse
+          python -m pip download --dest /tmp/wheelhouse -r requirements-dev.txt
+          ls -lh /tmp/wheelhouse
+
+      - name: Upload Python wheelhouse
+        uses: actions/upload-artifact@v4
+        with:
+          name: sg-gateway-python313-wheelhouse
+          path: /tmp/wheelhouse
+          retention-days: 1
+          if-no-files-found: error
+
       - name: Publish export status
         if: always()
         continue-on-error: true
@@ -49,7 +69,7 @@ jobs:
           payload = json.dumps({
               'state': state,
               'context': 'awg31/worktree-export',
-              'description': 'export exact feature branch as git bundle',
+              'description': 'export exact feature branch and local verification dependencies',
               'target_url': f"{os.environ['GITHUB_SERVER_URL']}/{repo}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
           }).encode('utf-8')
           request = urllib.request.Request(
