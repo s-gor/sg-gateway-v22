@@ -51,7 +51,15 @@ jobs:
           (cd "$out" && sha256sum amneziawg-tools-3.1.20260812.tar.gz amneziawg-go-linux-amd64-v3.1.20260814 > SHA256SUMS)
           cat "$out/SHA256SUMS"
 
-      - name: Upload artifacts
+      - name: Package current dev-02206 source
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git fetch --depth=1 origin dev-02206
+          git archive --format=tar.gz --output "$RUNNER_TEMP/dev-02206-source.tar.gz" origin/dev-02206
+          test -s "$RUNNER_TEMP/dev-02206-source.tar.gz"
+
+      - name: Upload AWG 3.1 artifacts
         uses: actions/upload-artifact@v4
         with:
           name: awg31-runtime-linux-amd64
@@ -59,6 +67,14 @@ jobs:
             ${{ runner.temp }}/awg31-artifacts/amneziawg-tools-3.1.20260812.tar.gz
             ${{ runner.temp }}/awg31-artifacts/amneziawg-go-linux-amd64-v3.1.20260814
             ${{ runner.temp }}/awg31-artifacts/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Upload dev-02206 source
+        uses: actions/upload-artifact@v4
+        with:
+          name: dev-02206-source
+          path: ${{ runner.temp }}/dev-02206-source.tar.gz
           if-no-files-found: error
           retention-days: 1
 
@@ -80,7 +96,7 @@ jobs:
           payload = json.dumps({
               'state': state,
               'context': 'awg31-runtime/build',
-              'description': 'pinned AWG 3.1 runtime artifacts',
+              'description': 'pinned AWG 3.1 runtime artifacts + dev source',
               'target_url': f"{os.environ['GITHUB_SERVER_URL']}/{repo}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
           }).encode('utf-8')
           request = urllib.request.Request(
