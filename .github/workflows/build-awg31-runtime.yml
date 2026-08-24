@@ -1,0 +1,59 @@
+name: Build AWG 3.1 Runtime
+
+on:
+  push:
+    branches:
+      - build-awg31-runtime-20260824
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout SG-Gateway
+        uses: actions/checkout@v4
+
+      - name: Install native build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential pkg-config libmnl-dev
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.0'
+          cache: false
+
+      - name: Build pinned AWG 3.1 artifacts
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          work="$RUNNER_TEMP/awg31-build"
+          out="$RUNNER_TEMP/awg31-artifacts"
+          mkdir -p "$work" "$out"
+
+          git clone --depth 1 --branch v3.1.20260814 https://github.com/amnezia-vpn/amneziawg-go.git "$work/amneziawg-go"
+          make -C "$work/amneziawg-go" amneziawg-go
+          install -m 0755 "$work/amneziawg-go/amneziawg-go" "$out/amneziawg-go-linux-amd64-v3.1.20260814"
+
+          git clone --depth 1 --branch v3.1.20260812 https://github.com/amnezia-vpn/amneziawg-tools.git "$work/amneziawg-tools-3.1.20260812"
+          make -C "$work/amneziawg-tools-3.1.20260812/src" PLATFORM=linux -j"$(nproc)"
+          "$work/amneziawg-tools-3.1.20260812/src/awg" --version
+          tar --exclude=.git -C "$work" -czf "$out/amneziawg-tools-3.1.20260812.tar.gz" amneziawg-tools-3.1.20260812
+
+          "$out/amneziawg-go-linux-amd64-v3.1.20260814" --version || true
+          (cd "$out" && sha256sum amneziawg-tools-3.1.20260812.tar.gz amneziawg-go-linux-amd64-v3.1.20260814 > SHA256SUMS)
+          cat "$out/SHA256SUMS"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: awg31-runtime-linux-amd64
+          path: |
+            ${{ runner.temp }}/awg31-artifacts/amneziawg-tools-3.1.20260812.tar.gz
+            ${{ runner.temp }}/awg31-artifacts/amneziawg-go-linux-amd64-v3.1.20260814
+            ${{ runner.temp }}/awg31-artifacts/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 1
