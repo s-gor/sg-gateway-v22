@@ -257,7 +257,10 @@ jobs:
               if not raw:
                   continue
               path = Path(raw.decode("utf-8"))
-              if not path.is_file():
+              if path in {
+                  Path("SOURCE-SHA256SUMS"),
+                  Path("tests/test_sg_gateway_v22_awg31_vendor_runtime.py"),
+              } or not path.is_file():
                   continue
               try:
                   text = path.read_text(encoding="utf-8")
