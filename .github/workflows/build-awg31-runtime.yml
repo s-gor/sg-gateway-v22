@@ -6,10 +6,11 @@ on:
       - build-awg31-runtime-20260824
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout SG-Gateway
@@ -46,6 +47,19 @@ jobs:
           "$out/amneziawg-go-linux-amd64-v3.1.20260814" --version || true
           (cd "$out" && sha256sum amneziawg-tools-3.1.20260812.tar.gz amneziawg-go-linux-amd64-v3.1.20260814 > SHA256SUMS)
           cat "$out/SHA256SUMS"
+
+      - name: Commit artifacts to build branch
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          install -m 0644 "$RUNNER_TEMP/awg31-artifacts/amneziawg-tools-3.1.20260812.tar.gz" vendor/cores/amneziawg-tools-3.1.20260812.tar.gz
+          install -m 0755 "$RUNNER_TEMP/awg31-artifacts/amneziawg-go-linux-amd64-v3.1.20260814" vendor/cores/amneziawg-go-linux-amd64-v3.1.20260814
+          install -m 0644 "$RUNNER_TEMP/awg31-artifacts/SHA256SUMS" /tmp/AWG31-SHA256SUMS
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add vendor/cores/amneziawg-tools-3.1.20260812.tar.gz vendor/cores/amneziawg-go-linux-amd64-v3.1.20260814
+          git commit -m 'build: publish pinned AWG 3.1 runtime artifacts'
+          git push
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
