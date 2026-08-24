@@ -1,0 +1,68 @@
+name: Export AWG31 Worktree
+
+on:
+  push:
+    branches:
+      - feature/awg31-independent-profile
+
+permissions:
+  contents: read
+  statuses: write
+
+jobs:
+  export:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout feature branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create git bundle
+        run: |
+          git bundle create /tmp/sg-gateway-awg31.bundle --all
+          git bundle verify /tmp/sg-gateway-awg31.bundle
+
+      - name: Upload git bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: sg-gateway-awg31-worktree
+          path: /tmp/sg-gateway-awg31.bundle
+          retention-days: 1
+          if-no-files-found: error
+
+      - name: Publish export status
+        if: always()
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import urllib.request
+
+          repo = os.environ['GITHUB_REPOSITORY']
+          sha = os.environ['GITHUB_SHA']
+          state = 'success' if os.environ.get('JOB_STATUS') == 'success' else 'failure'
+          payload = json.dumps({
+              'state': state,
+              'context': 'awg31/worktree-export',
+              'description': 'export exact feature branch as git bundle',
+              'target_url': f"{os.environ['GITHUB_SERVER_URL']}/{repo}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
+          }).encode('utf-8')
+          request = urllib.request.Request(
+              f'https://api.github.com/repos/{repo}/statuses/{sha}',
+              data=payload,
+              method='POST',
+              headers={
+                  'Authorization': f"Bearer {os.environ['GITHUB_TOKEN']}",
+                  'Accept': 'application/vnd.github+json',
+                  'X-GitHub-Api-Version': '2022-11-28',
+                  'Content-Type': 'application/json',
+              },
+          )
+          with urllib.request.urlopen(request, timeout=30) as response:
+              print(response.status, state, sha)
+          PY
