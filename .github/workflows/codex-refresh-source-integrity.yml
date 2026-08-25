@@ -1,0 +1,42 @@
+name: Refresh source integrity
+
+on:
+  push:
+    branches: [codex/sg-gateway-awg31-cleanup-fix]
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/sg-gateway-awg31-cleanup-fix
+          fetch-depth: 0
+      - name: Refresh and commit
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import subprocess
+          from pathlib import Path
+
+          excluded = {
+              'SOURCE-SHA256SUMS',
+              '.github/workflows/codex-refresh-source-integrity.yml',
+          }
+          tracked = [
+              path
+              for path in subprocess.check_output(['git', 'ls-files'], text=True).splitlines()
+              if path not in excluded
+          ]
+          rows = [f"{hashlib.sha256(Path(path).read_bytes()).hexdigest()}  {path}" for path in tracked]
+          Path('SOURCE-SHA256SUMS').write_text('\n'.join(rows) + '\n', encoding='utf-8')
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add SOURCE-SHA256SUMS
+          git commit -m "chore: refresh source integrity manifest"
+          git push origin HEAD:codex/sg-gateway-awg31-cleanup-fix
