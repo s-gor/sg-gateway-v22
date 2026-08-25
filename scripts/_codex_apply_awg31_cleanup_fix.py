@@ -82,10 +82,3 @@ replace_once(
   fi
 ''',
 )
-
-workflow = Path(".github/workflows/dev-02206-guard.yml")
-replace_once(
-    workflow,
-    "        with:\n          fetch-depth: 1\n",
-    "        with:\n          ref: ${{ github.head_ref || github.ref_name }}\n          fetch-depth: 1\n",
-)
