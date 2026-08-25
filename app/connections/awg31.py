@@ -14,6 +14,13 @@ PORT = 587
 ENDPOINT = f"{HOST}:{PORT}"
 TRANSPORT = "udp"
 DNS = "1.1.1.1"
+AWG31_MTU = 1420
+AWG31_PROTOCOL_OVERHEAD = 128
+MAX_I_PAYLOAD_SIZE = AWG31_MTU - AWG31_PROTOCOL_OVERHEAD
+I_TIMESTAMP_SIZE = 8
+_I_TAG_RE = re.compile(
+    r"(?:<b 0x(?P<hex>[0-9A-Fa-f]+)>|<(?P<size_tag>rd|rc|r) (?P<size>\d+)>|(?P<time><t>))"
+)
 
 I_FIELDS = tuple(f"I{index}" for index in range(1, 6))
 J_FIELDS = ("Jc", "Jmin", "Jmax")
@@ -81,13 +88,43 @@ def _u32_range(name: str, value: object) -> str:
     return str(low) if low == high else f"{low}-{high}"
 
 
-def _tagged_junk(name: str, value: object) -> str:
+def _tagged_junk(name: str, value: object) -> tuple[str, int]:
     text = str(value)
-    if len(text) > 1024:
-        raise Awg31ValidationError(f"{name} is too long")
+    if not text.strip():
+        return "", 0
+    if text != text.strip():
+        raise Awg31ValidationError(f"{name} must contain tags only")
     if any(char in text for char in ("\r", "\n", "\x00")):
         raise Awg31ValidationError(f"{name} contains forbidden control characters")
-    return text
+
+    position = 0
+    payload_size = 0
+    while position < len(text):
+        match = _I_TAG_RE.match(text, position)
+        if match is None:
+            raise Awg31ValidationError(
+                f"{name} must be a sequence of <b 0xHEX>, <r N>, <rd N>, <rc N>, or <t> tags"
+            )
+        if match.group("hex") is not None:
+            hex_value = match.group("hex")
+            if len(hex_value) % 2:
+                raise Awg31ValidationError(f"{name} hex payload must contain whole bytes")
+            payload_size += len(hex_value) // 2
+        elif match.group("size") is not None:
+            size = int(match.group("size"))
+            if size > MAX_I_PAYLOAD_SIZE:
+                raise Awg31ValidationError(
+                    f"{name} tag size exceeds the AWG31 MTU-safe limit"
+                )
+            payload_size += size
+        else:
+            payload_size += I_TIMESTAMP_SIZE
+        if payload_size > MAX_I_PAYLOAD_SIZE:
+            raise Awg31ValidationError(
+                f"{name} expanded payload exceeds the AWG31 MTU-safe limit"
+            )
+        position = match.end()
+    return text, payload_size
 
 
 def validate_parameters(values: Mapping[str, object]) -> dict[str, str | int]:
@@ -95,8 +132,17 @@ def validate_parameters(values: Mapping[str, object]) -> dict[str, str | int]:
     if unknown:
         raise Awg31ValidationError("Unknown AWG31 fields: " + ", ".join(sorted(unknown)))
     result: dict[str, str | int] = {}
+    total_i_payload = 0
     for name in I_FIELDS:
-        result[name] = _tagged_junk(name, values.get(name, DEFAULT_PARAMETERS[name]))
+        tagged, payload_size = _tagged_junk(
+            name, values.get(name, DEFAULT_PARAMETERS[name])
+        )
+        result[name] = tagged
+        total_i_payload += payload_size
+    if total_i_payload > MAX_I_PAYLOAD_SIZE:
+        raise Awg31ValidationError(
+            "Combined I1-I5 payload exceeds the AWG31 MTU-safe limit"
+        )
     for name in J_FIELDS + S_FIELDS:
         result[name] = _uint16(name, values.get(name, DEFAULT_PARAMETERS[name]))
     for name in H_FIELDS:
@@ -221,4 +267,10 @@ def set_server_public_key(value: str) -> None:
 
 def config_lines(settings: Awg31Settings | None = None) -> list[str]:
     current = settings or get_settings()
-    return [f"{name} = {current.parameters[name]}" for name in FIELD_NAMES]
+    lines: list[str] = []
+    for name in FIELD_NAMES:
+        value = current.parameters[name]
+        if name in I_FIELDS and value == "":
+            continue
+        lines.append(f"{name} = {value}")
+    return lines

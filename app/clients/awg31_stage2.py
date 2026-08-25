@@ -2,15 +2,15 @@ from __future__ import annotations
 
 from importlib import import_module
 from typing import Any
-from urllib.parse import quote, urlencode
 
 from flask import Blueprint, Response, abort, flash, jsonify, redirect, request
 from jinja2 import ChoiceLoader, DictLoader, PrefixLoader
 
 from app.connections.awg31 import (
-    Awg31ValidationError,
     ENDPOINT,
     FIELD_NAMES,
+    Awg31ValidationError,
+    config_lines,
     get_settings,
     save_settings,
 )
@@ -106,9 +106,7 @@ def _export_parts(client, device):
 
 def build_awg31_config(client, device=None):
     exports, config, settings = _export_parts(client, device)
-    parameter_lines = "\n".join(
-        f"{name} = {settings.parameters[name]}" for name in FIELD_NAMES
-    )
+    parameter_lines = "\n".join(config_lines(settings))
     body = f"""# SG-Gateway AmneziaWG 3.1
 # Access: {exports._label(client, device)}
 # Profile: awg31
@@ -134,19 +132,23 @@ PersistentKeepalive = {config.get('persistent_keepalive', 25)}
 
 
 def build_awg31_uri(client, device=None):
+    from app.connections.awg31_uri import encode_awg31_uri
+
     exports, config, settings = _export_parts(client, device)
-    query_values = {
-        "transport": "udp",
-        "address": str(config.get("address", "")),
-        "dns": settings.dns,
-        "public_key": str(config.get("server_public_key") or settings.server_public_key),
-        "allowed_ips": str(config.get("allowed_ips", "0.0.0.0/0, ::/0")),
-        "persistent_keepalive": str(config.get("persistent_keepalive", 25)),
-        **{name: str(settings.parameters[name]) for name in FIELD_NAMES},
-    }
-    private_key = quote(str(config.get("private_key", "")), safe="")
-    label = quote(exports._label(client, device), safe="")
-    body = f"awg31://{private_key}@{ENDPOINT}?{urlencode(query_values, quote_via=quote)}#{label}"
+    config_export = build_awg31_config(client, device)
+    body = encode_awg31_uri(
+        {
+            "private_key": str(config.get("private_key", "")),
+            "public_key": str(
+                config.get("server_public_key") or settings.server_public_key
+            ),
+            "address": str(config.get("address", "")),
+            "allowed_ips": str(config.get("allowed_ips", "0.0.0.0/0, ::/0")),
+            "persistent_keepalive": int(config.get("persistent_keepalive", 25)),
+            "parameters": settings.parameters,
+            "config": config_export.body,
+        }
+    )
     return exports.ClientExport(
         filename=f"sg-gateway-{exports._slug(client, device)}-amneziawg31-uri.txt",
         media_type="text/plain; charset=utf-8",
@@ -230,7 +232,7 @@ def install_access() -> None:
                     tertiary_label="Скачать URI",
                 )
             )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - render an isolated card failure
             cards.append(
                 access._error_card(
                     client,
