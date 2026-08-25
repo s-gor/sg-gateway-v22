@@ -240,6 +240,13 @@ exec "$@"
 """
     )
     runuser.chmod(0o755)
+    fake_id = bindir / "id"
+    fake_id.write_text(
+        "#!/usr/bin/env bash\n"
+        "if [[ ${1:-} == -u ]]; then printf '0\\n'; exit 0; fi\n"
+        "exec /usr/bin/id \"$@\"\n"
+    )
+    fake_id.chmod(0o755)
     for name in ("nginx", "sleep"):
         fake = bindir / name
         fake.write_text("#!/usr/bin/env bash\nexit 0\n")
