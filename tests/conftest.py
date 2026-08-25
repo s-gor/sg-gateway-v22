@@ -1,8 +1,27 @@
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 import pytest
+
+
+@pytest.fixture(scope="session", autouse=True)
+def name_detached_ci_checkout() -> None:
+    """Give file:// clone tests a resolvable branch in detached PR checkouts."""
+
+    root = Path(__file__).resolve().parents[1]
+    branch = subprocess.check_output(
+        ["git", "branch", "--show-current"], cwd=root, text=True
+    ).strip()
+    if not branch:
+        subprocess.run(
+            ["git", "switch", "-c", "ci-test-head"],
+            cwd=root,
+            text=True,
+            capture_output=True,
+            check=True,
+        )
 
 
 @pytest.fixture(autouse=True)

@@ -3109,11 +3109,11 @@ main() {
   CURRENT_LABEL="Запуск и финальная проверка"
   run_quiet "Этап 10/10 · Запуск sg-hostd" stage9_start_hostd
   run_quiet "Этап 10/10 · Проверка команд hostd" stage9_verify_hostd
+  run_quiet "Этап 10/10 · Подготовка независимого профиля AWG31" run_awg31_stage3a_migration
   run_quiet "Этап 10/10 · Применение подтверждённого Xray и клиентов" stage9_apply_runtime
   run_quiet "Этап 10/10 · Запуск панели" stage9_start_panel
   run_quiet "Этап 10/10 · Проверка Nginx и служб" stage9_verify_nginx
   run_quiet "Этап 10/10 · Контроль неизменности Clients" verify_client_identities_after_update
-  run_quiet "Этап 10/10 · Независимый профиль AWG31" run_awg31_stage3a_migration
 
   INSTALL_SUCCESS=1
   sanitize_installer_log_file
