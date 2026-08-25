@@ -37,11 +37,9 @@ jobs:
           ]
           rows = [f"{hashlib.sha256(Path(path).read_bytes()).hexdigest()}  {path}" for path in tracked]
           Path('SOURCE-SHA256SUMS').write_text('\n'.join(rows) + '\n', encoding='utf-8')
-          Path('.github/workflows/codex-apply-awg31-cleanup-fix.yml').unlink()
-          Path('scripts/_codex_apply_awg31_cleanup_fix.py').unlink()
           PY
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
+          git add install.sh deploy/install-core.sh deploy/full-uninstall-ubuntu.sh SOURCE-SHA256SUMS
           git commit -m "fix: order AWG31 provisioning and finalize cleanup"
           git push origin HEAD:codex/sg-gateway-awg31-cleanup-fix
