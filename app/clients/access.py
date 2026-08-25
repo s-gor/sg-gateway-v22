@@ -8,6 +8,7 @@ from app.clients.exports import (
     build_anytls_link,
     build_awg_config,
     build_awg3_config,
+    build_awg31_config,
     build_mieru_json,
     build_mieru_link,
     build_subscription_url,
@@ -171,6 +172,40 @@ def build_access_cards(
                     device,
                     kind="amneziawg3",
                     title="AmneziaWG 3",
+                    exc=exc,
+                )
+            )
+
+    awg31 = deployments.get("amneziawg31")
+    if awg31 is not None:
+        try:
+            status = _status(client, device, awg31)
+            export_url, _ = _urls(client, device, "amneziawg31")
+            uri_url, _ = _urls(client, device, "amneziawg31-uri")
+            cards.append(
+                AccessCard(
+                    kind="amneziawg31",
+                    title="AmneziaWG 3.1",
+                    status=status,
+                    description="Независимый AWG31-профиль на awg31.internal:587/UDP.",
+                    primary_action="Скачать конфигурацию",
+                    export_url=export_url,
+                    qr_url="",
+                    payload=build_awg31_config(client, device).body
+                    if status == "applied"
+                    else "",
+                    show_qr=False,
+                    tertiary_url=uri_url,
+                    tertiary_label="Скачать URI",
+                )
+            )
+        except Exception as exc:
+            cards.append(
+                _error_card(
+                    client,
+                    device,
+                    kind="amneziawg31",
+                    title="AmneziaWG 3.1",
                     exc=exc,
                 )
             )

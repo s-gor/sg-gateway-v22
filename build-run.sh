@@ -20,9 +20,15 @@ TRANSFER_ZIP="${OUT%.run}-TRANSFER.zip"
 
 mkdir -p "$STAGE"
 if command -v git >/dev/null 2>&1 && git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  SOURCE_SHA="$(git -C "$ROOT" rev-parse HEAD)"
+  SOURCE_TREE="$(git -C "$ROOT" rev-parse HEAD^{tree})"
   git -C "$ROOT" archive --format=tar HEAD | tar -C "$STAGE" -xf -
   SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-$(git -C "$ROOT" show -s --format=%ct HEAD)}"
 else
+  SOURCE_SHA="${SG_GATEWAY_SOURCE_SHA:-}"
+  SOURCE_TREE="${SG_GATEWAY_SOURCE_TREE:-}"
+  [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "[SG-Gateway Build] SG_GATEWAY_SOURCE_SHA must be an exact commit SHA" >&2; exit 1; }
+  [[ "$SOURCE_TREE" =~ ^[0-9a-f]{40}$ ]] || { echo "[SG-Gateway Build] SG_GATEWAY_SOURCE_TREE must be an exact Git tree SHA" >&2; exit 1; }
   tar -C "$ROOT" \
     --exclude='./.git' \
     --exclude='./.venv' \
@@ -38,6 +44,8 @@ else
     -cf - . | tar -C "$STAGE" -xf -
   SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-0}"
 fi
+[[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "[SG-Gateway Build] source SHA is invalid" >&2; exit 1; }
+[[ "$SOURCE_TREE" =~ ^[0-9a-f]{40}$ ]] || { echo "[SG-Gateway Build] source tree is invalid" >&2; exit 1; }
 [[ "$SOURCE_DATE_EPOCH" =~ ^[0-9]+$ ]] || SOURCE_DATE_EPOCH=0
 
 [[ "$(tr -d '[:space:]' < "$STAGE/VERSION")" == "$VERSION" ]] || { echo "[SG-Gateway Build] VERSION mismatch" >&2; exit 1; }
@@ -46,6 +54,21 @@ fi
 if [[ -f "$STAGE/vendor/cores/SHA256SUMS" ]]; then
   (cd "$STAGE/vendor/cores" && sha256sum -c SHA256SUMS >/dev/null)
 fi
+python3 - "$STAGE/PACKAGE-SOURCE.json" "$SOURCE_SHA" "$SOURCE_TREE" <<'PYSOURCE'
+import json
+import sys
+from pathlib import Path
+
+Path(sys.argv[1]).write_text(
+    json.dumps(
+        {"source_sha": sys.argv[2], "source_tree": sys.argv[3]},
+        ensure_ascii=False,
+        indent=2,
+        sort_keys=True,
+    ) + "\n",
+    encoding="utf-8",
+)
+PYSOURCE
 
 tar --sort=name --mtime="@${SOURCE_DATE_EPOCH}" --owner=0 --group=0 --numeric-owner \
   -C "$TMP" -czf "$PAYLOAD" "$SOURCE_FOLDER"
@@ -57,6 +80,8 @@ PACKAGE="SG-Gateway ${VERSION} (${BUILD_ID})"
   printf 'PACKAGE=%q\n' "$PACKAGE"
   printf 'EXPECTED_VERSION=%q\n' "$VERSION"
   printf 'EXPECTED_BUILD_ID=%q\n' "$BUILD_ID"
+  printf 'EXPECTED_SOURCE_SHA=%q\n' "$SOURCE_SHA"
+  printf 'EXPECTED_SOURCE_TREE=%q\n' "$SOURCE_TREE"
   printf 'SOURCE_FOLDER=%q\n' "$SOURCE_FOLDER"
   printf 'PAYLOAD_SHA256=%q\n' "$PAYLOAD_SHA"
   printf 'PAYLOAD_MARKER=%q\n' "$PAYLOAD_MARKER"
@@ -92,13 +117,13 @@ verify_source() {
   root="$TEMP_DIR/$SOURCE_FOLDER"
   [[ "$(tr -d '[:space:]' < "$root/VERSION")" == "$EXPECTED_VERSION" ]] || fail "Версия payload не совпала"
   [[ "$(tr -d '\r\n' < "$root/BUILD-ID")" == "$EXPECTED_BUILD_ID" ]] || fail "Build ID payload не совпал"
+  python3 "$root/scripts/package_contract.py" "$root" "$EXPECTED_SOURCE_SHA" >/dev/null || fail "Package manifest, payload, source SHA или AWG31 runtime assets не прошли проверку"
   (cd "$root" && sha256sum -c SOURCE-SHA256SUMS >/dev/null) || fail "Файлы исходника повреждены"
   if [[ -f "$root/vendor/cores/SHA256SUMS" ]]; then
     (cd "$root/vendor/cores" && sha256sum -c SHA256SUMS >/dev/null) || fail "Vendored engines повреждены"
   fi
-  while IFS= read -r -d '' shell_file; do
-    bash -n "$shell_file" || fail "Ошибка shell-синтаксиса: ${shell_file#$root/}"
-  done < <(find "$root" -type f -name '*.sh' -print0)
+  find "$root" -type f -name '*.sh' -exec bash -n {} \; || \
+    fail "Ошибка shell-синтаксиса в package payload"
 
   [[ "$(sha256sum "$root/assets/placeholder/index.html" | awk '{print $1}')" == "06b280bab43d9ed4ceeb75d34008b60158366a968e6eb950b3e0b4b0cbcdd226" ]] || fail "Заглушка не совпала с принятой"
   grep -Fq 'SG_GATEWAY_02110_HTTPS_VERIFY_RETRY_FIX1' "$root/deploy/configure-panel-access.sh" || fail "Нет HTTPS retry"
@@ -162,7 +187,7 @@ for line_no, raw in enumerate((root / "SOURCE-SHA256SUMS").read_text(encoding="u
 actual = {
     path.relative_to(root).as_posix()
     for path in root.rglob("*")
-    if path.is_file() and path.relative_to(root).as_posix() != "SOURCE-SHA256SUMS"
+    if path.is_file() and path.relative_to(root).as_posix() not in {"SOURCE-SHA256SUMS", "PACKAGE-SOURCE.json"}
 }
 missing = sorted(actual - listed)
 extra = sorted(listed - actual)
@@ -200,7 +225,7 @@ extract_payload
 verify_source
 case "${1:-}" in
   --verify-only)
-    printf '[SG-Gateway] [OK] %s: binary payload и исходники полностью проверены.\n' "$PACKAGE"
+    printf '[SG-Gateway] [OK] %s: binary payload и исходники полностью проверены. Source SHA: %s; tree: %s.\n' "$PACKAGE" "$EXPECTED_SOURCE_SHA" "$EXPECTED_SOURCE_TREE"
     exit 0
     ;;
   --extract-only)

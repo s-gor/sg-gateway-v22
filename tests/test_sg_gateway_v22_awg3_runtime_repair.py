@@ -5,19 +5,18 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.engines import provisioning
 from app import runtime_ui
-
+from app.engines import provisioning
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_awg3_repair_is_pinned_verified_local_first_and_runtime_only() -> None:
     body = (ROOT / "deploy/repair-awg3-runtime.sh").read_text(encoding="utf-8")
-    assert 'VENDOR_COMMIT="91cb614060edc9491b9f5178475089b443e63687"' in body
+    assert 'VENDOR_COMMIT="56df9a7b4fe509282e37374dd6ef3bccdc1b1100"' in body
     assert 'VENDOR_DIR="$PREFIX/vendor/cores"' in body
-    assert 'TOOLS_SHA256="f18592c499c893b1b87b15de9e707ce265585cf2536698975b6ede8156d14ada"' in body
-    assert 'GO_SHA256="375bc2645df09498aa30215e3b3a09a97626a8e929f409e0edef6564fb8e3110"' in body
+    assert 'TOOLS_SHA256="090f9383532822a756d078890b447e00af7f46bd30a10f9f47c46d633d807b19"' in body
+    assert 'GO_SHA256="131110027db6d5dc0e35b19eb5b8a2692676081366c34112088dc68bbb050bcd"' in body
     assert "stage_vendor_file" in body
     assert "sha256sum -c -" in body
     assert 'PREFIX="$STAGE_ROOT" SYSCONFDIR="$STAGE_ROOT/etc" install' in body
@@ -153,13 +152,15 @@ def test_awg3_runtime_ui_prevents_new_access_but_preserves_selected_access() -> 
 
 
 def test_02204_missing_awg3_can_update_then_repair_without_blocking_other_clients() -> None:
-    updater = (ROOT / "deploy/update-from-github.sh").read_text(encoding="utf-8")
+    updater = (ROOT / "deploy/update-from-github-core.sh").read_text(encoding="utf-8")
     panel_runtime = (ROOT / "hostd" / "sg_hostd" / "panel_update_runtime.py").read_text(encoding="utf-8")
     client_runtime = (ROOT / "hostd" / "sg_hostd" / "client_runtime.py").read_text(encoding="utf-8")
     commands = (ROOT / "hostd" / "sg_hostd" / "commands.py").read_text(encoding="utf-8")
     repair = (ROOT / "deploy" / "repair-awg3-runtime.sh").read_text(encoding="utf-8")
 
-    assert "sparse-checkout set app hostd deploy" in updater
+    assert "sparse-checkout set --no-cone" in updater
+    assert "/hostd/sg_hostd/" in updater
+    assert "/vendor/cores/amneziawg-go-linux-amd64-v3.0.0" in updater
     assert '".venv"|"awg3") continue ;;' in updater
     assert "clients.apply" not in updater
     assert "runtime.contract" not in updater

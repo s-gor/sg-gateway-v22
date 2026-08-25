@@ -24,7 +24,7 @@ def test_awg2_and_awg3_are_independent_device_credentials(tmp_path, monkeypatch)
     device = repository.get_primary_device(client_id)
     assert device is not None
     creds = {item.engine: json.loads(item.config_json or "{}") for item in repository.list_device_credentials(device.id)}
-    assert set(creds) == {"amneziawg", "amneziawg3"}
+    assert set(creds) == {"amneziawg", "amneziawg3", "amneziawg31"}
     assert creds["amneziawg"]["address"].startswith("10.66.")
     assert creds["amneziawg3"]["address"].startswith("10.67.")
     assert creds["amneziawg"]["private_key"] != creds["amneziawg3"]["private_key"]
@@ -53,7 +53,7 @@ def test_awg3_export_has_generation3_fields(tmp_path, monkeypatch):
 
 
 def test_awg3_installer_is_userspace_only_and_awg2_stays_frozen():
-    text = Path("install.sh").read_text(encoding="utf-8")
+    text = Path("deploy/install-core.sh").read_text(encoding="utf-8")
     assert 'AMNEZIAWG_TOOLS_VERSION="1.0.20260618-2"' in text
     assert 'AMNEZIAWG_KMOD_VERSION="1.0.20260329-2"' in text
     assert 'AWG3_TOOLS_VERSION="3.1.20260812"' in text

@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+SERVICE=sg-gateway-awg31.service
+ACTION=${1:-status}
+case "$ACTION" in
+  start|stop|restart) exec systemctl "$ACTION" "$SERVICE" ;;
+  status) exec systemctl status --no-pager "$SERVICE" ;;
+  *) echo "usage: $0 {start|stop|restart|status}" >&2; exit 64 ;;
+esac

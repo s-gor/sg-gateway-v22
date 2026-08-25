@@ -118,6 +118,17 @@ DEFAULT_CONNECTIONS = {
             '"allowed_ips":"0.0.0.0/0, ::/0","persistent_keepalive":"25-35","generation":3}'
         ),
     },
+    "amneziawg31": {
+        "host": "awg31.internal",
+        "port": 587,
+        "config_json": (
+            '{"profile":"awg31","generation":31,"dns":"1.1.1.1","transport":"udp",'
+            '"endpoint":"awg31.internal:587","server_public_key":"",'
+            '"i1":"","i2":"","i3":"","i4":"","i5":"",'
+            '"jc":0,"jmin":0,"jmax":0,"s1":0,"s2":0,"s3":0,"s4":0,'
+            '"h1":"0","h2":"0","h3":"0","h4":"0"}'
+        ),
+    },
     "xray": {
         "host": "",
         "port": 443,
