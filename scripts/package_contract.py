@@ -12,6 +12,11 @@ EXPECTED_RUNTIME_ASSETS = {
     "vendor/cores/amneziawg-tools-3.1.20260812.tar.gz": "f18592c499c893b1b87b15de9e707ce265585cf2536698975b6ede8156d14ada",
     "vendor/cores/amneziawg-go-linux-amd64-v3.1.20260814": "375bc2645df09498aa30215e3b3a09a97626a8e929f409e0edef6564fb8e3110",
 }
+REQUIRED_AWG31_PRODUCTION_FILES = (
+    "hostd/sg_hostd/__init__.py",
+    "vendor/cores/SHA256SUMS",
+    "vendor/cores/VERSIONS.env",
+)
 
 
 class PackageContractError(RuntimeError):
@@ -74,6 +79,11 @@ def verify_package_root(root: Path, expected_source_sha: str) -> dict:
         raise PackageContractError("AWG31 production file manifest is empty")
     if len(set(production)) != len(production):
         raise PackageContractError("AWG31 production file manifest contains duplicates")
+    for relative in REQUIRED_AWG31_PRODUCTION_FILES:
+        if relative not in production:
+            raise PackageContractError(
+                f"required AWG31 production file missing from manifest: {relative}"
+            )
 
     listed = _source_sums(root)
     actual = {

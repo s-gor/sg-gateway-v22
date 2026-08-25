@@ -409,10 +409,18 @@ def _restore_uploaded_full_backup(full: ModuleType) -> dict:
                 "[Restore] Safety Rollback выполнен и проверен после restart: "
                 "SQLite, runtime и новый процесс панели доступны"
             )
-            raise RuntimeError(
+            rollback_result = (
                 f"{restore_failed}; Safety Rollback выполнен и проверен после restart. "
                 f"Причина Restore: {restore_exc}"
-            ) from restore_exc
+            )
+            if restore_exc.args:
+                restore_exc.args = (
+                    rollback_result,
+                    *restore_exc.args[1:],
+                )
+            else:
+                restore_exc.args = (rollback_result,)
+            raise
 
     archive.unlink(missing_ok=True)
     cert_ready, cert_domain = full._restored_certificate_ready()
