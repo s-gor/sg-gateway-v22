@@ -247,7 +247,7 @@ exec "$@"
         "exec /usr/bin/id \"$@\"\n"
     )
     fake_id.chmod(0o755)
-    for name in ("nginx", "sleep"):
+    for name in ("chown", "nginx", "sleep"):
         fake = bindir / name
         fake.write_text("#!/usr/bin/env bash\nexit 0\n")
         fake.chmod(0o755)
