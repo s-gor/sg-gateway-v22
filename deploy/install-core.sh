@@ -3020,6 +3020,19 @@ verify_client_identities_after_update() {
   echo "Clients identities: unchanged"
 }
 
+run_awg31_stage3a_migration() {
+  local python="$PREFIX/.venv/bin/python"
+  [[ -x "$python" ]] || {
+    echo "AWG31 Stage3A requires the installed SG-Gateway Python" >&2
+    return 1
+  }
+  PYTHONPATH="$PREFIX:$PREFIX/hostd" "$python" \
+    -m app.maintenance.awg31_stage3a migrate \
+    --source-root "$SOURCE_DIR" \
+    --root / \
+    --database "$DATA_DIR/sg-gateway.sqlite"
+}
+
 print_sg_admin_status() {
   printf '[SG-Gateway] Профили sg-admin: Reality TCP, XHTTP Reality, AmneziaWG, Mieru\n'
   [[ "$CREATE_SG_ADMIN" == "1" ]] || return 0
@@ -3096,6 +3109,7 @@ main() {
   CURRENT_LABEL="Запуск и финальная проверка"
   run_quiet "Этап 10/10 · Запуск sg-hostd" stage9_start_hostd
   run_quiet "Этап 10/10 · Проверка команд hostd" stage9_verify_hostd
+  run_quiet "Этап 10/10 · Подготовка независимого профиля AWG31" run_awg31_stage3a_migration
   run_quiet "Этап 10/10 · Применение подтверждённого Xray и клиентов" stage9_apply_runtime
   run_quiet "Этап 10/10 · Запуск панели" stage9_start_panel
   run_quiet "Этап 10/10 · Проверка Nginx и служб" stage9_verify_nginx

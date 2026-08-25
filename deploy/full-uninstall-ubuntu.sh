@@ -295,12 +295,31 @@ cleanup_firewall(){
 }
 
 remove_account_and_verify(){
-  id sg-gateway >/dev/null 2>&1 && userdel sg-gateway >/dev/null 2>&1 || true
+  if id sg-gateway >/dev/null 2>&1; then
+    pkill -TERM -u sg-gateway >/dev/null 2>&1 || true
+    sleep 1
+    pkill -KILL -u sg-gateway >/dev/null 2>&1 || true
+    userdel sg-gateway >/dev/null 2>&1 || true
+  fi
   getent group sg-gateway >/dev/null 2>&1 && groupdel sg-gateway >/dev/null 2>&1 || true
+
+  # userdel/NSS hooks may touch the former service home after the main
+  # state-removal stage. Remove owned paths one final time before the
+  # absence checks so Full Uninstall is deterministic and idempotent.
+  rm -rf "$PREFIX" "$CONFIG_DIR" "$DATA_DIR" "$LOG_DIR" /run/sg-gateway
+
   systemctl daemon-reload
   systemctl reset-failed >/dev/null 2>&1 || true
 
   local bad=0 path
+  if id sg-gateway >/dev/null 2>&1; then
+    echo "Остаток после удаления: пользователь sg-gateway" >&2
+    bad=1
+  fi
+  if getent group sg-gateway >/dev/null 2>&1; then
+    echo "Остаток после удаления: группа sg-gateway" >&2
+    bad=1
+  fi
   for path in \
     "$PREFIX" "$CONFIG_DIR" "$DATA_DIR" \
     /etc/systemd/system/sg-gateway.service \
