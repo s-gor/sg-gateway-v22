@@ -78,6 +78,9 @@ def _payload(row: Any, preserved: dict[str, Any] | None = None) -> dict[str, Any
     current = dict(preserved or {})
     if not current.get("private_key") or not current.get("public_key"):
         current["private_key"], current["public_key"] = _generate_keypair()
+    from app.connections.awg31 import get_settings
+
+    settings = get_settings()
     current.update(
         {
             "profile": PROFILE_ID,
@@ -92,6 +95,8 @@ def _payload(row: Any, preserved: dict[str, Any] | None = None) -> dict[str, Any
             "allowed_ips": "0.0.0.0/0, ::/0",
             "persistent_keepalive": 25,
             "generation": 31,
+            "server_public_key": settings.server_public_key,
+            **{name.lower(): value for name, value in settings.parameters.items()},
         }
     )
     return current

@@ -43,3 +43,11 @@ from sg_hostd.awg31_integration import install as _install_awg31_apply
 _install_awg31_apply(_import_module("sg_hostd.client_runtime"))
 del _import_module
 del _install_awg31_apply
+
+# SG_GATEWAY_AWG31_STAGE2_COMMANDS
+from importlib import import_module as _stage2_import_module
+from sg_hostd.awg31_commands import install as _install_awg31_commands
+
+_install_awg31_commands(_stage2_import_module("sg_hostd.commands"))
+del _stage2_import_module
+del _install_awg31_commands

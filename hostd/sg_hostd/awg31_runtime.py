@@ -17,6 +17,7 @@ from app.clients.awg31_lifecycle import (
     SERVER_CONFIG,
     STATE_ROOT,
 )
+from app.connections.awg31 import config_lines, get_settings, set_server_public_key
 from app.db import connect, init_db
 
 SERVICE = "sg-gateway-awg31.service"
@@ -83,12 +84,14 @@ def _peers() -> list[dict[str, Any]]:
 
 
 def _peer_config(peer: dict[str, Any], server_public_key: str) -> str:
+    settings = get_settings()
     return "\n".join(
         [
             "[Interface]",
             f"PrivateKey = {peer['private_key']}",
             f"Address = {peer['address']}",
             f"DNS = {DNS}",
+            *config_lines(settings),
             "",
             "[Peer]",
             f"PublicKey = {server_public_key}",
@@ -102,6 +105,8 @@ def _peer_config(peer: dict[str, Any], server_public_key: str) -> str:
 
 def render() -> dict[str, Any]:
     private_key, public_key = _server_keys()
+    set_server_public_key(public_key)
+    settings = get_settings()
     peers = _peers()
     peer_blocks: list[str] = []
     PEER_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
@@ -127,6 +132,7 @@ def render() -> dict[str, Any]:
             f"PrivateKey = {private_key}",
             "ListenPort = 587",
             "Address = 10.131.0.1/24",
+            *config_lines(settings),
             *peer_blocks,
         ]
     )
