@@ -24,7 +24,7 @@ def test_awg2_and_awg3_are_independent_device_credentials(tmp_path, monkeypatch)
     device = repository.get_primary_device(client_id)
     assert device is not None
     creds = {item.engine: json.loads(item.config_json or "{}") for item in repository.list_device_credentials(device.id)}
-    assert set(creds) == {"amneziawg", "amneziawg3"}
+    assert set(creds) == {"amneziawg", "amneziawg3", "amneziawg31"}
     assert creds["amneziawg"]["address"].startswith("10.66.")
     assert creds["amneziawg3"]["address"].startswith("10.67.")
     assert creds["amneziawg"]["private_key"] != creds["amneziawg3"]["private_key"]

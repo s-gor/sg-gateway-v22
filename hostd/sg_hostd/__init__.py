@@ -35,3 +35,11 @@ _install_clients_keys_contract()
 _install_full_restore_hardening()
 del _install_clients_keys_contract
 del _install_full_restore_hardening
+
+# SG_GATEWAY_AWG31_STAGE1_CORE
+from importlib import import_module as _import_module
+from sg_hostd.awg31_integration import install as _install_awg31_apply
+
+_install_awg31_apply(_import_module("sg_hostd.client_runtime"))
+del _import_module
+del _install_awg31_apply
