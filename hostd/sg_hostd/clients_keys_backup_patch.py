@@ -136,6 +136,11 @@ def _rebind_client_credentials(data: ModuleType, database: sqlite3.Connection) -
     ).fetchall()
     for row_id, engine_raw, raw in rows:
         engine = str(engine_raw)
+        if engine == "amneziawg31":
+            # Independent AWG31 credentials are self-contained.  Never
+            # normalize or reserialize their config_json during a portable
+            # Clients & Keys restore.
+            continue
         try:
             payload = json.loads(raw or "{}")
         except (TypeError, ValueError, json.JSONDecodeError):

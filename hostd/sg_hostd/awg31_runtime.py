@@ -162,6 +162,42 @@ def apply_awg31() -> dict[str, Any]:
     return {"ok": True, **payload}
 
 
+def activate_restored_awg31(*, enabled: bool, active: bool) -> dict[str, Any]:
+    """Activate an exact restored profile without rewriting keys, DB or configs."""
+    required = (
+        SERVER_CONFIG,
+        STATE_ROOT / "server-private.key",
+        STATE_ROOT / "server-public.key",
+        RUNTIME_ROOT / "bin/awg",
+        RUNTIME_ROOT / "bin/awg-quick",
+        RUNTIME_ROOT / "bin/amneziawg-go",
+        Path("/etc/systemd/system") / SERVICE,
+    )
+    missing = [str(path) for path in required if not path.exists()]
+    if missing:
+        raise RuntimeError("Restored AWG31 profile is incomplete: " + ", ".join(missing))
+    with connect() as connection:
+        peers = int(
+            connection.execute(
+                "SELECT COUNT(*) FROM device_credentials WHERE engine = ?",
+                (ENGINE_ID,),
+            ).fetchone()[0]
+        )
+    _run(["systemctl", "daemon-reload"])
+    _run(["systemctl", "enable" if enabled else "disable", SERVICE])
+    _run(["systemctl", "restart" if active else "stop", SERVICE])
+    if active:
+        _run(["systemctl", "is-active", "--quiet", SERVICE])
+    return {
+        "ok": True,
+        "profile": "awg31",
+        "peers": peers,
+        "restored_exactly": True,
+        "service_enabled": enabled,
+        "service_active": active,
+    }
+
+
 def control(action: str) -> dict[str, Any]:
     if action not in {"start", "stop", "restart", "status"}:
         raise ValueError(action)

@@ -25,23 +25,25 @@ def test_awg31_vendor_files_are_pinned_and_hashed() -> None:
         assert hashlib.sha256(path.read_bytes()).hexdigest() == sums[name]
 
 
-def test_awg30_vendor_payload_is_removed() -> None:
-    assert not (CORES / "amneziawg-tools-3.0.20260805.tar.gz").exists()
-    assert not (CORES / "amneziawg-go-linux-amd64-v3.0.0").exists()
+def test_awg30_and_awg31_vendor_payloads_are_both_pinned() -> None:
+    assert (CORES / "amneziawg-tools-3.0.20260805.tar.gz").is_file()
+    assert (CORES / "amneziawg-go-linux-amd64-v3.0.0").is_file()
 
 
 def test_awg31_versions_are_declared() -> None:
     versions = (CORES / "VERSIONS.env").read_text(encoding="utf-8")
-    assert "AMNEZIAWG3_TOOLS_VERSION=3.1.20260812" in versions
-    assert "AMNEZIAWG3_GO_VERSION=3.1.20260814" in versions
+    assert "AMNEZIAWG3_TOOLS_VERSION=3.0.20260805" in versions
+    assert "AMNEZIAWG3_GO_VERSION=3.0.0" in versions
+    assert "AMNEZIAWG31_TOOLS_VERSION=3.1.20260812" in versions
+    assert "AMNEZIAWG31_GO_VERSION=3.1.20260814" in versions
 
 
-def test_awg31_repair_uses_new_vendor_runtime() -> None:
+def test_awg3_repair_stays_on_30_runtime() -> None:
     repair = (ROOT / "deploy" / "repair-awg3-runtime.sh").read_text(encoding="utf-8")
-    assert TOOLS in repair
-    assert GO in repair
-    assert "amneziawg-tools-3.0.20260805.tar.gz" not in repair
-    assert "amneziawg-go-linux-amd64-v3.0.0" not in repair
+    assert TOOLS not in repair
+    assert GO not in repair
+    assert "amneziawg-tools-3.0.20260805.tar.gz" in repair
+    assert "amneziawg-go-linux-amd64-v3.0.0" in repair
 
 
 def test_awg3_profile_remains_independent_from_awg2() -> None:

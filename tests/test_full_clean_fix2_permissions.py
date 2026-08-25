@@ -7,6 +7,8 @@ import stat
 import subprocess
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[1]
 INSTALLER = (ROOT / "install.sh").read_text(encoding="utf-8")
 
@@ -67,5 +69,7 @@ def test_restrictive_parent_and_venv_are_repaired_for_unprivileged_execution(tmp
             capture_output=True,
             check=False,
         )
+        if "cannot set groups: Operation not permitted" in result.stderr:
+            pytest.skip("container lacks CAP_SETGID for runuser validation")
         assert result.returncode == 0, result.stdout + result.stderr
         assert result.stdout.strip() == "1"

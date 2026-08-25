@@ -3,7 +3,6 @@ from __future__ import annotations
 import base64
 import json
 import secrets
-from functools import wraps
 from pathlib import Path
 from typing import Any
 
@@ -74,13 +73,22 @@ def _address(device_id: int) -> str:
     return f"10.131.0.{2 + ((device_id - 1) % 253)}/32"
 
 
-def _payload(row: Any, preserved: dict[str, Any] | None = None) -> dict[str, Any]:
+def _payload(
+    row: Any,
+    preserved: dict[str, Any] | None = None,
+    *,
+    settings_parameters: dict[str, Any] | None = None,
+    server_public_key: str | None = None,
+) -> dict[str, Any]:
     current = dict(preserved or {})
     if not current.get("private_key") or not current.get("public_key"):
         current["private_key"], current["public_key"] = _generate_keypair()
-    from app.connections.awg31 import get_settings
+    if settings_parameters is None or server_public_key is None:
+        from app.connections.awg31 import get_settings
 
-    settings = get_settings()
+        settings = get_settings()
+        settings_parameters = dict(settings.parameters)
+        server_public_key = settings.server_public_key
     current.update(
         {
             "profile": PROFILE_ID,
@@ -95,11 +103,35 @@ def _payload(row: Any, preserved: dict[str, Any] | None = None) -> dict[str, Any
             "allowed_ips": "0.0.0.0/0, ::/0",
             "persistent_keepalive": 25,
             "generation": 31,
-            "server_public_key": settings.server_public_key,
-            **{name.lower(): value for name, value in settings.parameters.items()},
+            "server_public_key": server_public_key,
+            **{name.lower(): value for name, value in settings_parameters.items()},
         }
     )
     return current
+
+
+def build_credential_payload(
+    *,
+    device_id: int,
+    device_name: str,
+    is_primary: bool,
+    client_name: str,
+    preserved: dict[str, Any] | None = None,
+    settings_parameters: dict[str, Any] | None = None,
+    server_public_key: str | None = None,
+) -> dict[str, Any]:
+    """Build one AWG31 credential without mutating repository globals."""
+    return _payload(
+        {
+            "device_id": device_id,
+            "device_name": device_name,
+            "is_primary": is_primary,
+            "client_name": client_name,
+        },
+        preserved,
+        settings_parameters=settings_parameters,
+        server_public_key=server_public_key,
+    )
 
 
 def _device_row(connection, device_id: int):
@@ -181,53 +213,3 @@ def _snapshot(client_id: int) -> dict[int, dict[str, Any]]:
             if payload is not None:
                 result[device_id] = payload
     return result
-
-
-def install(repository) -> None:
-    if getattr(repository, "_awg31_lifecycle_installed", False):
-        return
-
-    original_create_client = repository.create_client
-    original_create_device = repository.create_device
-    original_update_client = repository.update_client
-    original_update_device = repository.update_device
-
-    @wraps(original_create_client)
-    def create_client(name: str, access: str, expires_at: str | None = None):
-        client_id = original_create_client(name, access, expires_at)
-        if client_id is not None:
-            for device_id in _client_devices(int(client_id)):
-                ensure_peer(device_id)
-        return client_id
-
-    @wraps(original_create_device)
-    def create_device(client_id: int, name: str, access: str, expires_at: str | None = None):
-        device_id = original_create_device(client_id, name, access, expires_at)
-        if device_id is not None:
-            ensure_peer(int(device_id))
-        return device_id
-
-    @wraps(original_update_client)
-    def update_client(client_id: int, name: str, expires_at: str | None, access: str):
-        preserved = _snapshot(client_id)
-        changed = original_update_client(client_id, name, expires_at, access)
-        if changed:
-            for device_id in _client_devices(client_id):
-                ensure_peer(device_id, preserved.get(device_id))
-        return changed
-
-    @wraps(original_update_device)
-    def update_device(client_id: int, device_id: int, name: str, expires_at: str | None, access: str):
-        with connect() as connection:
-            preserved = _stored_payload(connection, device_id)
-        changed = original_update_device(client_id, device_id, name, expires_at, access)
-        if changed:
-            ensure_peer(device_id, preserved)
-        return changed
-
-    repository.create_client = create_client
-    repository.create_device = create_device
-    repository.update_client = update_client
-    repository.update_device = update_device
-    repository.delete_awg31_peer = delete_peer
-    repository._awg31_lifecycle_installed = True

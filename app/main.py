@@ -20,6 +20,7 @@ from app.clients.exports import (
     protocol_ready,
 )
 from app.clients.qr import ClientQrError, build_qr_svg
+from app.clients.awg31_stage2 import register_awg31
 from app.clients.runtime import ClientWorkflowError, apply_clients_runtime
 from app.clients.repository import (
     count_clients,
@@ -558,6 +559,7 @@ def create_app() -> Flask:
     app.secret_key = config.secret_key
 
     init_db()
+    register_awg31(app)
 
     @app.before_request
     def protect_panel():
