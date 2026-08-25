@@ -92,6 +92,7 @@ set -Eeuo pipefail
 PREFIX="$1/opt/sg-gateway"
 CONFIG_DIR="$1/etc/sg-gateway"
 DATA_DIR="$1/var/lib/sg-gateway"
+LOG_DIR="$1/var/log/sg-gateway"
 user_present=1
 group_present=1
 
