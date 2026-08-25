@@ -57,6 +57,7 @@ sanitize_installer_log_file() { :; }
 saved_https_access() { :; }
 xray_installed_version() { printf 'test'; }
 print_sg_admin_status() { :; }
+rm() { :; }
 
 main >/dev/null
 cat "$TRACE"
