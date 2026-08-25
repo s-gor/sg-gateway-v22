@@ -1,28 +1,58 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
+# SG_GATEWAY_UPDATE_CORE
 
-REPOSITORY="s-gor/sg-gateway-v22"
+REPOSITORY="${SG_GATEWAY_GITHUB_REPOSITORY:-s-gor/sg-gateway-v22}"
 BRANCH="${SG_GATEWAY_GITHUB_BRANCH:-${SG_GATEWAY_UPDATE_BRANCH:-main}}"
 ARCHIVE_URL="https://github.com/${REPOSITORY}/archive/refs/heads/${BRANCH}.tar.gz"
-GIT_URL="https://github.com/${REPOSITORY}.git"
+GIT_URL="${SG_GATEWAY_GIT_URL:-https://github.com/${REPOSITORY}.git}"
 
-PREFIX="/opt/sg-gateway"
-CONFIG_DIR="/etc/sg-gateway"
-DATA_DIR="/var/lib/sg-gateway"
-BACKUP_ROOT="/root/sg-gateway-update-safety"
+SYSTEM_ROOT="${SG_GATEWAY_ROOT:-/}"
+SYSTEM_ROOT="${SYSTEM_ROOT%/}"
+[[ -n "$SYSTEM_ROOT" ]] || SYSTEM_ROOT="/"
+
+system_path() {
+  local path="$1"
+  [[ "$path" == /* ]] || return 1
+  if [[ "$SYSTEM_ROOT" == / ]]; then
+    printf '%s\n' "$path"
+  else
+    printf '%s%s\n' "$SYSTEM_ROOT" "$path"
+  fi
+}
+
+PREFIX="${SG_GATEWAY_PREFIX:-$(system_path /opt/sg-gateway)}"
+CONFIG_DIR="${SG_GATEWAY_CONFIG_DIR:-$(system_path /etc/sg-gateway)}"
+DATA_DIR="${SG_GATEWAY_DATA_DIR:-$(system_path /var/lib/sg-gateway)}"
+DATABASE="${SG_GATEWAY_DATABASE:-$DATA_DIR/sg-gateway.sqlite}"
+BACKUP_ROOT="${SG_GATEWAY_UPDATE_BACKUP_ROOT:-$(system_path /root/sg-gateway-update-safety)}"
 BACKUP_KEEP="${SG_GATEWAY_UPDATE_BACKUP_KEEP:-2}"
 BACKUP_HEADROOM_MB="${SG_GATEWAY_UPDATE_BACKUP_HEADROOM_MB:-256}"
 PANEL_SERVICE="sg-gateway.service"
 PANEL_PRODUCTION_WSGI="app.production:app"
 HOSTD_SERVICE="sg-hostd.service"
 AWG3_SERVICE="sg-gateway-awg3.service"
-AWG3_CONFIG="/etc/amnezia/amneziawg/awg3.conf"
-AWG3_UNIT="/etc/systemd/system/sg-gateway-awg3.service"
+AWG31_SERVICE="sg-gateway-awg31.service"
+AWG2_CONFIG="$(system_path /etc/amnezia/amneziawg/awg0.conf)"
+AWG2_UNIT="$(system_path /etc/systemd/system/sg-gateway-awg.service)"
+AWG3_CONFIG="$(system_path /etc/amnezia/amneziawg/awg3.conf)"
+AWG3_UNIT="$(system_path /etc/systemd/system/sg-gateway-awg3.service)"
+AWG31_CONFIG="$(system_path /etc/amnezia/amneziawg/awg31)"
+AWG31_STATE="$(system_path /var/lib/sg-gateway/awg31)"
+AWG31_UNIT="$(system_path /etc/systemd/system/sg-gateway-awg31.service)"
 AWG3_ROOT="$PREFIX/awg3"
+LETSENCRYPT_DIR="$(system_path /etc/letsencrypt)"
+NGINX_CONFIG="$(system_path /etc/nginx/nginx.conf)"
+NGINX_SITE_AVAILABLE="$(system_path /etc/nginx/sites-available/sg-gateway)"
+NGINX_SITE_ENABLED="$(system_path /etc/nginx/sites-enabled/sg-gateway)"
+NGINX_STREAM_CONFIG="$(system_path /etc/nginx/stream-conf.d/sg-gateway-443.conf)"
+PANEL_UNIT="$(system_path /etc/systemd/system/sg-gateway.service)"
+HOSTD_UNIT="$(system_path /etc/systemd/system/sg-hostd.service)"
 TEMP_DIR=""
 BACKUP_DIR=""
 SOURCE_DIR=""
-SOURCE_COMMIT=""
+SOURCE_COMMIT="${SG_GATEWAY_SOURCE_COMMIT:-}"
+MIGRATION_SOURCE_DIR=""
 PANEL_UPDATE_STATE="${SG_GATEWAY_PANEL_UPDATE_STATE:-$DATA_DIR/updates/panel-state.json}"
 BACKUP_READY=0
 SERVICES_STOPPED=0
@@ -30,6 +60,19 @@ UPDATE_FINISHED=0
 ASSETS_FINGERPRINT=""
 ASSETS_RECOVERY_DIR=""
 ASSETS_RECOVERY_SOURCE=""
+
+RUNTIME_FILES=(
+  amneziawg-tools-3.0.20260805.tar.gz
+  amneziawg-go-linux-amd64-v3.0.0
+  amneziawg-tools-3.1.20260812.tar.gz
+  amneziawg-go-linux-amd64-v3.1.20260814
+)
+RUNTIME_SHA256=(
+  090f9383532822a756d078890b447e00af7f46bd30a10f9f47c46d633d807b19
+  131110027db6d5dc0e35b19eb5b8a2692676081366c34112088dc68bbb050bcd
+  f18592c499c893b1b87b15de9e707ce265585cf2536698975b6ede8156d14ada
+  375bc2645df09498aa30215e3b3a09a97626a8e929f409e0edef6564fb8e3110
+)
 
 GREEN=$'\033[1;32m'
 RED=$'\033[1;31m'
@@ -64,8 +107,10 @@ backup_is_complete() {
 }
 
 cleanup_incomplete_safety_backups() {
-  local dir
+  local dir listing
   [[ -d "$BACKUP_ROOT" ]] || return 0
+  listing="$(mktemp "$BACKUP_ROOT/.cleanup-incomplete.XXXXXX")"
+  find "$BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d -name '*-before-update' -print 2>/dev/null | sort > "$listing"
   while IFS= read -r dir; do
     [[ -n "$dir" ]] || continue
     [[ -n "$BACKUP_DIR" && "$dir" == "$BACKUP_DIR" ]] && continue
@@ -73,13 +118,16 @@ cleanup_incomplete_safety_backups() {
       printf '[SG-Gateway Update] Removing incomplete Safety Backup: %s\n' "$(basename "$dir")"
       rm -rf -- "$dir"
     fi
-  done < <(find "$BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d -name '*-before-update' -print 2>/dev/null | sort)
+  done < "$listing"
+  rm -f -- "$listing"
 }
 
 prune_safety_backups() {
-  local keep="$1" kept=0 dir
+  local keep="$1" kept=0 dir listing
   [[ "$keep" =~ ^[0-9]+$ ]] || return 1
   [[ -d "$BACKUP_ROOT" ]] || return 0
+  listing="$(mktemp "$BACKUP_ROOT/.prune.XXXXXX")"
+  find "$BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d -name '*-before-update' -print 2>/dev/null | sort -r > "$listing"
   while IFS= read -r dir; do
     [[ -n "$dir" ]] || continue
     backup_is_complete "$dir" || continue
@@ -89,7 +137,8 @@ prune_safety_backups() {
     fi
     printf '[SG-Gateway Update] Pruning old Safety Backup: %s\n' "$(basename "$dir")"
     rm -rf -- "$dir" || return 1
-  done < <(find "$BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d -name '*-before-update' -print 2>/dev/null | sort -r)
+  done < "$listing"
+  rm -f -- "$listing"
 }
 
 remove_current_incomplete_backup() {
@@ -123,15 +172,20 @@ ensure_safety_backup_space() {
     "$PREFIX"
     "$CONFIG_DIR"
     "$DATA_DIR"
-    /etc/letsencrypt
+    "$LETSENCRYPT_DIR"
+    "$AWG2_CONFIG"
+    "$AWG2_UNIT"
     "$AWG3_CONFIG"
     "$AWG3_UNIT"
-    /etc/nginx/nginx.conf
-    /etc/nginx/sites-available/sg-gateway
-    /etc/nginx/sites-enabled/sg-gateway
-    /etc/nginx/stream-conf.d/sg-gateway-443.conf
-    /etc/systemd/system/sg-gateway.service
-    /etc/systemd/system/sg-hostd.service
+    "$AWG31_CONFIG"
+    "$AWG31_STATE"
+    "$AWG31_UNIT"
+    "$NGINX_CONFIG"
+    "$NGINX_SITE_AVAILABLE"
+    "$NGINX_SITE_ENABLED"
+    "$NGINX_STREAM_CONFIG"
+    "$PANEL_UNIT"
+    "$HOSTD_UNIT"
   )
   while IFS= read -r candidate; do
     [[ -n "$candidate" ]] && candidates+=("$candidate")
@@ -347,11 +401,157 @@ print(hashlib.sha256(raw).hexdigest())
 PYCLIENTS
 }
 
+capture_credentials_state() {
+  local output="$1"
+  python3 - "$DATABASE" "$output" <<'PYCREDENTIALSNAPSHOT'
+import base64
+import json
+import sqlite3
+import sys
+from pathlib import Path
+
+database = Path(sys.argv[1])
+output = Path(sys.argv[2])
+
+def encode(value):
+    if value is None:
+        return {"type": "null"}
+    if isinstance(value, bytes):
+        return {"type": "blob", "value": base64.b64encode(value).decode("ascii")}
+    if isinstance(value, int):
+        return {"type": "integer", "value": value}
+    if isinstance(value, float):
+        return {"type": "real", "value": repr(value)}
+    return {"type": "text", "value": str(value)}
+
+payload = {"tables": {}}
+with sqlite3.connect(f"file:{database}?mode=ro", uri=True) as connection:
+    for table in ("clients", "devices", "device_credentials"):
+        columns = [row[1] for row in connection.execute(f"PRAGMA table_info({table})")]
+        if not columns:
+            raise SystemExit(f"required credentials table is missing: {table}")
+        order = ", ".join(f'"{column}"' for column in columns)
+        rows = connection.execute(f'SELECT {order} FROM "{table}" ORDER BY {order}').fetchall()
+        payload["tables"][table] = {
+            "columns": columns,
+            "rows": [[encode(value) for value in row] for row in rows],
+        }
+
+temporary = output.with_name(output.name + ".new")
+temporary.write_text(json.dumps(payload, sort_keys=True, separators=(",", ":")), encoding="utf-8")
+temporary.replace(output)
+PYCREDENTIALSNAPSHOT
+}
+
+verify_credentials_transition() {
+  local before="$1"
+  python3 - "$DATABASE" "$before" <<'PYCREDENTIALVERIFY'
+import base64
+import json
+import sqlite3
+import sys
+from collections import Counter
+from pathlib import Path
+
+database = Path(sys.argv[1])
+before = json.loads(Path(sys.argv[2]).read_text(encoding="utf-8"))
+
+def encode(value):
+    if value is None:
+        return {"type": "null"}
+    if isinstance(value, bytes):
+        return {"type": "blob", "value": base64.b64encode(value).decode("ascii")}
+    if isinstance(value, int):
+        return {"type": "integer", "value": value}
+    if isinstance(value, float):
+        return {"type": "real", "value": repr(value)}
+    return {"type": "text", "value": str(value)}
+
+def decode(value):
+    kind = value["type"]
+    if kind == "null":
+        return None
+    if kind == "blob":
+        return base64.b64decode(value["value"])
+    if kind == "integer":
+        return int(value["value"])
+    if kind == "real":
+        return float(value["value"])
+    return value["value"]
+
+after = {"tables": {}}
+with sqlite3.connect(f"file:{database}?mode=ro", uri=True) as connection:
+    for table in ("clients", "devices", "device_credentials"):
+        expected = before["tables"][table]
+        columns = [row[1] for row in connection.execute(f"PRAGMA table_info({table})")]
+        if columns != expected["columns"]:
+            raise SystemExit(f"{table} schema changed during Update")
+        select = ", ".join(f'"{column}"' for column in columns)
+        rows = connection.execute(f'SELECT {select} FROM "{table}" ORDER BY {select}').fetchall()
+        after["tables"][table] = {
+            "columns": columns,
+            "rows": [[encode(value) for value in row] for row in rows],
+        }
+
+for table in ("clients", "devices"):
+    if after["tables"][table] != before["tables"][table]:
+        raise SystemExit(f"{table} changed during Update")
+
+before_credentials = before["tables"]["device_credentials"]
+after_credentials = after["tables"]["device_credentials"]
+columns = before_credentials["columns"]
+try:
+    device_index = columns.index("device_id")
+    engine_index = columns.index("engine")
+except ValueError as exc:
+    raise SystemExit("device_credentials lacks device_id/engine") from exc
+
+before_rows = before_credentials["rows"]
+after_rows = after_credentials["rows"]
+remaining = Counter(json.dumps(row, sort_keys=True, separators=(",", ":")) for row in after_rows)
+for row in before_rows:
+    key = json.dumps(row, sort_keys=True, separators=(",", ":"))
+    if remaining[key] < 1:
+        raise SystemExit("an existing credential changed or was removed during Update")
+    remaining[key] -= 1
+
+added = []
+for key, count in remaining.items():
+    added.extend([json.loads(key)] * count)
+
+device_table = before["tables"]["devices"]
+device_columns = device_table["columns"]
+device_id_index = device_columns.index("id")
+device_ids = {decode(row[device_id_index]) for row in device_table["rows"]}
+before_pairs = {
+    (decode(row[device_index]), decode(row[engine_index])) for row in before_rows
+}
+for row in added:
+    device_id = decode(row[device_index])
+    engine = decode(row[engine_index])
+    if engine != "amneziawg31" or device_id not in device_ids:
+        raise SystemExit("Update added a credential outside the AWG31 migration allowance")
+    if (device_id, engine) in before_pairs:
+        raise SystemExit("Update duplicated an existing AWG31 credential")
+
+after_pairs = [
+    (decode(row[device_index]), decode(row[engine_index])) for row in after_rows
+]
+if len(after_pairs) != len(set(after_pairs)):
+    raise SystemExit("duplicate device credential records detected after Update")
+awg31_devices = {device_id for device_id, engine in after_pairs if engine == "amneziawg31"}
+if awg31_devices != device_ids:
+    raise SystemExit("AWG31 migration did not create exactly one credential for every existing device")
+
+print(f"Credentials transition: preserved={len(before_rows)} added_awg31={len(added)}")
+PYCREDENTIALVERIFY
+}
+
 capture_service_states() {
   local output="$1" service active enabled failed
   : > "$output"
   for service in \
-    nginx.service xray.service mihomo.service sg-gateway-awg.service "$AWG3_SERVICE" \
+    nginx.service xray.service mihomo.service sg-gateway-awg.service "$AWG3_SERVICE" "$AWG31_SERVICE" \
     sg-gateway-singbox.service "$HOSTD_SERVICE" "$PANEL_SERVICE"; do
     active=0
     enabled=0
@@ -368,7 +568,7 @@ verify_runtime_states_unchanged() {
   while IFS=$'\t' read -r service active enabled failed; do
     [[ -n "$service" ]] || continue
     case "$service" in
-      "$PANEL_SERVICE"|"$HOSTD_SERVICE") continue ;;
+      "$PANEL_SERVICE"|"$HOSTD_SERVICE"|"$AWG31_SERVICE") continue ;;
     esac
     now=0
     now_enabled=0
@@ -432,20 +632,20 @@ protected_runtime_paths() {
   source "$https_env"
   cert="${HTTPS_CERT:-}"
   key="${HTTPS_KEY:-}"
-  python3 - "$output" "$cert" "$key" <<'PYPROTECTED'
+  python3 - "$output" \
+    "$LETSENCRYPT_DIR" "$DATA_DIR/security/tls-state.json" \
+    "$AWG2_CONFIG" "$AWG2_UNIT" \
+    "$AWG3_CONFIG" "$AWG3_UNIT" "$AWG3_ROOT" \
+    "$AWG31_CONFIG" "$AWG31_STATE" "$AWG31_UNIT" "$PREFIX/awg31" \
+    -- "$cert" "$key" <<'PYPROTECTED'
 import os
 import sys
 from pathlib import Path
 
 output = Path(sys.argv[1])
-values = [
-    "/etc/letsencrypt",
-    "/var/lib/sg-gateway/security/tls-state.json",
-    "/etc/amnezia/amneziawg/awg3.conf",
-    "/etc/systemd/system/sg-gateway-awg3.service",
-    "/opt/sg-gateway/awg3",
-]
-for raw in sys.argv[2:]:
+separator = sys.argv.index("--")
+values = list(sys.argv[2:separator])
+for raw in sys.argv[separator + 1:]:
     raw = str(raw or "").strip()
     if not raw:
         continue
@@ -466,6 +666,33 @@ for raw in values:
     ordered.append(value)
 output.write_text("\n".join(ordered) + "\n", encoding="utf-8")
 PYPROTECTED
+}
+
+relative_to_system_root() {
+  local path="$1"
+  if [[ "$SYSTEM_ROOT" == / ]]; then
+    [[ "$path" == /* ]] || return 1
+    printf '%s\n' "${path#/}"
+    return 0
+  fi
+  case "$path" in
+    "$SYSTEM_ROOT"/*) printf '%s\n' "${path#"$SYSTEM_ROOT"/}" ;;
+    *) return 1 ;;
+  esac
+}
+
+preserved_runtime_paths() {
+  local source="$1" output="$2" path
+  : > "$output"
+  while IFS= read -r path; do
+    [[ -n "$path" ]] || continue
+    case "$path" in
+      "$AWG31_CONFIG"|"$AWG31_CONFIG"/*|"$AWG31_STATE"|"$AWG31_STATE"/*|"$AWG31_UNIT"|"$PREFIX/awg31"|"$PREFIX/awg31"/*)
+        continue
+        ;;
+    esac
+    printf '%s\n' "$path" >> "$output"
+  done < "$source"
 }
 
 create_safety_backup() {
@@ -493,17 +720,19 @@ create_safety_backup() {
 
   https_state > "$BACKUP_DIR/https-before.env"
   protected_runtime_paths "$BACKUP_DIR/https-before.env" "$BACKUP_DIR/protected-runtime-paths.txt"
+  preserved_runtime_paths "$BACKUP_DIR/protected-runtime-paths.txt" "$BACKUP_DIR/preserved-runtime-paths.txt"
 
   local protected_paths=()
-  mapfile -t protected_paths < "$BACKUP_DIR/protected-runtime-paths.txt"
+  mapfile -t protected_paths < "$BACKUP_DIR/preserved-runtime-paths.txt"
   fingerprint_paths "${protected_paths[@]}" > "$BACKUP_DIR/protected-runtime-before.sha256"
   fingerprint_clients > "$BACKUP_DIR/clients-before.sha256"
-  fingerprint_paths /etc/letsencrypt > "$BACKUP_DIR/letsencrypt-before.sha256"
+  capture_credentials_state "$BACKUP_DIR/credentials-before.json"
+  fingerprint_paths "$LETSENCRYPT_DIR" > "$BACKUP_DIR/letsencrypt-before.sha256"
   fingerprint_paths \
-    /etc/nginx/nginx.conf \
-    /etc/nginx/sites-available/sg-gateway \
-    /etc/nginx/sites-enabled/sg-gateway \
-    /etc/nginx/stream-conf.d/sg-gateway-443.conf \
+    "$NGINX_CONFIG" \
+    "$NGINX_SITE_AVAILABLE" \
+    "$NGINX_SITE_ENABLED" \
+    "$NGINX_STREAM_CONFIG" \
     > "$BACKUP_DIR/nginx-before.sha256"
 
   local existing=() relative absolute
@@ -512,15 +741,19 @@ create_safety_backup() {
     etc/sg-gateway \
     var/lib/sg-gateway \
     etc/letsencrypt \
+    etc/amnezia/amneziawg/awg0.conf \
     etc/amnezia/amneziawg/awg3.conf \
+    etc/amnezia/amneziawg/awg31 \
     etc/nginx/nginx.conf \
     etc/nginx/sites-available/sg-gateway \
     etc/nginx/sites-enabled/sg-gateway \
     etc/nginx/stream-conf.d/sg-gateway-443.conf \
     etc/systemd/system/sg-gateway.service \
     etc/systemd/system/sg-hostd.service \
-    etc/systemd/system/sg-gateway-awg3.service; do
-    if [[ -e "/$relative" || -L "/$relative" ]]; then
+    etc/systemd/system/sg-gateway-awg.service \
+    etc/systemd/system/sg-gateway-awg3.service \
+    etc/systemd/system/sg-gateway-awg31.service; do
+    if [[ -e "$SYSTEM_ROOT/$relative" || -L "$SYSTEM_ROOT/$relative" ]]; then
       existing+=("$relative")
     fi
   done
@@ -528,7 +761,9 @@ create_safety_backup() {
   while IFS= read -r absolute; do
     [[ -n "$absolute" && "$absolute" == /* ]] || continue
     if [[ -e "$absolute" || -L "$absolute" ]]; then
-      existing+=("${absolute#/}")
+      relative="$(relative_to_system_root "$absolute")" || \
+        fail "protected runtime path is outside SG_GATEWAY_ROOT: $absolute"
+      existing+=("$relative")
     fi
   done < "$BACKUP_DIR/protected-runtime-paths.txt"
 
@@ -555,7 +790,7 @@ create_safety_backup() {
   existing=("${unique[@]}")
 
   printf '%s\n' "${existing[@]}" > "$BACKUP_DIR/existing-paths.txt"
-  tar -C / -cpf "$BACKUP_DIR/state.tar" "${existing[@]}"
+  tar -C "$SYSTEM_ROOT" -cpf "$BACKUP_DIR/state.tar" "${existing[@]}"
   tar -tf "$BACKUP_DIR/state.tar" >/dev/null
   BACKUP_READY=1
 }
@@ -563,37 +798,36 @@ create_safety_backup() {
 rollback_update() {
   (( BACKUP_READY == 1 )) || return 0
   printf '\n%s[SG-Gateway Update] ROLLBACK:%s restoring the pre-update server state...\n' "$YELLOW" "$RESET"
-  systemctl stop "$PANEL_SERVICE" "$HOSTD_SERVICE" "$AWG3_SERVICE" >/dev/null 2>&1 || true
+  systemctl stop "$PANEL_SERVICE" "$HOSTD_SERVICE" "$AWG3_SERVICE" "$AWG31_SERVICE" >/dev/null 2>&1 || true
 
   local path
   for path in \
-    /opt/sg-gateway \
-    /etc/sg-gateway \
-    /var/lib/sg-gateway \
-    /etc/letsencrypt \
-    /etc/amnezia/amneziawg/awg3.conf \
-    /etc/nginx/sites-available/sg-gateway \
-    /etc/nginx/sites-enabled/sg-gateway \
-    /etc/nginx/stream-conf.d/sg-gateway-443.conf \
-    /etc/systemd/system/sg-gateway.service \
-    /etc/systemd/system/sg-hostd.service \
-    /etc/systemd/system/sg-gateway-awg3.service; do
+    "$PREFIX" \
+    "$CONFIG_DIR" \
+    "$DATA_DIR" \
+    "$LETSENCRYPT_DIR" \
+    "$AWG2_CONFIG" \
+    "$AWG3_CONFIG" \
+    "$AWG31_CONFIG" \
+    "$NGINX_SITE_AVAILABLE" \
+    "$NGINX_SITE_ENABLED" \
+    "$NGINX_STREAM_CONFIG" \
+    "$PANEL_UNIT" \
+    "$HOSTD_UNIT" \
+    "$AWG2_UNIT" \
+    "$AWG3_UNIT" \
+    "$AWG31_UNIT"; do
     rm -rf -- "$path"
   done
 
   while IFS= read -r path; do
     [[ -n "$path" && "$path" == /* ]] || continue
-    case "$path" in
-      /opt/sg-gateway|/opt/sg-gateway/*|/etc/sg-gateway|/etc/sg-gateway/*|/var/lib/sg-gateway|/var/lib/sg-gateway/*|/etc/letsencrypt|/etc/letsencrypt/*|/etc/amnezia/amneziawg/awg3.conf|/etc/systemd/system/sg-gateway-awg3.service)
-        continue
-        ;;
-    esac
-    if [[ -f "$path" || -L "$path" ]]; then
-      rm -f -- "$path"
-    fi
+    relative_to_system_root "$path" >/dev/null || continue
+    [[ "$path" != "$SYSTEM_ROOT" && "$path" != / ]] || continue
+    rm -rf -- "$path"
   done < "$BACKUP_DIR/protected-runtime-paths.txt"
 
-  tar -C / -xpf "$BACKUP_DIR/state.tar"
+  tar -C "$SYSTEM_ROOT" -xpf "$BACKUP_DIR/state.tar"
   systemctl daemon-reload >/dev/null 2>&1 || true
 
   if command -v nginx >/dev/null 2>&1 && nginx -t >/dev/null 2>&1; then
@@ -636,14 +870,10 @@ on_error() {
   printf '%s[SG-Gateway Update] Update failed.%s\n' "$RED" "$RESET" >&2
   exit "$rc"
 }
-trap on_error ERR
-trap 'exit 130' INT TERM
-trap cleanup EXIT
-
 run_stage() {
   local number="$1" label="$2"
   shift 2
-  printf '%s[SG-Gateway Update] [%s/6]%s %s\n' "$CYAN" "$number" "$RESET" "$label"
+  printf '%s[SG-Gateway Update] [%s/7]%s %s\n' "$CYAN" "$number" "$RESET" "$label"
   "$@"
   printf '%s[SG-Gateway Update] [OK]%s %s\n' "$GREEN" "$RESET" "$label"
 }
@@ -671,7 +901,7 @@ panel_wsgi_target() {
 
 # SG_GATEWAY_02204E_UPDATE_PRODUCTION_WSGI_FIX1
 migrate_panel_wsgi_service() {
-  local unit="/etc/systemd/system/sg-gateway.service"
+  local unit="$PANEL_UNIT"
   local current after
   [[ -f "$unit" ]] || fail "panel systemd unit is missing: $unit"
 
@@ -739,7 +969,8 @@ PYCANDIDATEWSGI
 
 validate_deployed_panel() {
   runuser -u sg-gateway -- "$PREFIX/.venv/bin/python" -B -c \
-    'from pathlib import Path; from jinja2 import Environment; env=Environment(); [env.parse(p.read_text(encoding="utf-8")) for p in Path("/opt/sg-gateway/app/web/templates").rglob("*.html")]; print("Templates: OK")'
+    'import sys; from pathlib import Path; from jinja2 import Environment; env=Environment(); [env.parse(p.read_text(encoding="utf-8")) for p in Path(sys.argv[1]).rglob("*.html")]; print("Templates: OK")' \
+    "$PREFIX/app/web/templates"
 
   local target validation_root validation_env
   target="$(panel_wsgi_target)"
@@ -749,10 +980,18 @@ validate_deployed_panel() {
   # runs as sg-gateway, so allow traversal only for the duration of this
   # isolated validation. Directory listing remains denied.
   chmod 0711 "$TEMP_DIR"
-  install -d -m 0750 -o sg-gateway -g sg-gateway \
-    "$validation_root" "$validation_root/data" "$validation_root/log"
+  if [[ "$SYSTEM_ROOT" == / ]]; then
+    install -d -m 0750 -o sg-gateway -g sg-gateway \
+      "$validation_root" "$validation_root/data" "$validation_root/log"
+  else
+    install -d -m 0750 "$validation_root" "$validation_root/data" "$validation_root/log"
+  fi
   validation_env="$validation_root/sg-gateway.env"
-  install -m 0600 -o sg-gateway -g sg-gateway "$CONFIG_DIR/sg-gateway.env" "$validation_env"
+  if [[ "$SYSTEM_ROOT" == / ]]; then
+    install -m 0600 -o sg-gateway -g sg-gateway "$CONFIG_DIR/sg-gateway.env" "$validation_env"
+  else
+    install -m 0600 "$CONFIG_DIR/sg-gateway.env" "$validation_env"
+  fi
 
   runuser -u sg-gateway -- "$PREFIX/.venv/bin/python" -B - \
     "$PREFIX" "$validation_env" "$target" "$validation_root" <<'PYDEPLOYEDWSGI'
@@ -849,16 +1088,22 @@ preflight() {
 }
 
 resolve_source_commit() {
-  local resolved=""
+  local resolved="$SOURCE_COMMIT" encoded
+
+  if [[ "$resolved" =~ ^[0-9a-fA-F]{40}$ ]]; then
+    SOURCE_COMMIT="${resolved,,}"
+    return 0
+  fi
 
   if command -v git >/dev/null 2>&1; then
     resolved="$(git ls-remote --exit-code "$GIT_URL" "refs/heads/$BRANCH" 2>/dev/null | awk 'NR==1 {print $1}' || true)"
   fi
 
   if [[ ! "$resolved" =~ ^[0-9a-f]{40}$ ]]; then
+    encoded="$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "$BRANCH")"
     resolved="$(
       curl -4 -fsSL --max-time 20 -A 'SG-Gateway-Updater' \
-        "https://api.github.com/repos/${REPOSITORY}/commits/${BRANCH}" 2>/dev/null \
+        "https://api.github.com/repos/${REPOSITORY}/commits/${encoded}" 2>/dev/null \
       | python3 -c 'import json,re,sys; value=str(json.load(sys.stdin).get("sha") or "").strip().lower(); print(value if re.fullmatch(r"[0-9a-f]{40}", value) else "")' \
         2>/dev/null || true
     )"
@@ -867,14 +1112,14 @@ resolve_source_commit() {
   if [[ ! "$resolved" =~ ^[0-9a-f]{40}$ ]]; then
     resolved="$(
       curl -4 -fsSL --max-time 20 -A 'SG-Gateway-Updater' \
-        "https://github.com/${REPOSITORY}/commits/${BRANCH}.atom" 2>/dev/null \
+        "https://github.com/${REPOSITORY}/commits/${encoded}.atom" 2>/dev/null \
       | python3 -c 'import re,sys; match=re.search(r"Grit::Commit/([0-9a-fA-F]{40})", sys.stdin.read()); print(match.group(1).lower() if match else "")' \
         2>/dev/null || true
     )"
   fi
 
-  [[ "$resolved" =~ ^[0-9a-f]{40}$ ]] || fail "cannot resolve exact GitHub commit for update channel $BRANCH"
-  SOURCE_COMMIT="$resolved"
+  [[ "$resolved" =~ ^[0-9a-fA-F]{40}$ ]] || fail "cannot resolve exact GitHub commit for update channel $BRANCH"
+  SOURCE_COMMIT="${resolved,,}"
 }
 
 prepare_source_archive() {
@@ -893,39 +1138,82 @@ prepare_source_archive() {
   tar -xzf "$archive" -C "$SOURCE_DIR" --strip-components=1
 }
 
+validate_runtime_sources() {
+  local directory="$1" index filename expected actual
+  for index in "${!RUNTIME_FILES[@]}"; do
+    filename="${RUNTIME_FILES[$index]}"
+    expected="${RUNTIME_SHA256[$index]}"
+    [[ -f "$directory/$filename" ]] || fail "required Stage3A runtime is missing: $filename"
+    actual="$(sha256sum "$directory/$filename" | awk '{print $1}')"
+    [[ "$actual" == "$expected" ]] || \
+      fail "Stage3A runtime SHA-256 mismatch: $filename (expected $expected, got $actual)"
+  done
+}
+
+stage_runtime_sources() {
+  local source="$1" stage="$2" filename
+  rm -rf -- "$stage"
+  mkdir -p "$stage/vendor/cores"
+  [[ -d "$source/deploy" ]] || fail "deploy source is missing from Stage3A source"
+  cp -a "$source/deploy" "$stage/deploy"
+  for filename in "${RUNTIME_FILES[@]}"; do
+    [[ -f "$source/vendor/cores/$filename" ]] || \
+      fail "required Stage3A runtime is missing: $filename"
+    cp -a "$source/vendor/cores/$filename" "$stage/vendor/cores/$filename"
+  done
+  validate_runtime_sources "$stage/vendor/cores"
+  local count
+  count="$(find "$stage/vendor/cores" -mindepth 1 -maxdepth 1 -type f | wc -l)"
+  [[ "$count" == "${#RUNTIME_FILES[@]}" ]] || fail "Stage3A runtime staging contains unexpected files"
+  printf '[SG-Gateway Update] Stage3A runtime staging: %s verified files\n' "$count"
+}
+
 prepare_source_light() {
   command -v git >/dev/null 2>&1 || return 1
+
+  resolve_source_commit
 
   rm -rf "$SOURCE_DIR"
   printf '[SG-Gateway Update] Source mode: LIGHT\n'
   printf '[SG-Gateway Update] Git partial clone: depth=1 + blob:none + runtime whitelist\n'
-  printf '[SG-Gateway Update] non-runtime trees: assets/data/docs/tests/vendor/.github skipped\n'
+  printf '[SG-Gateway Update] non-runtime trees: assets/data/docs/tests/.github and non-whitelisted vendor skipped\n'
 
   git -c advice.detachedHead=false clone \
     --quiet \
     --depth=1 \
     --filter=blob:none \
-    --sparse \
+    --no-checkout \
     --single-branch \
     --branch "$BRANCH" \
     "$GIT_URL" "$SOURCE_DIR" || return 1
 
-  SOURCE_COMMIT="$(git -C "$SOURCE_DIR" rev-parse HEAD 2>/dev/null || true)"
-  [[ "$SOURCE_COMMIT" =~ ^[0-9a-f]{40}$ ]] || return 1
+  git -C "$SOURCE_DIR" sparse-checkout init --no-cone || return 1
+  git -C "$SOURCE_DIR" sparse-checkout set --no-cone \
+    /VERSION \
+    /requirements.txt \
+    /app/ \
+    /hostd/requirements.txt \
+    /hostd/sg_hostd/ \
+    /deploy/ \
+    /vendor/cores/amneziawg-tools-3.0.20260805.tar.gz \
+    /vendor/cores/amneziawg-go-linux-amd64-v3.0.0 \
+    /vendor/cores/amneziawg-tools-3.1.20260812.tar.gz \
+    /vendor/cores/amneziawg-go-linux-amd64-v3.1.20260814 || return 1
+  git -C "$SOURCE_DIR" checkout --quiet --detach "$SOURCE_COMMIT" || return 1
+  [[ "$(git -C "$SOURCE_DIR" rev-parse HEAD 2>/dev/null || true)" == "$SOURCE_COMMIT" ]] || return 1
   printf '[SG-Gateway Update] Source commit: %s\n' "$SOURCE_COMMIT"
 
-  # SG_GATEWAY_02112_LIGHT_UPDATE_FIX9_R2
-  # Whitelist only live application source. Cone mode also keeps the small
-  # repository-root files required by validation (VERSION, requirements.txt).
-  git -C "$SOURCE_DIR" sparse-checkout set app hostd deploy || return 1
-
   local forbidden
-  for forbidden in vendor assets data docs tests .github; do
+  for forbidden in assets data docs tests .github; do
     [[ ! -e "$SOURCE_DIR/$forbidden" ]] || {
       echo "[SG-Gateway Update] LIGHT source unexpectedly contains: $forbidden" >&2
       return 1
     }
   done
+  validate_runtime_sources "$SOURCE_DIR/vendor/cores" || return 1
+  local runtime_count
+  runtime_count="$(find "$SOURCE_DIR/vendor/cores" -mindepth 1 -maxdepth 1 -type f | wc -l)"
+  [[ "$runtime_count" == "${#RUNTIME_FILES[@]}" ]] || return 1
 
   local object_size source_size
   object_size="$(du -sh "$SOURCE_DIR/.git/objects" 2>/dev/null | awk '{print $1}' || true)"
@@ -979,13 +1267,16 @@ print("Python syntax: OK")
 PYCHECK
 
   validate_candidate_wsgi_target "$SOURCE_DIR"
+
+  MIGRATION_SOURCE_DIR="$TEMP_DIR/stage3a-source"
+  stage_runtime_sources "$SOURCE_DIR" "$MIGRATION_SOURCE_DIR"
 }
 
 # SG_GATEWAY_02112_LIGHT_UPDATE_ASSET_PRESERVE_FIX10
 prepare_preserved_assets() {
   local live="$PREFIX/assets"
   local country_rel="geoip/sg-country-geoip.dat"
-  local archive listing recover_root
+  local archive listing archives recover_root
 
   ASSETS_FINGERPRINT=""
   ASSETS_RECOVERY_DIR=""
@@ -1002,6 +1293,8 @@ prepare_preserved_assets() {
   # server. Recover the last complete copy from our own pre-update
   # Safety Backups. Never re-download the 100+ MB asset tree in Light mode.
   listing="$TEMP_DIR/assets-backup-list.txt"
+  archives="$TEMP_DIR/assets-backup-archives.txt"
+  find "$BACKUP_ROOT" -mindepth 2 -maxdepth 2 -type f -name state.tar -print 2>/dev/null | sort -r > "$archives"
   while IFS= read -r archive; do
     [[ -f "$archive" ]] || continue
     : > "$listing"
@@ -1019,7 +1312,7 @@ prepare_preserved_assets() {
     ASSETS_RECOVERY_SOURCE="$(basename "$(dirname "$archive")")"
     printf '[SG-Gateway Update] Local assets: recovered from Safety Backup %s.\n' "$ASSETS_RECOVERY_SOURCE"
     return 0
-  done < <(find "$BACKUP_ROOT" -mindepth 2 -maxdepth 2 -type f -name state.tar -print 2>/dev/null | sort -r)
+  done < "$archives"
 
   fail "local assets are missing and no Safety Backup with assets was found; refusing to change the installed application"
 }
@@ -1040,14 +1333,16 @@ deploy_source() {
     SERVICES_STOPPED=1
   fi
 
-  local child
+  local child children
+  children="$TEMP_DIR/prefix-children.bin"
+  find "$PREFIX" -mindepth 1 -maxdepth 1 -print0 > "$children"
   while IFS= read -r -d '' child; do
     case "$(basename "$child")" in
       ".venv"|"awg3") continue ;;
       "assets") continue ;;
     esac
     rm -rf "$child"
-  done < <(find "$PREFIX" -mindepth 1 -maxdepth 1 -print0)
+  done < "$children"
 
   cp -a "$stage/." "$PREFIX/"
   if [[ ! -f "$PREFIX/assets/geoip/sg-country-geoip.dat" ]]; then
@@ -1066,7 +1361,9 @@ deploy_source() {
     \( -path "$PREFIX/.venv" -o -path "$PREFIX/assets" -o -path "$AWG3_ROOT" \) -prune -o \
     -type f -exec chmod 0644 {} +
   find "$PREFIX/deploy" -maxdepth 1 -type f -name '*.sh' -exec chmod 0755 {} + 2>/dev/null || true
-  chmod -R a+rX "$PREFIX/.venv"
+  if [[ "$SYSTEM_ROOT" == / ]]; then
+    chmod -R a+rX "$PREFIX/.venv"
+  fi
 
   [[ -f "$PREFIX/assets/geoip/sg-country-geoip.dat" ]] || fail "country GeoIP asset disappeared during Update"
   local assets_after
@@ -1099,22 +1396,34 @@ restart_panel() {
   SERVICES_STOPPED=0
 }
 
+run_stage3a_migration() {
+  [[ -n "$MIGRATION_SOURCE_DIR" && -d "$MIGRATION_SOURCE_DIR/vendor/cores" ]] || \
+    fail "verified Stage3A migration source is unavailable"
+  validate_runtime_sources "$MIGRATION_SOURCE_DIR/vendor/cores"
+  PYTHONPATH="$PREFIX:$PREFIX/hostd" \
+  SG_GATEWAY_APP_ROOT="$PREFIX" \
+  SG_GATEWAY_DATA_DIR="$DATA_DIR" \
+  "$PREFIX/.venv/bin/python" -B -m app.maintenance.awg31_stage3a migrate \
+    --source-root "$MIGRATION_SOURCE_DIR" \
+    --root "$SYSTEM_ROOT" \
+    --database "$DATABASE"
+}
+
 verify_final() {
   local before after
   local protected_paths=()
 
-  before="$(cat "$BACKUP_DIR/clients-before.sha256")"
-  after="$(fingerprint_clients)"
-  [[ "$before" == "$after" ]] || fail "Clients/credentials changed during Update"
+  verify_credentials_transition "$BACKUP_DIR/credentials-before.json" || \
+    fail "Clients/credentials changed outside the AWG31 migration allowance"
 
   before="$(cat "$BACKUP_DIR/letsencrypt-before.sha256")"
-  after="$(fingerprint_paths /etc/letsencrypt)"
+  after="$(fingerprint_paths "$LETSENCRYPT_DIR")"
   [[ "$before" == "$after" ]] || fail "/etc/letsencrypt changed during Update"
 
-  mapfile -t protected_paths < "$BACKUP_DIR/protected-runtime-paths.txt"
+  mapfile -t protected_paths < "$BACKUP_DIR/preserved-runtime-paths.txt"
   before="$(cat "$BACKUP_DIR/protected-runtime-before.sha256")"
   after="$(fingerprint_paths "${protected_paths[@]}")"
-  [[ "$before" == "$after" ]] || fail "TLS/AWG3 protected runtime changed during Update"
+  [[ "$before" == "$after" ]] || fail "TLS/AWG2/AWG3 protected runtime changed during Update"
 
   https_state > "$TEMP_DIR/https-after.env"
   cmp -s "$BACKUP_DIR/https-before.env" "$TEMP_DIR/https-after.env" || \
@@ -1122,10 +1431,10 @@ verify_final() {
 
   before="$(cat "$BACKUP_DIR/nginx-before.sha256")"
   after="$(fingerprint_paths \
-    /etc/nginx/nginx.conf \
-    /etc/nginx/sites-available/sg-gateway \
-    /etc/nginx/sites-enabled/sg-gateway \
-    /etc/nginx/stream-conf.d/sg-gateway-443.conf)"
+    "$NGINX_CONFIG" \
+    "$NGINX_SITE_AVAILABLE" \
+    "$NGINX_SITE_ENABLED" \
+    "$NGINX_STREAM_CONFIG")"
   [[ "$before" == "$after" ]] || fail "Nginx configuration changed during Update"
 
   verify_runtime_states_unchanged "$BACKUP_DIR/service-state.tsv"
@@ -1153,13 +1462,17 @@ bind_panel_update_state() {
 
   local new_version
   new_version="$(tr -d '\r\n' < "$PREFIX/VERSION")"
-  install -d -m 0750 -o root -g sg-gateway "$(dirname "$PANEL_UPDATE_STATE")"
+  if [[ "$SYSTEM_ROOT" == / ]]; then
+    install -d -m 0750 -o root -g sg-gateway "$(dirname "$PANEL_UPDATE_STATE")"
+  else
+    install -d -m 0750 "$(dirname "$PANEL_UPDATE_STATE")"
+  fi
 
   PYTHONPATH="$PREFIX:$PREFIX/hostd" \
   SG_GATEWAY_APP_ROOT="$PREFIX" \
   SG_GATEWAY_PANEL_UPDATE_STATE="$PANEL_UPDATE_STATE" \
   "$PREFIX/.venv/bin/python" -B - \
-    "$SOURCE_COMMIT" "$new_version" "$BACKUP_DIR" "$BRANCH" <<'PYPANELSTATE'
+    "$SOURCE_COMMIT" "$new_version" "$BACKUP_DIR" "$BRANCH" "$SYSTEM_ROOT" <<'PYPANELSTATE'
 import json
 import os
 import re
@@ -1174,6 +1487,7 @@ commit = sys.argv[1].strip().lower()
 version = sys.argv[2].strip()
 backup = Path(sys.argv[3]).name
 channel = sys.argv[4].strip()
+system_root = sys.argv[5]
 root = Path(os.environ["SG_GATEWAY_APP_ROOT"])
 state_path = Path(os.environ["SG_GATEWAY_PANEL_UPDATE_STATE"])
 
@@ -1196,7 +1510,8 @@ state_path.parent.mkdir(parents=True, exist_ok=True)
 temporary = state_path.with_name(state_path.name + ".new")
 temporary.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 os.chmod(temporary, 0o640)
-shutil.chown(temporary, user="root", group="sg-gateway")
+if system_root == "/":
+    shutil.chown(temporary, user="root", group="sg-gateway")
 os.replace(temporary, state_path)
 print(f"Panel Update baseline: {commit[:12]} ({channel})")
 PYPANELSTATE
@@ -1217,7 +1532,8 @@ main() {
   run_stage 3 "Обновление исходников SG-Gateway + WSGI migration" deploy_source "$SOURCE_DIR"
   run_stage 4 "Python/UI проверка без изменения runtime" validate_deployed_panel
   run_stage 5 "Перезапуск только panel + hostd" restart_panel
-  run_stage 6 "Проверка HTTPS, Clients, Nginx и runtime" verify_final
+  run_stage 6 "AWG31 Stage3A migration внутри Update transaction" run_stage3a_migration
+  run_stage 7 "Проверка HTTPS, credentials, Nginx и runtime" verify_final
   bind_panel_update_state
 
   if ! prune_safety_backups "$BACKUP_KEEP"; then
@@ -1238,4 +1554,9 @@ main() {
   printf '[SG-Gateway Update] ============================================================\n'
 }
 
-main "$@"
+if [[ ${SG_GATEWAY_UPDATE_CORE_LIBRARY_ONLY:-0} != 1 ]]; then
+  trap on_error ERR
+  trap 'exit 130' INT TERM
+  trap cleanup EXIT
+  main "$@"
+fi

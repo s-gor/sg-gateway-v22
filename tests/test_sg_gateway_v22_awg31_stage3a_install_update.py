@@ -340,7 +340,9 @@ def test_installer_updater_and_uninstall_entrypoints_are_wired_without_workflows
     install_core = (ROOT / "deploy/install-core.sh").read_text()
     update_core = (ROOT / "deploy/update-from-github-core.sh").read_text()
     assert "app.maintenance.awg31_stage3a migrate" in install
-    assert "app.maintenance.awg31_stage3a migrate" in update
+    assert "Bootstrap commit:" in update
+    assert "app.maintenance.awg31_stage3a migrate" in update_core
+    assert "run_stage3a_migration" in update_core
     assert "stage_backup_and_prepare" in install_core
     assert "capture_service_state" in update_core
     assert "app.maintenance.awg31_stage3a uninstall" in uninstall

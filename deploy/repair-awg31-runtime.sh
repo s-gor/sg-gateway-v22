@@ -18,7 +18,7 @@ printf '%s  %s\n' "$GO_SHA" "$VENDOR/$GO" | sha256sum -c -
 
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
-tar -xzf "$VENDOR/$TOOLS" -C "$TMP"
+tar --no-same-owner -xzf "$VENDOR/$TOOLS" -C "$TMP"
 SOURCE=$(find "$TMP" -mindepth 1 -maxdepth 1 -type d -name 'amneziawg-tools-*' -print -quit)
 test -n "$SOURCE"
 

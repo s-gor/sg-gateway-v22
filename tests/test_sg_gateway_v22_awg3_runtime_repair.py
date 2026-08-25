@@ -158,7 +158,9 @@ def test_02204_missing_awg3_can_update_then_repair_without_blocking_other_client
     commands = (ROOT / "hostd" / "sg_hostd" / "commands.py").read_text(encoding="utf-8")
     repair = (ROOT / "deploy" / "repair-awg3-runtime.sh").read_text(encoding="utf-8")
 
-    assert "sparse-checkout set app hostd deploy" in updater
+    assert "sparse-checkout set --no-cone" in updater
+    assert "/hostd/sg_hostd/" in updater
+    assert "/vendor/cores/amneziawg-go-linux-amd64-v3.0.0" in updater
     assert '".venv"|"awg3") continue ;;' in updater
     assert "clients.apply" not in updater
     assert "runtime.contract" not in updater
