@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
 import re
 import shlex
 import subprocess
-
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-INSTALL = (ROOT / "install.sh").read_text(encoding="utf-8")
+INSTALL = (ROOT / "deploy/install-core.sh").read_text(encoding="utf-8")
 WORKFLOW = (ROOT / ".github" / "workflows" / "dev-02206-guard.yml").read_text(encoding="utf-8")
 
 
@@ -89,7 +88,9 @@ INSTALL_LOG={shlex.quote(str(log))}
     env["SG_TEST_SUCCESS_AFTER"] = str(success_after)
     env["SG_GATEWAY_STARTUP_RETRY_DELAY"] = "0"
     env["SG_GATEWAY_STARTUP_REQUEST_TIMEOUT"] = "1"
-    result = subprocess.run(["bash", "-c", script], env=env, text=True, capture_output=True)
+    result = subprocess.run(
+        ["bash", "-c", script], env=env, text=True, capture_output=True, check=False
+    )
     body = log.read_text(encoding="utf-8") if log.exists() else ""
     count = int(state.read_text(encoding="utf-8")) if state.exists() else 0
     return result, body, count

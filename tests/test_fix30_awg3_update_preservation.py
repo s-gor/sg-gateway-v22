@@ -1,7 +1,6 @@
 from pathlib import Path
 
-
-UPDATER = Path("deploy/update-from-github.sh")
+UPDATER = Path("deploy/update-from-github-core.sh")
 
 
 def test_panel_update_preserves_awg3_userspace_and_checks_service_state():

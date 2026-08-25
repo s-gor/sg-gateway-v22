@@ -5,9 +5,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.engines import provisioning
 from app import runtime_ui
-
+from app.engines import provisioning
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -153,7 +152,7 @@ def test_awg3_runtime_ui_prevents_new_access_but_preserves_selected_access() -> 
 
 
 def test_02204_missing_awg3_can_update_then_repair_without_blocking_other_clients() -> None:
-    updater = (ROOT / "deploy/update-from-github.sh").read_text(encoding="utf-8")
+    updater = (ROOT / "deploy/update-from-github-core.sh").read_text(encoding="utf-8")
     panel_runtime = (ROOT / "hostd" / "sg_hostd" / "panel_update_runtime.py").read_text(encoding="utf-8")
     client_runtime = (ROOT / "hostd" / "sg_hostd" / "client_runtime.py").read_text(encoding="utf-8")
     commands = (ROOT / "hostd" / "sg_hostd" / "commands.py").read_text(encoding="utf-8")

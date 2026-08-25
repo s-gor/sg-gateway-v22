@@ -53,7 +53,7 @@ def test_awg3_export_has_generation3_fields(tmp_path, monkeypatch):
 
 
 def test_awg3_installer_is_userspace_only_and_awg2_stays_frozen():
-    text = Path("install.sh").read_text(encoding="utf-8")
+    text = Path("deploy/install-core.sh").read_text(encoding="utf-8")
     assert 'AMNEZIAWG_TOOLS_VERSION="1.0.20260618-2"' in text
     assert 'AMNEZIAWG_KMOD_VERSION="1.0.20260329-2"' in text
     assert 'AWG3_TOOLS_VERSION="3.1.20260812"' in text

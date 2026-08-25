@@ -1,7 +1,6 @@
 from pathlib import Path
 
-
-SCRIPT = Path("deploy/update-from-github.sh").read_text(encoding="utf-8")
+SCRIPT = Path("deploy/update-from-github-core.sh").read_text(encoding="utf-8")
 
 
 def _section(start: str, end: str) -> str:

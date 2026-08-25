@@ -16,7 +16,7 @@ def test_public_clean_install_refuses_existing_server() -> None:
 
 def test_clean_install_rejects_unsupported_ubuntu_before_mutation() -> None:
     wrapper = source("deploy/install-from-github.sh")
-    installer = source("install.sh")
+    installer = source("deploy/install-core.sh")
     for body in (wrapper, installer):
         assert "require_supported_ubuntu()" in body
         assert '${VERSION_ID:-}' in body
@@ -33,7 +33,7 @@ def test_existing_install_update_command_keeps_selected_branch() -> None:
 
 
 def test_dedicated_update_never_runs_full_installer_or_package_install() -> None:
-    body = source("deploy/update-from-github.sh")
+    body = source("deploy/update-from-github-core.sh")
     assert "Dedicated panel-only Update" in body
     assert 'bash "$SOURCE_DIR/install.sh"' not in body
     assert "SG_GATEWAY_SOURCE_DIR" not in body
@@ -47,7 +47,7 @@ def test_dedicated_update_never_runs_full_installer_or_package_install() -> None
 
 
 def test_dedicated_update_preserves_https_and_runtime() -> None:
-    body = source("deploy/update-from-github.sh")
+    body = source("deploy/update-from-github-core.sh")
     assert "etc/letsencrypt" in body
     assert "letsencrypt-before.sha256" in body
     assert "nginx-before.sha256" in body
@@ -61,7 +61,7 @@ def test_dedicated_update_preserves_https_and_runtime() -> None:
 
 
 def test_update_has_six_user_visible_stages_and_rollback() -> None:
-    body = source("deploy/update-from-github.sh")
+    body = source("deploy/update-from-github-core.sh")
     for number in range(1, 7):
         assert f"run_stage {number} " in body
     assert "rollback_update" in body
