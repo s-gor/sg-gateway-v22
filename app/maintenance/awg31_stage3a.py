@@ -109,12 +109,18 @@ class Stage3AInstaller(RuntimeMixin, DataMixin):
             connection.execute("PRAGMA foreign_keys = ON")
             connection.execute("BEGIN IMMEDIATE")
             settings = self._settings(connection)
-            self._persist_settings(connection, settings, server_public)
-            created = self._sync_credentials(connection, settings, server_public)
+            header_protection_key = self._header_protection_key(connection)
+            self._persist_settings(
+                connection, settings, server_public, header_protection_key
+            )
+            created = self._sync_credentials(
+                connection, settings, server_public, header_protection_key
+            )
             config, peer_count = self._render_configs(
                 work=work,
                 connection=connection,
                 settings=settings,
+                header_protection_key=header_protection_key,
                 server_private=server_private,
                 server_public=server_public,
             )
