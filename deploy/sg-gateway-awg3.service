@@ -1,15 +1,16 @@
 [Unit]
-Description=SG-Gateway AmneziaWG 3.1 userspace awg3
+Description=SG-Gateway AmneziaWG 3.0 userspace awg3
 After=network-online.target
 Wants=network-online.target
 ConditionPathExists=/etc/amnezia/amneziawg/awg3.conf
 ConditionPathExists=/opt/sg-gateway/awg3/bin/amneziawg-go
 
 [Service]
-Type=oneshot
-RemainAfterExit=yes
+Type=simple
 ExecStart=/opt/sg-gateway/deploy/sg-gateway-awg3-userspace.sh up
-ExecStop=/opt/sg-gateway/deploy/sg-gateway-awg3-userspace.sh down
+Restart=on-failure
+RestartSec=2
+RuntimeDirectory=amneziawg
 TimeoutStartSec=60
 TimeoutStopSec=30
 
