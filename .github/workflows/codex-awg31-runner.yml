@@ -1,4 +1,4 @@
-name: Run AWG31 picker patch
+name: Verify AWG31 client picker
 
 on:
   push:
@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  apply:
+  verify:
     if: github.actor == 's-gor'
     runs-on: ubuntu-24.04
     steps:
@@ -26,24 +26,12 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements-dev.txt
 
-      - name: Apply explicit AWG31 picker integration
-        run: python3 scripts/codex_awg31_picker_patch.py
-
-      - name: Commit candidate
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git rm -f AWG31-PATCH-ERROR.txt AWG31-TEST-ERROR.txt || true
-          git add app tests
-          git diff --check --cached
-          git commit -m "fix: expose AWG31 in client protocol pickers"
-
       - name: Run focused regressions
         id: focused
         continue-on-error: true
         run: |
           set -o pipefail
-          python -m pytest -q \
+          PYTHONPATH=.:hostd python -m pytest -q \
             tests/test_sg_gateway_v22_awg31_client_picker.py \
             tests/test_sg_gateway_v22_clients_devices_ux.py \
             tests/test_sg_gateway_v22_awg31_stage2_api_ui.py \
@@ -52,8 +40,10 @@ jobs:
       - name: Publish focused-test diagnostic
         if: steps.focused.outcome == 'failure'
         run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add AWG31-TEST-ERROR.txt
-          git commit -m "diagnostic: record AWG31 picker test failure"
+          git commit -m "diagnostic: update AWG31 picker test failure"
           git push origin HEAD:codex/awg31-client-picker
 
       - name: Stop after focused-test failure
@@ -65,11 +55,13 @@ jobs:
         continue-on-error: true
         run: |
           set -o pipefail
-          python -m pytest -q tests 2>&1 | tee AWG31-TEST-ERROR.txt
+          PYTHONPATH=.:hostd python -m pytest -q tests 2>&1 | tee AWG31-TEST-ERROR.txt
 
       - name: Publish full-test diagnostic
         if: steps.full.outcome == 'failure'
         run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add AWG31-TEST-ERROR.txt
           git commit -m "diagnostic: record AWG31 full-suite failure"
           git push origin HEAD:codex/awg31-client-picker
@@ -80,12 +72,14 @@ jobs:
 
       - name: Finalize branch
         run: |
-          git reset --hard HEAD
-          git rm \
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm -f \
             .github/workflows/codex-awg31-client-picker.yml \
             .github/workflows/codex-awg31-runner.yml \
-            scripts/codex_awg31_picker_patch.py
-          rm -f AWG31-TEST-ERROR.txt
+            scripts/codex_awg31_picker_patch.py \
+            AWG31-TEST-ERROR.txt \
+            AWG31-PATCH-ERROR.txt || true
           python3 - <<'PY'
           import hashlib
           import subprocess
@@ -98,5 +92,5 @@ jobs:
           PY
           git add SOURCE-SHA256SUMS
           git diff --check --cached
-          git commit -m "chore: refresh AWG31 picker source integrity"
+          git commit -m "chore: finalize AWG31 picker integration"
           git push origin HEAD:codex/awg31-client-picker
