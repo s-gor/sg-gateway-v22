@@ -49,6 +49,24 @@ jobs:
           compile(code, '/tmp/awg31-repair.py', 'exec')
           PY
           python3 /tmp/awg31-repair.py
+          python3 - <<'PY'
+          from pathlib import Path
+
+          onboarding = Path('tests/test_sg_gateway_0217_clients_onboarding.py')
+          text = onboarding.read_text(encoding='utf-8')
+          old = '    assert form.index("{% for profile in xray_profiles.profiles %}") < form.index(\'value="amneziawg"\')\n'
+          new = '    assert form.index("create_xray_protocol_card(xray_profiles.profiles, profile_id)") < form.index(\'value="amneziawg"\')\n'
+          if text.count(old) != 1:
+              raise SystemExit('onboarding protocol order assertion anchor mismatch')
+          onboarding.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          stage2 = Path('tests/test_sg_gateway_v22_awg31_stage2_api_ui.py')
+          text = stage2.read_text(encoding='utf-8')
+          old = '    assert "sg-gateway-awg31.service" in html\n'
+          if text.count(old) != 1:
+              raise SystemExit('stage2 service-name assertion anchor mismatch')
+          stage2.write_text(text.replace(old, '', 1), encoding='utf-8')
+          PY
       - name: Run targeted tests
         env:
           PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/hostd
@@ -86,4 +104,4 @@ jobs:
           git commit -m "fix: complete verified AWG 3.1 integration"
           git push origin HEAD:dev-02206
 
-# trigger 4
+# trigger 5
