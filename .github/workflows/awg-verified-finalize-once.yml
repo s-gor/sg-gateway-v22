@@ -67,3 +67,5 @@ jobs:
           git diff --cached --quiet && { echo "No final changes produced" >&2; exit 1; }
           git commit -m "fix: finalize verified AWG 3.1 clean-install stack"
           git push origin HEAD:dev-02206
+
+# retry 3: scoped repository patch
