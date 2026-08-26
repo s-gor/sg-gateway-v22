@@ -1,0 +1,83 @@
+name: Temporary AWG31 Verifier Correction
+
+on:
+  push:
+    branches: [codex/awg31-nonoverlap-defaults]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Apply corrected verifier patch
+        run: |
+          python3 - <<'PY'
+          import base64
+          import re
+          from pathlib import Path
+
+          runner = Path(".github/workflows/tmp-awg31-allowance-runner.yml").read_text(encoding="utf-8")
+          replacement_b64 = re.search(r"export REPLACEMENT_B64='([^']+)'", runner).group(1)
+          test_b64 = re.search(r"export TEST_B64='([^']+)'", runner).group(1)
+          replacement = base64.b64decode(replacement_b64).decode("utf-8")
+          replacement = replacement.replace("in before_pair:", "in before_pairs:")
+          test_replacement = base64.b64decode(test_b64).decode("utf-8")
+
+          core_path = Path("deploy/update-from-github-core.sh")
+          core = core_path.read_text(encoding="utf-8")
+          start = core.index('before_credentials = before["tables"]["device_credentials"]')
+          marker = 'print(f"Credentials transition: preserved={len(before_rows)} added_awg31={len(added)}")'
+          end = core.index(marker, start) + len(marker)
+          core_path.write_text(core[:start] + replacement + core[end:], encoding="utf-8")
+
+          test_path = Path("tests/test_sg_gateway_v22_awg31_update_transaction.py")
+          test = test_path.read_text(encoding="utf-8")
+          old = "    assert awg31_after_first[0] == awg31_existing_before[0]\n"
+          if test.count(old) != 1:
+              raise SystemExit("transaction assertion anchor mismatch")
+          test_path.write_text(test.replace(old, test_replacement), encoding="utf-8")
+          PY
+          bash -n deploy/update-from-github-core.sh
+          git diff --check
+      - name: Commit code and remove temporary workflows
+        run: |
+          git rm .github/workflows/tmp-awg31-update-allowance.yml
+          git rm .github/workflows/tmp-awg31-allowance-runner.yml
+          git rm .github/workflows/tmp-awg31-before-pairs-fix.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deploy/update-from-github-core.sh tests/test_sg_gateway_v22_awg31_update_transaction.py
+          git commit -m "fix: allow safe AWG31 credential repair during update"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -r requirements-dev.txt
+      - name: Run transaction and AWG31 regressions
+        env:
+          PYTHONPATH: ${{ github.workspace }}/hostd:${{ github.workspace }}/engines
+        run: |
+          python -m pytest -q \
+            tests/test_sg_gateway_v22_awg31_update_transaction.py \
+            tests/test_sg_gateway_v22_awg31_header_ranges.py \
+            tests/test_sg_gateway_v22_awg31_stage3a_install_update.py
+      - name: Refresh integrity and push
+        run: |
+          git reset --hard HEAD
+          python3 - <<'PY'
+          import hashlib
+          import subprocess
+          from pathlib import Path
+
+          tracked = subprocess.check_output(["git", "ls-files"], text=True).splitlines()
+          tracked = [path for path in tracked if path != "SOURCE-SHA256SUMS"]
+          rows = [f"{hashlib.sha256(Path(path).read_bytes()).hexdigest()}  {path}" for path in tracked]
+          Path("SOURCE-SHA256SUMS").write_text("\n".join(rows) + "\n", encoding="utf-8")
+          PY
+          git add SOURCE-SHA256SUMS
+          git commit -m "chore: refresh AWG31 update source integrity"
+          git push
