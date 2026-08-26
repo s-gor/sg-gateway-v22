@@ -27,13 +27,19 @@ J_FIELDS = ("Jc", "Jmin", "Jmax")
 S_FIELDS = tuple(f"S{index}" for index in range(1, 5))
 H_FIELDS = tuple(f"H{index}" for index in range(1, 5))
 FIELD_NAMES = I_FIELDS + J_FIELDS + S_FIELDS + H_FIELDS
+SAFE_HEADER_PARAMETERS: dict[str, str] = {
+    "H1": "1",
+    "H2": "2",
+    "H3": "3",
+    "H4": "4",
+}
 DEFAULT_PARAMETERS: dict[str, str | int] = {
     **{name: "" for name in I_FIELDS},
     "Jc": 0,
     "Jmin": 0,
     "Jmax": 0,
     **{name: 0 for name in S_FIELDS},
-    **{name: "0" for name in H_FIELDS},
+    **SAFE_HEADER_PARAMETERS,
 }
 
 
@@ -76,7 +82,7 @@ def _uint16(name: str, value: object) -> int:
     return parsed
 
 
-def _u32_range(name: str, value: object) -> str:
+def _u32_range_parts(name: str, value: object) -> tuple[str, int, int]:
     text = str(value).strip()
     match = re.fullmatch(r"(\d+)(?:-(\d+))?", text)
     if not match:
@@ -85,7 +91,26 @@ def _u32_range(name: str, value: object) -> str:
     high = int(match.group(2) or low)
     if low > 0xFFFFFFFF or high > 0xFFFFFFFF or high < low:
         raise Awg31ValidationError(f"{name} range is invalid")
-    return str(low) if low == high else f"{low}-{high}"
+    normalized = str(low) if low == high else f"{low}-{high}"
+    return normalized, low, high
+
+
+def _u32_range(name: str, value: object) -> str:
+    normalized, _, _ = _u32_range_parts(name, value)
+    return normalized
+
+
+def normalize_legacy_parameters(values: Mapping[str, object]) -> dict[str, object]:
+    """Repair only the invalid Stage3A all-zero header defaults.
+
+    Arbitrary overlapping user values remain untouched so validation can reject
+    them rather than silently changing an explicitly configured profile.
+    """
+
+    normalized = dict(values)
+    if all(str(normalized.get(name, "")).strip() == "0" for name in H_FIELDS):
+        normalized.update(SAFE_HEADER_PARAMETERS)
+    return normalized
 
 
 def _tagged_junk(name: str, value: object) -> tuple[str, int]:
@@ -128,6 +153,7 @@ def _tagged_junk(name: str, value: object) -> tuple[str, int]:
 
 
 def validate_parameters(values: Mapping[str, object]) -> dict[str, str | int]:
+    values = normalize_legacy_parameters(values)
     unknown = set(values) - set(FIELD_NAMES)
     if unknown:
         raise Awg31ValidationError("Unknown AWG31 fields: " + ", ".join(sorted(unknown)))
@@ -145,8 +171,23 @@ def validate_parameters(values: Mapping[str, object]) -> dict[str, str | int]:
         )
     for name in J_FIELDS + S_FIELDS:
         result[name] = _uint16(name, values.get(name, DEFAULT_PARAMETERS[name]))
+
+    header_ranges: dict[str, tuple[int, int]] = {}
     for name in H_FIELDS:
-        result[name] = _u32_range(name, values.get(name, DEFAULT_PARAMETERS[name]))
+        normalized, low, high = _u32_range_parts(
+            name, values.get(name, DEFAULT_PARAMETERS[name])
+        )
+        result[name] = normalized
+        header_ranges[name] = (low, high)
+    for index, left_name in enumerate(H_FIELDS):
+        left_low, left_high = header_ranges[left_name]
+        for right_name in H_FIELDS[index + 1 :]:
+            right_low, right_high = header_ranges[right_name]
+            if max(left_low, right_low) <= min(left_high, right_high):
+                raise Awg31ValidationError(
+                    f"{left_name} and {right_name} header ranges must not overlap"
+                )
+
     if int(result["Jmin"]) > int(result["Jmax"]):
         raise Awg31ValidationError("Jmin must not exceed Jmax")
     return result

@@ -109,8 +109,8 @@ class Stage3AInstaller(RuntimeMixin, DataMixin):
             connection.execute("PRAGMA foreign_keys = ON")
             connection.execute("BEGIN IMMEDIATE")
             settings = self._settings(connection)
-            self._persist_server_public_key(connection, server_public)
-            created = self._insert_missing_credentials(connection, settings)
+            self._persist_settings(connection, settings, server_public)
+            created = self._sync_credentials(connection, settings, server_public)
             config, peer_count = self._render_configs(
                 work=work,
                 connection=connection,
@@ -208,6 +208,8 @@ class Stage3AInstaller(RuntimeMixin, DataMixin):
                     "DELETE FROM device_credentials WHERE engine = ?", (ENGINE_ID,)
                 )
                 connection.commit()
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="SG-Gateway AWG31 stage 3A lifecycle")
     parser.add_argument("command", choices=("migrate", "uninstall"))
