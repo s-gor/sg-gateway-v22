@@ -172,3 +172,49 @@ html body.page-clients .dv16-device:not(.sg-device-expanded) .sg-device-collapse
     grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
   }
 }
+
+/* SG_NEW_CLIENT_PROTOCOL_PICKER_RESPONSIVE_V1
+   Keep the ten New Client protocol cards balanced at every viewport width. */
+html body.page-clients #cv2-dialog .cv12-protocols {
+  display: grid !important;
+  align-items: stretch !important;
+  gap: 10px !important;
+}
+
+html body.page-clients #cv2-dialog .cv12-protocols > legend {
+  grid-column: 1 / -1 !important;
+}
+
+html body.page-clients #cv2-dialog .cv12-protocols > .cv10-protocol,
+html body.page-clients #cv2-dialog .cv12-protocols > .cv10-protocol > span {
+  height: 100% !important;
+  box-sizing: border-box !important;
+}
+
+@media (min-width: 981px) {
+  html body.page-clients #cv2-dialog.cv10-dialog {
+    width: min(1540px, calc(100vw - 32px)) !important;
+    max-width: 1540px !important;
+  }
+
+  html body.page-clients #cv2-dialog .cv12-protocols {
+    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (min-width: 721px) and (max-width: 980px) {
+  html body.page-clients #cv2-dialog.cv10-dialog {
+    width: min(900px, calc(100vw - 28px)) !important;
+    max-width: 900px !important;
+  }
+
+  html body.page-clients #cv2-dialog .cv12-protocols {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 720px) {
+  html body.page-clients #cv2-dialog .cv12-protocols {
+    grid-template-columns: 1fr !important;
+  }
+}
