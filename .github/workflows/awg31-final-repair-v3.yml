@@ -40,6 +40,11 @@ jobs:
           block_end = code.index(block_end_marker, block_start) + len(block_end_marker)
           code = code[:block_start] + code[block_end:]
 
+          peer_block_start = code.index("old = '''    assert (root / \"etc/amnezia/amneziawg/awg31/peers/device-11.conf\").is_file()")
+          peer_block_end_marker = "write(stage3a, text.replace(old, new, 1))\n"
+          peer_block_end = code.index(peer_block_end_marker, peer_block_start) + len(peer_block_end_marker)
+          code = code[:peer_block_start] + code[peer_block_end:]
+
           Path('/tmp/awg31-repair.py').write_text(code, encoding='utf-8')
           compile(code, '/tmp/awg31-repair.py', 'exec')
           PY
@@ -77,4 +82,4 @@ jobs:
           git commit -m "fix: complete verified AWG 3.1 integration"
           git push origin HEAD:dev-02206
 
-# trigger 2
+# trigger 3
