@@ -63,3 +63,12 @@ def test_awg31_picker_is_exposed_in_create_and_edit_dialogs() -> None:
     assert "'amneziawg31'" in javascript
     assert "AmneziaWG 3.0" in clients
     assert "AmneziaWG 3.1" in clients
+
+
+def test_all_client_protocol_pickers_use_two_rows_of_five_on_desktop() -> None:
+    css = (ROOT / "app/web/static/sg-device-collapse-v4.css").read_text(encoding="utf-8")
+
+    assert "SG_CLIENT_PROTOCOL_PICKER_2X5_V1" in css
+    assert "#cv2-dialog .cv12-protocols" in css
+    assert ".dv16-dialog .dv16-protocol-list" in css
+    assert "grid-template-columns: repeat(5, minmax(0, 1fr)) !important;" in css
