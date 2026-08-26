@@ -1,0 +1,385 @@
+name: AWG31 Final Repair
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [dev-02206]
+    paths:
+      - .github/workflows/awg31-final-repair.yml
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: dev-02206
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+
+      - name: Apply remaining repair
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          def read(path):
+              return Path(path).read_text(encoding="utf-8")
+
+          def write(path, text):
+              Path(path).write_text(text, encoding="utf-8", newline="\n")
+
+          def replace_once(path, old, new):
+              text = read(path)
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{path}: expected one anchor, found {count}")
+              write(path, text.replace(old, new, 1))
+
+          path = "app/db.py"
+          text = read(path)
+          pattern = re.compile(
+              r'    "amneziawg31": \{\n.*?\n    \},\n    "xray": \{',
+              re.DOTALL,
+          )
+          replacement = '''    "amneziawg31": {
+              "host": "awg31.internal",
+              "port": 587,
+              "config_json": (
+                  '{"profile":"awg31","generation":31,"dns":"1.1.1.1","transport":"udp",'
+                  '"endpoint":"awg31.internal:587","allowed_ips":"0.0.0.0/0",'
+                  '"server_public_key":"","header_protection_key":"",'
+                  '"i1":"","i2":"","i3":"","i4":"","i5":"",'
+                  '"jc":4,"jmin":10,"jmax":50,"s1":64,"s2":96,"s3":48,"s4":12,'
+                  '"h1":"1085466381","h2":"1525636359","h3":"1894947610","h4":"2767261704",'
+                  '"contentpaddingaddition":"10-100","rekeyaftertime":"100-120",'
+                  '"rekeytimeout":"3-7","rejectaftertime":"150-180",'
+                  '"keepalivetimeout":"5-15","maxhandshakeattempts":"15-20",'
+                  '"randomtrailers":"on","disablecookies":"on"}'
+              ),
+          },
+          "xray": {'''
+          text, count = pattern.subn(replacement, text, count=1)
+          if count != 1:
+              raise SystemExit("app/db.py: AWG31 seed block anchor mismatch")
+          write(path, text)
+
+          write(
+              "tests/test_sg_gateway_0217_clients_onboarding.py",
+              ('''from pathlib import Path
+
+          ROOT = Path(__file__).resolve().parents[1]
+
+
+          def test_0217_clients_onboarding_and_protocol_grid():
+              text = (ROOT / "app/web/templates/clients.html").read_text(encoding="utf-8")
+              css = (ROOT / "app/web/static/sg-device-collapse-v4.css").read_text(encoding="utf-8")
+
+              assert "sg-0217-sg-admin-explainer" in text
+              assert "не системный пользователь Linux" in text
+              assert "не логин для входа в панель" in text
+              assert "sg-admin можно удалить" in text
+              assert 'id="sg-0217-client-protocol-grid"' not in text
+              assert "SG_CLIENT_PROTOCOL_DIALOG_LAYOUT_V2" in css
+              assert "grid-template-columns: repeat(5, minmax(0, 1fr)) !important;" in css
+              assert "grid-template-columns: repeat(2, minmax(0, 1fr)) !important;" in css
+              assert "grid-template-columns: 1fr !important;" in css
+
+              start = text.index("url_for('add_client')")
+              form = text[start:text.index("</form>", start)]
+              assert form.count('value="sgclient"') == 1
+              assert '<strong>SG Client</strong>' not in form
+              for token in (
+                  'value="amneziawg"',
+                  'value="amneziawg3"',
+                  'value="amneziawg31"',
+                  'value="mihomo"',
+                  'value="anytls"',
+                  'value="tuic"',
+              ):
+                  assert token in form
+              assert "Требуется HTTPS" in form
+              assert form.index("{% for profile in xray_profiles.profiles %}") < form.index('value="amneziawg"')
+          ''').replace("\n          ", "\n").lstrip(),
+          )
+
+          write(
+              "tests/test_sg_gateway_v22_clients_devices_ux.py",
+              ('''from pathlib import Path
+
+          ROOT = Path(__file__).resolve().parents[1]
+          JS = ROOT / "app/web/static/sg-device-collapse-v1.js"
+          COLLAPSE = ROOT / "app/web/static/sg-device-collapse-v4.css"
+          DEVICE_CSS = ROOT / "app/web/static/sg-devices-v46.css"
+
+
+          def test_protocol_picker_distinguishes_awg30_and_awg31() -> None:
+              body = JS.read_text(encoding="utf-8")
+              expected = ["xray_reality_tcp", "xray_xhttp_reality", "xray_xhttp_tls", "xray_hysteria2", "amneziawg", "amneziawg3", "amneziawg31", "mihomo", "anytls", "tuic"]
+              for value in expected:
+                  assert f"'{value}'" in body
+              assert "protocolOrder" in body
+              assert "normalizeProtocolPickers()" in body
+              assert "picker.open = true" in body
+              assert "setLabelTitle(byValue.get('amneziawg'), 'AmneziaWG 2.0')" in body
+              assert "setLabelTitle(byValue.get('amneziawg3'), 'AmneziaWG 3.0')" in body
+              assert "setLabelTitle(byValue.get('amneziawg31'), 'AmneziaWG 3.1')" in body
+              assert "setAvailableNote(byValue.get('amneziawg3'), 'UDP 586 · userspace-конфигурация и QR')" in body
+              assert "setAvailableNote(byValue.get('amneziawg31'), 'UDP 587 · userspace-конфигурация')" in body
+
+
+          def test_device_cards_start_collapsed_without_layout_jump() -> None:
+              js = JS.read_text(encoding="utf-8")
+              css = COLLAPSE.read_text(encoding="utf-8")
+              assert "card.classList.toggle('sg-device-expanded', expanded)" in js
+              assert "setExpanded(card, button, false)" in js
+              assert 'data-sg-collapse-ready="1"' in css
+              assert ".dv16-device:not(.sg-device-expanded)" in css
+              assert "Reserve the toggle slot before deferred JS runs" in css
+
+
+          def test_disable_actions_are_protected_and_visually_distinct() -> None:
+              js = JS.read_text(encoding="utf-8")
+              css = DEVICE_CSS.read_text(encoding="utf-8")
+              assert "function prepareDisableActions()" in js
+              assert "form.dataset.sgConfirmTitle = 'Отключить устройство'" in js
+              assert "form.dataset.sgConfirmTitle = 'Отключить клиента'" in js
+              assert "form.dataset.sgConfirmTone = 'warning'" in js
+              assert "button.classList.add('sg-warm-action')" in js
+              assert ".button.sg-warm-action" in css
+
+
+          def test_add_and_edit_protocol_grids_use_five_two_one_responsive_layout() -> None:
+              css = COLLAPSE.read_text(encoding="utf-8")
+              assert "SG_CLIENT_PROTOCOL_DIALOG_LAYOUT_V2" in css
+              assert "#cv2-dialog.cv10-dialog" in css
+              assert "max-width: 1120px !important;" in css
+              assert ".dv16-dialog .dv16-protocol-list" in css
+              assert "@media (min-width: 981px)" in css
+              assert "grid-template-columns: repeat(5, minmax(0, 1fr)) !important;" in css
+              assert "@media (min-width: 721px) and (max-width: 980px)" in css
+              assert "grid-template-columns: repeat(2, minmax(0, 1fr)) !important;" in css
+              assert "@media (max-width: 720px)" in css
+              assert "grid-template-columns: 1fr !important;" in css
+              assert "grid-auto-rows: 1fr !important;" in css
+              assert "grid-template-columns: 18px minmax(0, 1fr) !important;" in css
+
+
+          def test_current_xmux_gecko_subscription_and_low_resolution_layers_survive() -> None:
+              assert (ROOT / "app/xray/xmux.py").exists()
+              connections = (ROOT / "app/web/templates/connections.html").read_text(encoding="utf-8")
+              assert 'value="gecko"' in connections
+              base = (ROOT / "app/web/templates/base.html").read_text(encoding="utf-8")
+              assert "sg-low-resolution-v1.css" in base
+              assert (ROOT / "app/clients/sg_subscription_http_v4.py").exists()
+              assert (ROOT / "hostd/sg_hostd/awg3_runtime.py").exists()
+          ''').replace("\n          ", "\n").lstrip(),
+          )
+
+          replace_once(
+              "tests/test_sg_gateway_v22_awg31_foreground_service.py",
+              '    assert \'"$RUNTIME/bin/amneziawg-go" --foreground "$IFACE" &\' in launcher\n',
+              '    assert \'AWG_GO="$RUNTIME/bin/amneziawg-go"\' in launcher\n'
+              '    assert \'"$AWG_GO" --foreground "$IFACE" &\' in launcher\n'
+              '    assert "PID=$!" in launcher\n',
+          )
+
+          header_path = "tests/test_sg_gateway_v22_awg31_header_ranges.py"
+          replace_once(
+              header_path,
+              '''    DEFAULT_PARAMETERS,
+              normalize_legacy_parameters,
+              validate_parameters,
+          )
+          ''',
+              '''    DEFAULT_PARAMETERS,
+              REAL31_DEFAULT_PARAMETERS,
+              normalize_legacy_parameters,
+              validate_parameters,
+          )
+          ''',
+          )
+          replace_once(
+              header_path,
+              'SAFE_HEADERS = {"H1": "1", "H2": "2", "H3": "3", "H4": "4"}\n',
+              'SAFE_HEADERS = {name: str(REAL31_DEFAULT_PARAMETERS[name]) for name in ("H1", "H2", "H3", "H4")}\n',
+          )
+          replace_once(
+              header_path,
+              '    legacy = dict(DEFAULT_PARAMETERS, H1="0", H2="0", H3="0", H4="0")\n',
+              '''    legacy = dict(
+                  DEFAULT_PARAMETERS,
+                  Jc=0,
+                  Jmin=0,
+                  Jmax=0,
+                  S1=0,
+                  S2=0,
+                  S3=0,
+                  S4=0,
+                  H1="0",
+                  H2="0",
+                  H3="0",
+                  H4="0",
+              )
+          ''',
+          )
+
+          stage2 = "tests/test_sg_gateway_v22_awg31_stage2_api_ui.py"
+          replace_once(
+              stage2,
+              '''    "H3": "3003",
+              "H4": "4000-4010",
+          }
+          ''',
+              '''    "H3": "3003",
+              "H4": "4000-4010",
+              "ContentPaddingAddition": "10-100",
+              "RekeyAfterTime": "100-120",
+              "RekeyTimeout": "3-7",
+              "RejectAfterTime": "150-180",
+              "KeepaliveTimeout": "5-15",
+              "MaxHandshakeAttempts": "15-20",
+              "RandomTrailers": "on",
+              "DisableCookies": "on",
+          }
+          HEADER_PROTECTION_KEY = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+          ''',
+          )
+          text = read(stage2)
+          text = text.replace(
+              "    from app.connections.awg31 import save_settings\n\n    save_settings(VALID_PARAMETERS)\n",
+              "    from app.connections.awg31 import set_protocol_state\n\n"
+              "    set_protocol_state(VALID_PARAMETERS, HEADER_PROTECTION_KEY)\n",
+              1,
+          )
+          text = text.replace(
+              "    from app.connections.awg31 import save_settings, set_server_public_key\n\n"
+              "    save_settings(VALID_PARAMETERS)\n",
+              "    from app.connections.awg31 import set_protocol_state, set_server_public_key\n\n"
+              "    set_protocol_state(VALID_PARAMETERS, HEADER_PROTECTION_KEY)\n",
+              1,
+          )
+          text = text.replace(
+              "    from app.connections.awg31 import save_settings, set_server_public_key\n",
+              "    from app.connections.awg31 import set_protocol_state, set_server_public_key\n",
+              1,
+          )
+          text = text.replace(
+              "    save_settings(VALID_PARAMETERS)\n    set_server_public_key(SERVER_PUBLIC_KEY)\n",
+              "    set_protocol_state(VALID_PARAMETERS, HEADER_PROTECTION_KEY)\n"
+              "    set_server_public_key(SERVER_PUBLIC_KEY)\n",
+              1,
+          )
+          text = text.replace(
+              '    assert "awg31.internal:587" in html\n',
+              '    assert "UDP 587" in html\n    assert "10.131.0.0/24" in html\n',
+              1,
+          )
+          target = '''    for name, value in VALID_PARAMETERS.items():
+              assert f"{name} = {value}" in server
+              assert f"{name} = {value}" in peer
+          '''
+          replacement = '''    for name, value in VALID_PARAMETERS.items():
+              assert f"{name} = {value}" in server
+              assert f"{name} = {value}" in peer
+          assert f"HeaderProtectionKey = {HEADER_PROTECTION_KEY}" in server
+          assert f"HeaderProtectionKey = {HEADER_PROTECTION_KEY}" in peer
+          '''
+          if text.count(target) != 1:
+              raise SystemExit("stage2 render assertion anchor mismatch")
+          text = text.replace(target, replacement, 1)
+          write(stage2, text)
+
+          stage3a = "tests/test_sg_gateway_v22_awg31_stage3a_install_update.py"
+          text = read(stage3a)
+          old = '    assert settings_payload["server_public_key"]\n'
+          new = old + '    assert settings_payload["header_protection_key"]\n'
+          if text.count(old) != 1:
+              raise SystemExit("stage3a settings anchor mismatch")
+          text = text.replace(old, new, 1)
+          old = '''    assert (root / "etc/amnezia/amneziawg/awg31/peers/device-11.conf").is_file()
+          assert (root / "etc/amnezia/amneziawg/awg31/peers/device-22.conf").is_file()
+          '''
+          new = '''    peer_11 = root / "etc/amnezia/amneziawg/awg31/peers/device-11.conf"
+          peer_22 = root / "etc/amnezia/amneziawg/awg31/peers/device-22.conf"
+          assert peer_11.is_file()
+          assert peer_22.is_file()
+          key_line = f"HeaderProtectionKey = {settings_payload['header_protection_key']}"
+          assert key_line in server
+          assert key_line in peer_11.read_text()
+          assert key_line in peer_22.read_text()
+          assert "AllowedIPs = 0.0.0.0/0, ::/0" not in peer_11.read_text()
+          assert "AllowedIPs = 0.0.0.0/0" in peer_11.read_text()
+          '''
+          if text.count(old) != 1:
+              raise SystemExit("stage3a peer assertion anchor mismatch")
+          write(stage3a, text.replace(old, new, 1))
+
+          for source in (
+              "app/db.py",
+              "app/maintenance/awg31_stage3a.py",
+              "app/maintenance/awg31_stage3a_data.py",
+              "hostd/sg_hostd/awg31_runtime.py",
+              "tests/test_sg_gateway_0217_clients_onboarding.py",
+              "tests/test_sg_gateway_v22_clients_devices_ux.py",
+              "tests/test_sg_gateway_v22_awg31_stage2_api_ui.py",
+              "tests/test_sg_gateway_v22_awg31_stage3a_install_update.py",
+          ):
+              compile(read(source), source, "exec")
+          PY
+
+      - name: Run targeted tests
+        run: |
+          python -m pytest \
+            tests/test_sg_gateway_0217_clients_onboarding.py \
+            tests/test_sg_gateway_v22_clients_devices_ux.py \
+            tests/test_sg_gateway_v22_awg31_foreground_service.py \
+            tests/test_sg_gateway_v22_awg31_header_ranges.py \
+            tests/test_sg_gateway_v22_awg31_stage1_core.py \
+            tests/test_sg_gateway_v22_awg31_stage2_api_ui.py \
+            tests/test_sg_gateway_v22_awg31_stage3a_install_update.py \
+            tests/test_sg_gateway_v22_awg31_update_transaction.py
+
+      - name: Run full test suite
+        run: python -m pytest tests
+
+      - name: Commit verified repair
+        run: |
+          git restore -- data/sg-gateway.sqlite data/system-activity.json
+          git clean -fd
+          git rm .github/workflows/awg31-final-repair.yml
+          python3 - <<'PY'
+          import hashlib
+          import subprocess
+          from pathlib import Path
+
+          tracked = subprocess.check_output(
+              ["git", "ls-files"], text=True, encoding="utf-8"
+          ).splitlines()
+          tracked = [path for path in tracked if path != "SOURCE-SHA256SUMS"]
+          rows = [
+              f"{hashlib.sha256(Path(path).read_bytes()).hexdigest()}  {path}"
+              for path in tracked
+          ]
+          Path("SOURCE-SHA256SUMS").write_text(
+              "\n".join(rows) + "\n", encoding="utf-8"
+          )
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix: complete verified AWG 3.1 integration"
+          git push origin HEAD:dev-02206
