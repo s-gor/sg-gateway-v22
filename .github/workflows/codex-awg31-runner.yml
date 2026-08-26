@@ -33,20 +33,50 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git rm -f AWG31-PATCH-ERROR.txt || true
+          git rm -f AWG31-PATCH-ERROR.txt AWG31-TEST-ERROR.txt || true
           git add app tests
           git diff --check --cached
           git commit -m "fix: expose AWG31 in client protocol pickers"
 
       - name: Run focused regressions
+        id: focused
+        continue-on-error: true
         run: |
+          set -o pipefail
           python -m pytest -q \
             tests/test_sg_gateway_v22_awg31_client_picker.py \
             tests/test_sg_gateway_v22_clients_devices_ux.py \
-            tests/test_sg_gateway_v22_awg31_stage2_api_ui.py
+            tests/test_sg_gateway_v22_awg31_stage2_api_ui.py \
+            2>&1 | tee AWG31-TEST-ERROR.txt
+
+      - name: Publish focused-test diagnostic
+        if: steps.focused.outcome == 'failure'
+        run: |
+          git add AWG31-TEST-ERROR.txt
+          git commit -m "diagnostic: record AWG31 picker test failure"
+          git push origin HEAD:codex/awg31-client-picker
+
+      - name: Stop after focused-test failure
+        if: steps.focused.outcome == 'failure'
+        run: exit 1
 
       - name: Run full suite
-        run: python -m pytest -q tests
+        id: full
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          python -m pytest -q tests 2>&1 | tee AWG31-TEST-ERROR.txt
+
+      - name: Publish full-test diagnostic
+        if: steps.full.outcome == 'failure'
+        run: |
+          git add AWG31-TEST-ERROR.txt
+          git commit -m "diagnostic: record AWG31 full-suite failure"
+          git push origin HEAD:codex/awg31-client-picker
+
+      - name: Stop after full-test failure
+        if: steps.full.outcome == 'failure'
+        run: exit 1
 
       - name: Finalize branch
         run: |
@@ -55,6 +85,7 @@ jobs:
             .github/workflows/codex-awg31-client-picker.yml \
             .github/workflows/codex-awg31-runner.yml \
             scripts/codex_awg31_picker_patch.py
+          rm -f AWG31-TEST-ERROR.txt
           python3 - <<'PY'
           import hashlib
           import subprocess
