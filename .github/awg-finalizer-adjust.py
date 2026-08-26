@@ -11,15 +11,31 @@ def patch_clean_install_contract() -> set[str]:
     rel = "app/clients/repository.py"
     body = read(rel)
     original = body
-    old = '''                server_public_key=str(settings_raw.get("server_public_key") or ""),
+    start = body.index("def _create_device_rows(")
+    end = body.index("\ndef _client_from_row", start)
+    block = body[start:end]
+    old = '''            payload = build_credential_payload(
+                device_id=device_id,
+                device_name=device_name,
+                is_primary=is_primary,
+                client_name=client_name,
+                settings_parameters=parameters,
+                server_public_key=str(settings_raw.get("server_public_key") or ""),
             )'''
-    new = '''                server_public_key=str(settings_raw.get("server_public_key") or ""),
+    new = '''            payload = build_credential_payload(
+                device_id=device_id,
+                device_name=device_name,
+                is_primary=is_primary,
+                client_name=client_name,
+                settings_parameters=parameters,
+                server_public_key=str(settings_raw.get("server_public_key") or ""),
                 header_protection_key=str(
                     settings_raw.get("header_protection_key") or ""
                 ),
             )'''
-    if "header_protection_key=str(" not in body:
-        body = replace_once(body, old, new, "repository AWG31 header key")
+    if "header_protection_key=str(" not in block:
+        block = replace_once(block, old, new, "repository AWG31 header key")
+        body = body[:start] + block + body[end:]
     if body != original:
         write(rel, body)
         changed.add(rel)
