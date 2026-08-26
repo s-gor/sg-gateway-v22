@@ -7,7 +7,7 @@ from collections.abc import Mapping
 from typing import Any
 from urllib.parse import urlsplit
 
-from app.connections.awg31 import DNS, ENDPOINT, FIELD_NAMES, I_FIELDS, validate_parameters
+from app.connections.awg31 import DNS, FIELD_NAMES, I_FIELDS, validate_parameters
 
 SCHEME = "awg31"
 AUTHORITY = "import"
@@ -32,14 +32,38 @@ def _b64decode(value: str) -> bytes:
         raise Awg31UriError("Invalid AWG31 URI payload encoding") from exc
 
 
+def _endpoint(value: object) -> str:
+    text = str(value or "").strip()
+    if not text:
+        raise Awg31UriError("AWG31 URI requires an endpoint")
+    try:
+        parsed = urlsplit(f"//{text}")
+        port = parsed.port
+    except ValueError as exc:
+        raise Awg31UriError("AWG31 URI endpoint is invalid") from exc
+    if (
+        not parsed.hostname
+        or port is None
+        or not 1 <= port <= 65535
+        or parsed.path not in {"", "/"}
+        or parsed.query
+        or parsed.fragment
+        or parsed.username
+        or parsed.password
+    ):
+        raise Awg31UriError("AWG31 URI endpoint is invalid")
+    return text
+
+
 def _validate_config(payload: Mapping[str, Any], parameters: Mapping[str, str | int]) -> str:
+    endpoint = _endpoint(payload.get("endpoint"))
     config = payload.get("config")
     if not isinstance(config, str) or not config or len(config) > MAX_DECODED_SIZE:
         raise Awg31UriError("AWG31 URI does not contain a valid configuration")
     required_lines = (
         f"PrivateKey = {payload['private_key']}",
         f"PublicKey = {payload['public_key']}",
-        f"Endpoint = {ENDPOINT}",
+        f"Endpoint = {endpoint}",
         f"DNS = {DNS}",
     )
     for line in required_lines:
@@ -64,7 +88,7 @@ def encode_awg31_uri(payload: Mapping[str, Any]) -> str:
     normalized = {
         "profile": "awg31",
         "version": 1,
-        "endpoint": ENDPOINT,
+        "endpoint": _endpoint(payload.get("endpoint")),
         "transport": "udp",
         "dns": DNS,
         "private_key": str(payload.get("private_key") or ""),
@@ -111,8 +135,7 @@ def decode_awg31_uri(uri: str) -> dict[str, Any]:
         raise Awg31UriError("Invalid AWG31 URI payload")
     if payload.get("profile") != "awg31" or payload.get("version") != 1:
         raise Awg31UriError("AWG31 URI profile/version mismatch")
-    if payload.get("endpoint") != ENDPOINT:
-        raise Awg31UriError("AWG31 URI endpoint mismatch")
+    payload["endpoint"] = _endpoint(payload.get("endpoint"))
     if payload.get("transport") != "udp" or payload.get("dns") != DNS:
         raise Awg31UriError("AWG31 URI transport or DNS mismatch")
     parameters_raw = payload.get("parameters")

@@ -1,11 +1,10 @@
-<section class="cnv1-engine-card cnv1-engine-awg sg-ljd-card" id="awg31-settings" data-awg31-profile="awg31">
-  <header class="cnv1-engine-head">
-    <div class="cnv1-engine-title">
-      <div class="cnv1-engine-logo awg"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l2-7 4 14 2-7h6"/></svg></div>
+<section class="awgd-card awgd-card-v31" id="awg31-settings" data-awg31-profile="awg31">
+  <header class="awgd-head">
+    <div class="awgd-title">
+      <span class="awgd-generation">AWG3.1</span>
       <div>
-        <div class="cnv1-card-kicker">AWG31 · ОТДЕЛЬНЫЙ ПРОФИЛЬ</div>
-        <h2>AmneziaWG 3.1</h2>
-        <p>Профиль <code>awg31</code> не изменяет AmneziaWG 2 и AmneziaWG 3.</p>
+        <strong>AmneziaWG 3.1</strong>
+        <small>Отдельный userspace-профиль 3.1 · UDP 587 · RandomTrailers и DisableCookies.</small>
       </div>
     </div>
     <span class="cnv1-engine-status {{ 'success' if awg31_status.status == 'ok' and awg31_status.payload.get('status') == 'active' else 'warning' }}">
@@ -15,37 +14,58 @@
 
   <section class="cnv1-endpoint-card sg-ljd-nested">
     <div class="cnv1-endpoint-main"><div>
-      <span>ФИКСИРОВАННАЯ ТОЧКА</span>
-      <strong>awg31.internal:587</strong>
-      <small>UDP only · interface awg31 · DNS 1.1.1.1</small>
+      <span>ВНЕШНЯЯ ТОЧКА</span>
+      <strong>{{ awg31_public_host }}</strong>
+      <small>UDP 587 · интерфейс awg31 · 10.131.0.0/24</small>
     </div></div>
     <span class="cnv1-port-chip">UDP 587</span>
   </section>
 
-  <form method="post" action="/connections/amneziawg31" class="cnv1-engine-form">
-    <div class="cnv1-form-grid">
-      {% for name in ('I1', 'I2', 'I3', 'I4', 'I5') %}
-      <label><span>{{ name }}</span><input type="text" name="{{ name }}" maxlength="1024" value="{{ awg31_settings.parameters[name] }}"></label>
-      {% endfor %}
-      {% for name in ('Jc', 'Jmin', 'Jmax', 'S1', 'S2', 'S3', 'S4') %}
-      <label><span>{{ name }}</span><input type="number" name="{{ name }}" min="0" max="65535" value="{{ awg31_settings.parameters[name] }}" required></label>
-      {% endfor %}
-      {% for name in ('H1', 'H2', 'H3', 'H4') %}
-      <label><span>{{ name }}</span><input type="text" name="{{ name }}" pattern="[0-9]+(-[0-9]+)?" value="{{ awg31_settings.parameters[name] }}" required></label>
-      {% endfor %}
+  <form method="post" action="/connections/amneziawg31" class="cnv1-engine-form cnv1-engine-form-compact awgd-v31-form">
+    <div class="cnv1-compact-fields">
+      <label><span>UDP-порт</span><input type="number" value="587" readonly></label>
+      <label><span>DNS</span><input type="text" value="{{ awg31_settings.dns }}" readonly></label>
     </div>
+
+    <details class="cnv1-advanced sg-ljd-nested awgd-v31-advanced">
+      <summary><span>Дополнительно · AWG 3.1</span><span>{{ 'HeaderProtectionKey создан' if awg31_settings.advanced_security else 'ключ будет создан при применении' }}</span></summary>
+      <div class="cnv1-advanced-body">
+        <p class="awgd-v31-note">Сервер и клиенты получают один набор параметров. Приватный HeaderProtectionKey в интерфейсе не отображается.</p>
+        <div class="cnv1-form-grid awgd-v31-parameter-grid">
+          {% for name in ('I1', 'I2', 'I3', 'I4', 'I5') %}
+          <label><span>{{ name }}</span><input type="text" name="{{ name }}" maxlength="1024" value="{{ awg31_settings.parameters[name] }}"></label>
+          {% endfor %}
+          {% for name in ('Jc', 'Jmin', 'Jmax') %}
+          <label><span>{{ name }}</span><input type="number" name="{{ name }}" min="0" max="65535" value="{{ awg31_settings.parameters[name] }}" required></label>
+          {% endfor %}
+          {% for name in ('S1', 'S2', 'S3', 'S4') %}
+          <label><span>{{ name }}</span><input type="number" name="{{ name }}" min="12" max="65535" value="{{ awg31_settings.parameters[name] }}" required></label>
+          {% endfor %}
+          {% for name in ('H1', 'H2', 'H3', 'H4') %}
+          <label><span>{{ name }}</span><input type="text" name="{{ name }}" pattern="[0-9]+(-[0-9]+)?" value="{{ awg31_settings.parameters[name] }}" required></label>
+          {% endfor %}
+          {% for name in ('ContentPaddingAddition', 'RekeyAfterTime', 'RekeyTimeout', 'RejectAfterTime', 'KeepaliveTimeout', 'MaxHandshakeAttempts') %}
+          <label><span>{{ name }}</span><input type="text" name="{{ name }}" pattern="[0-9]+(-[0-9]+)?" value="{{ awg31_settings.parameters[name] }}" required></label>
+          {% endfor %}
+          {% for name in ('RandomTrailers', 'DisableCookies') %}
+          <label><span>{{ name }}</span><select name="{{ name }}"><option value="on" {{ 'selected' if awg31_settings.parameters[name] == 'on' else '' }}>on</option><option value="off" {{ 'selected' if awg31_settings.parameters[name] == 'off' else '' }}>off</option></select></label>
+          {% endfor %}
+        </div>
+      </div>
+    </details>
+
     <footer class="cnv1-form-actions">
-      <span>Сохраняются только параметры AWG31.</span>
-      <button class="button primary" type="submit">Сохранить AWG 3.1</button>
+      <span>Адрес подключения: {{ awg31_public_host }}:587</span>
+      <button class="button primary" type="submit">Сохранить</button>
     </footer>
   </form>
 
-  <section class="cnv1-note-panel sg-ljd-nested" aria-label="Управление AWG31 service">
-    <div><strong>sg-gateway-awg31.service</strong><p>Отдельное управление service профиля AWG31.</p></div>
-    <div class="cnv1-heading-actions">
+  <details class="awgd-v31-service sg-ljd-nested">
+    <summary><span>Служба AWG 3.1</span><span>Управление</span></summary>
+    <div class="awgd-v31-service-actions">
       {% for action, label in (('start', 'Start'), ('stop', 'Stop'), ('restart', 'Restart'), ('status', 'Status')) %}
       <form method="post" action="/connections/amneziawg31/service/{{ action }}"><button class="button" type="submit">{{ label }}</button></form>
       {% endfor %}
     </div>
-  </section>
+  </details>
 </section>

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import secrets
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -17,7 +18,13 @@ from app.clients.awg31_lifecycle import (
     SERVER_CONFIG,
     STATE_ROOT,
 )
-from app.connections.awg31 import config_lines, get_settings, set_server_public_key
+from app.connections.awg31 import (
+    REAL31_DEFAULT_PARAMETERS,
+    config_lines,
+    get_settings,
+    set_protocol_state,
+    set_server_public_key,
+)
 from app.db import connect, init_db
 
 SERVICE = "sg-gateway-awg31.service"
@@ -59,6 +66,50 @@ def _server_keys() -> tuple[str, str]:
     return private_key, public_key
 
 
+def _independent_headers() -> list[str]:
+    values: list[str] = []
+    while len(values) < 4:
+        value = str(100000 + secrets.randbelow(4_000_000_000))
+        if value not in values:
+            values.append(value)
+    return values
+
+
+def _ensure_protocol_state():
+    settings = get_settings()
+    parameters = dict(settings.parameters)
+    header_key = settings.header_protection_key
+    changed = False
+
+    if not header_key:
+        header_key = _run([str(AWG), "genkey"])
+        h1, h2, h3, h4 = _independent_headers()
+        parameters.update({"H1": h1, "H2": h2, "H3": h3, "H4": h4})
+        changed = True
+    elif [str(parameters.get(f"H{i}") or "") for i in range(1, 5)] == ["1", "2", "3", "4"]:
+        h1, h2, h3, h4 = _independent_headers()
+        parameters.update({"H1": h1, "H2": h2, "H3": h3, "H4": h4})
+        changed = True
+
+    for name, value in REAL31_DEFAULT_PARAMETERS.items():
+        if name.startswith("I"):
+            parameters.setdefault(name, value)
+            continue
+        current = parameters.get(name)
+        if current is None or str(current).strip() == "":
+            parameters[name] = value
+            changed = True
+
+    if any(int(parameters.get(f"S{i}") or 0) < 12 for i in range(1, 5)):
+        for name in ("S1", "S2", "S3", "S4"):
+            parameters[name] = REAL31_DEFAULT_PARAMETERS[name]
+        changed = True
+
+    if changed:
+        return set_protocol_state(parameters, header_key)
+    return settings
+
+
 def _peers() -> list[dict[str, Any]]:
     init_db()
     with connect() as connection:
@@ -95,7 +146,7 @@ def _peer_config(peer: dict[str, Any], server_public_key: str) -> str:
             "",
             "[Peer]",
             f"PublicKey = {server_public_key}",
-            "AllowedIPs = 0.0.0.0/0, ::/0",
+            "AllowedIPs = 0.0.0.0/0",
             f"Endpoint = {ENDPOINT}",
             "PersistentKeepalive = 25",
             "",
@@ -106,7 +157,7 @@ def _peer_config(peer: dict[str, Any], server_public_key: str) -> str:
 def render() -> dict[str, Any]:
     private_key, public_key = _server_keys()
     set_server_public_key(public_key)
-    settings = get_settings()
+    settings = _ensure_protocol_state()
     peers = _peers()
     peer_blocks: list[str] = []
     PEER_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
@@ -163,7 +214,6 @@ def apply_awg31() -> dict[str, Any]:
 
 
 def activate_restored_awg31(*, enabled: bool, active: bool) -> dict[str, Any]:
-    """Activate an exact restored profile without rewriting keys, DB or configs."""
     required = (
         SERVER_CONFIG,
         STATE_ROOT / "server-private.key",

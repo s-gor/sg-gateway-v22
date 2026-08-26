@@ -79,16 +79,21 @@ def _payload(
     *,
     settings_parameters: dict[str, Any] | None = None,
     server_public_key: str | None = None,
+    header_protection_key: str | None = None,
 ) -> dict[str, Any]:
     current = dict(preserved or {})
     if not current.get("private_key") or not current.get("public_key"):
         current["private_key"], current["public_key"] = _generate_keypair()
-    if settings_parameters is None or server_public_key is None:
+    if settings_parameters is None or server_public_key is None or header_protection_key is None:
         from app.connections.awg31 import get_settings
 
         settings = get_settings()
-        settings_parameters = dict(settings.parameters)
-        server_public_key = settings.server_public_key
+        if settings_parameters is None:
+            settings_parameters = dict(settings.parameters)
+        if server_public_key is None:
+            server_public_key = settings.server_public_key
+        if header_protection_key is None:
+            header_protection_key = settings.header_protection_key
     current.update(
         {
             "profile": PROFILE_ID,
@@ -100,10 +105,11 @@ def _payload(
             "transport": TRANSPORT,
             "interface": INTERFACE,
             "network": NETWORK,
-            "allowed_ips": "0.0.0.0/0, ::/0",
+            "allowed_ips": "0.0.0.0/0",
             "persistent_keepalive": 25,
             "generation": 31,
             "server_public_key": server_public_key,
+            "header_protection_key": header_protection_key,
             **{name.lower(): value for name, value in settings_parameters.items()},
         }
     )
@@ -119,6 +125,7 @@ def build_credential_payload(
     preserved: dict[str, Any] | None = None,
     settings_parameters: dict[str, Any] | None = None,
     server_public_key: str | None = None,
+    header_protection_key: str | None = None,
 ) -> dict[str, Any]:
     """Build one AWG31 credential without mutating repository globals."""
     return _payload(
@@ -131,6 +138,7 @@ def build_credential_payload(
         preserved,
         settings_parameters=settings_parameters,
         server_public_key=server_public_key,
+        header_protection_key=header_protection_key,
     )
 
 

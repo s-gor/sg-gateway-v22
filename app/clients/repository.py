@@ -284,6 +284,9 @@ def _create_device_rows(
                 client_name=client_name,
                 settings_parameters=parameters,
                 server_public_key=str(settings_raw.get("server_public_key") or ""),
+                header_protection_key=str(
+                    settings_raw.get("header_protection_key") or ""
+                ),
             )
             object_id = str(payload["public_key"])
             config_json = json.dumps(payload, ensure_ascii=False, sort_keys=True)

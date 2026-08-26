@@ -37,7 +37,7 @@ AWG3_DEFAULTS = {
     "reject_after_time": "150-180",
     "keepalive_timeout": "5-15",
     "max_handshake_attempts": "15-20",
-    "persistent_keepalive": "25-35",
+    "persistent_keepalive": 25,
 }
 
 
@@ -447,7 +447,7 @@ def apply_awg3() -> cr.EngineResult:
             raise cr.ClientRuntimeError("AWG3: runtime не слушает заданный endpoint после запуска")
 
         cr._set_engine_status(ENGINE, ids, "applied")
-        return cr.EngineResult(ENGINE, True, f"AmneziaWG 3.1 userspace применён; клиентов: {len(rows)}", len(rows))
+        return cr.EngineResult(ENGINE, True, f"AmneziaWG 3.0 применён; клиентов: {len(rows)}", len(rows))
     except Exception as exc:
         if backup.is_file():
             shutil.copy2(backup, AWG3_CONFIG)

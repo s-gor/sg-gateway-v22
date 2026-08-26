@@ -22,6 +22,7 @@
 {% set mihomo_public_host = connections[2].public_host if connections | length > 2 else mihomo.settings.host %}
 {% set awg3_country = connections[3].country_code if connections | length > 3 else awg_country %}
 {% set awg3_public_host = connections[3].public_host if connections | length > 3 else awg3_settings.host %}
+{% set awg31_public_host = awg3_public_host %}
 
 <section class="cnv1-page">
   <header class="cnv1-heading">
@@ -324,16 +325,16 @@
           <div>
             <div class="cnv1-card-kicker">UDP VPN · ДВА ПОКОЛЕНИЯ</div>
             <h2>AmneziaWG</h2>
-            <p>AWG2 и AWG3 работают независимо: отдельные профили, ключи, адреса и runtime.</p>
+            <p>AWG 2.0, 3.0 и 3.1 работают независимо: отдельные профили, ключи, адреса и runtime.</p>
           </div>
         </div>
-        <div class="awgd-footer"><span>AWG2 · kernel</span><span>AWG3 · userspace</span></div>
+        <div class="awgd-footer"><span>AWG 2.0</span><span>AWG 3.0</span><span>AWG 3.1</span></div>
       </header>
 
       <div class="awgd-grid">
         <section class="awgd-card awgd-card-v2">
           <header class="awgd-head">
-            <div class="awgd-title"><span class="awgd-generation">AWG2</span><div><strong>AmneziaWG 2</strong><small>Проверенная kernel-линия 1.x · существующие профили не меняются.</small></div></div>
+            <div class="awgd-title"><span class="awgd-generation">AWG2</span><div><strong>AmneziaWG 2.0</strong><small>Проверенная kernel-линия 1.x · существующие профили не меняются.</small></div></div>
             <span class="cnv1-engine-status {{ 'success' if awg_key_ready else 'warning' }}"><span></span>{{ 'Настроено' if awg_key_ready else 'Требует настройки' }}</span>
           </header>
           <section class="cnv1-endpoint-card sg-ljd-nested">
@@ -350,7 +351,7 @@
 
         <section class="awgd-card awgd-card-v3">
           <header class="awgd-head">
-            <div class="awgd-title"><span class="awgd-generation">AWG3</span><div><strong>AmneziaWG 3</strong><small>Изолированный userspace runtime 3.0 · AWG2 kernel и tools не заменяются.</small></div></div>
+            <div class="awgd-title"><span class="awgd-generation">AWG3</span><div><strong>AmneziaWG 3.0</strong><small>Изолированный userspace runtime 3.0 · AWG2 kernel и tools не заменяются.</small></div></div>
             <span class="cnv1-engine-status {{ 'success' if awg3_key_ready else 'warning' }}"><span></span>{{ 'Настроено' if awg3_key_ready else 'Готов к первому запуску' }}</span>
           </header>
           <section class="cnv1-endpoint-card sg-ljd-nested">
@@ -364,6 +365,8 @@
             <footer class="cnv1-form-actions"><span>Адрес подключения: {{ awg3_public_host }}:{{ awg3_settings.port }}</span><button class="button primary" type="submit">Сохранить</button></footer>
           </form>
         </section>
+
+        {% include "_awg31_panel.html" %}
       </div>
     </article>
 
@@ -542,5 +545,4 @@
   sync();
 })();
 </script>
-{% include '_awg31_panel.html' %}
 {% endblock %}

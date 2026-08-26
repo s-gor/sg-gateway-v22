@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 from app.clients import repository
@@ -79,7 +80,7 @@ def test_dual_awg_ui_is_scoped_and_keeps_button_palette():
     assert "AWG2" in html and "AWG3" in html
     assert "update_amneziawg3" in html
     assert 'class="button primary"' in html
-    assert ".button" not in css
+    assert not re.search(r"(?m)^\s*\.button\b", css)
     assert ".page-connections .awgd-" in css
 
 

@@ -173,7 +173,7 @@ def build_awg3_config(client: Client, device: Device | None = None) -> ClientExp
             endpoint = _format_endpoint(endpoint_host, endpoint_port)
     except Exception:
         pass
-    body = f"""# SG-Gateway AmneziaWG 3.1
+    body = f"""# SG-Gateway AmneziaWG 3.0
 # Access: {label}
 
 [Interface]
@@ -203,7 +203,7 @@ MaxHandshakeAttempts = {config.get("max_handshake_attempts", "")}
 PublicKey = {config.get("server_public_key", "")}
 Endpoint = {endpoint}
 AllowedIPs = {config.get("allowed_ips", "0.0.0.0/0, ::/0")}
-PersistentKeepalive = {config.get("persistent_keepalive", "25-35")}
+PersistentKeepalive = {config.get("persistent_keepalive", 25)}
 """
     return ClientExport(
         filename=f"sg-gateway-{_slug(client, device)}-amneziawg3.conf",
@@ -215,6 +215,12 @@ PersistentKeepalive = {config.get("persistent_keepalive", "25-35")}
 def build_awg31_config(client: Client, device: Device | None = None) -> ClientExport:
     config = _deployment_config(client, "amneziawg31", device)
     settings = get_awg31_settings()
+    endpoint_host = _public_export_host(settings.host)
+    endpoint = (
+        _format_endpoint(endpoint_host, settings.port)
+        if endpoint_host
+        else AWG31_ENDPOINT
+    )
     parameter_lines = "\n".join(awg31_config_lines(settings))
     body = f"""# SG-Gateway AmneziaWG 3.1
 # Access: {_label(client, device)}
@@ -229,7 +235,7 @@ DNS = {settings.dns}
 
 [Peer]
 PublicKey = {config.get('server_public_key') or settings.server_public_key}
-Endpoint = {AWG31_ENDPOINT}
+Endpoint = {endpoint}
 AllowedIPs = {config.get('allowed_ips', '0.0.0.0/0, ::/0')}
 PersistentKeepalive = {config.get('persistent_keepalive', 25)}
 """
@@ -245,6 +251,12 @@ def build_awg31_uri(client: Client, device: Device | None = None) -> ClientExpor
 
     config = _deployment_config(client, "amneziawg31", device)
     settings = get_awg31_settings()
+    endpoint_host = _public_export_host(settings.host)
+    endpoint = (
+        _format_endpoint(endpoint_host, settings.port)
+        if endpoint_host
+        else AWG31_ENDPOINT
+    )
     config_export = build_awg31_config(client, device)
     body = encode_awg31_uri(
         {
@@ -254,6 +266,7 @@ def build_awg31_uri(client: Client, device: Device | None = None) -> ClientExpor
             ),
             "address": str(config.get("address", "")),
             "allowed_ips": str(config.get("allowed_ips", "0.0.0.0/0, ::/0")),
+            "endpoint": endpoint,
             "persistent_keepalive": int(config.get("persistent_keepalive", 25)),
             "parameters": settings.parameters,
             "config": config_export.body,

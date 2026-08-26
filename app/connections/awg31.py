@@ -26,21 +26,40 @@ I_FIELDS = tuple(f"I{index}" for index in range(1, 6))
 J_FIELDS = ("Jc", "Jmin", "Jmax")
 S_FIELDS = tuple(f"S{index}" for index in range(1, 5))
 H_FIELDS = tuple(f"H{index}" for index in range(1, 5))
-FIELD_NAMES = I_FIELDS + J_FIELDS + S_FIELDS + H_FIELDS
-SAFE_HEADER_PARAMETERS: dict[str, str] = {
-    "H1": "1",
-    "H2": "2",
-    "H3": "3",
-    "H4": "4",
-}
-DEFAULT_PARAMETERS: dict[str, str | int] = {
+RANGE_FIELDS = (
+    "ContentPaddingAddition",
+    "RekeyAfterTime",
+    "RekeyTimeout",
+    "RejectAfterTime",
+    "KeepaliveTimeout",
+    "MaxHandshakeAttempts",
+)
+BOOL_FIELDS = ("RandomTrailers", "DisableCookies")
+FIELD_NAMES = I_FIELDS + J_FIELDS + S_FIELDS + H_FIELDS + RANGE_FIELDS + BOOL_FIELDS
+
+REAL31_DEFAULT_PARAMETERS: dict[str, str | int] = {
     **{name: "" for name in I_FIELDS},
-    "Jc": 0,
-    "Jmin": 0,
-    "Jmax": 0,
-    **{name: 0 for name in S_FIELDS},
-    **SAFE_HEADER_PARAMETERS,
+    "Jc": 4,
+    "Jmin": 10,
+    "Jmax": 50,
+    "S1": 64,
+    "S2": 96,
+    "S3": 48,
+    "S4": 12,
+    "H1": "1085466381",
+    "H2": "1525636359",
+    "H3": "1894947610",
+    "H4": "2767261704",
+    "ContentPaddingAddition": "10-100",
+    "RekeyAfterTime": "100-120",
+    "RekeyTimeout": "3-7",
+    "RejectAfterTime": "150-180",
+    "KeepaliveTimeout": "5-15",
+    "MaxHandshakeAttempts": "15-20",
+    "RandomTrailers": "on",
+    "DisableCookies": "on",
 }
+DEFAULT_PARAMETERS = dict(REAL31_DEFAULT_PARAMETERS)
 
 
 class Awg31ValidationError(ValueError):
@@ -51,11 +70,16 @@ class Awg31ValidationError(ValueError):
 class Awg31Settings:
     parameters: dict[str, str | int]
     server_public_key: str = ""
+    header_protection_key: str = ""
     enabled: bool = True
     host: str = HOST
     port: int = PORT
     dns: str = DNS
     transport: str = TRANSPORT
+
+    @property
+    def advanced_security(self) -> bool:
+        return bool(self.header_protection_key)
 
     def as_api(self) -> dict:
         return {
@@ -68,6 +92,7 @@ class Awg31Settings:
             "transport": self.transport,
             "dns": self.dns,
             "service": "sg-gateway-awg31.service",
+            "advanced_security": self.advanced_security,
             "parameters": dict(self.parameters),
         }
 
@@ -82,34 +107,44 @@ def _uint16(name: str, value: object) -> int:
     return parsed
 
 
-def _u32_range_parts(name: str, value: object) -> tuple[str, int, int]:
+def _range_parts(name: str, value: object, maximum: int) -> tuple[str, int, int]:
     text = str(value).strip()
     match = re.fullmatch(r"(\d+)(?:-(\d+))?", text)
     if not match:
         raise Awg31ValidationError(f"{name} must be an unsigned integer or range")
     low = int(match.group(1))
     high = int(match.group(2) or low)
-    if low > 0xFFFFFFFF or high > 0xFFFFFFFF or high < low:
+    if low > maximum or high > maximum or high < low:
         raise Awg31ValidationError(f"{name} range is invalid")
     normalized = str(low) if low == high else f"{low}-{high}"
     return normalized, low, high
 
 
-def _u32_range(name: str, value: object) -> str:
-    normalized, _, _ = _u32_range_parts(name, value)
-    return normalized
+def _bool_value(name: str, value: object) -> str:
+    normalized = str(value).strip().lower()
+    if normalized in {"on", "1", "true", "yes"}:
+        return "on"
+    if normalized in {"off", "0", "false", "no"}:
+        return "off"
+    raise Awg31ValidationError(f"{name} must be on or off")
+
+
+def _legacy_stage3a(values: Mapping[str, object]) -> bool:
+    headers = [str(values.get(name, "")).strip() for name in H_FIELDS]
+    return (
+        all(str(values.get(name, "0")).strip() == "0" for name in J_FIELDS + S_FIELDS)
+        and headers in (["0", "0", "0", "0"], ["1", "2", "3", "4"])
+    )
 
 
 def normalize_legacy_parameters(values: Mapping[str, object]) -> dict[str, object]:
-    """Repair only the invalid Stage3A all-zero header defaults.
-
-    Arbitrary overlapping user values remain untouched so validation can reject
-    them rather than silently changing an explicitly configured profile.
-    """
-
     normalized = dict(values)
-    if all(str(normalized.get(name, "")).strip() == "0" for name in H_FIELDS):
-        normalized.update(SAFE_HEADER_PARAMETERS)
+    if _legacy_stage3a(normalized):
+        normalized.update(REAL31_DEFAULT_PARAMETERS)
+    for name, default in REAL31_DEFAULT_PARAMETERS.items():
+        if name not in normalized or normalized[name] is None or str(normalized[name]).strip() == "":
+            if name not in I_FIELDS:
+                normalized[name] = default
     return normalized
 
 
@@ -138,16 +173,12 @@ def _tagged_junk(name: str, value: object) -> tuple[str, int]:
         elif match.group("size") is not None:
             size = int(match.group("size"))
             if size > MAX_I_PAYLOAD_SIZE:
-                raise Awg31ValidationError(
-                    f"{name} tag size exceeds the AWG31 MTU-safe limit"
-                )
+                raise Awg31ValidationError(f"{name} tag size exceeds the AWG31 MTU-safe limit")
             payload_size += size
         else:
             payload_size += I_TIMESTAMP_SIZE
         if payload_size > MAX_I_PAYLOAD_SIZE:
-            raise Awg31ValidationError(
-                f"{name} expanded payload exceeds the AWG31 MTU-safe limit"
-            )
+            raise Awg31ValidationError(f"{name} expanded payload exceeds the AWG31 MTU-safe limit")
         position = match.end()
     return text, payload_size
 
@@ -157,26 +188,26 @@ def validate_parameters(values: Mapping[str, object]) -> dict[str, str | int]:
     unknown = set(values) - set(FIELD_NAMES)
     if unknown:
         raise Awg31ValidationError("Unknown AWG31 fields: " + ", ".join(sorted(unknown)))
+
     result: dict[str, str | int] = {}
     total_i_payload = 0
     for name in I_FIELDS:
-        tagged, payload_size = _tagged_junk(
-            name, values.get(name, DEFAULT_PARAMETERS[name])
-        )
+        tagged, payload_size = _tagged_junk(name, values.get(name, DEFAULT_PARAMETERS[name]))
         result[name] = tagged
         total_i_payload += payload_size
     if total_i_payload > MAX_I_PAYLOAD_SIZE:
-        raise Awg31ValidationError(
-            "Combined I1-I5 payload exceeds the AWG31 MTU-safe limit"
-        )
+        raise Awg31ValidationError("Combined I1-I5 payload exceeds the AWG31 MTU-safe limit")
+
     for name in J_FIELDS + S_FIELDS:
         result[name] = _uint16(name, values.get(name, DEFAULT_PARAMETERS[name]))
+    if int(result["Jmin"]) > int(result["Jmax"]):
+        raise Awg31ValidationError("Jmin must not exceed Jmax")
+    if any(int(result[name]) < 12 for name in S_FIELDS):
+        raise Awg31ValidationError("S1-S4 must be at least 12 when HeaderProtectionKey is enabled")
 
     header_ranges: dict[str, tuple[int, int]] = {}
     for name in H_FIELDS:
-        normalized, low, high = _u32_range_parts(
-            name, values.get(name, DEFAULT_PARAMETERS[name])
-        )
+        normalized, low, high = _range_parts(name, values.get(name, DEFAULT_PARAMETERS[name]), 0xFFFFFFFF)
         result[name] = normalized
         header_ranges[name] = (low, high)
     for index, left_name in enumerate(H_FIELDS):
@@ -184,23 +215,30 @@ def validate_parameters(values: Mapping[str, object]) -> dict[str, str | int]:
         for right_name in H_FIELDS[index + 1 :]:
             right_low, right_high = header_ranges[right_name]
             if max(left_low, right_low) <= min(left_high, right_high):
-                raise Awg31ValidationError(
-                    f"{left_name} and {right_name} header ranges must not overlap"
-                )
+                raise Awg31ValidationError(f"{left_name} and {right_name} header ranges must not overlap")
 
-    if int(result["Jmin"]) > int(result["Jmax"]):
-        raise Awg31ValidationError("Jmin must not exceed Jmax")
+    for name in RANGE_FIELDS:
+        normalized, _, _ = _range_parts(name, values.get(name, DEFAULT_PARAMETERS[name]), 65535)
+        result[name] = normalized
+    for name in BOOL_FIELDS:
+        result[name] = _bool_value(name, values.get(name, DEFAULT_PARAMETERS[name]))
     return result
 
 
-def _storage_config(parameters: Mapping[str, str | int], server_public_key: str = "") -> dict:
+def _storage_config(
+    parameters: Mapping[str, str | int],
+    server_public_key: str = "",
+    header_protection_key: str = "",
+) -> dict:
     return {
         "profile": PROFILE_ID,
         "generation": 31,
         "dns": DNS,
         "transport": TRANSPORT,
         "endpoint": ENDPOINT,
+        "allowed_ips": "0.0.0.0/0",
         "server_public_key": server_public_key,
+        "header_protection_key": header_protection_key,
         **{name.lower(): value for name, value in parameters.items()},
     }
 
@@ -241,16 +279,15 @@ def get_settings() -> Awg31Settings:
     return Awg31Settings(
         parameters=parameters,
         server_public_key=str(config.get("server_public_key") or ""),
+        header_protection_key=str(config.get("header_protection_key") or ""),
         enabled=bool(row["enabled"]),
+        host=str(row["host"] or HOST),
+        port=int(row["port"] or PORT),
     )
 
 
-def save_settings(values: Mapping[str, object]) -> Awg31Settings:
-    current = get_settings()
-    merged = dict(current.parameters)
-    merged.update(values)
-    parameters = validate_parameters(merged)
-    config = _storage_config(parameters, current.server_public_key)
+def _update_storage(parameters: Mapping[str, str | int], server_public_key: str, header_key: str) -> None:
+    config = _storage_config(parameters, server_public_key, header_key)
     with connect() as connection:
         connection.execute(
             """
@@ -271,47 +308,47 @@ def save_settings(values: Mapping[str, object]) -> Awg31Settings:
                 peer = {}
             if not isinstance(peer, dict):
                 peer = {}
-            peer.update(_storage_config(parameters, current.server_public_key))
+            peer.update(config)
             connection.execute(
                 "UPDATE device_credentials SET config_json = ?, status = 'pending' WHERE id = ?",
                 (json.dumps(peer, ensure_ascii=False, sort_keys=True), int(row["id"])),
             )
+
+
+def save_settings(values: Mapping[str, object]) -> Awg31Settings:
+    current = get_settings()
+    merged = dict(current.parameters)
+    merged.update(values)
+    parameters = validate_parameters(merged)
+    _update_storage(parameters, current.server_public_key, current.header_protection_key)
     return get_settings()
 
 
 def set_server_public_key(value: str) -> None:
     current = get_settings()
-    key = str(value or "").strip()
-    config = _storage_config(current.parameters, key)
-    with connect() as connection:
-        connection.execute(
-            "UPDATE connection_settings SET config_json = ?, updated_at = CURRENT_TIMESTAMP WHERE engine = ?",
-            (json.dumps(config, ensure_ascii=False, sort_keys=True), ENGINE_ID),
-        )
-        rows = connection.execute(
-            "SELECT id, config_json FROM device_credentials WHERE engine = ?",
-            (ENGINE_ID,),
-        ).fetchall()
-        for row in rows:
-            try:
-                peer = json.loads(row["config_json"] or "{}")
-            except (TypeError, ValueError, json.JSONDecodeError):
-                peer = {}
-            if not isinstance(peer, dict):
-                peer = {}
-            peer["server_public_key"] = key
-            connection.execute(
-                "UPDATE device_credentials SET config_json = ? WHERE id = ?",
-                (json.dumps(peer, ensure_ascii=False, sort_keys=True), int(row["id"])),
-            )
+    _update_storage(current.parameters, str(value or "").strip(), current.header_protection_key)
+
+
+def set_protocol_state(values: Mapping[str, object], header_protection_key: str) -> Awg31Settings:
+    current = get_settings()
+    parameters = validate_parameters(values)
+    key = str(header_protection_key or "").strip()
+    if not key:
+        raise Awg31ValidationError("HeaderProtectionKey is required for AWG 3.1")
+    _update_storage(parameters, current.server_public_key, key)
+    return get_settings()
 
 
 def config_lines(settings: Awg31Settings | None = None) -> list[str]:
     current = settings or get_settings()
     lines: list[str] = []
-    for name in FIELD_NAMES:
+    for name in I_FIELDS + J_FIELDS + S_FIELDS + H_FIELDS:
         value = current.parameters[name]
         if name in I_FIELDS and value == "":
             continue
         lines.append(f"{name} = {value}")
+    if current.header_protection_key:
+        lines.append(f"HeaderProtectionKey = {current.header_protection_key}")
+    for name in RANGE_FIELDS + BOOL_FIELDS:
+        lines.append(f"{name} = {current.parameters[name]}")
     return lines

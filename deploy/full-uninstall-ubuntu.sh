@@ -10,6 +10,8 @@ UNINSTALL_LOG="/var/log/sg-gateway-full-uninstall-02206.log"
 PANEL_PORT="63443"
 XRAY_PORT="443"
 AWG_PORT="585"
+AWG3_PORT="586"
+AWG31_PORT="587"
 MIHOMO_PORT="2099"
 XHTTP_REALITY_PORT="8444"
 XHTTP_TLS_PORT="8445"
@@ -101,14 +103,17 @@ stop_runtime(){
   local service
   for service in \
     sg-gateway.service sg-hostd.service xray.service mihomo.service \
-    sg-gateway-awg.service sg-gateway-awg3.service sg-gateway-singbox.service; do
+    sg-gateway-awg.service sg-gateway-awg3.service sg-gateway-awg31.service sg-gateway-singbox.service; do
     systemctl disable --now "$service" >/dev/null 2>&1 || true
   done
   ip link delete awg0 >/dev/null 2>&1 || true
   ip link delete awg3 >/dev/null 2>&1 || true
-  rm -f /var/run/amneziawg/awg3.sock >/dev/null 2>&1 || true
+  ip link delete awg31 >/dev/null 2>&1 || true
+  rm -f /var/run/amneziawg/awg3.sock /var/run/amneziawg/awg31.sock >/dev/null 2>&1 || true
   if command -v nft >/dev/null 2>&1; then
     nft delete table ip sg_gateway_awg >/dev/null 2>&1 || true
+    nft delete table ip sg_gateway_awg3 >/dev/null 2>&1 || true
+    nft delete table ip sg_gateway_awg31 >/dev/null 2>&1 || true
   fi
 }
 
@@ -116,11 +121,15 @@ remove_service_and_web_config(){
   rm -f \
     /etc/systemd/system/sg-gateway.service \
     /etc/systemd/system/sg-hostd.service \
+    /etc/systemd/system/sg-gateway-awg.service \
+    /etc/systemd/system/sg-gateway-awg3.service \
+    /etc/systemd/system/sg-gateway-awg31.service \
     /etc/systemd/system/xray.service \
     /etc/systemd/system/xray@.service \
     /etc/systemd/system/mihomo.service \
     /etc/systemd/system/sg-gateway-awg.service \
     /etc/systemd/system/sg-gateway-awg3.service \
+    /etc/systemd/system/sg-gateway-awg31.service \
     /etc/systemd/system/sg-gateway-singbox.service
   rm -rf \
     /etc/systemd/system/sg-gateway.service.d \
@@ -286,7 +295,7 @@ cleanup_firewall(){
     for rule in \
       "${PANEL_PORT}/tcp" "80/tcp" "${XRAY_PORT}/tcp" \
       "${XHTTP_REALITY_PORT}/tcp" "${XHTTP_TLS_PORT}/tcp" \
-      "${AWG_PORT}/udp" "${HYSTERIA2_PORT}/udp" \
+      "${AWG_PORT}/udp" "${AWG3_PORT}/udp" "${AWG31_PORT}/udp" "${HYSTERIA2_PORT}/udp" \
       "${MIHOMO_PORT}/tcp" "${ANYTLS_PORT}/tcp" "${TUIC_PORT}/udp"; do
       ufw --force delete allow "$rule" >/dev/null 2>&1 || true
     done
@@ -324,6 +333,9 @@ remove_account_and_verify(){
     "$PREFIX" "$CONFIG_DIR" "$DATA_DIR" \
     /etc/systemd/system/sg-gateway.service \
     /etc/systemd/system/sg-hostd.service \
+    /etc/systemd/system/sg-gateway-awg.service \
+    /etc/systemd/system/sg-gateway-awg3.service \
+    /etc/systemd/system/sg-gateway-awg31.service \
     /etc/systemd/system/xray.service \
     /etc/nginx/stream-conf.d/sg-gateway-443.conf \
     /var/www/sg-gateway-placeholder \

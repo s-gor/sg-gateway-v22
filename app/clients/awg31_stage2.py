@@ -12,6 +12,7 @@ from app.connections.awg31 import (
     get_settings,
     save_settings,
 )
+from app.connections.awg31_uri import Awg31UriError
 
 
 blueprint = Blueprint("awg31", __name__)
@@ -96,7 +97,14 @@ def _download(client_id: int, device_id: int, *, uri: bool = False):
     device = repository.get_device(device_id, client_id)
     if client is None or device is None:
         abort(404)
-    export = build_awg31_uri(client, device) if uri else build_awg31_config(client, device)
+    try:
+        export = build_awg31_uri(client, device) if uri else build_awg31_config(client, device)
+    except Awg31UriError as exc:
+        return Response(
+            f"Ошибка формирования AmneziaWG 3.1 URI: {exc}\n",
+            status=409,
+            mimetype="text/plain",
+        )
     return Response(
         export.body,
         mimetype=export.media_type,
