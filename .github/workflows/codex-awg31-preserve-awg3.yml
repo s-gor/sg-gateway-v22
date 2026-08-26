@@ -167,61 +167,62 @@ jobs:
           path = Path('app/maintenance/awg31_stage3a.py')
           text = path.read_text(encoding='utf-8')
 
-          old = '''        committed = False
-          try:
-              vendor, deploy = self._copy_install_media(work)
-          '''
-          new = '''        committed = False
-          preserve_awg3_runtime = (
-              self.layout.awg3_runtime.exists() or self.layout.awg3_runtime.is_symlink()
+          needle = "        committed = False\n"
+          replacement = (
+              needle
+              + "        preserve_awg3_runtime = (\n"
+              + "            self.layout.awg3_runtime.exists()\n"
+              + "            or self.layout.awg3_runtime.is_symlink()\n"
+              + "        )\n"
           )
-          try:
-              vendor, deploy = self._copy_install_media(work)
-          '''
-          if old not in text:
-              raise SystemExit('cannot locate Stage3A transaction prelude')
-          text = text.replace(old, new, 1)
+          if text.count(needle) != 1:
+              raise SystemExit('cannot locate unique Stage3A transaction prelude')
+          text = text.replace(needle, replacement, 1)
 
-          old = '''            replacements.append(self._replace(self.layout.awg3_runtime, awg3_runtime, backups))
-              replacements.append(self._replace(self.layout.awg31_runtime, awg31_runtime, backups))
-          '''
-          new = '''            if not preserve_awg3_runtime:
-                  replacements.append(
-                      self._replace(self.layout.awg3_runtime, awg3_runtime, backups)
-                  )
-              replacements.append(self._replace(self.layout.awg31_runtime, awg31_runtime, backups))
-          '''
-          if old not in text:
-              raise SystemExit('cannot locate AWG3 runtime replacement')
-          text = text.replace(old, new, 1)
+          needle = "            replacements.append(self._replace(self.layout.awg3_runtime, awg3_runtime, backups))\n"
+          replacement = (
+              "            if not preserve_awg3_runtime:\n"
+              + "                replacements.append(\n"
+              + "                    self._replace(self.layout.awg3_runtime, awg3_runtime, backups)\n"
+              + "                )\n"
+          )
+          if text.count(needle) != 1:
+              raise SystemExit('cannot locate unique AWG3 runtime replacement')
+          text = text.replace(needle, replacement, 1)
 
-          old = '''            if self.layout.awg3_unit.is_file():
-                  self.os.run("systemctl", "try-restart", "sg-gateway-awg3.service")
-              connection.commit()
-          '''
-          new = '''            if not preserve_awg3_runtime and self.layout.awg3_unit.is_file():
-                  self.os.run("systemctl", "try-restart", "sg-gateway-awg3.service")
-              connection.commit()
-          '''
-          if old not in text:
-              raise SystemExit('cannot locate successful AWG3 restart')
-          text = text.replace(old, new, 1)
+          success = (
+              "            if self.layout.awg3_unit.is_file():\n"
+              + "                self.os.run(\"systemctl\", \"try-restart\", \"sg-gateway-awg3.service\")\n"
+          )
+          success_replacement = success.replace(
+              "if self.layout.awg3_unit.is_file():",
+              "if not preserve_awg3_runtime and self.layout.awg3_unit.is_file():",
+          )
+          if text.count(success) != 1:
+              raise SystemExit('cannot locate unique successful AWG3 restart')
+          text = text.replace(success, success_replacement, 1)
 
-          old = '''            if self.layout.awg3_unit.is_file():
-                  with contextlib.suppress(RuntimeError):
-                      self.os.run("systemctl", "try-restart", "sg-gateway-awg3.service")
-              raise
-          '''
-          new = '''            if not preserve_awg3_runtime and self.layout.awg3_unit.is_file():
-                  with contextlib.suppress(RuntimeError):
-                      self.os.run("systemctl", "try-restart", "sg-gateway-awg3.service")
-              raise
-          '''
-          if old not in text:
-              raise SystemExit('cannot locate rollback AWG3 restart')
-          text = text.replace(old, new, 1)
-
+          rollback = (
+              "            if self.layout.awg3_unit.is_file():\n"
+              + "                with contextlib.suppress(RuntimeError):\n"
+              + "                    self.os.run(\"systemctl\", \"try-restart\", \"sg-gateway-awg3.service\")\n"
+          )
+          rollback_replacement = rollback.replace(
+              "if self.layout.awg3_unit.is_file():",
+              "if not preserve_awg3_runtime and self.layout.awg3_unit.is_file():",
+          )
+          if text.count(rollback) != 1:
+              raise SystemExit('cannot locate unique rollback AWG3 restart')
+          text = text.replace(rollback, rollback_replacement, 1)
           path.write_text(text, encoding='utf-8')
+
+          test_path = Path('tests/test_sg_gateway_v22_awg31_stage3a_install_update.py')
+          tests = test_path.read_text(encoding='utf-8')
+          old = 'assert fake.commands.count(("systemctl", "try-restart", "sg-gateway-awg3.service")) == 2'
+          new = 'assert fake.commands.count(("systemctl", "try-restart", "sg-gateway-awg3.service")) == 1'
+          if tests.count(old) != 1:
+              raise SystemExit('cannot locate AWG3 idempotency restart expectation')
+          test_path.write_text(tests.replace(old, new, 1), encoding='utf-8')
           PY
 
       - name: Prove GREEN
@@ -233,6 +234,7 @@ jobs:
 
       - name: Refresh integrity and commit
         run: |
+          rm -f .github/workflows/codex-awg31-preserve-awg3.yml
           python3 - <<'PY'
           import hashlib
           import subprocess
@@ -248,7 +250,6 @@ jobs:
           Path('SOURCE-SHA256SUMS').write_text('\n'.join(rows) + '\n', encoding='utf-8')
           PY
 
-          rm -f .github/workflows/codex-awg31-preserve-awg3.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
