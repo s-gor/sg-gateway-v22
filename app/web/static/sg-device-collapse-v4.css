@@ -157,3 +157,18 @@ html body.page-clients .dv16-device:not(.sg-device-expanded) .sg-device-collapse
     align-items: flex-start !important;
   }
 }
+
+/* SG_CLIENT_PROTOCOL_PICKER_2X5_V1
+   Ten protocol cards use two rows of five in every desktop client/device dialog. */
+@media (min-width: 1181px) {
+  html body.page-clients #cv2-dialog.cv10-dialog,
+  html body.page-clients .dv16-dialog {
+    width: min(1540px, calc(100vw - 32px)) !important;
+    max-width: 1540px !important;
+  }
+
+  html body.page-clients #cv2-dialog .cv12-protocols,
+  html body.page-clients .dv16-dialog .dv16-protocol-list {
+    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  }
+}
