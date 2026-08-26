@@ -50,6 +50,8 @@ jobs:
           PY
           python3 /tmp/awg31-repair.py
       - name: Run targeted tests
+        env:
+          PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/hostd
         run: |
           python -m pytest \
             tests/test_sg_gateway_0217_clients_onboarding.py \
@@ -61,6 +63,8 @@ jobs:
             tests/test_sg_gateway_v22_awg31_stage3a_install_update.py \
             tests/test_sg_gateway_v22_awg31_update_transaction.py
       - name: Run full test suite
+        env:
+          PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/hostd
         run: python -m pytest tests
       - name: Commit verified code repair
         run: |
@@ -82,4 +86,4 @@ jobs:
           git commit -m "fix: complete verified AWG 3.1 integration"
           git push origin HEAD:dev-02206
 
-# trigger 3
+# trigger 4
