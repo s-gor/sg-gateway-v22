@@ -119,17 +119,22 @@ DEFAULT_CONNECTIONS = {
         ),
     },
     "amneziawg31": {
-        "host": "awg31.internal",
-        "port": 587,
-        "config_json": (
-            '{"profile":"awg31","generation":31,"dns":"1.1.1.1","transport":"udp",'
-            '"endpoint":"awg31.internal:587","server_public_key":"",'
-            '"i1":"","i2":"","i3":"","i4":"","i5":"",'
-            '"jc":0,"jmin":0,"jmax":0,"s1":0,"s2":0,"s3":0,"s4":0,'
-            '"h1":"1","h2":"2","h3":"3","h4":"4"}'
-        ),
-    },
-    "xray": {
+    "host": "awg31.internal",
+    "port": 587,
+    "config_json": (
+        '{"profile":"awg31","generation":31,"dns":"1.1.1.1","transport":"udp",'
+        '"endpoint":"awg31.internal:587","allowed_ips":"0.0.0.0/0",'
+        '"server_public_key":"","header_protection_key":"",'
+        '"i1":"","i2":"","i3":"","i4":"","i5":"",'
+        '"jc":4,"jmin":10,"jmax":50,"s1":64,"s2":96,"s3":48,"s4":12,'
+        '"h1":"1085466381","h2":"1525636359","h3":"1894947610","h4":"2767261704",'
+        '"contentpaddingaddition":"10-100","rekeyaftertime":"100-120",'
+        '"rekeytimeout":"3-7","rejectaftertime":"150-180",'
+        '"keepalivetimeout":"5-15","maxhandshakeattempts":"15-20",'
+        '"randomtrailers":"on","disablecookies":"on"}'
+    ),
+},
+"xray": {
         "host": "",
         "port": 443,
         "config_json": (

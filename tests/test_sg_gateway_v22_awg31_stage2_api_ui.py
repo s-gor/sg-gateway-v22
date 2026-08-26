@@ -30,7 +30,16 @@ VALID_PARAMETERS = {
     "H2": "2000-2002",
     "H3": "3003",
     "H4": "4000-4010",
+    "ContentPaddingAddition": "10-100",
+    "RekeyAfterTime": "100-120",
+    "RekeyTimeout": "3-7",
+    "RejectAfterTime": "150-180",
+    "KeepaliveTimeout": "5-15",
+    "MaxHandshakeAttempts": "15-20",
+    "RandomTrailers": "on",
+    "DisableCookies": "on",
 }
+HEADER_PROTECTION_KEY = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
 
 
 @pytest.fixture()
@@ -216,9 +225,9 @@ def test_server_and_peer_configs_contain_every_awg31_parameter(
 ) -> None:
     from sg_hostd import awg31_runtime
 
-    from app.connections.awg31 import save_settings
+    from app.connections.awg31 import set_protocol_state
 
-    save_settings(VALID_PARAMETERS)
+    set_protocol_state(VALID_PARAMETERS, HEADER_PROTECTION_KEY)
     client_id = repository.create_client("Stage 2", "amneziawg,amneziawg3,amneziawg31")
     assert client_id is not None
     device_id = _primary_device(client_id)
@@ -244,9 +253,9 @@ def test_server_and_peer_configs_contain_every_awg31_parameter(
 
 def test_awg31_config_and_uri_exports_are_profile_specific(isolated_stage2) -> None:
     from app.clients.exports import build_awg31_config, build_awg31_uri
-    from app.connections.awg31 import save_settings, set_server_public_key
+    from app.connections.awg31 import set_protocol_state, set_server_public_key
 
-    save_settings(VALID_PARAMETERS)
+    set_protocol_state(VALID_PARAMETERS, HEADER_PROTECTION_KEY)
     set_server_public_key(SERVER_PUBLIC_KEY)
     client_id = repository.create_client("Export 31", "amneziawg,amneziawg3,amneziawg31")
     assert client_id is not None
@@ -458,10 +467,10 @@ def test_empty_i_fields_are_omitted_and_filled_configs_pass_real_awg31_parser(
 
 def test_awg31_uri_consumer_round_trips_complete_configuration(isolated_stage2) -> None:
     from app.clients.awg31_stage2 import build_awg31_config, build_awg31_uri
-    from app.connections.awg31 import save_settings, set_server_public_key
+    from app.connections.awg31 import set_protocol_state, set_server_public_key
     from app.connections.awg31_uri import decode_awg31_uri
 
-    save_settings(VALID_PARAMETERS)
+    set_protocol_state(VALID_PARAMETERS, HEADER_PROTECTION_KEY)
     set_server_public_key(SERVER_PUBLIC_KEY)
     client_id = repository.create_client("URI 31", "amneziawg,amneziawg3,amneziawg31")
     assert client_id is not None
@@ -513,8 +522,8 @@ def test_awg31_ui_is_distinct_and_controls_only_awg31_service(
     assert "AmneziaWG 2" in html
     assert "AmneziaWG 3" in html
     assert "AmneziaWG 3.1" in html
-    assert "awg31.internal:587" in html
-    assert "sg-gateway-awg31.service" in html
+    assert "UDP 587" in html
+    assert "10.131.0.0/24" in html
     for action in ("start", "stop", "restart", "status"):
         assert f"/connections/amneziawg31/service/{action}" in html
     assert "awg31.status" in calls

@@ -12,10 +12,13 @@ def test_0217_clients_onboarding_and_protocol_grid():
     assert "не логин для входа в панель" in text
     assert "sg-admin можно удалить" in text
     assert 'id="sg-0217-client-protocol-grid"' not in text
-    assert "SG_NEW_CLIENT_PROTOCOL_PICKER_RESPONSIVE_V1" in css
+    assert "SG_CLIENT_PROTOCOL_DIALOG_LAYOUT_V2" in css
     assert "grid-template-columns: repeat(5, minmax(0, 1fr)) !important;" in css
+    assert "grid-template-columns: repeat(2, minmax(0, 1fr)) !important;" in css
+    assert "grid-template-columns: 1fr !important;" in css
 
-    form = text[text.index("url_for('add_client')"):text.index("</form>", text.index("url_for('add_client')"))]
+    start = text.index("url_for('add_client')")
+    form = text[start:text.index("</form>", start)]
     assert form.count('value="sgclient"') == 1
     assert '<strong>SG Client</strong>' not in form
     for token in (
@@ -28,4 +31,4 @@ def test_0217_clients_onboarding_and_protocol_grid():
     ):
         assert token in form
     assert "Требуется HTTPS" in form
-    assert form.index("{% for profile in xray_profiles.profiles %}") < form.index('value="amneziawg"')
+    assert form.index("create_xray_protocol_card(xray_profiles.profiles, profile_id)") < form.index('value="amneziawg"')

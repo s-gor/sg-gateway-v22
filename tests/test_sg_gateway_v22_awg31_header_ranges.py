@@ -9,6 +9,7 @@ import pytest
 from app.connections.awg31 import (
     Awg31ValidationError,
     DEFAULT_PARAMETERS,
+    REAL31_DEFAULT_PARAMETERS,
     normalize_legacy_parameters,
     validate_parameters,
 )
@@ -16,7 +17,7 @@ from app.db import DEFAULT_CONNECTIONS
 from app.maintenance.awg31_stage3a import Stage3AInstaller
 
 ROOT = Path(__file__).resolve().parents[1]
-SAFE_HEADERS = {"H1": "1", "H2": "2", "H3": "3", "H4": "4"}
+SAFE_HEADERS = {name: str(REAL31_DEFAULT_PARAMETERS[name]) for name in ("H1", "H2", "H3", "H4")}
 
 
 class FakeOS:
@@ -158,7 +159,20 @@ def test_awg31_validation_rejects_overlapping_header_ranges(headers: dict[str, s
 
 
 def test_only_legacy_all_zero_headers_are_normalized() -> None:
-    legacy = dict(DEFAULT_PARAMETERS, H1="0", H2="0", H3="0", H4="0")
+    legacy = dict(
+        DEFAULT_PARAMETERS,
+        Jc=0,
+        Jmin=0,
+        Jmax=0,
+        S1=0,
+        S2=0,
+        S3=0,
+        S4=0,
+        H1="0",
+        H2="0",
+        H3="0",
+        H4="0",
+    )
     normalized = normalize_legacy_parameters(legacy)
     assert {name: normalized[name] for name in SAFE_HEADERS} == SAFE_HEADERS
     assert validate_parameters(legacy) == validate_parameters(DEFAULT_PARAMETERS)
