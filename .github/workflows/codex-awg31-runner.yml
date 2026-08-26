@@ -10,6 +10,7 @@ permissions:
 
 jobs:
   apply:
+    if: github.actor == 's-gor'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -26,18 +27,39 @@ jobs:
           python -m pip install -r requirements-dev.txt
 
       - name: Execute reviewed patch script
+        id: patch
+        continue-on-error: true
         run: |
           python3 - <<'PY'
           from pathlib import Path
           import textwrap
+          import traceback
 
-          source = Path('.github/workflows/codex-awg31-client-picker.yml').read_text(encoding='utf-8')
-          marker = "          python3 - <<'PY'\n"
-          body = source.split(marker, 1)[1].split("\n          PY\n", 1)[0]
-          exec(compile(textwrap.dedent(body), 'awg31-picker-patch', 'exec'), {})
+          try:
+              source = Path('.github/workflows/codex-awg31-client-picker.yml').read_text(encoding='utf-8')
+              marker = "          python3 - <<'PY'\n"
+              body = source.split(marker, 1)[1].split("\n          PY\n", 1)[0]
+              exec(compile(textwrap.dedent(body), 'awg31-picker-patch', 'exec'), {})
+          except BaseException:
+              Path('AWG31-PATCH-ERROR.txt').write_text(traceback.format_exc(), encoding='utf-8')
+              raise
           PY
 
+      - name: Publish patch diagnostic
+        if: steps.patch.outcome == 'failure'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add AWG31-PATCH-ERROR.txt
+          git commit -m "diagnostic: record AWG31 picker patch failure"
+          git push origin HEAD:codex/awg31-client-picker
+
+      - name: Stop after patch failure
+        if: steps.patch.outcome == 'failure'
+        run: exit 1
+
       - name: Commit candidate
+        if: steps.patch.outcome == 'success'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -45,6 +67,7 @@ jobs:
           git commit -m "fix: expose AWG31 in client protocol pickers"
 
       - name: Run focused regressions
+        if: steps.patch.outcome == 'success'
         run: |
           python -m pytest -q \
             tests/test_sg_gateway_v22_awg31_client_picker.py \
@@ -52,9 +75,11 @@ jobs:
             tests/test_sg_gateway_v22_awg31_stage2_api_ui.py
 
       - name: Run full suite
+        if: steps.patch.outcome == 'success'
         run: python -m pytest -q tests
 
       - name: Finalize branch
+        if: steps.patch.outcome == 'success'
         run: |
           git reset --hard HEAD
           git rm \
