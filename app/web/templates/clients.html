@@ -10,7 +10,19 @@
 {% endblock %}
 
 {% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='sg-device-collapse-v4.css') }}?v={{ app_version }}-devices-collapse-v4-dialog-layout-v2">
 {% set awg3_runtime = runtime_engine_state('amneziawg3') if runtime_engine_state is defined else {'known': false, 'ready': true, 'missing': []} %}
+{% macro create_xray_protocol_card(profiles, profile_id) -%}
+  {% set matches = profiles | selectattr('id', 'equalto', profile_id) | list %}
+  {% if matches %}
+    {% set profile = matches[0] %}
+    {% set token = 'xray_' ~ profile.id %}
+    <label class="cv10-protocol {{ 'is-locked' if not profile.ready else '' }}">
+      <input type="checkbox" name="protocols" value="{{ token }}" {% if profile.ready and profile.id == 'reality_tcp' %}checked{% elif not profile.ready %}disabled{% endif %}>
+      <span><strong>{{ profile.title }}</strong><small>{% if profile.ready %}Отдельный профиль и QR{% elif profile.tls_required and not xray_profiles.tls_ready %}Требуется HTTPS{% elif profile.encryption_required and not profile.encryption_ready %}Сначала восстановите VLESS Encryption{% elif not profile.enabled %}Сначала включите профиль в Connections{% else %}Проверьте профиль Xray в Connections{% endif %}</small></span>
+    </label>
+  {% endif %}
+{%- endmacro %}
 <script>document.body.classList.add('clients-clarity-hotfix2');</script>
 <section class="cv2-page cv10-page cv35-page cv15-clarity-page">
   <header class="cv2-heading cv15-heading">
@@ -153,22 +165,23 @@
     <input type="hidden" name="protocols" value="sgclient">
     <fieldset class="cv10-protocols cv12-protocols">
       <legend>Каналы основного устройства</legend>
-      {% for profile in xray_profiles.profiles %}
-      {% set token = 'xray_' ~ profile.id %}
-      <label class="cv10-protocol {{ 'is-locked' if not profile.ready else '' }}">
-        <input type="checkbox" name="protocols" value="{{ token }}" {% if profile.ready and profile.id == 'reality_tcp' %}checked{% elif not profile.ready %}disabled{% endif %}>
-        <span><strong>{{ profile.title }}</strong><small>{% if profile.ready %}Отдельный профиль и QR{% elif profile.tls_required and not xray_profiles.tls_ready %}Требуется HTTPS{% elif profile.encryption_required and not profile.encryption_ready %}Сначала восстановите VLESS Encryption{% elif not profile.enabled %}Сначала включите профиль в Connections{% else %}Проверьте профиль Xray в Connections{% endif %}</small></span>
-      </label>
+      <!-- SG_PROTOCOL_ORDER_START -->
+      {% for profile_id in ['reality_tcp', 'xhttp_reality'] %}
+        {{ create_xray_protocol_card(xray_profiles.profiles, profile_id) }}
       {% endfor %}
-      <label class="cv10-protocol"><input type="checkbox" name="protocols" value="amneziawg"><span><strong>AmneziaWG 2</strong><small>AWG2 · отдельная конфигурация и QR</small></span></label>
+      <label class="cv10-protocol"><input type="checkbox" name="protocols" value="amneziawg"><span><strong>AmneziaWG 2.0</strong><small>AWG2 · отдельная конфигурация и QR</small></span></label>
       <label class="cv10-protocol {{ 'is-locked' if awg3_runtime.known and not awg3_runtime.ready else '' }}">
         <input type="checkbox" name="protocols" value="amneziawg3" {% if awg3_runtime.known and not awg3_runtime.ready %}disabled{% endif %}>
         <span><strong>AmneziaWG 3.0</strong><small>{{ 'AWG3 runtime требует восстановления в Maintenance' if awg3_runtime.known and not awg3_runtime.ready else 'AWG 3.0 userspace · отдельная конфигурация и QR' }}</small></span>
       </label>
       <label class="cv10-protocol"><input type="checkbox" name="protocols" value="amneziawg31"><span><strong>AmneziaWG 3.1</strong><small>AWG 3.1 userspace · отдельная конфигурация</small></span></label>
       <label class="cv10-protocol"><input type="checkbox" name="protocols" value="mihomo" checked><span><strong>Mieru</strong><small>Mieru-ссылка и Mihomo YAML</small></span></label>
+      {% for profile_id in ['xhttp_tls', 'hysteria2'] %}
+        {{ create_xray_protocol_card(xray_profiles.profiles, profile_id) }}
+      {% endfor %}
       <label class="cv10-protocol {{ 'is-locked' if not tls.https_ready else '' }}"><input type="checkbox" name="protocols" value="anytls" {% if not tls.https_ready %}disabled{% endif %}><span><strong>AnyTLS</strong><small>{{ 'Отдельный TLS-профиль и QR' if tls.https_ready else 'Требуется HTTPS' }}</small></span></label>
       <label class="cv10-protocol {{ 'is-locked' if not tls.https_ready else '' }}"><input type="checkbox" name="protocols" value="tuic" {% if not tls.https_ready %}disabled{% endif %}><span><strong>TUIC v5</strong><small>{{ 'Отдельный QUIC/UDP-профиль и QR' if tls.https_ready else 'Требуется HTTPS' }}</small></span></label>
+      <!-- SG_PROTOCOL_ORDER_END -->
     </fieldset>
     {% if awg3_runtime.known and not awg3_runtime.ready %}
     <div class="cv2-filter-footer" data-awg3-runtime-warning>
