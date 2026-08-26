@@ -9,7 +9,13 @@ import sqlite3
 import subprocess
 from pathlib import Path
 
-from app.connections.awg31 import DEFAULT_PARAMETERS, FIELD_NAMES, I_FIELDS, validate_parameters
+from app.connections.awg31 import (
+    DEFAULT_PARAMETERS,
+    FIELD_NAMES,
+    I_FIELDS,
+    normalize_legacy_parameters,
+    validate_parameters,
+)
 from app.maintenance.awg31_stage3a_common import DNS, ENDPOINT, ENGINE_ID, INTERFACE, NETWORK
 
 
@@ -74,50 +80,62 @@ class DataMixin:
                 }
         if not values:
             values = dict(DEFAULT_PARAMETERS)
-        return validate_parameters(values)
+        return validate_parameters(normalize_legacy_parameters(values))
 
     @staticmethod
-    def _persist_server_public_key(
-        connection: sqlite3.Connection, server_public_key: str
+    def _persist_settings(
+        connection: sqlite3.Connection,
+        settings: dict[str, str | int],
+        server_public_key: str,
     ) -> None:
         row = connection.execute(
             "SELECT config_json FROM connection_settings WHERE engine = ?", (ENGINE_ID,)
         ).fetchone()
-        if row is None:
-            payload = {
+        payload: dict[str, object] = {}
+        if row is not None:
+            try:
+                raw = json.loads(row[0] or "{}")
+            except (TypeError, ValueError, json.JSONDecodeError):
+                raw = {}
+            if isinstance(raw, dict):
+                payload = raw
+        payload.update(
+            {
+                "profile": "awg31",
+                "generation": 31,
+                "dns": DNS,
+                "transport": "udp",
                 "endpoint": ENDPOINT,
                 "server_public_key": server_public_key,
-                **{name.lower(): value for name, value in DEFAULT_PARAMETERS.items()},
+                **{name.lower(): value for name, value in settings.items()},
             }
+        )
+        serialized = json.dumps(payload, sort_keys=True)
+        if row is None:
             connection.execute(
                 """
                 INSERT INTO connection_settings(engine, enabled, host, port, config_json)
                 VALUES (?, 1, 'awg31.internal', 587, ?)
                 """,
-                (ENGINE_ID, json.dumps(payload, sort_keys=True)),
+                (ENGINE_ID, serialized),
             )
             return
-        try:
-            payload = json.loads(row[0] or "{}")
-        except (TypeError, ValueError, json.JSONDecodeError):
-            payload = {}
-        if not isinstance(payload, dict):
-            payload = {}
-        payload["endpoint"] = ENDPOINT
-        payload["server_public_key"] = server_public_key
         connection.execute(
             """
             UPDATE connection_settings
-            SET host = 'awg31.internal', port = 587, config_json = ?,
+            SET enabled = 1, host = 'awg31.internal', port = 587, config_json = ?,
                 updated_at = CURRENT_TIMESTAMP
             WHERE engine = ?
             """,
-            (json.dumps(payload, sort_keys=True), ENGINE_ID),
+            (serialized, ENGINE_ID),
         )
 
     @classmethod
-    def _insert_missing_credentials(
-        cls, connection: sqlite3.Connection, settings: dict[str, str | int]
+    def _sync_credentials(
+        cls,
+        connection: sqlite3.Connection,
+        settings: dict[str, str | int],
+        server_public_key: str,
     ) -> int:
         rows = connection.execute(
             """
@@ -127,40 +145,61 @@ class DataMixin:
             """
         ).fetchall()
         created = 0
+        shared = {
+            "profile": "awg31",
+            "engine": ENGINE_ID,
+            "dns": DNS,
+            "endpoint": ENDPOINT,
+            "transport": "udp",
+            "interface": INTERFACE,
+            "network": NETWORK,
+            "allowed_ips": "0.0.0.0/0, ::/0",
+            "persistent_keepalive": 25,
+            "generation": 31,
+            "server_public_key": server_public_key,
+            **{name.lower(): value for name, value in settings.items()},
+        }
         for device_id, device_name, is_primary, client_name in rows:
+            label = client_name if is_primary else f"{client_name} · {device_name}"
             existing = connection.execute(
-                "SELECT 1 FROM device_credentials WHERE device_id = ? AND engine = ?",
+                "SELECT id, config_json FROM device_credentials "
+                "WHERE device_id = ? AND engine = ?",
                 (device_id, ENGINE_ID),
             ).fetchone()
-            if existing is not None:
+            if existing is None:
+                private_key, public_key = cls._keypair()
+                payload = {
+                    **shared,
+                    "client_name": label,
+                    "private_key": private_key,
+                    "public_key": public_key,
+                    "address": f"10.131.0.{2 + ((int(device_id) - 1) % 253)}/32",
+                }
+                connection.execute(
+                    """
+                    INSERT INTO device_credentials(device_id, engine, status, engine_object_id, config_json)
+                    VALUES (?, ?, 'pending', ?, ?)
+                    """,
+                    (device_id, ENGINE_ID, public_key, json.dumps(payload, sort_keys=True)),
+                )
+                created += 1
                 continue
-            private_key, public_key = cls._keypair()
-            label = client_name if is_primary else f"{client_name} · {device_name}"
-            payload = {
-                "profile": "awg31",
-                "engine": ENGINE_ID,
-                "client_name": label,
-                "private_key": private_key,
-                "public_key": public_key,
-                "address": f"10.131.0.{2 + ((int(device_id) - 1) % 253)}/32",
-                "dns": DNS,
-                "endpoint": ENDPOINT,
-                "transport": "udp",
-                "interface": INTERFACE,
-                "network": NETWORK,
-                "allowed_ips": "0.0.0.0/0, ::/0",
-                "persistent_keepalive": 25,
-                "generation": 31,
-                **{name.lower(): value for name, value in settings.items()},
-            }
-            connection.execute(
-                """
-                INSERT INTO device_credentials(device_id, engine, status, engine_object_id, config_json)
-                VALUES (?, ?, 'pending', ?, ?)
-                """,
-                (device_id, ENGINE_ID, public_key, json.dumps(payload, sort_keys=True)),
-            )
-            created += 1
+
+            credential_id, config_json = existing
+            try:
+                raw_payload = json.loads(config_json or "{}")
+            except (TypeError, ValueError, json.JSONDecodeError):
+                raw_payload = {}
+            if not isinstance(raw_payload, dict):
+                raw_payload = {}
+            payload = dict(raw_payload)
+            payload.update(shared)
+            payload["client_name"] = label
+            if payload != raw_payload:
+                connection.execute(
+                    "UPDATE device_credentials SET config_json = ?, status = 'pending' WHERE id = ?",
+                    (json.dumps(payload, sort_keys=True), int(credential_id)),
+                )
         return created
 
     @staticmethod
