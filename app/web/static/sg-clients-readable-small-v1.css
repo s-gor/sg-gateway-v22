@@ -12,26 +12,3 @@
 .cv15-clarity-page .cv15-device-count small { font-size:13px; }
 .cv15-clarity-page .cv2-expiry { font-size:15px; }
 .cv15-clarity-page .cv15-no-results span { font-size:14px; }
-
-/* SG-Gateway 022.04 · unified protocol picker 3x3 on Add client. */
-html body.page-clients #cv2-dialog.cv10-dialog {
-  width:min(1180px,calc(100vw - 32px)) !important;
-  max-width:1180px !important;
-}
-html body.page-clients #cv2-dialog.cv10-dialog .cv12-protocols {
-  grid-template-columns:repeat(3,minmax(0,1fr)) !important;
-  gap:10px !important;
-}
-html body.page-clients #cv2-dialog.cv10-dialog .cv12-protocols > legend {
-  grid-column:1 / -1 !important;
-}
-@media (max-width:900px) {
-  html body.page-clients #cv2-dialog.cv10-dialog .cv12-protocols {
-    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
-  }
-}
-@media (max-width:620px) {
-  html body.page-clients #cv2-dialog.cv10-dialog .cv12-protocols {
-    grid-template-columns:1fr !important;
-  }
-}
