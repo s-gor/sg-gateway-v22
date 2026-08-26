@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import json
 import os
 import secrets
@@ -75,6 +76,10 @@ def _independent_headers() -> list[str]:
     return values
 
 
+def _header_protection_key() -> str:
+    return base64.b64encode(secrets.token_bytes(32)).decode("ascii")
+
+
 def _ensure_protocol_state():
     settings = get_settings()
     parameters = dict(settings.parameters)
@@ -82,7 +87,7 @@ def _ensure_protocol_state():
     changed = False
 
     if not header_key:
-        header_key = _run([str(AWG), "genkey"])
+        header_key = _header_protection_key()
         h1, h2, h3, h4 = _independent_headers()
         parameters.update({"H1": h1, "H2": h2, "H3": h3, "H4": h4})
         changed = True
