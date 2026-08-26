@@ -26,49 +26,57 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements-dev.txt
 
-      - name: Run focused regressions
-        id: focused
-        continue-on-error: true
+      - name: Align legacy tests with explicit AWG31 selection
         run: |
-          set -o pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          stage1 = Path('tests/test_sg_gateway_v22_awg31_stage1_core.py')
+          text = stage1.read_text(encoding='utf-8')
+          old = '"amneziawg,amneziawg3"'
+          if text.count(old) != 4:
+              raise SystemExit(f'stage1 expected 4 implicit AWG31 fixtures, found {text.count(old)}')
+          stage1.write_text(
+              text.replace(old, '"amneziawg,amneziawg3,amneziawg31"'),
+              encoding='utf-8',
+          )
+
+          dual = Path('tests/test_sg_gateway_v22_awg3_dual_contract.py')
+          text = dual.read_text(encoding='utf-8')
+          old = 'repository.create_client("Dual AWG", "amneziawg,amneziawg3")'
+          if text.count(old) != 1:
+              raise SystemExit('dual AWG fixture not found exactly once')
+          text = text.replace(
+              old,
+              'repository.create_client("Dual AWG", "amneziawg,amneziawg3,amneziawg31")',
+          )
+          text = text.replace(
+              '    assert "\'amneziawg3\'" in body\n    assert "AmneziaWG 3.1" in body',
+              '    assert "\'amneziawg3\'" in body\n    assert "\'amneziawg31\'" in body\n    assert "AmneziaWG 3.0" in body\n    assert "AmneziaWG 3.1" in body',
+          )
+          dual.write_text(text, encoding='utf-8')
+          PY
+
+      - name: Commit corrected contracts
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm -f AWG31-TEST-ERROR.txt AWG31-PATCH-ERROR.txt || true
+          git add tests
+          git diff --check --cached
+          git commit -m "test: require explicit AWG31 client selection"
+
+      - name: Run focused regressions
+        run: |
           PYTHONPATH=.:hostd python -m pytest -q \
             tests/test_sg_gateway_v22_awg31_client_picker.py \
             tests/test_sg_gateway_v22_clients_devices_ux.py \
+            tests/test_sg_gateway_v22_awg31_stage1_core.py \
             tests/test_sg_gateway_v22_awg31_stage2_api_ui.py \
-            2>&1 | tee AWG31-TEST-ERROR.txt
-
-      - name: Publish focused-test diagnostic
-        if: steps.focused.outcome == 'failure'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add AWG31-TEST-ERROR.txt
-          git commit -m "diagnostic: update AWG31 picker test failure"
-          git push origin HEAD:codex/awg31-client-picker
-
-      - name: Stop after focused-test failure
-        if: steps.focused.outcome == 'failure'
-        run: exit 1
+            tests/test_sg_gateway_v22_awg3_dual_contract.py
 
       - name: Run full suite
-        id: full
-        continue-on-error: true
-        run: |
-          set -o pipefail
-          PYTHONPATH=.:hostd python -m pytest -q tests 2>&1 | tee AWG31-TEST-ERROR.txt
-
-      - name: Publish full-test diagnostic
-        if: steps.full.outcome == 'failure'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add AWG31-TEST-ERROR.txt
-          git commit -m "diagnostic: record AWG31 full-suite failure"
-          git push origin HEAD:codex/awg31-client-picker
-
-      - name: Stop after full-test failure
-        if: steps.full.outcome == 'failure'
-        run: exit 1
+        run: PYTHONPATH=.:hostd python -m pytest -q tests
 
       - name: Finalize branch
         run: |
