@@ -503,29 +503,87 @@ columns = before_credentials["columns"]
 try:
     device_index = columns.index("device_id")
     engine_index = columns.index("engine")
+    status_index = columns.index("status")
+    config_index = columns.index("config_json")
 except ValueError as exc:
-    raise SystemExit("device_credentials lacks device_id/engine") from exc
+    raise SystemExit("device_credentials lacks device_id/engine/status/config_json") from exc
 
 before_rows = before_credentials["rows"]
 after_rows = after_credentials["rows"]
-remaining = Counter(json.dumps(row, sort_keys=True, separators=(",", ":")) for row in after_rows)
-for row in before_rows:
-    key = json.dumps(row, sort_keys=True, separators=(",", ":"))
-    if remaining[key] < 1:
-        raise SystemExit("an existing credential changed or was removed during Update")
-    remaining[key] -= 1
 
-added = []
-for key, count in remaining.items():
-    added.extend([json.loads(key)] * count)
+def rows_by_pair(rows, label):
+    result = {}
+    for row in rows:
+        pair = (decode(row[device_index]), decode(row[engine_index]))
+        if pair in result:
+            raise SystemExit(f"duplicate device credential records detected in {label}")
+        result[pair] = row
+    return result
+
+before_by_pair = rows_by_pair(before_rows, "pre-update state")
+after_by_pair = rows_by_pair(after_rows, "post-update state")
+allowed_awg31_config_changes = {
+    "profile", "engine", "client_name", "dns", "endpoint", "transport",
+    "interface", "network", "allowed_ips", "persistent_keepalive",
+    "generation", "server_public_key",
+    "i1", "i2", "i3", "i4", "i5",
+    "jc", "jmin", "jmax", "s1", "s2", "s3", "s4",
+    "h1", "h2", "h3", "h4",
+}
+updated_awg31 = 0
+missing = object()
+
+for pair, before_row in before_by_pair.items():
+    after_row = after_by_pair.get(pair)
+    if after_row is None:
+        raise SystemExit("an existing credential was removed during Update")
+    if after_row == before_row:
+        continue
+
+    device_id, engine = pair
+    if engine != "amneziawg31":
+        raise SystemExit("an existing non-AWG31 credential changed during Update")
+
+    for index, column in enumerate(columns):
+        if column in {"status", "config_json"}:
+            continue
+        if after_row[index] != before_row[index]:
+            raise SystemExit(
+                f"protected AWG31 credential field changed during Update: {column}"
+            )
+
+    try:
+        before_config = json.loads(decode(before_row[config_index]) or "{}")
+        after_config = json.loads(decode(after_row[config_index]) or "{}")
+    except (TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise SystemExit("existing AWG31 credential config_json is invalid") from exc
+    if not isinstance(before_config, dict) or not isinstance(after_config, dict):
+        raise SystemExit("existing AWG31 credential config_json must be an object")
+
+    for key in set(before_config) | set(after_config):
+        if key.lower() in allowed_awg31_config_changes:
+            continue
+        if before_config.get(key, missing) != after_config.get(key, missing):
+            raise SystemExit(
+                f"protected AWG31 credential config field changed during Update: {key}"
+            )
+
+    before_status = decode(before_row[status_index])
+    after_status = decode(after_row[status_index])
+    if before_status != after_status and after_status != "pending":
+        raise SystemExit("existing AWG31 credential received an unsafe status transition")
+    updated_awg31 += 1
+
+added = [
+    after_by_pair[pair]
+    for pair in after_by_pair.keys() - before_by_pair.keys()
+]
 
 device_table = before["tables"]["devices"]
 device_columns = device_table["columns"]
 device_id_index = device_columns.index("id")
 device_ids = {decode(row[device_id_index]) for row in device_table["rows"]}
-before_pairs = {
-    (decode(row[device_index]), decode(row[engine_index])) for row in before_rows
-}
+before_pairs = set(before_by_pair)
 for row in added:
     device_id = decode(row[device_index])
     engine = decode(row[engine_index])
@@ -534,16 +592,16 @@ for row in added:
     if (device_id, engine) in before_pairs:
         raise SystemExit("Update duplicated an existing AWG31 credential")
 
-after_pairs = [
-    (decode(row[device_index]), decode(row[engine_index])) for row in after_rows
-]
-if len(after_pairs) != len(set(after_pairs)):
-    raise SystemExit("duplicate device credential records detected after Update")
-awg31_devices = {device_id for device_id, engine in after_pairs if engine == "amneziawg31"}
+awg31_devices = {
+    device_id for device_id, engine in after_by_pair if engine == "amneziawg31"
+}
 if awg31_devices != device_ids:
     raise SystemExit("AWG31 migration did not create exactly one credential for every existing device")
 
-print(f"Credentials transition: preserved={len(before_rows)} added_awg31={len(added)}")
+print(
+    f"Credentials transition: preserved={len(before_rows)} "
+    f"added_awg31={len(added)} updated_awg31={updated_awg31}"
+)
 PYCREDENTIALVERIFY
 }
 

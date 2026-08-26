@@ -427,7 +427,16 @@ def test_public_update_is_atomic_credentials_safe_and_idempotent(tmp_path: Path)
     assert _credential_rows(database, ("amneziawg", "amneziawg3")) == legacy_before
     awg31_after_first = _credential_rows(database, ("amneziawg31",))
     assert len(awg31_after_first) == 2
-    assert awg31_after_first[0] == awg31_existing_before[0]
+    before_existing = awg31_existing_before[0]
+    after_existing = awg31_after_first[0]
+    assert after_existing[:3] == before_existing[:3]
+    assert after_existing[4] == before_existing[4]
+    assert after_existing[6:] == before_existing[6:]
+    before_config = json.loads(before_existing[5])
+    after_config = json.loads(after_existing[5])
+    for protected in ("private_key", "public_key", "address"):
+        assert after_config[protected] == before_config[protected]
+    assert after_config["server_public_key"]
     assert (server_root / "etc/amnezia/amneziawg/awg0.conf").read_bytes() == preserved_runtime_before["awg2_config"]
     assert (server_root / "etc/amnezia/amneziawg/awg3.conf").read_bytes() == preserved_runtime_before["awg3_config"]
     assert _tree_digest(prefix / "awg3") == preserved_runtime_before["awg3_runtime"]
