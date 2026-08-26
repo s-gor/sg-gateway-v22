@@ -153,6 +153,7 @@ def _tagged_junk(name: str, value: object) -> tuple[str, int]:
 
 
 def validate_parameters(values: Mapping[str, object]) -> dict[str, str | int]:
+    values = normalize_legacy_parameters(values)
     unknown = set(values) - set(FIELD_NAMES)
     if unknown:
         raise Awg31ValidationError("Unknown AWG31 fields: " + ", ".join(sorted(unknown)))
@@ -236,7 +237,7 @@ def get_settings() -> Awg31Settings:
     except (TypeError, ValueError, json.JSONDecodeError):
         config = {}
     raw = {name: config.get(name.lower(), DEFAULT_PARAMETERS[name]) for name in FIELD_NAMES}
-    parameters = validate_parameters(normalize_legacy_parameters(raw))
+    parameters = validate_parameters(raw)
     return Awg31Settings(
         parameters=parameters,
         server_public_key=str(config.get("server_public_key") or ""),
