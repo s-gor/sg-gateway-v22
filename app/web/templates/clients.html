@@ -170,8 +170,9 @@
       <label class="cv10-protocol"><input type="checkbox" name="protocols" value="amneziawg"><span><strong>AmneziaWG 2</strong><small>AWG2 · отдельная конфигурация и QR</small></span></label>
       <label class="cv10-protocol {{ 'is-locked' if awg3_runtime.known and not awg3_runtime.ready else '' }}">
         <input type="checkbox" name="protocols" value="amneziawg3" {% if awg3_runtime.known and not awg3_runtime.ready %}disabled{% endif %}>
-        <span><strong>AmneziaWG 3</strong><small>{{ 'AWG3 runtime требует восстановления в Maintenance' if awg3_runtime.known and not awg3_runtime.ready else 'AWG3 userspace · отдельная конфигурация и QR' }}</small></span>
+        <span><strong>AmneziaWG 3.0</strong><small>{{ 'AWG3 runtime требует восстановления в Maintenance' if awg3_runtime.known and not awg3_runtime.ready else 'AWG 3.0 userspace · отдельная конфигурация и QR' }}</small></span>
       </label>
+      <label class="cv10-protocol"><input type="checkbox" name="protocols" value="amneziawg31"><span><strong>AmneziaWG 3.1</strong><small>AWG 3.1 userspace · отдельная конфигурация</small></span></label>
       <label class="cv10-protocol"><input type="checkbox" name="protocols" value="mihomo" checked><span><strong>Mieru</strong><small>Mieru-ссылка и Mihomo YAML</small></span></label>
       <label class="cv10-protocol {{ 'is-locked' if not tls.https_ready else '' }}"><input type="checkbox" name="protocols" value="anytls" {% if not tls.https_ready %}disabled{% endif %}><span><strong>AnyTLS</strong><small>{{ 'Отдельный TLS-профиль и QR' if tls.https_ready else 'Требуется HTTPS' }}</small></span></label>
       <label class="cv10-protocol {{ 'is-locked' if not tls.https_ready else '' }}"><input type="checkbox" name="protocols" value="tuic" {% if not tls.https_ready %}disabled{% endif %}><span><strong>TUIC v5</strong><small>{{ 'Отдельный QUIC/UDP-профиль и QR' if tls.https_ready else 'Требуется HTTPS' }}</small></span></label>

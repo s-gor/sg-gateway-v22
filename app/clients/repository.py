@@ -16,6 +16,7 @@ PRIMARY_DEVICE_NAME = "Основной доступ"
 SUPPORTED_ENGINES = (
     "amneziawg",
     "amneziawg3",
+    "amneziawg31",
     "xray",
     "mihomo",
     "anytls",
@@ -184,7 +185,7 @@ def _parse_access(access: str) -> tuple[list[str], list[str], list[str]]:
     aliases = {
         "recommended": "xray_xhttp_reality,sgclient",
         "full": (
-            "amneziawg,amneziawg3,xray_reality_tcp,xray_xhttp_reality,"
+            "amneziawg,amneziawg3,amneziawg31,xray_reality_tcp,xray_xhttp_reality,"
             "xray_xhttp_tls,xray_hysteria2,sgclient"
         ),
         "xray": "xray_reality_tcp,xray_xhttp_reality",
@@ -255,7 +256,7 @@ def _create_device_rows(
     device_id = int(cursor.lastrowid)
     access_label = client_name if is_primary else f"{client_name} · {device_name}"
 
-    for engine in [*engines, "amneziawg31"]:
+    for engine in engines:
         if engine == "amneziawg31":
             from app.clients.awg31_lifecycle import build_credential_payload
             from app.connections.awg31 import DEFAULT_PARAMETERS, FIELD_NAMES, validate_parameters
@@ -624,7 +625,7 @@ def _sync_device_access(
         (device_id,),
     ).fetchall()
     existing = {str(row["engine"]): row for row in rows}
-    wanted = set(engines) | {"amneziawg31"}
+    wanted = set(engines)
 
     for engine, row in existing.items():
         if engine not in wanted:
@@ -633,7 +634,7 @@ def _sync_device_access(
             )
 
     label = client_name if is_primary else f"{client_name} · {device_name}"
-    for engine in [*engines, "amneziawg31"]:
+    for engine in engines:
         row = existing.get(engine)
         if row is not None:
             config_json = _credential_label_payload(

@@ -219,7 +219,7 @@ def test_server_and_peer_configs_contain_every_awg31_parameter(
     from app.connections.awg31 import save_settings
 
     save_settings(VALID_PARAMETERS)
-    client_id = repository.create_client("Stage 2", "amneziawg,amneziawg3")
+    client_id = repository.create_client("Stage 2", "amneziawg,amneziawg3,amneziawg31")
     assert client_id is not None
     device_id = _primary_device(client_id)
 
@@ -248,7 +248,7 @@ def test_awg31_config_and_uri_exports_are_profile_specific(isolated_stage2) -> N
 
     save_settings(VALID_PARAMETERS)
     set_server_public_key(SERVER_PUBLIC_KEY)
-    client_id = repository.create_client("Export 31", "amneziawg,amneziawg3")
+    client_id = repository.create_client("Export 31", "amneziawg,amneziawg3,amneziawg31")
     assert client_id is not None
     device_id = _primary_device(client_id)
     with db.connect() as connection:
@@ -398,7 +398,7 @@ def test_empty_i_fields_are_omitted_and_filled_configs_pass_real_awg31_parser(
     from app.clients.exports import build_awg31_config
     from app.connections.awg31 import DEFAULT_PARAMETERS, save_settings
 
-    client_id = repository.create_client("Parser 31", "amneziawg,amneziawg3")
+    client_id = repository.create_client("Parser 31", "amneziawg,amneziawg3,amneziawg31")
     assert client_id is not None
     device_id = _primary_device(client_id)
     root = tmp_path / "rendered"
@@ -463,7 +463,7 @@ def test_awg31_uri_consumer_round_trips_complete_configuration(isolated_stage2) 
 
     save_settings(VALID_PARAMETERS)
     set_server_public_key(SERVER_PUBLIC_KEY)
-    client_id = repository.create_client("URI 31", "amneziawg,amneziawg3")
+    client_id = repository.create_client("URI 31", "amneziawg,amneziawg3,amneziawg31")
     assert client_id is not None
     device_id = _primary_device(client_id)
     client = repository.get_client(client_id)

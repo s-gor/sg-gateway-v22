@@ -32,7 +32,12 @@
       {% set awg3_selected = 'amneziawg3' in primary_tokens %}
       <label class="dv16-protocol {{ 'is-locked' if awg3_runtime.known and not awg3_runtime.ready and not awg3_selected else '' }}">
         <input type="checkbox" name="protocols" value="amneziawg3" {% if awg3_selected %}checked{% endif %} {% if awg3_runtime.known and not awg3_runtime.ready and not awg3_selected %}disabled{% endif %}>
-        <span><strong>AmneziaWG 3</strong><small>{% if awg3_selected %}Подключён — существующие credentials сохраняются{% elif awg3_runtime.known and not awg3_runtime.ready %}Runtime требует восстановления в Maintenance{% else %}AWG3 userspace · конфигурация и QR{% endif %}</small></span>
+        <span><strong>AmneziaWG 3.0</strong><small>{% if awg3_selected %}Подключён — существующие credentials сохраняются{% elif awg3_runtime.known and not awg3_runtime.ready %}Runtime требует восстановления в Maintenance{% else %}AWG 3.0 userspace · конфигурация и QR{% endif %}</small></span>
+      </label>
+      {% set awg31_selected = 'amneziawg31' in primary_tokens %}
+      <label class="dv16-protocol">
+        <input type="checkbox" name="protocols" value="amneziawg31" {% if awg31_selected %}checked{% endif %}>
+        <span><strong>AmneziaWG 3.1</strong><small>{{ 'Подключён — существующие credentials сохраняются' if awg31_selected else 'AWG 3.1 userspace · конфигурация' }}</small></span>
       </label>
       {% set anytls_selected = 'anytls' in primary_tokens %}
       <label class="dv16-protocol {{ 'is-locked' if not tls.https_ready and not anytls_selected else '' }}"><input type="checkbox" name="protocols" value="anytls" {% if anytls_selected %}checked{% endif %} {% if not tls.https_ready and not anytls_selected %}disabled{% endif %}><span><strong>AnyTLS</strong><small>{{ 'Подключён — пароль сохранится' if anytls_selected else ('Доступен' if tls.https_ready else 'Нужен HTTPS') }}</small></span></label>
@@ -82,7 +87,12 @@
       {% set device_awg3_selected = 'amneziawg3' in selected_tokens %}
       <label class="dv16-protocol {{ 'is-locked' if awg3_runtime.known and not awg3_runtime.ready and not device_awg3_selected else '' }}">
         <input type="checkbox" name="protocols" value="amneziawg3" {% if device_awg3_selected %}checked{% endif %} {% if awg3_runtime.known and not awg3_runtime.ready and not device_awg3_selected %}disabled{% endif %}>
-        <span><strong>AmneziaWG 3</strong><small>{% if device_awg3_selected %}Подключён — существующие credentials сохраняются{% elif awg3_runtime.known and not awg3_runtime.ready %}Runtime требует восстановления в Maintenance{% else %}AWG3 userspace · конфигурация и QR{% endif %}</small></span>
+        <span><strong>AmneziaWG 3.0</strong><small>{% if device_awg3_selected %}Подключён — существующие credentials сохраняются{% elif awg3_runtime.known and not awg3_runtime.ready %}Runtime требует восстановления в Maintenance{% else %}AWG 3.0 userspace · конфигурация и QR{% endif %}</small></span>
+      </label>
+      {% set device_awg31_selected = 'amneziawg31' in selected_tokens %}
+      <label class="dv16-protocol">
+        <input type="checkbox" name="protocols" value="amneziawg31" {% if device_awg31_selected %}checked{% endif %}>
+        <span><strong>AmneziaWG 3.1</strong><small>{{ 'Подключён — существующие credentials сохраняются' if device_awg31_selected else 'AWG 3.1 userspace · конфигурация' }}</small></span>
       </label>
       {% set anytls_selected = 'anytls' in selected_tokens %}
       <label class="dv16-protocol {{ 'is-locked' if not tls.https_ready and not anytls_selected else '' }}"><input type="checkbox" name="protocols" value="anytls" {% if anytls_selected %}checked{% endif %} {% if not tls.https_ready and not anytls_selected %}disabled{% endif %}><span><strong>AnyTLS</strong><small>{{ 'Подключён — пароль сохранится' if anytls_selected else ('Доступен' if tls.https_ready else 'Нужен HTTPS') }}</small></span></label>
