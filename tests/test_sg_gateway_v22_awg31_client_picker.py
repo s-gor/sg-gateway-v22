@@ -72,3 +72,19 @@ def test_all_client_protocol_pickers_use_two_rows_of_five_on_desktop() -> None:
     assert "#cv2-dialog .cv12-protocols" in css
     assert ".dv16-dialog .dv16-protocol-list" in css
     assert "grid-template-columns: repeat(5, minmax(0, 1fr)) !important;" in css
+
+
+def test_new_client_picker_uses_one_external_responsive_grid_contract() -> None:
+    clients = (ROOT / "app/web/templates/clients.html").read_text(encoding="utf-8")
+    css = (ROOT / "app/web/static/sg-device-collapse-v4.css").read_text(encoding="utf-8")
+
+    assert 'id="sg-0217-client-protocol-grid"' not in clients
+    assert "SG_NEW_CLIENT_PROTOCOL_PICKER_RESPONSIVE_V1" in css
+    assert "@media (min-width: 981px)" in css
+    assert "html body.page-clients #cv2-dialog .cv12-protocols" in css
+    assert "grid-template-columns: repeat(5, minmax(0, 1fr)) !important;" in css
+    assert "@media (min-width: 721px) and (max-width: 980px)" in css
+    assert "grid-template-columns: repeat(2, minmax(0, 1fr)) !important;" in css
+    assert "@media (max-width: 720px)" in css
+    assert "grid-template-columns: 1fr !important;" in css
+    assert "height: 100% !important;" in css

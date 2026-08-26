@@ -7,13 +7,6 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='sg-clients-runtime-v10.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='sg-preview35-clients.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='sg-clients-readable-small-v1.css') }}">
-  <style id="sg-0217-client-protocol-grid">
-    #cv2-dialog.cv10-dialog { width: min(1180px, calc(100vw - 32px)); max-width: 1180px; }
-    #cv2-dialog .cv12-protocols { display: grid !important; grid-template-columns: repeat(4, minmax(0, 1fr)) !important; gap: 10px !important; }
-    #cv2-dialog .cv12-protocols > legend { grid-column: 1 / -1; }
-    @media (max-width: 980px) { #cv2-dialog .cv12-protocols { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; } }
-    @media (max-width: 620px) { #cv2-dialog .cv12-protocols { grid-template-columns: 1fr !important; } }
-  </style>
 {% endblock %}
 
 {% block content %}
