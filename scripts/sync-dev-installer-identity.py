@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-import hashlib
 import re
-import subprocess
 import sys
 from pathlib import Path
 
@@ -11,7 +9,6 @@ ROOT = Path(__file__).resolve().parents[1]
 VERSION_FILE = ROOT / "VERSION"
 INSTALLER = ROOT / "install.sh"
 UNINSTALLER = ROOT / "deploy" / "full-uninstall-ubuntu.sh"
-SOURCE_SUMS = ROOT / "SOURCE-SHA256SUMS"
 AWG3_HELPER_CHMOD = 'chmod 0755 "$PREFIX/deploy/sg-gateway-awg3-userspace.sh"'
 
 
@@ -136,18 +133,6 @@ def normalized_uninstaller(text: str, version: str, token: str) -> str:
     return text
 
 
-def refresh_source_integrity() -> None:
-    tracked = subprocess.check_output(
-        ["git", "ls-files"],
-        cwd=ROOT,
-        text=True,
-        encoding="utf-8",
-    ).splitlines()
-    tracked = [path for path in tracked if path != SOURCE_SUMS.name]
-    rows = [f"{hashlib.sha256((ROOT / path).read_bytes()).hexdigest()}  {path}" for path in tracked]
-    SOURCE_SUMS.write_text("\n".join(rows) + "\n", encoding="utf-8", newline="\n")
-
-
 def main() -> int:
     check_only = sys.argv[1:] == ["--check"]
     if sys.argv[1:] not in ([], ["--check"]):
@@ -174,13 +159,11 @@ def main() -> int:
 
     for path in changed:
         path.write_text(updated[path], encoding="utf-8", newline="\n")
-    refresh_source_integrity()
     if changed:
         names = ", ".join(path.relative_to(ROOT).as_posix() for path in changed)
         print(f"Deploy identity synchronized to {version}: {names}")
     else:
         print(f"Deploy identity already synchronized to {version}")
-    print("Source integrity inventory refreshed")
     return 0
 
 
