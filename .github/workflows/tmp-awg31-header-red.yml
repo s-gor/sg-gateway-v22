@@ -5,7 +5,7 @@ on:
     branches: [codex/awg31-nonoverlap-defaults]
 
 permissions:
-  contents: read
+  contents: write
 
 env:
   PYTHONPATH: ${{ github.workspace }}/hostd:${{ github.workspace }}/engines
@@ -15,6 +15,21 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+      - name: Patch AWG31 database seed
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("app/db.py")
+          content = path.read_text(encoding="utf-8")
+          old = '\"h1\":\"0\",\"h2\":\"0\",\"h3\":\"0\",\"h4\":\"0\"'
+          new = '\"h1\":\"1\",\"h2\":\"2\",\"h3\":\"3\",\"h4\":\"4\"'
+          count = content.count(old)
+          if count not in {0, 1}:
+              raise SystemExit(f"unexpected AWG31 seed match count: {count}")
+          if count == 1:
+              path.write_text(content.replace(old, new), encoding="utf-8")
+          PY
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -26,3 +41,14 @@ jobs:
             tests/test_sg_gateway_v22_awg31_stage2_api_ui.py \
             tests/test_sg_gateway_v22_awg31_stage3a_install_update.py \
             tests/test_sg_gateway_v22_awg31_preserve_existing_awg3.py
+      - run: git diff --check
+      - name: Commit safe database seed
+        run: |
+          if git diff --quiet -- app/db.py; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/db.py
+          git commit -m "fix: seed safe AWG31 header values"
+          git push
