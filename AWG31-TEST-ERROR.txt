@@ -1,0 +1,48 @@
+..........................F.F..F                                         [100%]
+=================================== FAILURES ===================================
+__________ test_server_and_peer_configs_contain_every_awg31_parameter __________
+
+isolated_stage2 = PosixPath('/tmp/pytest-of-runner/pytest-0/test_server_and_peer_configs_c0/sg-gateway.sqlite')
+tmp_path = PosixPath('/tmp/pytest-of-runner/pytest-0/test_server_and_peer_configs_c0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fa1176cddc0>
+
+    def test_server_and_peer_configs_contain_every_awg31_parameter(
+        isolated_stage2,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+>       from sg_hostd import awg31_runtime
+E       ModuleNotFoundError: No module named 'sg_hostd'
+
+tests/test_sg_gateway_v22_awg31_stage2_api_ui.py:217: ModuleNotFoundError
+__ test_empty_i_fields_are_omitted_and_filled_configs_pass_real_awg31_parser ___
+
+isolated_stage2 = PosixPath('/tmp/pytest-of-runner/pytest-0/test_empty_i_fields_are_omitte0/sg-gateway.sqlite')
+tmp_path = PosixPath('/tmp/pytest-of-runner/pytest-0/test_empty_i_fields_are_omitte0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fa1176b03b0>
+
+    def test_empty_i_fields_are_omitted_and_filled_configs_pass_real_awg31_parser(
+        isolated_stage2,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+>       from sg_hostd import awg31_runtime
+E       ModuleNotFoundError: No module named 'sg_hostd'
+
+tests/test_sg_gateway_v22_awg31_stage2_api_ui.py:396: ModuleNotFoundError
+______________ test_hostd_awg31_actions_target_dedicated_service _______________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fa1176344d0>
+
+    def test_hostd_awg31_actions_target_dedicated_service(
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+>       from sg_hostd import awg31_runtime, commands
+E       ModuleNotFoundError: No module named 'sg_hostd'
+
+tests/test_sg_gateway_v22_awg31_stage2_api_ui.py:530: ModuleNotFoundError
+=========================== short test summary info ============================
+FAILED tests/test_sg_gateway_v22_awg31_stage2_api_ui.py::test_server_and_peer_configs_contain_every_awg31_parameter - ModuleNotFoundError: No module named 'sg_hostd'
+FAILED tests/test_sg_gateway_v22_awg31_stage2_api_ui.py::test_empty_i_fields_are_omitted_and_filled_configs_pass_real_awg31_parser - ModuleNotFoundError: No module named 'sg_hostd'
+FAILED tests/test_sg_gateway_v22_awg31_stage2_api_ui.py::test_hostd_awg31_actions_target_dedicated_service - ModuleNotFoundError: No module named 'sg_hostd'
+3 failed, 29 passed in 1.35s
