@@ -37,6 +37,8 @@ jobs:
         run: |
           cat .github/awg-finalizer-payload/part-* | base64 -d > /tmp/awg-finalizer-payload.tar.gz
           tar -xzf /tmp/awg-finalizer-payload.tar.gz
+          python .github/awg-finalizer-adjust.py
+          python -m py_compile scripts/_awg_verified_finalizer.py
 
       - name: Apply and verify tested server state
         run: python scripts/_awg_verified_finalizer.py
@@ -50,6 +52,7 @@ jobs:
         run: |
           rm -rf .github/awg-finalizer-payload
           rm -f \
+            .github/awg-finalizer-adjust.py \
             .github/workflows/awg-verified-finalize-once.yml \
             scripts/_awg_initial_verified_patcher.py \
             scripts/_awg31_v31_verified_patcher.py \
