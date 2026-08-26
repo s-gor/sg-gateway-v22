@@ -100,7 +100,7 @@ def test_awg31_contract_is_fixed_udp_only() -> None:
 
 
 def test_client_create_update_and_awg31_delete_are_isolated(isolated_clients) -> None:
-    client_id = repository.create_client("Alpha", "amneziawg,amneziawg3")
+    client_id = repository.create_client("Alpha", "amneziawg,amneziawg3,amneziawg31")
     assert client_id is not None
     device_id = _primary_device(client_id)
     before = _credentials(device_id)
@@ -110,7 +110,7 @@ def test_client_create_update_and_awg31_delete_are_isolated(isolated_clients) ->
     assert awg31_before["transport"] == "udp"
     assert awg31_before["address"].startswith("10.131.0.")
 
-    assert repository.update_client(client_id, "Alpha Updated", None, "amneziawg,amneziawg3")
+    assert repository.update_client(client_id, "Alpha Updated", None, "amneziawg,amneziawg3,amneziawg31")
     updated = _credentials(device_id)
     assert updated["amneziawg31"]["client_name"] == "Alpha Updated"
     assert updated["amneziawg31"]["private_key"] == awg31_before["private_key"]
@@ -130,7 +130,7 @@ def test_client_create_update_and_awg31_delete_are_isolated(isolated_clients) ->
 
 
 def test_client_delete_cascades_its_awg31_peer(isolated_clients) -> None:
-    client_id = repository.create_client("Delete Me", "amneziawg,amneziawg3")
+    client_id = repository.create_client("Delete Me", "amneziawg,amneziawg3,amneziawg31")
     assert client_id is not None
     device_id = _primary_device(client_id)
     assert "amneziawg31" in _credentials(device_id)
@@ -146,7 +146,7 @@ def test_client_delete_cascades_its_awg31_peer(isolated_clients) -> None:
 def test_awg31_renders_separate_server_and_peer_configs(
     isolated_clients, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    client_id = repository.create_client("Runtime", "amneziawg,amneziawg3")
+    client_id = repository.create_client("Runtime", "amneziawg,amneziawg3,amneziawg31")
     assert client_id is not None
     device_id = _primary_device(client_id)
 
