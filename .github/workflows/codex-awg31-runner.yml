@@ -32,14 +32,17 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          import textwrap
           import traceback
 
           try:
               source = Path('.github/workflows/codex-awg31-client-picker.yml').read_text(encoding='utf-8')
               marker = "          python3 - <<'PY'\n"
               body = source.split(marker, 1)[1].split("\n          PY\n", 1)[0]
-              exec(compile(textwrap.dedent(body), 'awg31-picker-patch', 'exec'), {})
+              body = '\n'.join(
+                  line[10:] if line.startswith('          ') else line
+                  for line in body.splitlines()
+              )
+              exec(compile(body, 'awg31-picker-patch', 'exec'), {})
           except BaseException:
               Path('AWG31-PATCH-ERROR.txt').write_text(traceback.format_exc(), encoding='utf-8')
               raise
@@ -63,6 +66,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm -f AWG31-PATCH-ERROR.txt || true
           git add app tests
           git commit -m "fix: expose AWG31 in client protocol pickers"
 
