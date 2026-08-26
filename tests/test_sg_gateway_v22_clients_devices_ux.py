@@ -6,17 +6,19 @@ COLLAPSE = ROOT / 'app/web/static/sg-device-collapse-v4.css'
 LIST_CSS = ROOT / 'app/web/static/sg-clients-readable-small-v1.css'
 DEVICE_CSS = ROOT / 'app/web/static/sg-devices-v46.css'
 
-def test_protocol_picker_is_unified_for_current_eight_protocols_only() -> None:
+def test_protocol_picker_distinguishes_awg30_and_awg31() -> None:
     body = JS.read_text(encoding='utf-8')
-    expected = ['xray_reality_tcp','xray_xhttp_reality','xray_xhttp_tls','xray_hysteria2','amneziawg','amneziawg3','mihomo','anytls','tuic']
+    expected = ['xray_reality_tcp','xray_xhttp_reality','xray_xhttp_tls','xray_hysteria2','amneziawg','amneziawg3','amneziawg31','mihomo','anytls','tuic']
     for value in expected:
         assert f"'{value}'" in body
     assert 'protocolOrder' in body
     assert 'normalizeProtocolPickers()' in body
     assert 'picker.open = true' in body
     assert "setLabelTitle(byValue.get('amneziawg'), 'AmneziaWG 2.0')" in body
-    assert "setLabelTitle(byValue.get('amneziawg3'), 'AmneziaWG 3.1')" in body
+    assert "setLabelTitle(byValue.get('amneziawg3'), 'AmneziaWG 3.0')" in body
+    assert "setLabelTitle(byValue.get('amneziawg31'), 'AmneziaWG 3.1')" in body
     assert "setAvailableNote(byValue.get('amneziawg3'), 'UDP 586 · userspace-конфигурация и QR')" in body
+    assert "setAvailableNote(byValue.get('amneziawg31'), 'UDP 587 · userspace-конфигурация')" in body
 
 def test_device_cards_start_collapsed_without_layout_jump() -> None:
     js = JS.read_text(encoding='utf-8')

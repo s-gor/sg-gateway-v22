@@ -19,7 +19,7 @@ def test_awg2_and_awg3_are_independent_device_credentials(tmp_path, monkeypatch)
     assert get_connection_settings("amneziawg").port == 585
     assert get_connection_settings("amneziawg3").port == 586
 
-    client_id = repository.create_client("Dual AWG", "amneziawg,amneziawg3")
+    client_id = repository.create_client("Dual AWG", "amneziawg,amneziawg3,amneziawg31")
     assert client_id
     device = repository.get_primary_device(client_id)
     assert device is not None
@@ -92,5 +92,7 @@ def test_client_dataclass_keeps_pre_awg3_constructor_compatible():
 def test_device_picker_orders_both_awg_generations():
     body = Path("app/web/static/sg-device-collapse-v1.js").read_text(encoding="utf-8")
     assert "'amneziawg3'" in body
+    assert "'amneziawg31'" in body
+    assert "AmneziaWG 3.0" in body
     assert "AmneziaWG 3.1" in body
     assert "UDP 586 · userspace-конфигурация и QR" in body

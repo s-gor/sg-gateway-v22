@@ -10,6 +10,7 @@
     'xray_hysteria2',
     'amneziawg',
     'amneziawg3',
+    'amneziawg31',
     'mihomo',
     'anytls',
     'tuic'
@@ -45,7 +46,8 @@
     });
 
     setLabelTitle(byValue.get('amneziawg'), 'AmneziaWG 2.0');
-    setLabelTitle(byValue.get('amneziawg3'), 'AmneziaWG 3.1');
+    setLabelTitle(byValue.get('amneziawg3'), 'AmneziaWG 3.0');
+    setLabelTitle(byValue.get('amneziawg31'), 'AmneziaWG 3.1');
 
     if (addMode) {
       setAvailableNote(byValue.get('xray_reality_tcp'), 'Отдельный профиль и QR');
@@ -54,6 +56,7 @@
       setAvailableNote(byValue.get('xray_hysteria2'), 'Отдельный профиль и QR');
       setAvailableNote(byValue.get('amneziawg'), 'UDP 585 · отдельная конфигурация и QR');
       setAvailableNote(byValue.get('amneziawg3'), 'UDP 586 · userspace-конфигурация и QR');
+      setAvailableNote(byValue.get('amneziawg31'), 'UDP 587 · userspace-конфигурация');
       setAvailableNote(byValue.get('mihomo'), 'Mieru-ссылка, Router / ZB и JSON для iPhone');
       setAvailableNote(byValue.get('anytls'), 'Отдельный TLS-профиль и QR');
       setAvailableNote(byValue.get('tuic'), 'Отдельный QUIC/UDP-профиль и QR');
