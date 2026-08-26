@@ -1,0 +1,19 @@
+name: Temporary AWG31 Header Regression
+
+on:
+  push:
+    branches: [codex/awg31-nonoverlap-defaults]
+
+permissions:
+  contents: read
+
+jobs:
+  focused:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -r requirements-dev.txt
+      - run: python -m pytest -q tests/test_sg_gateway_v22_awg31_header_ranges.py
