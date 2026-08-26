@@ -128,7 +128,7 @@ def build_access_cards(
             cards.append(
                 AccessCard(
                     kind="amneziawg",
-                    title="AmneziaWG 2",
+                    title="AmneziaWG 2.0",
                     status=status,
                     description="Полная AWG-конфигурация с параметрами маскировки.",
                     primary_action="Скачать конфигурацию",
@@ -143,7 +143,7 @@ def build_access_cards(
                     client,
                     device,
                     kind="amneziawg",
-                    title="AmneziaWG 2",
+                    title="AmneziaWG 2.0",
                     exc=exc,
                 )
             )
@@ -156,9 +156,9 @@ def build_access_cards(
             cards.append(
                 AccessCard(
                     kind="amneziawg3",
-                    title="AmneziaWG 3",
+                    title="AmneziaWG 3.0",
                     status=status,
-                    description="Отдельный AWG3 userspace-профиль с параметрами 3.0.",
+                    description="Отдельный AmneziaWG 3.0 профиль с расширенными параметрами.",
                     primary_action="Скачать конфигурацию",
                     export_url=export_url,
                     qr_url=qr_url,
@@ -171,7 +171,7 @@ def build_access_cards(
                     client,
                     device,
                     kind="amneziawg3",
-                    title="AmneziaWG 3",
+                    title="AmneziaWG 3.0",
                     exc=exc,
                 )
             )
@@ -180,23 +180,20 @@ def build_access_cards(
     if awg31 is not None:
         try:
             status = _status(client, device, awg31)
-            export_url, _ = _urls(client, device, "amneziawg31")
-            uri_url, _ = _urls(client, device, "amneziawg31-uri")
+            export_url, qr_url = _urls(client, device, "amneziawg31")
             cards.append(
                 AccessCard(
                     kind="amneziawg31",
                     title="AmneziaWG 3.1",
                     status=status,
-                    description="Независимый AWG31-профиль на awg31.internal:587/UDP.",
+                    description="Независимый AmneziaWG 3.1 профиль на UDP 587.",
                     primary_action="Скачать конфигурацию",
                     export_url=export_url,
-                    qr_url="",
+                    qr_url=qr_url,
                     payload=build_awg31_config(client, device).body
                     if status == "applied"
                     else "",
-                    show_qr=False,
-                    tertiary_url=uri_url,
-                    tertiary_label="Скачать URI",
+                    show_qr=True,
                 )
             )
         except Exception as exc:
