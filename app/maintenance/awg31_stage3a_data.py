@@ -10,10 +10,15 @@ import subprocess
 from pathlib import Path
 
 from app.connections.awg31 import (
+    BOOL_FIELDS,
     DEFAULT_PARAMETERS,
     FIELD_NAMES,
+    H_FIELDS,
     I_FIELDS,
-    normalize_legacy_parameters,
+    J_FIELDS,
+    RANGE_FIELDS,
+    REAL31_DEFAULT_PARAMETERS,
+    S_FIELDS,
     validate_parameters,
 )
 from app.maintenance.awg31_stage3a_common import DNS, ENDPOINT, ENGINE_ID, INTERFACE, NETWORK
@@ -63,30 +68,78 @@ class DataMixin:
         )
 
     @staticmethod
-    def _settings(connection: sqlite3.Connection) -> dict[str, str | int]:
+    def _raw_settings(connection: sqlite3.Connection) -> dict[str, object]:
         row = connection.execute(
             "SELECT config_json FROM connection_settings WHERE engine = ?", (ENGINE_ID,)
         ).fetchone()
-        values: dict[str, object] = {}
-        if row is not None:
+        if row is None:
+            return {}
+        try:
+            raw = json.loads(row[0] or "{}")
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return {}
+        return raw if isinstance(raw, dict) else {}
+
+    @classmethod
+    def _settings(cls, connection: sqlite3.Connection) -> dict[str, str | int]:
+        raw = cls._raw_settings(connection)
+        values = {
+            name: raw.get(name, raw.get(name.lower(), DEFAULT_PARAMETERS[name]))
+            for name in FIELD_NAMES
+        }
+        lower_keys = {str(name).lower() for name in raw}
+        missing_real31 = any(
+            name.lower() not in lower_keys for name in RANGE_FIELDS + BOOL_FIELDS
+        )
+        unsafe_padding = False
+        for name in S_FIELDS:
             try:
-                raw = json.loads(row[0] or "{}")
+                unsafe_padding = unsafe_padding or int(values[name]) < 12
+            except (TypeError, ValueError):
+                unsafe_padding = True
+        if missing_real31 or unsafe_padding:
+            for name in J_FIELDS + S_FIELDS + H_FIELDS + RANGE_FIELDS + BOOL_FIELDS:
+                values[name] = REAL31_DEFAULT_PARAMETERS[name]
+        return validate_parameters(values)
+
+    @staticmethod
+    def _valid_header_key(value: object) -> str:
+        text = str(value or "").strip()
+        if not text:
+            return ""
+        try:
+            decoded = base64.b64decode(text, validate=True)
+        except (ValueError, TypeError):
+            return ""
+        return text if len(decoded) == 32 else ""
+
+    @classmethod
+    def _header_protection_key(cls, connection: sqlite3.Connection) -> str:
+        raw = cls._raw_settings(connection)
+        key = cls._valid_header_key(raw.get("header_protection_key"))
+        if key:
+            return key
+        rows = connection.execute(
+            "SELECT config_json FROM device_credentials WHERE engine = ? ORDER BY id",
+            (ENGINE_ID,),
+        ).fetchall()
+        for row in rows:
+            try:
+                payload = json.loads(row[0] or "{}")
             except (TypeError, ValueError, json.JSONDecodeError):
-                raw = {}
-            if isinstance(raw, dict):
-                values = {
-                    name: raw.get(name, raw.get(name.lower(), DEFAULT_PARAMETERS[name]))
-                    for name in FIELD_NAMES
-                }
-        if not values:
-            values = dict(DEFAULT_PARAMETERS)
-        return validate_parameters(normalize_legacy_parameters(values))
+                continue
+            if isinstance(payload, dict):
+                key = cls._valid_header_key(payload.get("header_protection_key"))
+                if key:
+                    return key
+        return base64.b64encode(secrets.token_bytes(32)).decode("ascii")
 
     @staticmethod
     def _persist_settings(
         connection: sqlite3.Connection,
         settings: dict[str, str | int],
         server_public_key: str,
+        header_protection_key: str,
     ) -> None:
         row = connection.execute(
             "SELECT config_json FROM connection_settings WHERE engine = ?", (ENGINE_ID,)
@@ -106,7 +159,9 @@ class DataMixin:
                 "dns": DNS,
                 "transport": "udp",
                 "endpoint": ENDPOINT,
+                "allowed_ips": "0.0.0.0/0",
                 "server_public_key": server_public_key,
+                "header_protection_key": header_protection_key,
                 **{name.lower(): value for name, value in settings.items()},
             }
         )
@@ -136,6 +191,7 @@ class DataMixin:
         connection: sqlite3.Connection,
         settings: dict[str, str | int],
         server_public_key: str,
+        header_protection_key: str,
     ) -> int:
         rows = connection.execute(
             """
@@ -153,10 +209,11 @@ class DataMixin:
             "transport": "udp",
             "interface": INTERFACE,
             "network": NETWORK,
-            "allowed_ips": "0.0.0.0/0, ::/0",
+            "allowed_ips": "0.0.0.0/0",
             "persistent_keepalive": 25,
             "generation": 31,
             "server_public_key": server_public_key,
+            "header_protection_key": header_protection_key,
             **{name.lower(): value for name, value in settings.items()},
         }
         for device_id, device_name, is_primary, client_name in rows:
@@ -203,13 +260,18 @@ class DataMixin:
         return created
 
     @staticmethod
-    def _parameter_lines(settings: dict[str, str | int]) -> list[str]:
+    def _parameter_lines(
+        settings: dict[str, str | int], header_protection_key: str
+    ) -> list[str]:
         lines: list[str] = []
-        for name in FIELD_NAMES:
+        for name in I_FIELDS + J_FIELDS + S_FIELDS + H_FIELDS:
             value = settings[name]
             if name in I_FIELDS and value == "":
                 continue
             lines.append(f"{name} = {value}")
+        lines.append(f"HeaderProtectionKey = {header_protection_key}")
+        for name in RANGE_FIELDS + BOOL_FIELDS:
+            lines.append(f"{name} = {settings[name]}")
         return lines
 
     def _prepare_state(self, work: Path, runtime: Path) -> tuple[Path, str, str]:
@@ -241,6 +303,7 @@ class DataMixin:
         work: Path,
         connection: sqlite3.Connection,
         settings: dict[str, str | int],
+        header_protection_key: str,
         server_private: str,
         server_public: str,
     ) -> tuple[Path, int]:
@@ -267,12 +330,12 @@ class DataMixin:
                     f"PrivateKey = {private_key}",
                     f"Address = {address}",
                     f"DNS = {DNS}",
-                    *self._parameter_lines(settings),
+                    *self._parameter_lines(settings, header_protection_key),
                     "",
                     "[Peer]",
                     f"PublicKey = {server_public}",
                     f"Endpoint = {ENDPOINT}",
-                    "AllowedIPs = 0.0.0.0/0, ::/0",
+                    "AllowedIPs = 0.0.0.0/0",
                     "PersistentKeepalive = 25",
                     "",
                 ]
@@ -289,7 +352,7 @@ class DataMixin:
                 f"PrivateKey = {server_private}",
                 "ListenPort = 587",
                 "Address = 10.131.0.1/24",
-                *self._parameter_lines(settings),
+                *self._parameter_lines(settings, header_protection_key),
                 *peer_blocks,
             ]
         ).rstrip() + "\n"
