@@ -1,0 +1,38 @@
+name: Refresh AWG31 picker source manifest
+
+on:
+  push:
+    branches:
+      - codex/awg31-client-picker
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    if: github.actor == 's-gor'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Remove helper and refresh manifest
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/codex-refresh-awg31-picker-source.yml
+          python3 - <<'PY'
+          import hashlib
+          import subprocess
+          from pathlib import Path
+
+          tracked = subprocess.check_output(['git', 'ls-files'], text=True, encoding='utf-8').splitlines()
+          tracked = [path for path in tracked if path != 'SOURCE-SHA256SUMS']
+          rows = [f"{hashlib.sha256(Path(path).read_bytes()).hexdigest()}  {path}" for path in tracked]
+          Path('SOURCE-SHA256SUMS').write_text('\n'.join(rows) + '\n', encoding='utf-8')
+          PY
+          git add SOURCE-SHA256SUMS
+          git diff --check --cached
+          git commit -m "chore: refresh AWG31 picker source manifest"
+          git push origin HEAD:codex/awg31-client-picker
