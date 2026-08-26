@@ -1,5 +1,5 @@
 Traceback (most recent call last):
-  File "<stdin>", line 9, in <module>
-  File "awg31-picker-patch", line 1
-    from pathlib import Path
-IndentationError: unexpected indent
+  File "<stdin>", line 12, in <module>
+  File "awg31-picker-patch", line 63, in <module>
+  File "awg31-picker-patch", line 8, in replace
+SystemExit: app/web/templates/client_detail.html: expected 1 occurrences, found 0: '        <label class="dv16-protocol">\n<input type="checkbox" name="protocols" value="amneziawg3">\n<span><strong>AmneziaWG 3</strong><small>AWG3 userspace · отдельная конфигурация и QR</small></span>\n        </label>\n'
