@@ -9,6 +9,8 @@ AWG_QUICK="$AWG3_ROOT/bin/awg-quick"
 AWG_GO="$AWG3_ROOT/bin/amneziawg-go"
 SOCKET="/var/run/amneziawg/awg3.sock"
 IFACE="awg3"
+DAEMON_PID=""
+STRIPPED=""
 
 require_runtime() {
   [[ -x "$AWG" ]] || { echo "AWG3 tool missing: $AWG" >&2; return 1; }
@@ -37,72 +39,74 @@ run_config_commands() {
   done < <(config_values "$key")
 }
 
-stop_runtime() {
+cleanup_runtime() {
+  set +e
+  if [[ -n "$DAEMON_PID" ]]; then
+    kill "$DAEMON_PID" >/dev/null 2>&1 || true
+    wait "$DAEMON_PID" >/dev/null 2>&1 || true
+  fi
   if [[ -f "$CONFIG" ]]; then
     run_config_commands PostDown || true
   fi
-  if ip link show dev "$IFACE" >/dev/null 2>&1; then
-    ip link delete dev "$IFACE" >/dev/null 2>&1 || true
-  fi
+  ip link delete dev "$IFACE" >/dev/null 2>&1 || true
   rm -f "$SOCKET"
+  [[ -z "$STRIPPED" ]] || rm -f "$STRIPPED"
 }
 
 start_runtime() {
   require_runtime
-  stop_runtime
+  cleanup_runtime
 
-  "$AWG_GO" "$IFACE"
+  "$AWG_GO" --foreground "$IFACE" &
+  DAEMON_PID=$!
+  trap 'rc=$?; trap - EXIT INT TERM; cleanup_runtime; exit "$rc"' EXIT INT TERM
 
   local deadline=$((SECONDS + 10))
   until [[ -S "$SOCKET" ]] && ip link show dev "$IFACE" >/dev/null 2>&1; do
+    kill -0 "$DAEMON_PID" >/dev/null 2>&1 || {
+      echo "AWG3 userspace daemon exited before interface creation" >&2
+      return 1
+    }
     if (( SECONDS >= deadline )); then
       echo "AWG3 userspace interface did not appear" >&2
-      stop_runtime
       return 1
     fi
     sleep 0.1
   done
 
-  local stripped=""
-  stripped="$(mktemp /run/sg-gateway-awg3.XXXXXX)"
-  if ! {
-    "$AWG_QUICK" strip "$CONFIG" > "$stripped"
-    "$AWG" setconf "$IFACE" "$stripped"
+  STRIPPED="$(mktemp /run/sg-gateway-awg3.XXXXXX)"
+  "$AWG_QUICK" strip "$CONFIG" > "$STRIPPED"
+  "$AWG" setconf "$IFACE" "$STRIPPED"
 
-    # wg-quick permits multiple comma-separated addresses on one Address line.
-    # Split them explicitly because the AWG3 userspace helper configures the
-    # interface itself instead of delegating address setup to wg-quick.
-    local address_line="" address=""
-    local -a addresses=()
-    while IFS= read -r address_line; do
-      [[ -n "$address_line" ]] || continue
-      IFS=',' read -r -a addresses <<< "$address_line"
-      for address in "${addresses[@]}"; do
-        address="${address#"${address%%[![:space:]]*}"}"
-        address="${address%"${address##*[![:space:]]}"}"
-        [[ -n "$address" ]] || continue
-        if [[ "$address" == *:* ]]; then
-          ip -6 address add "$address" dev "$IFACE"
-        else
-          ip -4 address add "$address" dev "$IFACE"
-        fi
-      done
-    done < <(config_values Address)
+  local address_line="" address=""
+  local -a addresses=()
+  while IFS= read -r address_line; do
+    [[ -n "$address_line" ]] || continue
+    IFS=',' read -r -a addresses <<< "$address_line"
+    for address in "${addresses[@]}"; do
+      address="${address#"${address%%[![:space:]]*}"}"
+      address="${address%"${address##*[![:space:]]}"}"
+      [[ -n "$address" ]] || continue
+      if [[ "$address" == *:* ]]; then
+        ip -6 address add "$address" dev "$IFACE"
+      else
+        ip -4 address add "$address" dev "$IFACE"
+      fi
+    done
+  done < <(config_values Address)
 
-    local mtu=""
-    mtu="$(config_values MTU | head -n 1 || true)"
-    if [[ -n "$mtu" ]]; then
-      ip link set mtu "$mtu" dev "$IFACE"
-    fi
-    ip link set up dev "$IFACE"
-    run_config_commands PostUp
-    "$AWG" show "$IFACE" >/dev/null
-  }; then
-    rm -f "$stripped"
-    stop_runtime
-    return 1
+  local mtu=""
+  mtu="$(config_values MTU | head -n 1 || true)"
+  if [[ -n "$mtu" ]]; then
+    ip link set mtu "$mtu" dev "$IFACE"
   fi
-  rm -f "$stripped"
+  ip link set up dev "$IFACE"
+  run_config_commands PostUp
+  "$AWG" show "$IFACE" >/dev/null
+  rm -f "$STRIPPED"
+  STRIPPED=""
+
+  wait "$DAEMON_PID"
 }
 
 case "${1:-}" in
@@ -110,10 +114,10 @@ case "${1:-}" in
     start_runtime
     ;;
   down)
-    stop_runtime
+    cleanup_runtime
     ;;
   restart)
-    stop_runtime
+    cleanup_runtime
     start_runtime
     ;;
   *)
