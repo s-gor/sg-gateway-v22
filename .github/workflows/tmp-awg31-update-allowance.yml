@@ -1,0 +1,186 @@
+name: Temporary AWG31 Update Allowance
+
+on:
+  push:
+    branches: [codex/awg31-nonoverlap-defaults]
+
+permissions:
+  contents: write
+
+env:
+  PYTHONPATH: ${{ github.workspace }}/hostd:${{ github.workspace }}/engines
+
+jobs:
+  patch:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Apply transaction verifier fix
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          core_path = Path("deploy/update-from-github-core.sh")
+          core = core_path.read_text(encoding="utf-8")
+          start = core.index('before_credentials = before["tables"]["device_credentials"]')
+          end_marker = 'print(f"Credentials transition: preserved={len(before_rows)} added_awg31={len(added)}")'
+          end = core.index(end_marker, start) + len(end_marker)
+          replacement = r'''before_credentials = before["tables"]["device_credentials"]
+after_credentials = after["tables"]["device_credentials"]
+columns = before_credentials["columns"]
+try:
+    device_index = columns.index("device_id")
+    engine_index = columns.index("engine")
+    status_index = columns.index("status")
+    config_index = columns.index("config_json")
+except ValueError as exc:
+    raise SystemExit("device_credentials lacks device_id/engine/status/config_json") from exc
+
+before_rows = before_credentials["rows"]
+after_rows = after_credentials["rows"]
+
+def rows_by_pair(rows, label):
+    result = {}
+    for row in rows:
+        pair = (decode(row[device_index]), decode(row[engine_index]))
+        if pair in result:
+            raise SystemExit(f"duplicate device credential records detected in {label}")
+        result[pair] = row
+    return result
+
+before_by_pair = rows_by_pair(before_rows, "pre-update state")
+after_by_pair = rows_by_pair(after_rows, "post-update state")
+allowed_awg31_config_changes = {
+    "profile", "engine", "client_name", "dns", "endpoint", "transport",
+    "interface", "network", "allowed_ips", "persistent_keepalive",
+    "generation", "server_public_key",
+    "i1", "i2", "i3", "i4", "i5",
+    "jc", "jmin", "jmax", "s1", "s2", "s3", "s4",
+    "h1", "h2", "h3", "h4",
+}
+updated_awg31 = 0
+missing = object()
+
+for pair, before_row in before_by_pair.items():
+    after_row = after_by_pair.get(pair)
+    if after_row is None:
+        raise SystemExit("an existing credential was removed during Update")
+    if after_row == before_row:
+        continue
+
+    device_id, engine = pair
+    if engine != "amneziawg31":
+        raise SystemExit("an existing non-AWG31 credential changed during Update")
+
+    for index, column in enumerate(columns):
+        if column in {"status", "config_json"}:
+            continue
+        if after_row[index] != before_row[index]:
+            raise SystemExit(
+                f"protected AWG31 credential field changed during Update: {column}"
+            )
+
+    try:
+        before_config = json.loads(decode(before_row[config_index]) or "{}")
+        after_config = json.loads(decode(after_row[config_index]) or "{}")
+    except (TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise SystemExit("existing AWG31 credential config_json is invalid") from exc
+    if not isinstance(before_config, dict) or not isinstance(after_config, dict):
+        raise SystemExit("existing AWG31 credential config_json must be an object")
+
+    for key in set(before_config) | set(after_config):
+        if key.lower() in allowed_awg31_config_changes:
+            continue
+        if before_config.get(key, missing) != after_config.get(key, missing):
+            raise SystemExit(
+                f"protected AWG31 credential config field changed during Update: {key}"
+            )
+
+    before_status = decode(before_row[status_index])
+    after_status = decode(after_row[status_index])
+    if before_status != after_status and after_status != "pending":
+        raise SystemExit("existing AWG31 credential received an unsafe status transition")
+    updated_awg31 += 1
+
+added = [
+    after_by_pair[pair]
+    for pair in after_by_pair.keys() - before_by_pair.keys()
+]
+
+device_table = before["tables"]["devices"]
+device_columns = device_table["columns"]
+device_id_index = device_columns.index("id")
+device_ids = {decode(row[device_id_index]) for row in device_table["rows"]}
+before_pairs = set(before_by_pair)
+for row in added:
+    device_id = decode(row[device_index])
+    engine = decode(row[engine_index])
+    if engine != "amneziawg31" or device_id not in device_ids:
+        raise SystemExit("Update added a credential outside the AWG31 migration allowance")
+    if (device_id, engine) in before_pairs:
+        raise SystemExit("Update duplicated an existing AWG31 credential")
+
+awg31_devices = {
+    device_id for device_id, engine in after_by_pair if engine == "amneziawg31"
+}
+if awg31_devices != device_ids:
+    raise SystemExit("AWG31 migration did not create exactly one credential for every existing device")
+
+print(
+    f"Credentials transition: preserved={len(before_rows)} "
+    f"added_awg31={len(added)} updated_awg31={updated_awg31}"
+)'''
+          core_path.write_text(core[:start] + replacement + core[end:], encoding="utf-8")
+
+          test_path = Path("tests/test_sg_gateway_v22_awg31_update_transaction.py")
+          test = test_path.read_text(encoding="utf-8")
+          old = "    assert awg31_after_first[0] == awg31_existing_before[0]\n"
+          new = '''    before_existing = awg31_existing_before[0]\n    after_existing = awg31_after_first[0]\n    assert after_existing[:3] == before_existing[:3]\n    assert after_existing[4] == before_existing[4]\n    assert after_existing[6:] == before_existing[6:]\n    before_config = json.loads(before_existing[5])\n    after_config = json.loads(after_existing[5])\n    for protected in ("private_key", "public_key", "address"):\n        assert after_config[protected] == before_config[protected]\n    assert after_config["server_public_key"]\n'''
+          if test.count(old) != 1:
+              raise SystemExit("transaction assertion anchor mismatch")
+          test_path.write_text(test.replace(old, new), encoding="utf-8")
+          PY
+          bash -n deploy/update-from-github-core.sh
+          git diff --check
+      - name: Commit code and remove helper
+        run: |
+          git rm .github/workflows/tmp-awg31-update-allowance.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deploy/update-from-github-core.sh tests/test_sg_gateway_v22_awg31_update_transaction.py
+          git commit -m "fix: allow safe AWG31 credential repair during update"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -r requirements-dev.txt
+      - name: Run transaction and AWG31 regressions
+        run: |
+          python -m pytest -q \
+            tests/test_sg_gateway_v22_awg31_update_transaction.py \
+            tests/test_sg_gateway_v22_awg31_header_ranges.py \
+            tests/test_sg_gateway_v22_awg31_stage3a_install_update.py
+      - name: Refresh integrity from committed clean tree
+        run: |
+          git reset --hard HEAD
+          python3 - <<'PY'
+          import hashlib
+          import subprocess
+          from pathlib import Path
+
+          tracked = subprocess.check_output(
+              ["git", "ls-files"], text=True, encoding="utf-8"
+          ).splitlines()
+          tracked = [path for path in tracked if path != "SOURCE-SHA256SUMS"]
+          rows = [
+              f"{hashlib.sha256(Path(path).read_bytes()).hexdigest()}  {path}"
+              for path in tracked
+          ]
+          Path("SOURCE-SHA256SUMS").write_text(
+              "\n".join(rows) + "\n", encoding="utf-8"
+          )
+          PY
+          git add SOURCE-SHA256SUMS
+          git commit -m "chore: refresh AWG31 update source integrity"
+          git push
