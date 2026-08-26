@@ -12,6 +12,7 @@ from app.connections.awg31 import (
     normalize_legacy_parameters,
     validate_parameters,
 )
+from app.db import DEFAULT_CONNECTIONS
 from app.maintenance.awg31_stage3a import Stage3AInstaller
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -136,6 +137,11 @@ def test_awg31_default_header_values_are_pairwise_non_overlapping() -> None:
     assert validate_parameters(DEFAULT_PARAMETERS) == DEFAULT_PARAMETERS
 
 
+def test_awg31_database_seed_uses_safe_header_values() -> None:
+    seed = json.loads(DEFAULT_CONNECTIONS["amneziawg31"]["config_json"])
+    assert {name: seed[name.lower()] for name in SAFE_HEADERS} == SAFE_HEADERS
+
+
 @pytest.mark.parametrize(
     "headers",
     [
@@ -155,11 +161,12 @@ def test_only_legacy_all_zero_headers_are_normalized() -> None:
     legacy = dict(DEFAULT_PARAMETERS, H1="0", H2="0", H3="0", H4="0")
     normalized = normalize_legacy_parameters(legacy)
     assert {name: normalized[name] for name in SAFE_HEADERS} == SAFE_HEADERS
+    assert validate_parameters(legacy) == validate_parameters(DEFAULT_PARAMETERS)
 
     arbitrary_overlap = dict(DEFAULT_PARAMETERS, H1="9", H2="9", H3="30", H4="40")
     assert normalize_legacy_parameters(arbitrary_overlap) == arbitrary_overlap
     with pytest.raises(Awg31ValidationError, match="must not overlap"):
-        validate_parameters(normalize_legacy_parameters(arbitrary_overlap))
+        validate_parameters(arbitrary_overlap)
 
 
 def test_stage3a_repairs_legacy_headers_and_preserves_existing_keys(tmp_path: Path) -> None:
