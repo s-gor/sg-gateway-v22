@@ -244,7 +244,7 @@ def test_migration_preserves_awg2_awg3_and_existing_awg31_keys_idempotently(prov
     assert second.created_credentials == 0
     assert after_second == after_first
     assert _rows(database, ("amneziawg", "amneziawg3")) == before_legacy
-    assert fake.commands.count(("systemctl", "try-restart", "sg-gateway-awg3.service")) == 2
+    assert fake.commands.count(("systemctl", "try-restart", "sg-gateway-awg3.service")) == 1
     for path, expected_body in preserved_files.items():
         assert path.read_text() == expected_body
 
