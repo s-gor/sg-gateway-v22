@@ -79,6 +79,10 @@ class Stage3AInstaller(RuntimeMixin, DataMixin):
         replacements: list[Replacement] = []
         connection: sqlite3.Connection | None = None
         committed = False
+        preserve_awg3_runtime = (
+            self.layout.awg3_runtime.exists()
+            or self.layout.awg3_runtime.is_symlink()
+        )
         try:
             vendor, deploy = self._copy_install_media(work)
             awg3_runtime = self._build_runtime(
@@ -115,7 +119,10 @@ class Stage3AInstaller(RuntimeMixin, DataMixin):
                 server_public=server_public,
             )
 
-            replacements.append(self._replace(self.layout.awg3_runtime, awg3_runtime, backups))
+            if not preserve_awg3_runtime:
+                replacements.append(
+                    self._replace(self.layout.awg3_runtime, awg3_runtime, backups)
+                )
             replacements.append(self._replace(self.layout.awg31_runtime, awg31_runtime, backups))
             replacements.append(self._replace(self.layout.config, config, backups))
             replacements.append(self._replace(self.layout.state, state, backups))
@@ -141,7 +148,7 @@ class Stage3AInstaller(RuntimeMixin, DataMixin):
             self.os.run("systemctl", "daemon-reload")
             self.os.run("systemctl", "enable", SERVICE)
             self.os.run("systemctl", "restart", SERVICE)
-            if self.layout.awg3_unit.is_file():
+            if not preserve_awg3_runtime and self.layout.awg3_unit.is_file():
                 self.os.run("systemctl", "try-restart", "sg-gateway-awg3.service")
             connection.commit()
             committed = True
@@ -162,7 +169,7 @@ class Stage3AInstaller(RuntimeMixin, DataMixin):
             self._rollback(replacements)
             with contextlib.suppress(RuntimeError):
                 self.os.run("systemctl", "daemon-reload")
-            if self.layout.awg3_unit.is_file():
+            if not preserve_awg3_runtime and self.layout.awg3_unit.is_file():
                 with contextlib.suppress(RuntimeError):
                     self.os.run("systemctl", "try-restart", "sg-gateway-awg3.service")
             raise
