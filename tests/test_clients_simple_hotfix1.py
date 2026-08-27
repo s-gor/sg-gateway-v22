@@ -17,7 +17,8 @@ def test_client_detail_is_device_first_and_simple() -> None:
     assert "Одна подписка для этого устройства" not in template
     assert "dv16-device" in template
     assert "dv16-dialog" in template
-    assert 'type="hidden" name="protocols" value="sgclient"' in template
+    assert 'type="hidden" name="protocols" value="sgclient"' not in template
+    assert "SG_AWG_ONLY_NOTICE_V1_ADD_DEVICE" in template
 
 
 def test_modal_uses_compact_native_checkboxes() -> None:

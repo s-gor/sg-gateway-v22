@@ -19,7 +19,10 @@ def test_0217_clients_onboarding_and_protocol_grid():
 
     start = text.index("url_for('add_client')")
     form = text[start:text.index("</form>", start)]
-    assert form.count('value="sgclient"') == 1
+    assert form.count('value="sgclient"') == 0
+    assert "SG_AWG_ONLY_NOTICE_V1_CREATE_CLIENT" in form
+    main = (ROOT / "app/main.py").read_text(encoding="utf-8")
+    assert main.count("_prepare_client_protocols(request.form.getlist") == 4
     assert '<strong>SG Client</strong>' not in form
     for token in (
         'value="amneziawg"',
