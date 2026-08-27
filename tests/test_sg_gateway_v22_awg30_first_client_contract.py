@@ -27,6 +27,10 @@ def test_awg30_remains_submit_capable_in_client_create_and_edit_dialogs() -> Non
     for tag in create_tags + edit_tags:
         assert "disabled" not in tag
 
+    # The removed browser-side readiness gate must not leave an undefined
+    # Jinja variable behind in the client-detail include.
+    assert "awg3_runtime" not in edit_source
+
     # Runtime provisioning remains the authoritative fail-closed check and
     # returns a precise recovery message if a real installation is incomplete.
     provisioning = (ROOT / "app/engines/provisioning.py").read_text(encoding="utf-8")
