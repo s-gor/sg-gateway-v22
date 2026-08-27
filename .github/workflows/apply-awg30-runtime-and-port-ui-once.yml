@@ -60,23 +60,17 @@ jobs:
 
           template_path = Path("app/web/templates/connections.html")
           template = template_path.read_text(encoding="utf-8")
-          old = '''                <label class="xps2-field-port">
-                  <span>{{ 'UDP-порт' if profile.id == 'hysteria2' else 'TCP-порт' }}</span>
-                  <input type="number" min="1" max="65535"
-                         name="{{ profile.id }}_port" value="{{ profile.port }}"
-                         {% if locked %}disabled{% endif %}>
-                </label>'''
-          new = '''                {% if profile.id not in ['reality_tcp', 'xhttp_reality'] %}
-                <label class="xps2-field-port">
-                  <span>{{ 'UDP-порт' if profile.id == 'hysteria2' else 'TCP-порт' }}</span>
-                  <input type="number" min="1" max="65535"
-                         name="{{ profile.id }}_port" value="{{ profile.port }}"
-                         {% if locked %}disabled{% endif %}>
-                </label>
-                {% endif %}'''
-          if template.count(old) != 1:
-              raise SystemExit("connections.html editable port block anchor not found")
-          template_path.write_text(template.replace(old, new, 1), encoding="utf-8", newline="\n")
+          loop_start = template.index("{% for profile in xray_profiles.profiles %}")
+          port_start = template.index(
+              '                <label class="xps2-field-port">', loop_start
+          )
+          port_end_marker = '                </label>'
+          port_end = template.index(port_end_marker, port_start) + len(port_end_marker)
+          block = template[port_start:port_end]
+          guard = "                {% if profile.id not in ['reality_tcp', 'xhttp_reality'] %}\n"
+          close = "\n                {% endif %}"
+          template = template[:port_start] + guard + block + close + template[port_end:]
+          template_path.write_text(template, encoding="utf-8", newline="\n")
           PY
 
       - name: Verify targeted behavior
