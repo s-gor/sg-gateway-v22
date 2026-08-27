@@ -7,6 +7,7 @@ on:
       - test/reinstall-after-full-uninstall
     paths:
       - .github/workflows/reinstall-after-full-uninstall-smoke.yml
+      - tests/test_sg_gateway_v22_reinstall_after_full_uninstall.py
       - install.sh
       - deploy/full-uninstall-ubuntu.sh
       - deploy/sg-gateway-awg3.service
@@ -21,6 +22,7 @@ on:
       - dev-02206
     paths:
       - .github/workflows/reinstall-after-full-uninstall-smoke.yml
+      - tests/test_sg_gateway_v22_reinstall_after_full_uninstall.py
       - install.sh
       - deploy/full-uninstall-ubuntu.sh
       - deploy/sg-gateway-awg3.service
@@ -41,6 +43,15 @@ jobs:
     steps:
       - name: Checkout candidate
         uses: actions/checkout@v4
+
+      - name: Verify reinstall command contract
+        run: |
+          python3 - <<'PY'
+          import runpy
+          namespace = runpy.run_path("tests/test_sg_gateway_v22_reinstall_after_full_uninstall.py")
+          namespace["test_full_uninstall_prints_the_canonical_reinstall_command"]()
+          namespace["test_reinstall_smoke_covers_the_real_same_server_lifecycle"]()
+          PY
 
       - name: Confirm virgin SG-Gateway state
         run: |
