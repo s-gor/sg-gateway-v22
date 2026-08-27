@@ -2,9 +2,10 @@
 name: Reinstall after full uninstall smoke
 
 on:
+  workflow_dispatch:
   push:
     branches:
-      - test/reinstall-after-full-uninstall
+      - dev-02206
     paths:
       - .github/workflows/reinstall-after-full-uninstall-smoke.yml
       - tests/test_sg_gateway_v22_reinstall_after_full_uninstall.py
