@@ -1,0 +1,136 @@
+name: Update repairs idle AWG3 smoke
+
+on:
+  pull_request:
+    branches:
+      - dev-02206
+    paths:
+      - deploy/update-from-github.sh
+      - app/maintenance/awg3_idle_bootstrap.py
+      - hostd/sg_hostd/awg3_runtime.py
+      - tests/test_sg_gateway_v22_awg30_update_bootstrap.py
+      - .github/workflows/update-idle-awg3-smoke.yml
+  push:
+    branches:
+      - dev-02206
+    paths:
+      - deploy/update-from-github.sh
+      - app/maintenance/awg3_idle_bootstrap.py
+      - hostd/sg_hostd/awg3_runtime.py
+      - tests/test_sg_gateway_v22_awg30_update_bootstrap.py
+      - .github/workflows/update-idle-awg3-smoke.yml
+
+permissions:
+  contents: read
+
+jobs:
+  update-repairs-idle-awg3:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - name: Checkout candidate with history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Materialize the confirmed defective base
+        run: |
+          git worktree add /tmp/sg-gateway-old 76407dbf680c54a3a2ef8d3c01f7d2568d5276dc
+
+      - name: Seed old installation parameters
+        run: |
+          PUBLIC_IP="$(curl -4 -fsS --max-time 15 https://api.ipify.org)"
+          python3 - "$PUBLIC_IP" <<'PY'
+          import ipaddress
+          import sys
+          ip = ipaddress.ip_address(sys.argv[1])
+          assert ip.version == 4 and ip.is_global, ip
+          PY
+          sudo tee /root/sg-gateway-02206-installer-resume.env >/dev/null <<EOF
+          PANEL_PORT=63443
+          XRAY_PORT=443
+          AWG_PORT=585
+          REALITY_TARGET=www.bing.com:443
+          REALITY_SNI=www.bing.com
+          ADMIN_PASSWORD=UpdateIdleAwg3Test2026
+          ADMIN_PASSWORD_HASH=
+          PUBLIC_ADDRESS=$PUBLIC_IP
+          SERVER_NAME=sg-gateway-update-old
+          COUNTRY_CODE=fr
+          CREATE_SG_ADMIN=1
+          SECRET_KEY=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+          EOF
+          sudo chmod 0600 /root/sg-gateway-02206-installer-resume.env
+
+      - name: Install the old behavior
+        env:
+          SG_GATEWAY_SOURCE_DIR: /tmp/sg-gateway-old
+          SG_GATEWAY_APT_WAIT_SECONDS: "900"
+        run: sudo -E bash /tmp/sg-gateway-old/install.sh
+
+      - name: Confirm the screenshot state before update
+        run: |
+          ! sudo systemctl is-active --quiet sg-gateway-awg3.service
+          sudo test ! -s /etc/amnezia/amneziawg/awg3.conf
+          sudo bash -c '
+            set -a
+            source /etc/sg-gateway/runtime.env
+            source /etc/sg-gateway/sg-gateway.env
+            set +a
+            runuser -u sg-gateway -- env \
+              PYTHONPATH=/opt/sg-gateway:/opt/sg-gateway/hostd \
+              /opt/sg-gateway/.venv/bin/python - <<"PY"
+          from app.db import connect
+          with connect() as connection:
+              count = connection.execute(
+                  "SELECT COUNT(*) FROM device_credentials WHERE engine = ?",
+                  ("amneziawg3",),
+              ).fetchone()[0]
+          assert int(count) == 0, count
+          PY
+          '
+
+      - name: Run the candidate public update entrypoint
+        env:
+          SG_GATEWAY_GITHUB_BRANCH: ${{ github.head_ref || github.ref_name }}
+          SG_GATEWAY_ALLOW_DEVELOPMENT: "1"
+          SG_GATEWAY_UPDATE_BACKUP_KEEP: "1"
+        run: sudo -E bash deploy/update-from-github.sh
+
+      - name: Verify update repaired AWG3 without creating a client
+        run: |
+          sudo systemctl is-active --quiet sg-gateway-awg3.service
+          sudo systemctl is-enabled --quiet sg-gateway-awg3.service
+          sudo test -S /run/amneziawg/awg3.sock
+          sudo ip link show dev awg3
+          sudo test -s /etc/amnezia/amneziawg/awg3.conf
+          ! sudo grep -q '^\[Peer\]' /etc/amnezia/amneziawg/awg3.conf
+          test "$(sudo /opt/sg-gateway/awg3/bin/awg show awg3 listen-port)" = "586"
+          sudo awk -F= '
+            $1 == "SG_GATEWAY_AWG3_PUBLIC_KEY" && length($2) >= 40 { ready=1 }
+            END { exit(ready ? 0 : 1) }
+          ' /etc/sg-gateway/engine-secrets.env
+          sudo bash -c '
+            set -a
+            source /etc/sg-gateway/runtime.env
+            source /etc/sg-gateway/sg-gateway.env
+            set +a
+            runuser -u sg-gateway -- env \
+              PYTHONPATH=/opt/sg-gateway:/opt/sg-gateway/hostd \
+              /opt/sg-gateway/.venv/bin/python - <<"PY"
+          from app.db import connect
+          with connect() as connection:
+              count = connection.execute(
+                  "SELECT COUNT(*) FROM device_credentials WHERE engine = ?",
+                  ("amneziawg3",),
+              ).fetchone()[0]
+          assert int(count) == 0, count
+          PY
+          '
+
+      - name: Print diagnostics on failure
+        if: failure()
+        run: |
+          sudo systemctl status sg-gateway.service sg-hostd.service sg-gateway-awg3.service --no-pager || true
+          sudo journalctl -b -u sg-gateway.service -u sg-hostd.service -u sg-gateway-awg3.service -n 250 --no-pager || true
+          sudo tail -n 250 /var/log/sg-gateway-installer-02206.log || true
