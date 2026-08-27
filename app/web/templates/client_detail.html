@@ -13,6 +13,9 @@
   <!-- SG_DEVICE_COLLAPSE_V1_JS -->
   <script src="{{ url_for('static', filename='sg-device-collapse-v1.js') }}?v={{ app_version }}" defer></script>
   <!-- /SG_DEVICE_COLLAPSE_V1_JS -->
+  <!-- SG_AWG_ONLY_NOTICE_V1_ASSETS -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='sg-awg-only-notice-v1.css') }}?v={{ app_version }}">
+  <script src="{{ url_for('static', filename='sg-awg-only-notice-v1.js') }}?v={{ app_version }}" defer></script>
 {% endblock %}
 
 {% block content %}
@@ -243,7 +246,6 @@
       <input type="text" name="name" maxlength="60" required placeholder="Телефон, ноутбук или телевизор" autocomplete="off">
     </label>
 
-    <input type="hidden" name="protocols" value="sgclient">
     <section class="dv16-recommended">
       <div>
         <strong>Рекомендуемый набор уже выбран</strong>
@@ -287,6 +289,8 @@
           <span><strong>TUIC v5</strong><small>{{ 'Доступен' if tls.https_ready else 'Нужен HTTPS' }}</small></span>
         </label>
       </fieldset>
+    <!-- SG_AWG_ONLY_NOTICE_V1_ADD_DEVICE -->
+    <div class="sg-awg-only-note" data-awg-only-note role="status" aria-live="polite">При выборе только AWG-профилей подписка не создаётся. Используйте QR-коды или файлы конфигурации для каждого соединения.</div>
     </details>
 
     <label class="dv16-field">

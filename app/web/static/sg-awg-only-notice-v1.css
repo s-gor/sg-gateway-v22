@@ -1,0 +1,18 @@
+/* SG_AWG_ONLY_NOTICE_V1_STYLES */
+.sg-awg-only-note {
+  margin: 0.75rem 0 1rem;
+  padding: 0.78rem 0.9rem;
+  border: 1px solid rgba(148, 163, 184, 0.38);
+  border-radius: 0.75rem;
+  background: rgba(148, 163, 184, 0.08);
+  color: inherit;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  transition: background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.sg-awg-only-note.is-active {
+  border-color: rgba(245, 158, 11, 0.92);
+  background: rgba(245, 158, 11, 0.19);
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.12);
+}

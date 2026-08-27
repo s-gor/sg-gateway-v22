@@ -157,6 +157,30 @@ COUNTRY_OPTIONS = [
 COUNTRY_NAMES = dict(COUNTRY_OPTIONS)
 
 
+# SG_GATEWAY_02206_AWG_ONLY_PROTOCOLS_V3
+_CLIENT_SUBSCRIPTION_SOURCES = {"mihomo", "anytls", "tuic"}
+
+
+def _prepare_client_protocols(values) -> list[str]:
+    # Add SG Client only when at least one subscription source is selected.
+    protocols: list[str] = []
+    for value in values:
+        token = str(value or "").strip().lower()
+        if not token or token == "sgclient" or token in protocols:
+            continue
+        protocols.append(token)
+
+    has_subscription_source = any(
+        token in _CLIENT_SUBSCRIPTION_SOURCES
+        or token == "xray"
+        or token.startswith("xray_")
+        for token in protocols
+    )
+    if has_subscription_source:
+        protocols.append("sgclient")
+    return protocols
+
+
 def normalize_country_code(value: str | None) -> str:
     code = (value or "unknown").strip().lower()
     if not re.fullmatch(r"[a-z]{2}|unknown", code):
@@ -1028,7 +1052,7 @@ def create_app() -> Flask:
 
     @app.post("/clients")
     def add_client():
-        protocols = request.form.getlist("protocols")
+        protocols = _prepare_client_protocols(request.form.getlist("protocols"))
         access = ",".join(protocols)
         try:
             client_id = create_client(
@@ -1106,7 +1130,7 @@ def create_app() -> Flask:
         snapshot = snapshot_client(client_id)
         if snapshot is None:
             abort(404)
-        protocols = request.form.getlist("protocols")
+        protocols = _prepare_client_protocols(request.form.getlist("protocols"))
         try:
             updated = update_client(
                 client_id,
@@ -1136,7 +1160,7 @@ def create_app() -> Flask:
         snapshot = snapshot_client(client_id)
         if snapshot is None:
             abort(404)
-        protocols = request.form.getlist("protocols")
+        protocols = _prepare_client_protocols(request.form.getlist("protocols"))
         try:
             updated = update_device(
                 client_id,
@@ -1323,7 +1347,7 @@ def create_app() -> Flask:
         if client is None:
             abort(404)
         snapshot = snapshot_client(client_id)
-        protocols = request.form.getlist("protocols")
+        protocols = _prepare_client_protocols(request.form.getlist("protocols"))
         access = ",".join(protocols)
         try:
             device_id = create_device(
