@@ -28,14 +28,18 @@ class FileSnapshot:
     existed: bool
     content: bytes
     mode: int
+    uid: int
+    gid: int
 
 
 def _snapshot_file(path: Path) -> FileSnapshot:
     try:
         stat = path.stat()
-        return FileSnapshot(path, True, path.read_bytes(), stat.st_mode & 0o777)
+        return FileSnapshot(
+            path, True, path.read_bytes(), stat.st_mode & 0o777, stat.st_uid, stat.st_gid
+        )
     except FileNotFoundError:
-        return FileSnapshot(path, False, b"", 0o600)
+        return FileSnapshot(path, False, b"", 0o600, 0, 0)
 
 
 def _restore_file(snapshot: FileSnapshot) -> None:
@@ -46,6 +50,7 @@ def _restore_file(snapshot: FileSnapshot) -> None:
     temporary = snapshot.path.with_name(snapshot.path.name + ".awg3-bootstrap-rollback")
     temporary.write_bytes(snapshot.content)
     os.chmod(temporary, snapshot.mode)
+    os.chown(temporary, snapshot.uid, snapshot.gid)
     os.replace(temporary, snapshot.path)
 
 
