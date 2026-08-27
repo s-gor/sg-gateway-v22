@@ -693,7 +693,7 @@ protected_runtime_paths() {
   python3 - "$output" \
     "$LETSENCRYPT_DIR" "$DATA_DIR/security/tls-state.json" \
     "$AWG2_CONFIG" "$AWG2_UNIT" \
-    "$AWG3_CONFIG" "$AWG3_UNIT" "$AWG3_ROOT" \
+    "$AWG3_CONFIG" "$AWG3_ROOT" \
     "$AWG31_CONFIG" "$AWG31_STATE" "$AWG31_UNIT" "$PREFIX/awg31" \
     -- "$cert" "$key" <<'PYPROTECTED'
 import os
@@ -1419,6 +1419,14 @@ deploy_source() {
     \( -path "$PREFIX/.venv" -o -path "$PREFIX/assets" -o -path "$AWG3_ROOT" \) -prune -o \
     -type f -exec chmod 0644 {} +
   find "$PREFIX/deploy" -maxdepth 1 -type f -name '*.sh' -exec chmod 0755 {} + 2>/dev/null || true
+
+  # The AWG3 config and userspace binaries remain preserved, but the systemd
+  # unit is managed source and must follow the deployed release. The previous
+  # unit is already inside Safety Backup and rollback restores it atomically.
+  [[ -f "$PREFIX/deploy/sg-gateway-awg3.service" ]] || \
+    fail "deployed AWG3 systemd unit is missing"
+  install -m 0644 "$PREFIX/deploy/sg-gateway-awg3.service" "$AWG3_UNIT"
+  systemctl daemon-reload
   if [[ "$SYSTEM_ROOT" == / ]]; then
     chmod -R a+rX "$PREFIX/.venv"
   fi
@@ -1494,6 +1502,9 @@ verify_final() {
     "$NGINX_SITE_ENABLED" \
     "$NGINX_STREAM_CONFIG")"
   [[ "$before" == "$after" ]] || fail "Nginx configuration changed during Update"
+
+  cmp -s "$PREFIX/deploy/sg-gateway-awg3.service" "$AWG3_UNIT" || \
+    fail "installed AWG3 systemd unit does not match deployed source"
 
   verify_runtime_states_unchanged "$BACKUP_DIR/service-state.tsv"
   nginx -t >/dev/null
