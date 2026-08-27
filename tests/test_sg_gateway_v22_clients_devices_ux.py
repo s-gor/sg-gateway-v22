@@ -13,7 +13,8 @@ def test_protocol_picker_distinguishes_awg30_and_awg31() -> None:
         assert f"'{value}'" in body
     assert "protocolOrder" in body
     assert "normalizeProtocolPickers()" in body
-    assert "picker.open = true" in body
+    assert "picker.replaceWith(...picker.childNodes)" in body
+    assert "picker.open = true" not in body
     assert "setLabelTitle(byValue.get('amneziawg'), 'AmneziaWG 2.0')" in body
     assert "setLabelTitle(byValue.get('amneziawg3'), 'AmneziaWG 3.0')" in body
     assert "setLabelTitle(byValue.get('amneziawg31'), 'AmneziaWG 3.1')" in body
