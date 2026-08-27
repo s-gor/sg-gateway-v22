@@ -79,6 +79,7 @@ jobs:
           python -m pytest \
             tests/test_fix30_awg3_update_preservation.py \
             tests/test_sg_gateway_v22_awg3_runtime_repair.py \
+            tests/test_sg_gateway_v22_awg30_first_client_contract.py \
             tests/test_sg_gateway_v22_runtime_contract_data_backup.py \
             tests/test_sg_gateway_v22_02206_hardening.py \
             tests/test_sg_gateway_v22_02206_panel_startup_retry.py \
@@ -93,15 +94,9 @@ jobs:
           command -v cc
           command -v pkg-config
           command -v sha256sum
-          if [[ -f vendor/cores/amneziawg-tools-3.1.20260812.tar.gz ]]; then
-            TOOLS="vendor/cores/amneziawg-tools-3.1.20260812.tar.gz"
-            GO="vendor/cores/amneziawg-go-linux-amd64-v3.1.20260814"
-            EXPECTED_TOOLS_VERSION="3.1.20260812"
-          else
-            TOOLS="vendor/cores/amneziawg-tools-3.0.20260805.tar.gz"
-            GO="vendor/cores/amneziawg-go-linux-amd64-v3.0.0"
-            EXPECTED_TOOLS_VERSION="3.0.20260805"
-          fi
+          TOOLS="vendor/cores/amneziawg-tools-3.0.20260805.tar.gz"
+          GO="vendor/cores/amneziawg-go-linux-amd64-v3.0.0"
+          EXPECTED_TOOLS_VERSION="3.0.20260805"
           (cd vendor/cores && grep "  $(basename "$TOOLS")$" SHA256SUMS | sha256sum -c -)
           (cd vendor/cores && grep "  $(basename "$GO")$" SHA256SUMS | sha256sum -c -)
           AWG3_TEST_ROOT="$(mktemp -d /tmp/sg-awg3-focused.XXXXXX)"
