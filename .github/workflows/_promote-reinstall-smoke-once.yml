@@ -26,17 +26,8 @@ jobs:
 
           path = Path(".github/workflows/reinstall-after-full-uninstall-smoke.yml")
           body = path.read_text(encoding="utf-8")
-          old = """on:
-  push:
-    branches:
-      - test/reinstall-after-full-uninstall
-"""
-          new = """on:
-  workflow_dispatch:
-  push:
-    branches:
-      - dev-02206
-"""
+          old = "on:\n  push:\n    branches:\n      - test/reinstall-after-full-uninstall\n"
+          new = "on:\n  workflow_dispatch:\n  push:\n    branches:\n      - dev-02206\n"
           if body.count(old) != 1:
               raise SystemExit("temporary branch trigger not found exactly once")
           path.write_text(body.replace(old, new, 1), encoding="utf-8", newline="\n")
