@@ -267,7 +267,9 @@ def test_apply_contract_runs_before_engine_mutation_and_awg3_empty_is_safe() -> 
 
     awg3_source = (ROOT / "hostd/sg_hostd/awg3_runtime.py").read_text(encoding="utf-8")
     apply_awg3 = awg3_source.split("def apply_awg3()", 1)[1]
-    assert apply_awg3.index("if not rows:") < apply_awg3.index("_tool(AWG3_AWG)")
+    assert "if not rows and any(not path.is_file() for path in runtime_paths):" in apply_awg3
+    assert apply_awg3.index("_ensure_server_secrets()") < apply_awg3.index("_render(rows, secrets)")
+    assert apply_awg3.index("_render(rows, secrets)") < apply_awg3.index('["systemctl", "restart", AWG3_SERVICE]')
 
 
 def test_full_restore_contract_is_before_safety_backup() -> None:
