@@ -38,6 +38,33 @@ def test_awg30_remains_submit_capable_in_client_create_and_edit_dialogs() -> Non
     assert "AWG3 требует восстановления" in provisioning
 
 
+def test_awg30_and_awg31_preserve_their_shared_runtime_directory() -> None:
+    awg30 = (ROOT / "deploy/sg-gateway-awg3.service").read_text(encoding="utf-8")
+    awg31 = (ROOT / "deploy/sg-gateway-awg31.service").read_text(encoding="utf-8")
+
+    for unit in (awg30, awg31):
+        assert "Type=simple" in unit
+        assert "Environment=WG_PROCESS_FOREGROUND=1" in unit
+        assert "RuntimeDirectory=amneziawg" in unit
+        assert "RuntimeDirectoryPreserve=yes" in unit
+
+
+def test_clean_install_workflow_creates_a_real_awg30_client() -> None:
+    workflow = (ROOT / ".github/workflows/clean-install-awg3-smoke.yml").read_text(
+        encoding="utf-8"
+    )
+
+    assert "Run native clean installer" in workflow
+    assert 'create_client("ci-clean-awg3", "amneziawg3")' in workflow
+    assert "apply_clients_runtime()" in workflow
+    assert "systemctl is-active --quiet sg-gateway-awg3.service" in workflow
+    assert "systemctl is-active --quiet sg-gateway-awg31.service" in workflow
+    assert "test -S /run/amneziawg/awg3.sock" in workflow
+    assert "test -S /run/amneziawg/awg31.sock" in workflow
+    assert 'awg show awg3 listen-port)" = "586"' in workflow
+    assert 'awg show awg31 listen-port)" = "587"' in workflow
+
+
 def test_dev_guard_builds_the_exact_awg30_runtime_used_by_clean_install() -> None:
     workflow = (ROOT / ".github/workflows/dev-02206-guard.yml").read_text(encoding="utf-8")
 
