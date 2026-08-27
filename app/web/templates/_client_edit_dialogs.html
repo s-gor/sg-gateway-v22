@@ -176,17 +176,5 @@
     if (awg2Title) awg2Title.textContent = 'AmneziaWG 2.0';
   }
   // SG_ADD_DEVICE_PROTOCOL_ORDER_V2_END
-
-  const awg3Ready = {{ 'true' if not awg3_runtime.known or awg3_runtime.ready else 'false' }};
-  if (!awg3Ready) {
-    document.querySelectorAll('input[type="checkbox"][name="protocols"][value="amneziawg3"]').forEach(input => {
-      if (input.checked) return;
-      input.disabled = true;
-      const label = input.closest('label');
-      label?.classList.add('is-locked');
-      const hint = label?.querySelector('small');
-      if (hint) hint.textContent = 'AWG3 runtime требует восстановления в Maintenance';
-    });
-  }
 })();
 </script>
