@@ -3,7 +3,6 @@ e68728efbc5d4191ddad8406e79698c16aa1e06ce429484e418bf8aa33f59de4  .env.example
 8e802fda46a15e166fd5ad6b6d5a1debb469f85cf071e432e2963bbf14f8eed0  .github/workflows/ci.yml
 3e665e6f70a9204d2fc66f09d7827ed199c2dd9ddb46d7b9716992e53694fcbb  .github/workflows/clean-install-awg3-smoke.yml
 9e25981262749d865e3aeb853efd927d19bab70fca1942abcfde83b6de62ad67  .github/workflows/dev-02206-guard.yml
-711956252fa46b5da61ea2b259a0995bbe593628313c2f71b601e55a19145004  .github/workflows/finalize-awg3-integrity.yml
 cb7b3227308d6bf05da7749afa6166b837f47d19b945e54085479e643439b588  .github/workflows/reinstall-after-full-uninstall-smoke.yml
 080433c20dcf079cf091ba7d4aa7f7051c84cd09228a455d90fadffaaa19ab4f  .github/workflows/release-02204-stable.yml
 65e042823f19cb7ff641b62ac7164074aac733c1cb0a24b6dd8835ba3c1a9891  .github/workflows/release-fix30.yml
