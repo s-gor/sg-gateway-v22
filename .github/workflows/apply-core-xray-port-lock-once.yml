@@ -1,0 +1,213 @@
+name: Apply fixed core Xray port contract once
+
+on:
+  push:
+    branches:
+      - fix/02206-lock-core-xray-ports
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/02206-lock-core-xray-ports
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install test dependencies
+        run: python -m pip install -r requirements-dev.txt
+
+      - name: Write regression tests first
+        run: |
+          cat > tests/test_sg_gateway_v22_core_xray_system_ports.py <<'PY'
+          from pathlib import Path
+          from types import SimpleNamespace
+
+          from app.xray import profiles
+
+
+          ROOT = Path(__file__).resolve().parents[1]
+
+
+          def _base_config() -> dict:
+              return {
+                  "fingerprint": "firefox",
+                  "reality_tcp_enabled": True,
+                  "reality_tcp_port": 10443,
+                  "xhttp_reality_enabled": False,
+                  "xhttp_reality_port": 18444,
+                  "xhttp_reality_path": "/sg-xhttp-reality",
+                  "xhttp_reality_mode": "stream-one",
+                  "xhttp_tls_enabled": False,
+                  "xhttp_tls_port": 8445,
+                  "xhttp_tls_path": "/sg-xhttp-tls",
+                  "xhttp_tls_mode": "auto",
+                  "hysteria2_enabled": False,
+                  "hysteria2_port": 8446,
+                  "hysteria2_obfs_mode": "none",
+                  "hysteria2_finalmask": {},
+              }
+
+
+          def _form() -> dict:
+              return {
+                  "host": "203.0.113.10",
+                  "fingerprint": "firefox",
+                  "reality_tcp_enabled": "1",
+                  "reality_tcp_port": "24443",
+                  "xhttp_reality_port": "28444",
+                  "xhttp_reality_path": "/sg-xhttp-reality",
+                  "xhttp_reality_mode": "stream-one",
+                  "xhttp_tls_port": "8445",
+                  "xhttp_tls_path": "/sg-xhttp-tls",
+                  "xhttp_tls_mode": "auto",
+                  "hysteria2_port": "8446",
+                  "hysteria2_obfs_mode": "none",
+              }
+
+
+          def test_core_xray_ports_ignore_stored_and_posted_overrides(monkeypatch) -> None:
+              settings = SimpleNamespace(host="203.0.113.10", port=10443)
+              monkeypatch.setattr(
+                  profiles,
+                  "_config",
+                  lambda: (settings, _base_config(), {"https_ready": False}),
+              )
+
+              prepared = profiles._prepare(_form())
+
+              assert profiles.REALITY_TCP_PORT == 443
+              assert profiles.XHTTP_REALITY_PORT == 8444
+              assert prepared.port == 443
+              assert prepared.config["reality_tcp_port"] == 443
+              assert prepared.config["xhttp_reality_port"] == 8444
+
+
+          def test_connections_ui_renders_core_ports_as_system_values() -> None:
+              template = (ROOT / "app/web/templates/connections.html").read_text(encoding="utf-8")
+
+              assert "profile.id in ['reality_tcp', 'xhttp_reality']" in template
+              assert "Системный порт SG-Gateway" in template
+              assert "xps2-system-port" in template
+              assert 'name="{{ profile.id }}_port"' in template
+              system_start = template.index("{% if profile.id in ['reality_tcp', 'xhttp_reality'] %}")
+              editable_start = template.index("{% else %}", system_start)
+              system_block = template[system_start:editable_start]
+              assert 'name="{{ profile.id }}_port"' not in system_block
+              assert "<output" in system_block
+          PY
+
+      - name: Verify tests fail before production change
+        run: |
+          set +e
+          python -m pytest -q tests/test_sg_gateway_v22_core_xray_system_ports.py > /tmp/red.log 2>&1
+          rc=$?
+          cat /tmp/red.log
+          set -e
+          if [[ $rc -eq 0 ]]; then
+            echo 'Regression tests unexpectedly passed before implementation' >&2
+            exit 1
+          fi
+
+      - name: Apply minimal production change
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          profiles_path = Path("app/xray/profiles.py")
+          text = profiles_path.read_text(encoding="utf-8")
+
+          old = 'REALITY_TCP_FLOW = "xtls-rprx-vision"\nXRAY_MINIMUM_VERSION = "26.6.27"'
+          new = (
+              'REALITY_TCP_FLOW = "xtls-rprx-vision"\n'
+              'REALITY_TCP_PORT = 443\n'
+              'XHTTP_REALITY_PORT = 8444\n'
+              'XRAY_MINIMUM_VERSION = "26.6.27"'
+          )
+          if old not in text:
+              raise SystemExit("constant insertion anchor not found")
+          text = text.replace(old, new, 1)
+
+          replacements = {
+              '"reality_tcp_port": _port(config.get("reality_tcp_port"), legacy_port or 443),':
+                  '"reality_tcp_port": REALITY_TCP_PORT,',
+              '"xhttp_reality_port": _port(config.get("xhttp_reality_port"), 8444),':
+                  '"xhttp_reality_port": XHTTP_REALITY_PORT,',
+              '"reality_tcp_port": _port(form.get("reality_tcp_port"), int(settings.port or 443)),':
+                  '"reality_tcp_port": REALITY_TCP_PORT,',
+              '"xhttp_reality_port": _port(form.get("xhttp_reality_port"), 8444),':
+                  '"xhttp_reality_port": XHTTP_REALITY_PORT,',
+          }
+          for source, target in replacements.items():
+              if text.count(source) != 1:
+                  raise SystemExit(f"expected one profiles.py anchor: {source}")
+              text = text.replace(source, target, 1)
+          profiles_path.write_text(text, encoding="utf-8")
+
+          template_path = Path("app/web/templates/connections.html")
+          template = template_path.read_text(encoding="utf-8")
+          old_block = '''                <label class="xps2-field-port">
+                  <span>{{ 'UDP-порт' if profile.id == 'hysteria2' else 'TCP-порт' }}</span>
+                  <input type="number" min="1" max="65535"
+                         name="{{ profile.id }}_port" value="{{ profile.port }}"
+                         {% if locked %}disabled{% endif %}>
+                </label>'''
+          new_block = '''                {% if profile.id in ['reality_tcp', 'xhttp_reality'] %}
+                <div class="xps2-field-port xps2-system-port">
+                  <span>TCP-порт</span>
+                  <output>{{ profile.port }}</output>
+                  <small>Системный порт SG-Gateway. Изменяется только вместе с серверной конфигурацией.</small>
+                </div>
+                {% else %}
+                <label class="xps2-field-port">
+                  <span>{{ 'UDP-порт' if profile.id == 'hysteria2' else 'TCP-порт' }}</span>
+                  <input type="number" min="1" max="65535"
+                         name="{{ profile.id }}_port" value="{{ profile.port }}"
+                         {% if locked %}disabled{% endif %}>
+                </label>
+                {% endif %}'''
+          if template.count(old_block) != 1:
+              raise SystemExit("connections.html port block anchor not found")
+          template_path.write_text(template.replace(old_block, new_block, 1), encoding="utf-8")
+          PY
+
+      - name: Verify targeted behavior
+        run: |
+          python -m pytest -q \
+            tests/test_sg_gateway_v22_core_xray_system_ports.py \
+            tests/test_sg_gateway_v22_xray_fingerprint.py \
+            tests/test_xray_profile_flow_v23.py \
+            tests/test_preview54_sgpanel_vless_port.py
+
+      - name: Remove one-time workflow and refresh source integrity
+        run: |
+          git rm .github/workflows/apply-core-xray-port-lock-once.yml
+          git add app/xray/profiles.py app/web/templates/connections.html tests/test_sg_gateway_v22_core_xray_system_ports.py
+          python - <<'PY'
+          import hashlib
+          import subprocess
+          from pathlib import Path
+
+          tracked = subprocess.check_output(["git", "ls-files"], text=True, encoding="utf-8").splitlines()
+          tracked = sorted(path for path in tracked if path != "SOURCE-SHA256SUMS")
+          lines = [f"{hashlib.sha256(Path(path).read_bytes()).hexdigest()}  {path}" for path in tracked]
+          Path("SOURCE-SHA256SUMS").write_text("\n".join(lines) + "\n", encoding="utf-8")
+          PY
+          git add SOURCE-SHA256SUMS
+
+      - name: Commit completed fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "fix: lock core Xray listener ports"
+          git push origin HEAD:fix/02206-lock-core-xray-ports
