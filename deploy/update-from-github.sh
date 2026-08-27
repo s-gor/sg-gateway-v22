@@ -62,12 +62,10 @@ post_update_awg3_bootstrap() {
   [[ -x "$python" && -f "$module" ]] || return 0
 
   printf '[SG-Gateway Update] Checking AWG3.0 first-start state...\n'
-  set -a
-  # shellcheck disable=SC1090
-  [[ -f "$config_dir/runtime.env" ]] && source "$config_dir/runtime.env"
-  # shellcheck disable=SC1090
-  [[ -f "$config_dir/sg-gateway.env" ]] && source "$config_dir/sg-gateway.env"
-  set +a
+  # Persisted env files contain passwords, hashes and keys. They are data,
+  # not shell programs: sourcing them can expand values such as $3 or execute
+  # substitutions. The AWG3 bootstrap reads runtime.env and engine secrets
+  # through its data parser; only the path overrides below must be exported.
 
   PYTHONPATH="$prefix:$prefix/hostd" \
   SG_GATEWAY_APP_ROOT="$prefix" \
