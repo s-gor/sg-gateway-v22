@@ -2,7 +2,8 @@ name: Apply AWG3 updater persistence patch
 
 on:
   push:
-    branches: [fix/awg3-unit-update-persistence]
+    branches:
+      - fix/awg3-unit-update-persistence
 
 permissions:
   contents: write
@@ -26,33 +27,33 @@ jobs:
           path = Path("deploy/update-from-github-core.sh")
           text = path.read_text(encoding="utf-8")
 
-          old = '''    "$AWG3_CONFIG" "$AWG3_UNIT" "$AWG3_ROOT" \\\n'''
-          new = '''    "$AWG3_CONFIG" "$AWG3_ROOT" \\\n'''
+          old = '    "$AWG3_CONFIG" "$AWG3_UNIT" "$AWG3_ROOT" \\\n'
+          new = '    "$AWG3_CONFIG" "$AWG3_ROOT" \\\n'
           if text.count(old) != 1:
               raise SystemExit(f"expected one protected AWG3 unit entry, found {text.count(old)}")
           text = text.replace(old, new, 1)
 
-          anchor = '''  find "$PREFIX/deploy" -maxdepth 1 -type f -name '*.sh' -exec chmod 0755 {} + 2>/dev/null || true
-'''
-          addition = anchor + '''
-  # The AWG3 config and userspace binaries remain preserved, but the systemd
-  # unit is managed source and must follow the deployed release. The previous
-  # unit is already inside Safety Backup and rollback restores it atomically.
-  [[ -f "$PREFIX/deploy/sg-gateway-awg3.service" ]] || \\
-    fail "deployed AWG3 systemd unit is missing"
-  install -m 0644 "$PREFIX/deploy/sg-gateway-awg3.service" "$AWG3_UNIT"
-  systemctl daemon-reload
-'''
+          anchor = '  find "$PREFIX/deploy" -maxdepth 1 -type f -name \'*.sh\' -exec chmod 0755 {} + 2>/dev/null || true\n'
+          addition = anchor + (
+              '\n'
+              '  # The AWG3 config and userspace binaries remain preserved, but the systemd\n'
+              '  # unit is managed source and must follow the deployed release. The previous\n'
+              '  # unit is already inside Safety Backup and rollback restores it atomically.\n'
+              '  [[ -f "$PREFIX/deploy/sg-gateway-awg3.service" ]] || \\\n'
+              '    fail "deployed AWG3 systemd unit is missing"\n'
+              '  install -m 0644 "$PREFIX/deploy/sg-gateway-awg3.service" "$AWG3_UNIT"\n'
+              '  systemctl daemon-reload\n'
+          )
           if text.count(anchor) != 1:
               raise SystemExit(f"expected one deploy chmod anchor, found {text.count(anchor)}")
           text = text.replace(anchor, addition, 1)
 
-          anchor = '''  verify_runtime_states_unchanged "$BACKUP_DIR/service-state.tsv"
-'''
-          addition = '''  cmp -s "$PREFIX/deploy/sg-gateway-awg3.service" "$AWG3_UNIT" || \\
-    fail "installed AWG3 systemd unit does not match deployed source"
-
-''' + anchor
+          anchor = '  verify_runtime_states_unchanged "$BACKUP_DIR/service-state.tsv"\n'
+          addition = (
+              '  cmp -s "$PREFIX/deploy/sg-gateway-awg3.service" "$AWG3_UNIT" || \\\n'
+              '    fail "installed AWG3 systemd unit does not match deployed source"\n\n'
+              + anchor
+          )
           if text.count(anchor) != 1:
               raise SystemExit(f"expected one runtime verification anchor, found {text.count(anchor)}")
           text = text.replace(anchor, addition, 1)
@@ -72,6 +73,6 @@ jobs:
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A deploy/update-from-github-core.sh tests/test_fix30_awg3_update_preservation.py SOURCE-SHA256SUMS .github/workflows/apply-awg3-unit-persistence.yml
+          git add -A
           git commit -m "fix: deploy current AWG3 unit during updates"
           git push origin HEAD:fix/awg3-unit-update-persistence
