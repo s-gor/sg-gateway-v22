@@ -37,8 +37,8 @@ def test_all_eight_vendor_files_are_required():
         "wgcf-cli-linux-64.tar.zstd",
         "amneziawg-tools-1.0.20260618-2.tar.gz",
         "amneziawg-linux-kernel-module-1.0.20260329-2.tar.gz",
-        "amneziawg-tools-3.1.20260812.tar.gz",
-        "amneziawg-go-linux-amd64-v3.1.20260814",
+        "amneziawg-tools-3.0.20260805.tar.gz",
+        "amneziawg-go-linux-amd64-v3.0.0",
     ):
         assert name in installer
         assert (ROOT / "vendor" / "cores" / name).is_file()
@@ -77,6 +77,7 @@ def test_full_uninstall_removes_orphaned_awg_dkms_module_files():
     assert 'find /lib/modules -type f' in uninstall
     assert "-path '*/updates/dkms/*' -delete" in uninstall
     assert uninstall.index('find /lib/modules -type f') < uninstall.index('depmod -a')
+
 
 def test_stage7_accepts_runtime_conflict_without_hiding_route_failures():
     installer = read("install.sh")

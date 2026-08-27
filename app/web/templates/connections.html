@@ -175,12 +175,14 @@
                   <strong>{{ profile.title }}</strong>
                   <span>{{ profile.transport }} · {{ profile.security }}</span>
                 </div>
+                {% if profile.id not in ['reality_tcp', 'xhttp_reality'] %}
                 <label class="xps2-field-port">
                   <span>{{ 'UDP-порт' if profile.id == 'hysteria2' else 'TCP-порт' }}</span>
                   <input type="number" min="1" max="65535"
                          name="{{ profile.id }}_port" value="{{ profile.port }}"
                          {% if locked %}disabled{% endif %}>
                 </label>
+                {% endif %}
                 {% if profile.mode %}
                 {% if profile.id == 'xhttp_reality' %}
                 <input type="hidden" name="{{ profile.id }}_mode" value="stream-one">
