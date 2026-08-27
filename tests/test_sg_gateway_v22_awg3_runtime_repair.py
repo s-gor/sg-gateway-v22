@@ -136,19 +136,19 @@ def test_runtime_ui_blocks_only_explicit_missing_awg3_and_exposes_deployment(mon
     assert state["deployment"] == {}
 
 
-def test_awg3_runtime_ui_prevents_new_access_but_preserves_selected_access() -> None:
+def test_awg3_runtime_ui_keeps_submission_enabled_and_server_gate_authoritative() -> None:
     production = (ROOT / "app" / "production.py").read_text(encoding="utf-8")
     clients = (ROOT / "app" / "web" / "templates" / "clients.html").read_text(encoding="utf-8")
     dialogs = (ROOT / "app" / "web" / "templates" / "_client_edit_dialogs.html").read_text(encoding="utf-8")
     detail = (ROOT / "app" / "web" / "templates" / "client_detail.html").read_text(encoding="utf-8")
+    provisioning_source = (ROOT / "app" / "engines" / "provisioning.py").read_text(encoding="utf-8")
     assert "runtime_engine_state" in production
-    assert "runtime_engine_state('amneziawg3')" in clients
-    assert "AWG3 runtime требует восстановления в Maintenance" in clients
-    assert "data-awg3-runtime-warning" in clients
-    assert "runtime_engine_state('amneziawg3')" in dialogs
-    assert "if (input.checked) return;" in dialogs
-    assert "input.disabled = true;" in dialogs
+    assert "runtime_engine_state('amneziawg3')" not in clients
+    assert "runtime_engine_state('amneziawg3')" not in dialogs
+    assert 'value="amneziawg3"' in clients
+    assert 'value="amneziawg3"' in dialogs
     assert 'value="amneziawg3"' in detail
+    assert "_require_awg3_runtime()" in provisioning_source
 
 
 def test_02204_missing_awg3_can_update_then_repair_without_blocking_other_clients() -> None:
