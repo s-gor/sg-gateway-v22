@@ -1,0 +1,49 @@
+name: Patch AWG3 idle contract
+
+on:
+  push:
+    branches:
+      - fix/awg3-initialize-on-install
+    paths:
+      - .github/workflows/patch-awg3-idle-contract.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/awg3-initialize-on-install
+          fetch-depth: 1
+      - name: Replace obsolete zero-client shutdown assertion
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("tests/test_sg_gateway_v22_runtime_contract_data_backup.py")
+          source = path.read_text(encoding="utf-8")
+          old = '''    assert apply_awg3.index("if not rows:") < apply_awg3.index("_tool(AWG3_AWG)")
+'''
+          new = '''    assert "if not rows and any(not path.is_file() for path in runtime_paths):" in apply_awg3
+    assert apply_awg3.index("_ensure_server_secrets()") < apply_awg3.index("_render(rows, secrets)")
+    assert apply_awg3.index("_render(rows, secrets)") < apply_awg3.index('["systemctl", "restart", AWG3_SERVICE]')
+'''
+          if old not in source:
+              raise SystemExit("obsolete AWG3 assertion was not found")
+          path.write_text(source.replace(old, new, 1), encoding="utf-8")
+
+          migration = Path("app/maintenance/awg3_idle_bootstrap.py")
+          body = migration.read_text(encoding="utf-8")
+          body = body.replace("import shutil\n", "").replace("import tempfile\n", "")
+          migration.write_text(body, encoding="utf-8")
+          PY
+      - name: Commit patch
+        run: |
+          git config user.name "SG-Gateway CI"
+          git config user.email "actions@users.noreply.github.com"
+          git add tests/test_sg_gateway_v22_runtime_contract_data_backup.py app/maintenance/awg3_idle_bootstrap.py
+          git commit -m "test: replace obsolete AWG3 zero-client shutdown contract"
+          git push origin HEAD:fix/awg3-initialize-on-install
