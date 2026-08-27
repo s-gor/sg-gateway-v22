@@ -1,3 +1,4 @@
+# Contract: install, fully uninstall, and install again on the same Ubuntu host.
 name: Reinstall after full uninstall smoke
 
 on:
