@@ -1,5 +1,6 @@
 name: Apply AWG3.0 runtime and port UI fix once
 
+# Retry after correcting the legacy AWG3 installer test contract.
 on:
   push:
     branches: [fix/02206-awg3-runtime-and-system-port-ui]
