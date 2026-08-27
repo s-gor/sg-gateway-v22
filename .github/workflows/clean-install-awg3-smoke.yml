@@ -1,0 +1,103 @@
+name: Clean install AWG3 smoke
+
+on:
+  push:
+    branches:
+      - test/clean-install-awg3
+
+permissions:
+  contents: read
+
+jobs:
+  clean-install-awg3:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Checkout clean-install candidate
+        uses: actions/checkout@v4
+
+      - name: Confirm clean SG-Gateway state
+        run: |
+          sudo test ! -e /opt/sg-gateway
+          sudo test ! -e /etc/sg-gateway
+          sudo test ! -e /var/lib/sg-gateway
+          sudo test ! -e /etc/systemd/system/sg-gateway-awg3.service
+
+      - name: Seed unattended clean-install parameters
+        run: |
+          PUBLIC_IP="$(curl -4 -fsS --max-time 15 https://api.ipify.org)"
+          python3 - "$PUBLIC_IP" <<'PY'
+          import ipaddress
+          import sys
+          ip = ipaddress.ip_address(sys.argv[1])
+          assert ip.version == 4 and ip.is_global, ip
+          PY
+          sudo install -m 0600 /dev/null /root/sg-gateway-02206-installer-resume.env
+          sudo tee /root/sg-gateway-02206-installer-resume.env >/dev/null <<EOF
+          PANEL_PORT=63443
+          XRAY_PORT=443
+          AWG_PORT=585
+          REALITY_TARGET=www.bing.com:443
+          REALITY_SNI=www.bing.com
+          ADMIN_PASSWORD=CleanInstallTest2026
+          ADMIN_PASSWORD_HASH=
+          PUBLIC_ADDRESS=$PUBLIC_IP
+          SERVER_NAME=sg-gateway-ci
+          COUNTRY_CODE=us
+          CREATE_SG_ADMIN=1
+          SECRET_KEY=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+          EOF
+
+      - name: Run native clean installer
+        env:
+          SG_GATEWAY_SOURCE_DIR: ${{ github.workspace }}
+          SG_GATEWAY_APT_WAIT_SECONDS: "900"
+        run: sudo -E bash install.sh
+
+      - name: Verify clean-install AWG3 unit
+        run: |
+          sudo cmp -s \
+            /opt/sg-gateway/deploy/sg-gateway-awg3.service \
+            /etc/systemd/system/sg-gateway-awg3.service
+          sudo systemctl is-active --quiet sg-hostd.service
+          sudo systemctl is-active --quiet sg-gateway.service
+
+      - name: Create and apply first AWG3 client
+        run: |
+          sudo bash -c '
+            set -a
+            source /etc/sg-gateway/runtime.env
+            source /etc/sg-gateway/sg-gateway.env
+            set +a
+            runuser -u sg-gateway -- env \
+              PYTHONPATH=/opt/sg-gateway:/opt/sg-gateway/hostd \
+              /opt/sg-gateway/.venv/bin/python - <<"PY"
+          from app.clients.repository import create_client, delete_client
+          from app.clients.runtime import apply_clients_runtime
+
+          client_id = create_client("ci-clean-awg3", "amneziawg3")
+          if not client_id:
+              raise SystemExit("AWG3 clean-install client was not created")
+          try:
+              result = apply_clients_runtime()
+          except Exception:
+              delete_client(client_id)
+              raise
+          print(result.get("message") or result)
+          PY
+          '
+
+      - name: Verify live AWG3 interface
+        run: |
+          sudo systemctl is-active --quiet sg-gateway-awg3.service
+          sudo test -S /run/amneziawg/awg3.sock
+          sudo ip link show dev awg3
+          test "$(sudo /opt/sg-gateway/awg3/bin/awg show awg3 listen-port)" = "586"
+          sudo /opt/sg-gateway/awg3/bin/awg show awg3
+
+      - name: Print diagnostics on failure
+        if: failure()
+        run: |
+          sudo systemctl status sg-gateway-awg3.service --no-pager || true
+          sudo journalctl -b -u sg-gateway-awg3.service -n 100 --no-pager || true
+          sudo tail -n 150 /var/log/sg-gateway-installer-02206.log || true
