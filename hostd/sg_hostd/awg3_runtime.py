@@ -405,17 +405,31 @@ def _runtime_valid() -> bool:
 
 
 def apply_awg3() -> cr.EngineResult:
-    # SG_GATEWAY_02206_AWG3_EMPTY_RUNTIME_V1
-    # Removing/disabling the last AWG3 client must remain possible even when an
-    # old installation never received the AWG3 userspace runtime. Only an
-    # active AWG3 deployment requires the tools.
+    # SG_GATEWAY_02206_AWG3_IDLE_BOOTSTRAP_V1
+    # AWG3 is a server profile, not only a collection of peers. A clean
+    # installation must therefore create its independent key/config and start
+    # UDP 586 even before the first client exists. Legacy installations with a
+    # completely missing optional runtime still remain removable: when there
+    # are no peers, absence of the tools is treated as an idle no-op.
     rows = cr._deployment_rows(ENGINE)
     ids = [int(row["client_id"]) for row in rows]
     previous = cr._status_snapshot(ENGINE)
 
-    if not rows:
-        subprocess.run(["systemctl", "stop", AWG3_SERVICE], capture_output=True, text=True, timeout=60, check=False)
-        return cr.EngineResult(ENGINE, True, "Нет активных клиентов AWG3", 0)
+    runtime_paths = (AWG3_AWG, AWG3_AWG_QUICK, AWG3_GO, AWG3_HELPER)
+    if not rows and any(not path.is_file() for path in runtime_paths):
+        subprocess.run(
+            ["systemctl", "stop", AWG3_SERVICE],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
+        )
+        return cr.EngineResult(
+            ENGINE,
+            True,
+            "AWG3 runtime отсутствует; пустой профиль оставлен выключенным",
+            0,
+        )
 
     _tool(AWG3_AWG)
     _tool(AWG3_AWG_QUICK)
@@ -427,6 +441,7 @@ def apply_awg3() -> cr.EngineResult:
 
     candidate = cr.CANDIDATE_DIR / "awg3.conf"
     backup = AWG3_CONFIG.with_suffix(".conf.previous")
+    had_config = AWG3_CONFIG.is_file()
     try:
         cr._set_engine_status(ENGINE, ids, "checking")
         body = _render(rows, secrets)
@@ -435,7 +450,7 @@ def apply_awg3() -> cr.EngineResult:
 
         cr._set_engine_status(ENGINE, ids, "applying")
         AWG3_CONFIG.parent.mkdir(parents=True, exist_ok=True)
-        if AWG3_CONFIG.is_file():
+        if had_config:
             shutil.copy2(AWG3_CONFIG, backup)
         cr._atomic_write(AWG3_CONFIG, body, 0o600)
         cr._run(["systemctl", "daemon-reload"], timeout=30)
@@ -447,11 +462,29 @@ def apply_awg3() -> cr.EngineResult:
             raise cr.ClientRuntimeError("AWG3: runtime не слушает заданный endpoint после запуска")
 
         cr._set_engine_status(ENGINE, ids, "applied")
-        return cr.EngineResult(ENGINE, True, f"AmneziaWG 3.0 применён; клиентов: {len(rows)}", len(rows))
+        message = (
+            "AmneziaWG 3.0 подготовлен; клиентов: 0"
+            if not rows
+            else f"AmneziaWG 3.0 применён; клиентов: {len(rows)}"
+        )
+        return cr.EngineResult(ENGINE, True, message, len(rows))
     except Exception as exc:
         if backup.is_file():
             shutil.copy2(backup, AWG3_CONFIG)
-            subprocess.run(["systemctl", "restart", AWG3_SERVICE], capture_output=True, text=True, check=False)
+            subprocess.run(
+                ["systemctl", "restart", AWG3_SERVICE],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        elif not had_config:
+            AWG3_CONFIG.unlink(missing_ok=True)
+            subprocess.run(
+                ["systemctl", "stop", AWG3_SERVICE],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
         restored = _runtime_valid()
         cr._set_failure_status(ENGINE, ids, previous, runtime_restored=restored)
         return cr.EngineResult(ENGINE, False, f"AWG3 userspace: {exc}", len(rows))

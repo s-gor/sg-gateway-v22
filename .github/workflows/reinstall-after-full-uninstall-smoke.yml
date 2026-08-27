@@ -9,6 +9,7 @@ on:
     paths:
       - .github/workflows/reinstall-after-full-uninstall-smoke.yml
       - tests/test_sg_gateway_v22_reinstall_after_full_uninstall.py
+      - tests/test_sg_gateway_v22_awg30_idle_bootstrap.py
       - install.sh
       - deploy/full-uninstall-ubuntu.sh
       - deploy/sg-gateway-awg3.service
@@ -24,6 +25,7 @@ on:
     paths:
       - .github/workflows/reinstall-after-full-uninstall-smoke.yml
       - tests/test_sg_gateway_v22_reinstall_after_full_uninstall.py
+      - tests/test_sg_gateway_v22_awg30_idle_bootstrap.py
       - install.sh
       - deploy/full-uninstall-ubuntu.sh
       - deploy/sg-gateway-awg3.service
@@ -147,6 +149,37 @@ jobs:
           SG_GATEWAY_SOURCE_DIR: ${{ github.workspace }}
           SG_GATEWAY_APT_WAIT_SECONDS: "900"
         run: sudo -E bash install.sh
+
+      - name: Verify initialized AWG3 immediately after reinstall
+        run: |
+          sudo systemctl is-active --quiet sg-gateway-awg3.service
+          sudo test -S /run/amneziawg/awg3.sock
+          sudo ip link show dev awg3
+          sudo test -s /etc/amnezia/amneziawg/awg3.conf
+          ! sudo grep -q '^\[Peer\]' /etc/amnezia/amneziawg/awg3.conf
+          test "$(sudo /opt/sg-gateway/awg3/bin/awg show awg3 listen-port)" = "586"
+          sudo awk -F= '
+            $1 == "SG_GATEWAY_AWG3_PUBLIC_KEY" && length($2) >= 40 { ready=1 }
+            END { exit(ready ? 0 : 1) }
+          ' /etc/sg-gateway/engine-secrets.env
+          sudo bash -c '
+            set -a
+            source /etc/sg-gateway/runtime.env
+            source /etc/sg-gateway/sg-gateway.env
+            set +a
+            runuser -u sg-gateway -- env \
+              PYTHONPATH=/opt/sg-gateway:/opt/sg-gateway/hostd \
+              /opt/sg-gateway/.venv/bin/python - <<"PY"
+          from app.db import connect
+
+          with connect() as connection:
+              peers = connection.execute(
+                  "SELECT COUNT(*) FROM device_credentials WHERE engine = ?",
+                  ("amneziawg3",),
+              ).fetchone()[0]
+          assert int(peers) == 0, peers
+          PY
+          '
 
       - name: Create and apply first AWG3 client after reinstall
         run: |

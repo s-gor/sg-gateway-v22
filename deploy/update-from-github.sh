@@ -52,6 +52,30 @@ bootstrap_resolve_commit() {
   printf '%s\n' "${resolved,,}"
 }
 
+post_update_awg3_bootstrap() {
+  local prefix="${SG_GATEWAY_PREFIX:-/opt/sg-gateway}"
+  local config_dir="${SG_GATEWAY_CONFIG_DIR:-/etc/sg-gateway}"
+  local data_dir="${SG_GATEWAY_DATA_DIR:-/var/lib/sg-gateway}"
+  local python="$prefix/.venv/bin/python"
+  local module="$prefix/app/maintenance/awg3_idle_bootstrap.py"
+
+  [[ -x "$python" && -f "$module" ]] || return 0
+
+  printf '[SG-Gateway Update] Checking AWG3.0 first-start state...\n'
+  set -a
+  # shellcheck disable=SC1090
+  [[ -f "$config_dir/runtime.env" ]] && source "$config_dir/runtime.env"
+  # shellcheck disable=SC1090
+  [[ -f "$config_dir/sg-gateway.env" ]] && source "$config_dir/sg-gateway.env"
+  set +a
+
+  PYTHONPATH="$prefix:$prefix/hostd" \
+  SG_GATEWAY_APP_ROOT="$prefix" \
+  SG_GATEWAY_CONFIG_DIR="$config_dir" \
+  SG_GATEWAY_DATA_DIR="$data_dir" \
+    "$python" -B -m app.maintenance.awg3_idle_bootstrap
+}
+
 bootstrap_main() {
   command -v curl >/dev/null 2>&1 || bootstrap_fail "required command is missing: curl"
   command -v python3 >/dev/null 2>&1 || bootstrap_fail "required command is missing: python3"
@@ -78,7 +102,8 @@ bootstrap_main() {
   SG_GATEWAY_SOURCE_COMMIT="$commit" bash "$core" "$@"
   rc=$?
   set -e
-  return "$rc"
+  (( rc == 0 )) || return "$rc"
+  post_update_awg3_bootstrap
 }
 
 PREFIX="/opt/sg-gateway"
