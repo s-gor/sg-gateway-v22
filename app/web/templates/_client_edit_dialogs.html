@@ -29,7 +29,6 @@
       <input type="text" name="name" maxlength="80" required value="{{ client.name|e }}" autocomplete="off">
     </label>
 
-    <input type="hidden" name="protocols" value="sgclient">
     <fieldset class="dv16-protocol-list">
       <legend>Каналы основного устройства</legend>
       <!-- SG_PROTOCOL_ORDER_START -->
@@ -57,6 +56,8 @@
       <label class="dv16-protocol {{ 'is-locked' if not tls.https_ready and not tuic_selected else '' }}"><input type="checkbox" name="protocols" value="tuic" {% if tuic_selected %}checked{% endif %} {% if not tls.https_ready and not tuic_selected %}disabled{% endif %}><span><strong>TUIC v5</strong><small>{{ 'Подключён — реквизиты сохранятся' if tuic_selected else ('Доступен' if tls.https_ready else 'Нужен HTTPS') }}</small></span></label>
       <!-- SG_PROTOCOL_ORDER_END -->
     </fieldset>
+    <!-- SG_AWG_ONLY_NOTICE_V1_EDIT_CLIENT -->
+    <div class="sg-awg-only-note" data-awg-only-note role="status" aria-live="polite">При выборе только AWG-профилей подписка не создаётся. Используйте QR-коды или файлы конфигурации для каждого соединения.</div>
 
     <label class="dv16-field">
       <span>Срок действия клиента</span>
@@ -87,7 +88,6 @@
     </header>
 
     <label class="dv16-field"><span>Название</span><input type="text" name="name" maxlength="60" required value="{{ device.name|e }}" autocomplete="off"></label>
-    <input type="hidden" name="protocols" value="sgclient">
     <fieldset class="dv16-protocol-list">
       <legend>Каналы подключения</legend>
       <!-- SG_PROTOCOL_ORDER_START -->
@@ -115,6 +115,8 @@
       <label class="dv16-protocol {{ 'is-locked' if not tls.https_ready and not tuic_selected else '' }}"><input type="checkbox" name="protocols" value="tuic" {% if tuic_selected %}checked{% endif %} {% if not tls.https_ready and not tuic_selected %}disabled{% endif %}><span><strong>TUIC v5</strong><small>{{ 'Подключён — реквизиты сохранятся' if tuic_selected else ('Доступен' if tls.https_ready else 'Нужен HTTPS') }}</small></span></label>
       <!-- SG_PROTOCOL_ORDER_END -->
     </fieldset>
+    <!-- SG_AWG_ONLY_NOTICE_V1_EDIT_DEVICE -->
+    <div class="sg-awg-only-note" data-awg-only-note role="status" aria-live="polite">При выборе только AWG-профилей подписка не создаётся. Используйте QR-коды или файлы конфигурации для каждого соединения.</div>
 
     <label class="dv16-field"><span>Срок действия</span><input type="date" name="expires_at" value="{{ device.expires_at or '' }}"><small>Пустое поле означает бессрочный доступ.</small></label>
     <footer class="dv16-dialog-actions"><button class="button" type="button" data-close-device-edit="{{ device.id }}">Отмена</button><button class="button primary" type="submit">Сохранить и применить</button></footer>
