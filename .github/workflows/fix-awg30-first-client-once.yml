@@ -20,12 +20,13 @@ jobs:
           fetch-depth: 0
 
       - name: Apply patch
-        run: python3 scripts/apply_awg30_first_client_fix.py
+        run: python3 scripts/apply_awg30_first_client_fix_v2.py
 
       - name: Remove temporary patch files and refresh integrity
         run: |
           git rm .github/workflows/fix-awg30-first-client-once.yml
           git rm scripts/apply_awg30_first_client_fix.py
+          git rm scripts/apply_awg30_first_client_fix_v2.py
           python3 - <<'PY'
           import hashlib
           import subprocess
