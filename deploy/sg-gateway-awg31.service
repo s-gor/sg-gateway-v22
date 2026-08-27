@@ -5,10 +5,14 @@ Wants=network-online.target
 
 [Service]
 Type=simple
+Environment=WG_PROCESS_FOREGROUND=1
 ExecStart=/opt/sg-gateway/deploy/sg-gateway-awg31-userspace.sh
 Restart=on-failure
 RestartSec=2
 RuntimeDirectory=amneziawg
+# AWG3.0 and AWG3.1 share /run/amneziawg. Stopping either service must not
+# remove the other profile's control socket and terminate its userspace daemon.
+RuntimeDirectoryPreserve=yes
 StateDirectory=sg-gateway/awg31
 
 [Install]
