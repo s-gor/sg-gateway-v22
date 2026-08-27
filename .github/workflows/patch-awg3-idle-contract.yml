@@ -25,12 +25,12 @@ jobs:
 
           path = Path("tests/test_sg_gateway_v22_runtime_contract_data_backup.py")
           source = path.read_text(encoding="utf-8")
-          old = '''    assert apply_awg3.index("if not rows:") < apply_awg3.index("_tool(AWG3_AWG)")
-'''
-          new = '''    assert "if not rows and any(not path.is_file() for path in runtime_paths):" in apply_awg3
-    assert apply_awg3.index("_ensure_server_secrets()") < apply_awg3.index("_render(rows, secrets)")
-    assert apply_awg3.index("_render(rows, secrets)") < apply_awg3.index('["systemctl", "restart", AWG3_SERVICE]')
-'''
+          old = '    assert apply_awg3.index("if not rows:") < apply_awg3.index("_tool(AWG3_AWG)")\n'
+          new = (
+              '    assert "if not rows and any(not path.is_file() for path in runtime_paths):" in apply_awg3\n'
+              '    assert apply_awg3.index("_ensure_server_secrets()") < apply_awg3.index("_render(rows, secrets)")\n'
+              '    assert apply_awg3.index("_render(rows, secrets)") < apply_awg3.index(\'["systemctl", "restart", AWG3_SERVICE]\')\n'
+          )
           if old not in source:
               raise SystemExit("obsolete AWG3 assertion was not found")
           path.write_text(source.replace(old, new, 1), encoding="utf-8")
