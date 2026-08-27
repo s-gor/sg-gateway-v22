@@ -19,26 +19,29 @@ jobs:
           ref: fix/02206-awg30-client-selection-runtime
           fetch-depth: 0
 
-      - name: Apply patch
-        run: python3 scripts/apply_awg30_first_client_fix_v3.py
+      - name: Apply templates patch
+        run: python3 scripts/apply_awg30_first_client_fix_v4.py
 
-      - name: Remove temporary patch files and refresh integrity
+      - name: Refresh clean-tree integrity manifest
         run: |
-          git rm .github/workflows/fix-awg30-first-client-once.yml
-          git rm scripts/apply_awg30_first_client_fix.py
-          git rm scripts/apply_awg30_first_client_fix_v2.py
-          git rm scripts/apply_awg30_first_client_fix_v3.py
           python3 - <<'PY'
           import hashlib
           import subprocess
           from pathlib import Path
 
+          excluded = {
+              '.github/workflows/fix-awg30-first-client-once.yml',
+              'scripts/apply_awg30_first_client_fix.py',
+              'scripts/apply_awg30_first_client_fix_v2.py',
+              'scripts/apply_awg30_first_client_fix_v3.py',
+              'scripts/apply_awg30_first_client_fix_v4.py',
+          }
           paths = subprocess.check_output(
               ['git', 'ls-files'], text=True, encoding='utf-8'
           ).splitlines()
           paths = [
               path for path in paths
-              if path != 'SOURCE-SHA256SUMS' and Path(path).exists()
+              if path != 'SOURCE-SHA256SUMS' and path not in excluded and Path(path).exists()
           ]
           Path('SOURCE-SHA256SUMS').write_text(
               '\n'.join(
@@ -49,10 +52,10 @@ jobs:
           )
           PY
 
-      - name: Commit fix
+      - name: Commit production changes
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
+          git add app/web/templates/clients.html app/web/templates/_client_edit_dialogs.html SOURCE-SHA256SUMS
           git commit -m "fix: restore AWG3.0 first-client submission"
           git push origin HEAD:fix/02206-awg30-client-selection-runtime
