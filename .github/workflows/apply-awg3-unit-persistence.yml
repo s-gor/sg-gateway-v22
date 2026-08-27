@@ -17,6 +17,13 @@ jobs:
           ref: fix/awg3-unit-update-persistence
           fetch-depth: 1
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install test dependencies
+        run: python -m pip install -r requirements-dev.txt
+
       - name: Patch updater and remove one-shot workflow
         run: |
           python3 - <<'PY'
