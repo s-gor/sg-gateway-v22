@@ -11,6 +11,31 @@ def test_panel_update_preserves_awg3_userspace_and_checks_service_state():
     assert "verify_runtime_states_unchanged" in text
 
 
+def test_panel_update_deploys_current_awg3_unit_without_replacing_runtime():
+    text = UPDATER.read_text(encoding="utf-8")
+
+    # The generated config and userspace binaries remain protected, while the
+    # managed systemd unit must follow the source tree. Otherwise an update can
+    # deploy a fixed unit under /opt but keep the stale unit in /etc/systemd.
+    protected = text[text.index("protected_runtime_paths() {") : text.index("create_safety_backup() {")]
+    assert '"$AWG3_CONFIG"' in protected
+    assert '"$AWG3_ROOT"' in protected
+    assert '"$AWG3_UNIT"' not in protected
+
+    backup = text[text.index("create_safety_backup() {") : text.index("rollback_update() {")]
+    assert "etc/systemd/system/sg-gateway-awg3.service" in backup
+
+    deploy = text[text.index("deploy_source() {") : text.index("restart_panel() {")]
+    assert '".venv"|"awg3") continue ;;' in deploy
+    assert 'rm -rf "$stage/vendor/cores"' in deploy
+    assert 'install -m 0644 "$PREFIX/deploy/sg-gateway-awg3.service" "$AWG3_UNIT"' in deploy
+    assert "systemctl daemon-reload" in deploy
+
+    final = text[text.index("verify_final() {") : text.index("bind_panel_update_state() {")]
+    assert 'cmp -s "$PREFIX/deploy/sg-gateway-awg3.service" "$AWG3_UNIT"' in final
+    assert "verify_runtime_states_unchanged" in final
+
+
 def test_panel_update_accepts_missing_awg3_as_a_preserved_runtime_state():
     text = UPDATER.read_text(encoding="utf-8")
 
@@ -20,7 +45,6 @@ def test_panel_update_accepts_missing_awg3_as_a_preserved_runtime_state():
     assert 'digest.update(b"MISSING\\0")' in text
     protected = text[text.index("protected_runtime_paths() {") : text.index("create_safety_backup() {")]
     assert '"$AWG3_CONFIG"' in protected
-    assert '"$AWG3_UNIT"' in protected
     assert '"$AWG3_ROOT"' in protected
 
     preflight = text[text.index("preflight() {") : text.index("resolve_source_commit() {")]
