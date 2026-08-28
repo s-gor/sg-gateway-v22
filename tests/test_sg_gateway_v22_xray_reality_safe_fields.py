@@ -11,13 +11,15 @@ ROOT = Path(__file__).resolve().parents[1]
 SCRIPT_PATH = ROOT / "app/web/static/sg-xmux-settings-v1.js"
 
 
-def test_fingerprint_native_menu_uses_readable_theme_colors() -> None:
+def test_fingerprint_native_menu_uses_readable_system_popup() -> None:
     script = SCRIPT_PATH.read_text(encoding="utf-8")
 
     assert "data-fingerprint-panel" in script
-    assert "colorScheme" in script
+    assert "fingerprint.style.colorScheme = 'light'" in script
     assert "querySelectorAll('option, optgroup')" in script
-    assert "getComputedStyle(fingerprint)" in script
+    assert "item.style.backgroundColor = '#ffffff'" in script
+    assert "item.style.color = '#17212b'" in script
+    assert "getComputedStyle(fingerprint)" not in script
 
 
 def test_xray_client_settings_are_two_open_rows() -> None:
@@ -36,15 +38,19 @@ def test_xray_client_settings_are_two_open_rows() -> None:
     assert "configureCompactRealityPanel" not in script
 
 
-def test_xray_client_settings_have_compact_responsive_grid() -> None:
+def test_xray_client_settings_have_balanced_responsive_grid() -> None:
     script = SCRIPT_PATH.read_text(encoding="utf-8")
 
     assert ".xray-settings-primary" in script
-    assert "grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto" in script
+    assert "grid-template-columns: minmax(340px, .8fr) minmax(420px, 1.2fr) auto" in script
+    assert ".xray-settings-primary > .xray-reality-sni" in script
+    assert ".xray-settings-primary > .xray-reality-sni input" in script
+    assert "max-width: none !important" in script
     assert ".xray-settings-identity" in script
-    assert "grid-template-columns: minmax(0, 1.45fr) minmax(260px, .55fr)" in script
+    assert "grid-template-columns: minmax(0, 1.4fr) minmax(300px, .6fr)" in script
     assert ".xray-copy-icon" in script
-    assert "@media (max-width: 900px)" in script
+    assert "@media (max-width: 1100px)" in script
+    assert "@media (max-width: 700px)" in script
 
 
 def test_public_xray_form_changes_only_sni(
