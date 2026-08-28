@@ -229,11 +229,12 @@ def _storage_config(
     parameters: Mapping[str, str | int],
     server_public_key: str = "",
     header_protection_key: str = "",
+    dns: str = DNS,
 ) -> dict:
     return {
         "profile": PROFILE_ID,
         "generation": 31,
-        "dns": DNS,
+        "dns": dns,
         "transport": TRANSPORT,
         "endpoint": ENDPOINT,
         "allowed_ips": "0.0.0.0/0",
@@ -283,11 +284,17 @@ def get_settings() -> Awg31Settings:
         enabled=bool(row["enabled"]),
         host=str(row["host"] or HOST),
         port=int(row["port"] or PORT),
+        dns=str(config.get("dns") or DNS),
     )
 
 
-def _update_storage(parameters: Mapping[str, str | int], server_public_key: str, header_key: str) -> None:
-    config = _storage_config(parameters, server_public_key, header_key)
+def _update_storage(
+    parameters: Mapping[str, str | int],
+    server_public_key: str,
+    header_key: str,
+    dns: str = DNS,
+) -> None:
+    config = _storage_config(parameters, server_public_key, header_key, dns)
     with connect() as connection:
         connection.execute(
             """
@@ -320,13 +327,20 @@ def save_settings(values: Mapping[str, object]) -> Awg31Settings:
     merged = dict(current.parameters)
     merged.update(values)
     parameters = validate_parameters(merged)
-    _update_storage(parameters, current.server_public_key, current.header_protection_key)
+    _update_storage(
+        parameters, current.server_public_key, current.header_protection_key, current.dns
+    )
     return get_settings()
 
 
 def set_server_public_key(value: str) -> None:
     current = get_settings()
-    _update_storage(current.parameters, str(value or "").strip(), current.header_protection_key)
+    _update_storage(
+        current.parameters,
+        str(value or "").strip(),
+        current.header_protection_key,
+        current.dns,
+    )
 
 
 def set_protocol_state(values: Mapping[str, object], header_protection_key: str) -> Awg31Settings:
@@ -335,7 +349,7 @@ def set_protocol_state(values: Mapping[str, object], header_protection_key: str)
     key = str(header_protection_key or "").strip()
     if not key:
         raise Awg31ValidationError("HeaderProtectionKey is required for AWG 3.1")
-    _update_storage(parameters, current.server_public_key, key)
+    _update_storage(parameters, current.server_public_key, key, current.dns)
     return get_settings()
 
 

@@ -340,10 +340,9 @@
             <span class="cnv1-engine-status {{ 'success' if awg_key_ready else 'warning' }}"><span></span>{{ 'Настроено' if awg_key_ready else 'Требует настройки' }}</span>
           </header>
           <section class="cnv1-endpoint-card sg-ljd-nested">
-            <div class="cnv1-endpoint-main"><img src="{{ country_flag_url(awg_country) }}" alt="{{ country_name(awg_country) }}" width="30" height="20"><div><span>ВНЕШНЯЯ ТОЧКА</span><strong>{{ awg_public_host }}</strong><small>UDP {{ awg_settings.port }} · {{ country_name(awg_country) }}</small></div></div>
-            <span class="cnv1-port-chip">UDP {{ awg_settings.port }}</span>
+            <div class="cnv1-endpoint-main"><img src="{{ country_flag_url(awg_country) }}" alt="{{ country_name(awg_country) }}" width="30" height="20"><div><span>ВНЕШНЯЯ ТОЧКА</span><strong>{{ awg_public_host }}:{{ awg_settings.port }} · DNS {{ awg_dns.dns }}</strong><small>{{ country_name(awg_country) }}</small></div></div>
           </section>
-          <form method="post" action="{{ url_for('update_amneziawg') }}" class="cnv1-engine-form cnv1-engine-form-compact">
+          <form method="post" action="{{ url_for('update_amneziawg') }}" class="cnv1-engine-form cnv1-engine-form-compact awgd-legacy-settings" hidden>
             <input type="hidden" name="host" value="{{ awg_public_host }}"><input type="hidden" name="country_code" value="{{ awg_country }}">
             <div class="cnv1-compact-fields"><label><span>UDP-порт</span><input type="number" name="port" min="585" max="585" value="{{ awg_settings.port }}" readonly required></label><label><span>DNS</span><input type="text" name="dns" value="{{ awg_settings.config.get('dns', '1.1.1.1') }}"></label></div>
             <details class="cnv1-advanced sg-ljd-nested"><summary><span>Дополнительно · ключ сервера</span><span>{{ 'Настроен' if awg_key_ready else 'Требует настройки' }}</span></summary><div class="cnv1-advanced-body"><label><span>Server public key</span><textarea name="server_public_key" rows="3">{{ awg_settings.config.get('server_public_key', '') }}</textarea><small>Публичный ключ AWG2 для новых клиентских файлов.</small></label></div></details>
@@ -357,10 +356,9 @@
             <span class="cnv1-engine-status {{ 'success' if awg3_key_ready else 'warning' }}"><span></span>{{ 'Настроено' if awg3_key_ready else 'Готов к первому запуску' }}</span>
           </header>
           <section class="cnv1-endpoint-card sg-ljd-nested">
-            <div class="cnv1-endpoint-main"><img src="{{ country_flag_url(awg3_country) }}" alt="{{ country_name(awg3_country) }}" width="30" height="20"><div><span>ВНЕШНЯЯ ТОЧКА</span><strong>{{ awg3_public_host }}</strong><small>UDP {{ awg3_settings.port }} · {{ country_name(awg3_country) }}</small></div></div>
-            <span class="cnv1-port-chip">UDP {{ awg3_settings.port }}</span>
+            <div class="cnv1-endpoint-main"><img src="{{ country_flag_url(awg3_country) }}" alt="{{ country_name(awg3_country) }}" width="30" height="20"><div><span>ВНЕШНЯЯ ТОЧКА</span><strong>{{ awg3_public_host }}:{{ awg3_settings.port }} · DNS {{ awg_dns.dns }}</strong><small>{{ country_name(awg3_country) }}</small></div></div>
           </section>
-          <form method="post" action="{{ url_for('update_amneziawg3') }}" class="cnv1-engine-form cnv1-engine-form-compact">
+          <form method="post" action="{{ url_for('update_amneziawg3') }}" class="cnv1-engine-form cnv1-engine-form-compact awgd-legacy-settings" hidden>
             <input type="hidden" name="host" value="{{ awg3_public_host }}"><input type="hidden" name="country_code" value="{{ awg3_country }}">
             <div class="cnv1-compact-fields"><label><span>UDP-порт</span><input type="number" name="port" min="586" max="586" value="{{ awg3_settings.port }}" readonly required></label><label><span>DNS</span><input type="text" name="dns" value="{{ awg3_settings.config.get('dns', '1.1.1.1') }}"></label></div>
             <details class="cnv1-advanced sg-ljd-nested"><summary><span>Дополнительно · ключ сервера</span><span>{{ 'Настроен' if awg3_key_ready else 'Создастся автоматически' }}</span></summary><div class="cnv1-advanced-body"><label><span>Server public key</span><textarea name="server_public_key" rows="3">{{ awg3_settings.config.get('server_public_key', '') }}</textarea><small>AWG3 создаёт собственный ключ и синхронизирует его после успешного runtime apply.</small></label></div></details>
@@ -370,6 +368,19 @@
 
         {% include "_awg31_panel.html" %}
       </div>
+
+      <section id="awg-dns" class="awgd-shared-dns sg-ljd-nested">
+        <div class="awgd-shared-dns-copy">
+          <span>ОБЩАЯ НАСТРОЙКА</span>
+          <strong>DNS клиентов AWG</strong>
+          <small>Используется устройствами при активном VPN. Сохранение обновит AWG 2.0, 3.0, 3.1 и существующие клиентские конфигурации.</small>
+        </div>
+        <form method="post" action="{{ url_for('update_awg_dns') }}" class="awgd-shared-dns-form">
+          <label><span>DNS</span><input type="text" name="dns" value="{{ awg_dns.dns }}" inputmode="decimal" autocomplete="off" required></label>
+          <button class="button primary" type="submit">Сохранить DNS</button>
+        </form>
+        {% if not awg_dns.consistent %}<p class="awgd-shared-dns-warning">В профилях сохранены разные DNS. Нажмите «Сохранить DNS», чтобы синхронизировать их.</p>{% endif %}
+      </section>
     </article>
 
     {% include "_mihomo_panel.html" %}
