@@ -40,7 +40,10 @@ jobs:
               "\n".join(rows) + "\n", encoding="utf-8"
           )
 
-          expected = dict(row.split("  ", 1) for row in rows)
+          expected = {}
+          for row in rows:
+              digest, path = row.split("  ", 1)
+              expected[path] = digest
           assert set(expected) == set(tracked)
           for path, digest in expected.items():
               assert hashlib.sha256(Path(path).read_bytes()).hexdigest() == digest
