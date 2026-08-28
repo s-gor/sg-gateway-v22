@@ -251,6 +251,41 @@ def _process_rss(names: tuple[str, ...]) -> int:
     return total
 
 
+
+def _sg_gateway_process_rss(
+    proc_root: Path = Path("/proc"),
+    app_root: Path | None = None,
+) -> int:
+    root = (app_root or Path(__file__).resolve().parents[1]).resolve()
+    venv_root = str((root / ".venv").resolve())
+    allowed_apps = ("app.production:app", "sg_hostd.app:app")
+    total = 0
+
+    if not proc_root.exists():
+        return total
+
+    for item in proc_root.iterdir():
+        if not item.name.isdigit():
+            continue
+        try:
+            command = (item / "cmdline").read_bytes().replace(b"\0", b" ").decode(
+                "utf-8", errors="replace"
+            )
+            if venv_root not in command:
+                continue
+            if not any(application in command for application in allowed_apps):
+                continue
+            status = (item / "status").read_text(encoding="utf-8")
+        except OSError:
+            continue
+
+        match = re.search(r"VmRSS:\s+(\d+)\s+kB", status)
+        if match:
+            total += int(match.group(1)) * 1024
+
+    return total
+
+
 def _resource_state(percent: int) -> tuple[str, str]:
     if percent >= 95:
         return "critical", "Критично"
@@ -444,7 +479,7 @@ def _dashboard_resources() -> dict:
     used_percent = round(used * 100 / total) if total else 0
     memory_state, memory_label = _resource_state(used_percent)
 
-    panel_rss = _process_rss(("python", "waitress"))
+    panel_rss = _sg_gateway_process_rss()
     web_rss = _process_rss(("nginx",))
 
     # Build one non-overlapping partition of total RAM for the detail rows.
