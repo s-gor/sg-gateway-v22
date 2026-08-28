@@ -87,8 +87,26 @@
       (selected || optionButtons.find((optionButton) => !optionButton.disabled))?.focus();
     };
 
+    const positionMenu = () => {
+      const rect = trigger.getBoundingClientRect();
+      const viewportGap = 12;
+      const preferredHeight = 340;
+      const spaceBelow = window.innerHeight - rect.bottom - viewportGap;
+      const spaceAbove = rect.top - viewportGap;
+      const openUp = spaceBelow < preferredHeight && spaceAbove > spaceBelow;
+      const availableSpace = openUp ? spaceAbove : spaceBelow;
+      const availableHeight = Math.max(96, Math.min(preferredHeight, availableSpace));
+      menu.classList.toggle('opens-up', openUp);
+      menu.style.maxHeight = `${availableHeight}px`;
+    };
+
+    const repositionOpenMenu = () => {
+      if (!menu.hidden) positionMenu();
+    };
+
     const openMenu = () => {
       menu.hidden = false;
+      positionMenu();
       picker.classList.add('is-open');
       trigger.setAttribute('aria-expanded', 'true');
       window.requestAnimationFrame(focusSelected);
@@ -96,6 +114,8 @@
 
     function closeMenu(returnFocus = false) {
       menu.hidden = true;
+      menu.classList.remove('opens-up');
+      menu.style.removeProperty('max-height');
       picker.classList.remove('is-open');
       trigger.setAttribute('aria-expanded', 'false');
       if (returnFocus) trigger.focus();
@@ -131,6 +151,8 @@
     document.addEventListener('click', (event) => {
       if (!picker.contains(event.target)) closeMenu();
     });
+    window.addEventListener('resize', repositionOpenMenu);
+    window.addEventListener('scroll', repositionOpenMenu, true);
     fingerprint.addEventListener('change', syncSelection);
 
     fingerprint.hidden = true;
@@ -202,6 +224,7 @@
         white-space: nowrap;
       }
       .cnv1-engine-xray .xray-fingerprint-picker {
+        --xray-picker-menu-bg: #10253a;
         position: relative;
         width: 100%;
         min-width: 0;
@@ -244,18 +267,30 @@
       }
       .cnv1-engine-xray .xray-fingerprint-menu {
         position: absolute;
-        z-index: 120;
+        z-index: 500;
         top: calc(100% + 6px);
         right: 0;
         left: 0;
-        max-height: min(430px, calc(100vh - 150px));
         overflow-y: auto;
+        overscroll-behavior: contain;
+        scrollbar-gutter: stable;
+        isolation: isolate;
+        opacity: 1;
         border: 1px solid var(--xray-picker-border, var(--line));
         border-radius: var(--xray-picker-radius, 8px);
-        background: var(--xray-picker-bg, var(--panel-3));
+        background: var(--xray-picker-menu-bg);
         color: var(--xray-picker-color, var(--text));
         padding: 6px;
-        box-shadow: 0 18px 42px rgba(0, 0, 0, .34);
+        box-shadow: 0 20px 48px rgba(0, 0, 0, .58);
+        backdrop-filter: none;
+      }
+      .cnv1-engine-xray .xray-fingerprint-menu.opens-up {
+        top: auto;
+        bottom: calc(100% + 6px);
+      }
+      html[data-theme="light"] .cnv1-engine-xray .xray-fingerprint-menu {
+        background: #f8fafc;
+        box-shadow: 0 18px 42px rgba(28, 45, 62, .24);
       }
       .cnv1-engine-xray .xray-fingerprint-menu[hidden] {
         display: none !important;
