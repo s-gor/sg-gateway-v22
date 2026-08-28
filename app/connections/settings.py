@@ -65,29 +65,22 @@ def _is_public_xray_form_update() -> bool:
     return bool(has_request_context() and request.endpoint == "update_xray")
 
 
-def _current_engine_config(engine: str) -> dict:
-    with connect() as connection:
-        row = connection.execute(
-            "SELECT config_json FROM connection_settings WHERE engine = ?",
-            (engine,),
-        ).fetchone()
-    if row is None:
-        return {}
-    try:
-        config = json.loads(row["config_json"] or "{}")
-    except (TypeError, ValueError, json.JSONDecodeError):
-        return {}
-    return config if isinstance(config, dict) else {}
-
-
 def update_connection_settings(engine: str, host: str, port: int | str, config: dict) -> bool:
-    clean_host = _clean_host(host)
-    if engine == "amneziawg":
-        clean_port = AMNEZIAWG_UDP_PORT
-    elif engine == "amneziawg3":
-        clean_port = AMNEZIAWG3_UDP_PORT
+    public_xray_update = engine == "xray" and _is_public_xray_form_update()
+    current_xray = get_connection_settings(engine) if public_xray_update else None
+
+    if current_xray is not None:
+        clean_host = current_xray.host
+        clean_port = current_xray.port
     else:
-        clean_port = _clean_port(port)
+        clean_host = _clean_host(host)
+        if engine == "amneziawg":
+            clean_port = AMNEZIAWG_UDP_PORT
+        elif engine == "amneziawg3":
+            clean_port = AMNEZIAWG3_UDP_PORT
+        else:
+            clean_port = _clean_port(port)
+
     if clean_host is None or clean_port is None:
         log_operation(
             action="connection.update",
@@ -97,20 +90,23 @@ def update_connection_settings(engine: str, host: str, port: int | str, config: 
         )
         return False
 
-    stored_config = dict(config)
-    if engine == "xray":
-        # The Reality TCP listener has one port in both legacy endpoint metadata
-        # and the current profile configuration. Keep them atomic.
-        stored_config["reality_tcp_port"] = clean_port
+    if current_xray is not None:
+        requested_server_name = str(
+            config.get(
+                "server_name",
+                current_xray.config.get("server_name", "www.cloudflare.com"),
+            )
+        ).strip()
+        stored_config = dict(current_xray.config)
+        stored_config["server_name"] = requested_server_name
+    else:
+        stored_config = dict(config)
 
-        # public_key and short_id are derived from root-owned server identity.
-        # The ordinary web form may display them, but only trusted installer or
-        # maintenance code outside this route may replace them.
-        if _is_public_xray_form_update():
-            current_config = _current_engine_config(engine)
-            for key in ("public_key", "short_id"):
-                if key in current_config:
-                    stored_config[key] = current_config[key]
+    if engine == "xray":
+        # The listener endpoint and Reality identity are server-managed. The
+        # ordinary Connections form may change only server_name (SNI), while
+        # trusted installer and maintenance callers can still update all data.
+        stored_config["reality_tcp_port"] = clean_port
 
     with connect() as connection:
         cursor = connection.execute(
@@ -139,9 +135,14 @@ def update_connection_settings(engine: str, host: str, port: int | str, config: 
         )
         return False
 
+    message = (
+        f"Reality SNI обновлён: {stored_config.get('server_name', '')}"
+        if public_xray_update
+        else f"Адрес {engine} обновлён: {clean_host}:{clean_port}"
+    )
     log_operation(
         action="connection.update",
         target=f"connection:{engine}",
-        message=f"Адрес {engine} обновлён: {clean_host}:{clean_port}",
+        message=message,
     )
     return True
