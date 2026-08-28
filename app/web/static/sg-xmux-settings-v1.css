@@ -452,3 +452,81 @@ html[data-theme="light"] .xps2-salamander {
     white-space: normal;
   }
 }
+
+/* Reality settings: one editable SNI row and one compact read-only identity row. */
+.xray-reality-compact {
+  gap: 12px;
+}
+
+.xray-reality-compact-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(280px, .65fr);
+  grid-template-areas:
+    "sni sni"
+    "public short";
+  gap: 12px 14px;
+}
+
+.xray-reality-compact-grid > label {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+}
+
+.xray-reality-sni { grid-area: sni; }
+.xray-reality-public { grid-area: public; }
+.xray-reality-short { grid-area: short; }
+
+.xray-reality-value-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: stretch;
+  gap: 8px;
+  min-width: 0;
+}
+
+.xray-reality-value-row input,
+.xray-reality-value-row textarea {
+  min-width: 0;
+  min-height: 42px;
+  height: 42px;
+  resize: none;
+  overflow: hidden;
+  white-space: nowrap;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.xray-reality-readonly input,
+.xray-reality-readonly textarea {
+  cursor: text;
+  opacity: .92;
+}
+
+.xray-reality-copy {
+  min-width: 112px;
+  min-height: 42px;
+  padding-inline: 14px;
+}
+
+.xray-reality-actions {
+  margin-top: 0;
+  padding-top: 12px;
+}
+
+.xray-reality-actions > span {
+  font-size: 12px;
+}
+
+@media (max-width: 760px) {
+  .xray-reality-compact-grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "sni"
+      "public"
+      "short";
+  }
+
+  .xray-reality-value-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+}

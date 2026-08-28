@@ -20,56 +20,93 @@
     });
   };
 
-  const lockRealityIdentity = () => {
-    const fields = [
-      document.querySelector('.cnv1-engine-xray textarea[name="public_key"]'),
-      document.querySelector('.cnv1-engine-xray input[name="short_id"]'),
-    ].filter(Boolean);
+  const configureCompactRealityPanel = () => {
+    const form = document.querySelector(
+      '.cnv1-engine-xray form[action$="/connections/xray"]'
+    );
+    if (!form) return;
 
-    fields.forEach((field) => {
+    const grid = form.querySelector('.cnv1-form-grid');
+    if (!grid) return;
+
+    form.classList.add('xray-reality-compact');
+    grid.classList.add('xray-reality-compact-grid');
+
+    const hostField = grid.querySelector('input[name="host"]');
+    const portField = grid.querySelector('input[name="port"]');
+    hostField.closest('label')?.remove();
+    portField.closest('label')?.remove();
+
+    const serverName = grid.querySelector('input[name="server_name"]');
+    const serverNameLabel = serverName?.closest('label');
+    serverNameLabel?.classList.add('xray-reality-sni');
+
+    const details = form.closest('details');
+    const summaryTitle = details?.querySelector(':scope > summary span:first-child');
+    if (summaryTitle) summaryTitle.textContent = 'Reality SNI и ключи';
+
+    const addCopyAction = (field, areaClass) => {
+      if (!field) return;
+
       field.readOnly = true;
       field.removeAttribute('name');
       field.setAttribute('aria-readonly', 'true');
       field.dataset.serverManaged = '1';
       field.title = 'Значение управляется сервером';
+      if (field.tagName === 'TEXTAREA') field.rows = 1;
 
       const label = field.closest('label');
-      if (label && !label.querySelector('[data-server-managed-note]')) {
-        const note = document.createElement('small');
-        note.dataset.serverManagedNote = '1';
-        note.textContent = 'Управляется сервером · только чтение';
-        label.append(note);
-      }
-    });
-  };
+      if (!label) return;
+      label.classList.add('xray-reality-readonly', areaClass);
+      label.querySelector('[data-server-managed-note]')?.remove();
 
-  const bindRealityPortToApply = () => {
-    const portField = document.querySelector(
-      '.cnv1-engine-xray form[action$="/connections/xray"] input[name="port"]'
-    );
-    const profilesForm = document.getElementById('xps2-form');
-    if (!portField || !profilesForm) return;
+      const valueRow = document.createElement('div');
+      valueRow.className = 'xray-reality-value-row';
+      field.replaceWith(valueRow);
+      valueRow.append(field);
 
-    let mirror = profilesForm.querySelector('input[name="reality_tcp_port"]');
-    if (!mirror) {
-      mirror = document.createElement('input');
-      mirror.type = 'hidden';
-      mirror.name = 'reality_tcp_port';
-      profilesForm.append(mirror);
-    }
-
-    const syncPort = () => {
-      mirror.value = portField.value;
+      const copyButton = document.createElement('button');
+      copyButton.type = 'button';
+      copyButton.className = 'button xray-reality-copy';
+      copyButton.textContent = 'Копировать';
+      copyButton.addEventListener('click', async () => {
+        const original = copyButton.textContent;
+        try {
+          await navigator.clipboard.writeText(field.value);
+          copyButton.textContent = 'Скопировано';
+        } catch (_error) {
+          field.focus();
+          field.select();
+          document.execCommand('copy');
+          copyButton.textContent = 'Скопировано';
+        }
+        window.setTimeout(() => {
+          copyButton.textContent = original;
+        }, 1400);
+      });
+      valueRow.append(copyButton);
     };
-    portField.addEventListener('input', syncPort);
-    profilesForm.addEventListener('submit', syncPort);
-    syncPort();
+
+    addCopyAction(
+      grid.querySelector('textarea[name="public_key"]'),
+      'xray-reality-public'
+    );
+    addCopyAction(
+      grid.querySelector('input[name="short_id"]'),
+      'xray-reality-short'
+    );
+
+    const footer = form.querySelector('.cnv1-form-actions');
+    footer?.classList.add('xray-reality-actions');
+    const footerText = footer?.querySelector('span');
+    if (footerText) footerText.textContent = 'Изменяется только Reality SNI.';
+    const submitButton = footer?.querySelector('button[type="submit"]');
+    if (submitButton) submitButton.textContent = 'Сохранить SNI';
   };
 
   const ready = () => {
     configureFingerprintMenu();
-    lockRealityIdentity();
-    bindRealityPortToApply();
+    configureCompactRealityPanel();
 
     const form = document.querySelector('[data-xmux-form]');
     if (form) {
