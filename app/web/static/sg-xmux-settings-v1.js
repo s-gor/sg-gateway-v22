@@ -20,34 +20,200 @@
     });
   };
 
-  const configureCompactRealityPanel = () => {
+  const ensureXrayTwoRowStyles = () => {
+    if (document.getElementById('xray-two-row-styles')) return;
+
+    const style = document.createElement('style');
+    style.id = 'xray-two-row-styles';
+    style.textContent = `
+      .cnv1-engine-xray .xray-settings-primary {
+        display: grid !important;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto !important;
+        grid-template-areas: "fingerprint sni action" !important;
+        align-items: end;
+        gap: 10px 12px;
+        padding: 12px 14px;
+      }
+      .cnv1-engine-xray .xray-settings-primary .xps2-parameter-title {
+        display: none !important;
+      }
+      .cnv1-engine-xray .xray-settings-primary > .xps2-field-mode {
+        grid-area: fingerprint !important;
+      }
+      .cnv1-engine-xray .xray-settings-primary > .xray-reality-sni {
+        display: grid;
+        grid-area: sni;
+        min-width: 0;
+        gap: 5px;
+      }
+      .cnv1-engine-xray .xray-settings-primary > label > span {
+        display: block !important;
+        color: var(--sg-muted);
+        font-size: 9.5px;
+        font-weight: 800;
+        letter-spacing: .025em;
+      }
+      .cnv1-engine-xray .xray-settings-primary .xps2-field-mode > small {
+        display: none !important;
+      }
+      .cnv1-engine-xray .xray-settings-primary select,
+      .cnv1-engine-xray .xray-settings-primary input {
+        width: 100%;
+        min-width: 0;
+        min-height: 42px;
+      }
+      .cnv1-engine-xray .xray-settings-primary > .xray-reality-save {
+        grid-area: action;
+        min-height: 42px;
+        padding-inline: 16px;
+        white-space: nowrap;
+      }
+      .cnv1-engine-xray .xray-settings-identity {
+        display: grid !important;
+        grid-template-columns: minmax(0, 1.45fr) minmax(260px, .55fr) !important;
+        grid-template-areas: none !important;
+        align-items: end;
+        gap: 10px 14px;
+        padding: 12px 14px;
+      }
+      .cnv1-engine-xray .xray-settings-identity > label {
+        display: grid;
+        min-width: 0;
+        gap: 5px;
+      }
+      .cnv1-engine-xray .xray-settings-identity > label > span {
+        color: var(--sg-muted);
+        font-size: 9.5px;
+        font-weight: 800;
+        letter-spacing: .025em;
+      }
+      .cnv1-engine-xray .xray-reality-value-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 42px;
+        align-items: stretch;
+        min-width: 0;
+        gap: 8px;
+      }
+      .cnv1-engine-xray .xray-reality-value-row input,
+      .cnv1-engine-xray .xray-reality-value-row textarea {
+        width: 100%;
+        min-width: 0;
+        min-height: 42px;
+        height: 42px;
+        resize: none;
+        overflow: hidden;
+        white-space: nowrap;
+        cursor: text;
+        opacity: .92;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      }
+      .cnv1-engine-xray .xray-copy-icon {
+        display: inline-grid;
+        width: 42px;
+        min-width: 42px;
+        min-height: 42px;
+        place-items: center;
+        padding: 0;
+        font-size: 19px;
+        line-height: 1;
+      }
+      .cnv1-engine-xray .xray-reality-form-anchor {
+        display: none !important;
+      }
+      @media (max-width: 900px) {
+        .cnv1-engine-xray .xray-settings-primary {
+          grid-template-columns: minmax(0, 1fr) auto !important;
+          grid-template-areas:
+            "fingerprint fingerprint"
+            "sni action" !important;
+        }
+        .cnv1-engine-xray .xray-settings-identity {
+          grid-template-columns: minmax(0, 1fr) !important;
+        }
+      }
+      @media (max-width: 620px) {
+        .cnv1-engine-xray .xray-settings-primary {
+          grid-template-columns: minmax(0, 1fr) !important;
+          grid-template-areas:
+            "fingerprint"
+            "sni"
+            "action" !important;
+        }
+        .cnv1-engine-xray .xray-settings-primary > .xray-reality-save {
+          width: 100%;
+        }
+      }
+    `;
+    document.head.append(style);
+  };
+
+  const bindRealityCopyActions = (container) => {
+    container.querySelectorAll('.xray-copy-icon[data-copy-field]').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const field = document.getElementById(button.dataset.copyField);
+        if (!field) return;
+
+        const original = button.textContent;
+        try {
+          await navigator.clipboard.writeText(field.value);
+          button.textContent = '✓';
+        } catch (_error) {
+          field.focus();
+          field.select();
+          document.execCommand('copy');
+          button.textContent = '✓';
+        }
+        window.setTimeout(() => {
+          button.textContent = original;
+        }, 1400);
+      });
+    });
+  };
+
+  const configureTwoRowXraySettings = () => {
+    const fingerprintRow = document.querySelector('[data-fingerprint-panel]');
     const form = document.querySelector(
       '.cnv1-engine-xray form[action$="/connections/xray"]'
     );
-    if (!form) return;
+    if (!fingerprintRow || !form) return;
 
+    const details = form.closest('details');
     const grid = form.querySelector('.cnv1-form-grid');
-    if (!grid) return;
+    const parameterList = fingerprintRow.parentElement;
+    if (!details || !grid || !parameterList) return;
 
-    form.classList.add('xray-reality-compact');
-    grid.classList.add('xray-reality-compact-grid');
+    ensureXrayTwoRowStyles();
 
-    const hostField = grid.querySelector('input[name="host"]');
-    const portField = grid.querySelector('input[name="port"]');
-    hostField.closest('label')?.remove();
-    portField.closest('label')?.remove();
+    form.id = 'xray-reality-form';
+    form.classList.add('xray-reality-form-anchor');
+    details.before(form);
+
+    grid.querySelector('input[name="host"]')?.closest('label')?.remove();
+    grid.querySelector('input[name="port"]')?.closest('label')?.remove();
 
     const serverName = grid.querySelector('input[name="server_name"]');
     const serverNameLabel = serverName?.closest('label');
-    serverNameLabel?.classList.add('xray-reality-sni');
+    const submitButton = form.querySelector('button[type="submit"]');
+    if (!serverName || !serverNameLabel || !submitButton) return;
 
-    const details = form.closest('details');
-    const summaryTitle = details?.querySelector(':scope > summary span:first-child');
-    if (summaryTitle) summaryTitle.textContent = 'Reality SNI и ключи';
+    fingerprintRow.classList.add('xray-settings-primary');
+    fingerprintRow.querySelector('.xps2-parameter-title')?.remove();
+    const fingerprintCaption = fingerprintRow.querySelector('.xps2-field-mode > span');
+    if (fingerprintCaption) fingerprintCaption.textContent = 'Client Fingerprint';
 
-    const addCopyAction = (field, areaClass) => {
-      if (!field) return;
+    serverNameLabel.classList.add('xray-reality-sni');
+    serverName.setAttribute('form', form.id);
+    submitButton.classList.add('xray-reality-save');
+    submitButton.textContent = 'Сохранить SNI';
+    submitButton.setAttribute('form', form.id);
+    fingerprintRow.append(serverNameLabel, submitButton);
 
+    const identityRow = document.createElement('article');
+    identityRow.className = 'xps2-parameter-row is-visible xray-settings-identity';
+
+    const prepareIdentityField = (field, id, labelText) => {
+      if (!field) return null;
+      field.id = id;
       field.readOnly = true;
       field.removeAttribute('name');
       field.setAttribute('aria-readonly', 'true');
@@ -56,9 +222,11 @@
       if (field.tagName === 'TEXTAREA') field.rows = 1;
 
       const label = field.closest('label');
-      if (!label) return;
-      label.classList.add('xray-reality-readonly', areaClass);
+      if (!label) return null;
+      label.classList.add('xray-reality-readonly');
       label.querySelector('[data-server-managed-note]')?.remove();
+      const caption = label.querySelector(':scope > span');
+      if (caption) caption.textContent = labelText;
 
       const valueRow = document.createElement('div');
       valueRow.className = 'xray-reality-value-row';
@@ -67,46 +235,38 @@
 
       const copyButton = document.createElement('button');
       copyButton.type = 'button';
-      copyButton.className = 'button xray-reality-copy';
-      copyButton.textContent = 'Копировать';
-      copyButton.addEventListener('click', async () => {
-        const original = copyButton.textContent;
-        try {
-          await navigator.clipboard.writeText(field.value);
-          copyButton.textContent = 'Скопировано';
-        } catch (_error) {
-          field.focus();
-          field.select();
-          document.execCommand('copy');
-          copyButton.textContent = 'Скопировано';
-        }
-        window.setTimeout(() => {
-          copyButton.textContent = original;
-        }, 1400);
-      });
+      copyButton.className = 'button xray-copy-icon';
+      copyButton.dataset.copyField = id;
+      copyButton.textContent = '⧉';
+      copyButton.title = `Копировать ${labelText}`;
+      copyButton.setAttribute('aria-label', `Копировать ${labelText}`);
       valueRow.append(copyButton);
+      return label;
     };
 
-    addCopyAction(
+    const publicLabel = prepareIdentityField(
       grid.querySelector('textarea[name="public_key"]'),
-      'xray-reality-public'
+      'xray-reality-public-key',
+      'Reality public key'
     );
-    addCopyAction(
+    const shortLabel = prepareIdentityField(
       grid.querySelector('input[name="short_id"]'),
-      'xray-reality-short'
+      'xray-reality-short-id',
+      'Short ID'
     );
+    if (publicLabel) identityRow.append(publicLabel);
+    if (shortLabel) identityRow.append(shortLabel);
+    fingerprintRow.after(identityRow);
 
-    const footer = form.querySelector('.cnv1-form-actions');
-    footer?.classList.add('xray-reality-actions');
-    const footerText = footer?.querySelector('span');
-    if (footerText) footerText.textContent = 'Изменяется только Reality SNI.';
-    const submitButton = footer?.querySelector('button[type="submit"]');
-    if (submitButton) submitButton.textContent = 'Сохранить SNI';
+    form.querySelector('.cnv1-form-actions')?.remove();
+    grid.remove();
+    details.remove();
+    bindRealityCopyActions(identityRow);
   };
 
   const ready = () => {
     configureFingerprintMenu();
-    configureCompactRealityPanel();
+    configureTwoRowXraySettings();
 
     const form = document.querySelector('[data-xmux-form]');
     if (form) {
