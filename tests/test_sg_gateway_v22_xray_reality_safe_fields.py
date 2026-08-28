@@ -9,6 +9,7 @@ from app.main import create_app
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT_PATH = ROOT / "app/web/static/sg-xmux-settings-v1.js"
+CSS_PATH = ROOT / "app/web/static/sg-xmux-settings-v1.css"
 
 
 def test_fingerprint_native_menu_uses_readable_theme_colors() -> None:
@@ -20,26 +21,32 @@ def test_fingerprint_native_menu_uses_readable_theme_colors() -> None:
     assert "getComputedStyle(fingerprint)" in script
 
 
-def test_reality_identity_fields_are_read_only_and_not_submitted() -> None:
+def test_reality_panel_keeps_only_sni_editable_and_adds_copy_actions() -> None:
     script = SCRIPT_PATH.read_text(encoding="utf-8")
 
-    assert 'textarea[name="public_key"]' in script
-    assert 'input[name="short_id"]' in script
+    assert "configureCompactRealityPanel" in script
+    assert "hostField.closest('label')?.remove()" in script
+    assert "portField.closest('label')?.remove()" in script
     assert "field.readOnly = true" in script
     assert "field.removeAttribute('name')" in script
-    assert "aria-readonly" in script
+    assert "xray-reality-copy" in script
+    assert "navigator.clipboard.writeText(field.value)" in script
+    assert "Сохранить SNI" in script
+    assert "bindRealityPortToApply" not in script
+    assert "reality_tcp_port" not in script
 
 
-def test_reality_port_is_mirrored_into_main_xray_apply() -> None:
-    script = SCRIPT_PATH.read_text(encoding="utf-8")
+def test_reality_panel_has_compact_two_row_layout() -> None:
+    css = CSS_PATH.read_text(encoding="utf-8")
 
-    assert "bindRealityPortToApply" in script
-    assert "mirror.name = 'reality_tcp_port'" in script
-    assert "profilesForm.addEventListener('submit', syncPort)" in script
-    assert "portField.addEventListener('input', syncPort)" in script
+    assert ".xray-reality-compact-grid" in css
+    assert 'grid-template-areas:\n    "sni sni"\n    "public short"' in css
+    assert ".xray-reality-value-row" in css
+    assert ".xray-reality-copy" in css
+    assert "@media (max-width: 760px)" in css
 
 
-def test_public_xray_form_syncs_listener_port_and_preserves_identity(
+def test_public_xray_form_changes_only_sni(
     tmp_path: Path, monkeypatch
 ) -> None:
     monkeypatch.chdir(tmp_path)
@@ -50,9 +57,11 @@ def test_public_xray_form_syncs_listener_port_and_preserves_identity(
     trusted_config = dict(current.config)
     trusted_config.update(
         {
+            "server_name": "old.example.com",
             "public_key": "TRUSTED_REALITY_PUBLIC_KEY",
             "short_id": "0123456789abcdef",
             "reality_tcp_port": 443,
+            "trusted_marker": "must-survive",
         }
     )
     assert update_connection_settings(
@@ -65,17 +74,21 @@ def test_public_xray_form_syncs_listener_port_and_preserves_identity(
     response = client.post(
         "/connections/xray",
         data={
-            "host": "203.0.113.10",
+            "host": "attacker.example.net",
             "port": "9443",
-            "server_name": "www.bing.com",
+            "server_name": "new.example.com",
             "public_key": "ATTACKER_REPLACEMENT_KEY",
             "short_id": "deadbeefdeadbeef",
+            "trusted_marker": "attacker-value",
         },
     )
 
     saved = get_connection_settings("xray")
     assert response.status_code == 302
-    assert saved.port == 9443
-    assert saved.config["reality_tcp_port"] == 9443
+    assert saved.host == "203.0.113.10"
+    assert saved.port == 443
+    assert saved.config["reality_tcp_port"] == 443
+    assert saved.config["server_name"] == "new.example.com"
     assert saved.config["public_key"] == "TRUSTED_REALITY_PUBLIC_KEY"
     assert saved.config["short_id"] == "0123456789abcdef"
+    assert saved.config["trusted_marker"] == "must-survive"
