@@ -55,6 +55,31 @@ def _clean_port(port: int | str) -> int | None:
     return None
 
 
+def _is_public_xray_form_update() -> bool:
+    """Return True only for the ordinary Connections Reality form."""
+
+    try:
+        from flask import has_request_context, request
+    except ImportError:
+        return False
+    return bool(has_request_context() and request.endpoint == "update_xray")
+
+
+def _current_engine_config(engine: str) -> dict:
+    with connect() as connection:
+        row = connection.execute(
+            "SELECT config_json FROM connection_settings WHERE engine = ?",
+            (engine,),
+        ).fetchone()
+    if row is None:
+        return {}
+    try:
+        config = json.loads(row["config_json"] or "{}")
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return {}
+    return config if isinstance(config, dict) else {}
+
+
 def update_connection_settings(engine: str, host: str, port: int | str, config: dict) -> bool:
     clean_host = _clean_host(host)
     if engine == "amneziawg":
@@ -72,6 +97,21 @@ def update_connection_settings(engine: str, host: str, port: int | str, config: 
         )
         return False
 
+    stored_config = dict(config)
+    if engine == "xray":
+        # The Reality TCP listener has one port in both legacy endpoint metadata
+        # and the current profile configuration. Keep them atomic.
+        stored_config["reality_tcp_port"] = clean_port
+
+        # public_key and short_id are derived from root-owned server identity.
+        # The ordinary web form may display them, but only trusted installer or
+        # maintenance code outside this route may replace them.
+        if _is_public_xray_form_update():
+            current_config = _current_engine_config(engine)
+            for key in ("public_key", "short_id"):
+                if key in current_config:
+                    stored_config[key] = current_config[key]
+
     with connect() as connection:
         cursor = connection.execute(
             """
@@ -85,7 +125,7 @@ def update_connection_settings(engine: str, host: str, port: int | str, config: 
             (
                 clean_host,
                 clean_port,
-                json.dumps(config, ensure_ascii=False, sort_keys=True),
+                json.dumps(stored_config, ensure_ascii=False, sort_keys=True),
                 engine,
             ),
         )
