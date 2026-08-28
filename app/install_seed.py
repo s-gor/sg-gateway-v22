@@ -226,7 +226,7 @@ def seed_or_migrate() -> None:
     ):
         admin_client_id = create_client(
             "sg-admin",
-            "xray_reality_tcp,xray_xhttp_reality,amneziawg,mihomo,sgclient",
+            "xray_reality_tcp,xray_xhttp_reality,amneziawg,amneziawg3,mihomo,sgclient",
         )
         if not admin_client_id:
             raise RuntimeError("Не удалось создать первого клиента sg-admin")
