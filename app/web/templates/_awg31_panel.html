@@ -18,15 +18,14 @@
       <img src="{{ country_flag_url(awg3_country) }}" alt="{{ country_name(awg3_country) }}" width="30" height="20">
       <div>
         <span>ВНЕШНЯЯ ТОЧКА</span>
-        <strong>{{ awg31_public_host }}</strong>
-        <small>UDP 587 · {{ country_name(awg3_country) }}</small>
+        <strong>{{ awg31_public_host }}:587 · DNS {{ awg_dns.dns }}</strong>
+        <small>{{ country_name(awg3_country) }}</small>
         <small class="awgd-v31-technical" hidden>UDP 587 · интерфейс awg31 · 10.131.0.0/24</small>
       </div>
     </div>
-    <span class="cnv1-port-chip">UDP 587</span>
   </section>
 
-  <form method="post" action="/connections/amneziawg31" class="cnv1-engine-form cnv1-engine-form-compact awgd-v31-form">
+  <form method="post" action="/connections/amneziawg31" class="cnv1-engine-form cnv1-engine-form-compact awgd-v31-form" hidden>
     <div class="cnv1-compact-fields awgd-compact-single">
       <label class="awgd-dns-field"><span>DNS</span><input type="text" value="{{ awg31_settings.dns }}" readonly></label>
     </div>

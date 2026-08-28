@@ -48,6 +48,11 @@ from app.system_activity import collect_system_activity
 from app.connections.geoip_country import lookup_country_code
 from app.connections.service import list_connections
 from app.connections.settings import get_connection_settings, update_connection_settings
+from app.connections.awg_dns import (
+    SharedAwgDnsError,
+    get_shared_awg_dns,
+    set_shared_awg_dns,
+)
 from app.db import init_db
 from app.help.content import get_topic, list_topics
 from app.maintenance.backups import (
@@ -1464,17 +1469,27 @@ def create_app() -> Flask:
             connections=list_connections(),
             awg_settings=get_connection_settings("amneziawg"),
             awg3_settings=get_connection_settings("amneziawg3"),
+            awg_dns=get_shared_awg_dns(),
             xray_settings=get_connection_settings("xray"),
             xray_profiles=xray_profiles_overview(),
             mihomo=mihomo_overview(),
             client_total=count_clients(),
         )
 
+    @app.post("/connections/awg-dns")
+    def update_awg_dns():
+        try:
+            state = set_shared_awg_dns(request.form.get("dns", ""))
+        except SharedAwgDnsError as exc:
+            flash(f"DNS клиентов AWG не сохранён: {exc}", "error")
+        else:
+            flash(f"DNS {state.dns} применён к AWG 2.0, 3.0 и 3.1.", "success")
+        return redirect(url_for("connections") + "#awg-dns")
+
     @app.post("/connections/amneziawg")
     def update_amneziawg():
         current = get_connection_settings("amneziawg")
         config = dict(current.config)
-        config["dns"] = request.form.get("dns", config.get("dns", "1.1.1.1"))
         config["server_public_key"] = request.form.get(
             "server_public_key",
             config.get("server_public_key", "PLACEHOLDER_SERVER_PUBLIC_KEY"),
@@ -1495,7 +1510,6 @@ def create_app() -> Flask:
     def update_amneziawg3():
         current = get_connection_settings("amneziawg3")
         config = dict(current.config)
-        config["dns"] = request.form.get("dns", config.get("dns", "1.1.1.1"))
         config["server_public_key"] = request.form.get(
             "server_public_key", config.get("server_public_key", "")
         )
