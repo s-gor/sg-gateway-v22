@@ -80,6 +80,16 @@ def _credential_payloads() -> dict[str, tuple[str, dict]]:
     }
 
 
+def _authenticated_client():
+    from app.main import create_app
+
+    app = create_app()
+    client = app.test_client()
+    with client.session_transaction() as session:
+        session["authenticated"] = True
+    return client
+
+
 def test_shared_awg_dns_updates_all_settings_and_existing_credentials(
     isolated_database: Path,
 ) -> None:
@@ -137,7 +147,7 @@ def test_connections_has_one_visible_shared_dns_form_and_compact_card_lines() ->
     awg31 = (ROOT / "app/web/templates/_awg31_panel.html").read_text(encoding="utf-8")
 
     assert connections.count('action="{{ url_for(\'update_awg_dns\') }}"') == 1
-    assert connections.count('name="dns"') == 3
+    assert connections.count('name="dns"') == 1
     assert awg31.count('name="dns"') == 0
     assert 'class="awgd-shared-dns' in connections
     assert "DNS клиентов AWG" in connections
@@ -152,15 +162,44 @@ def test_connections_has_one_visible_shared_dns_form_and_compact_card_lines() ->
 
 
 def test_shared_dns_form_route_updates_all_awg_profiles(isolated_database: Path) -> None:
-    from app.main import create_app
-
-    app = create_app()
-    client = app.test_client()
-    with client.session_transaction() as session:
-        session["authenticated"] = True
+    client = _authenticated_client()
 
     response = client.post("/connections/awg-dns", data={"dns": "8.8.4.4"})
 
     assert response.status_code == 302
     assert response.headers["Location"].endswith("/connections#awg-dns")
     assert _settings_dns() == {engine: "8.8.4.4" for engine in AWG_ENGINES}
+
+
+def test_legacy_profile_forms_cannot_diverge_the_shared_dns(
+    isolated_database: Path,
+) -> None:
+    from app.connections.awg_dns import set_shared_awg_dns
+
+    set_shared_awg_dns("9.9.9.9")
+    client = _authenticated_client()
+
+    response = client.post(
+        "/connections/amneziawg",
+        data={
+            "host": "vpn.example",
+            "port": "585",
+            "dns": "8.8.8.8",
+            "country_code": "nl",
+            "server_public_key": "awg2-server",
+        },
+    )
+    assert response.status_code == 302
+
+    response = client.post(
+        "/connections/amneziawg3",
+        data={
+            "host": "vpn.example",
+            "port": "586",
+            "dns": "8.8.4.4",
+            "server_public_key": "awg3-server",
+        },
+    )
+    assert response.status_code == 302
+
+    assert _settings_dns() == {engine: "9.9.9.9" for engine in AWG_ENGINES}
