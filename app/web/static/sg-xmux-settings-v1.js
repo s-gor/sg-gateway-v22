@@ -3,16 +3,140 @@
     const fingerprint = document.querySelector(
       '[data-fingerprint-panel] select[name="fingerprint"]'
     );
-    if (!fingerprint) return;
+    if (!fingerprint || fingerprint.dataset.sgPickerReady === '1') return;
 
-    // Windows Chrome may keep a light native popup even when the closed select
-    // is dark. Give the popup an explicit light palette so every option stays
-    // readable in both application themes.
-    fingerprint.style.colorScheme = 'light';
-    fingerprint.querySelectorAll('option, optgroup').forEach((item) => {
-      item.style.backgroundColor = '#ffffff';
-      item.style.color = '#17212b';
+    const field = fingerprint.closest('.xps2-field-mode');
+    if (!field) return;
+
+    fingerprint.dataset.sgPickerReady = '1';
+
+    const selectStyles = getComputedStyle(fingerprint);
+    const picker = document.createElement('div');
+    picker.className = 'xray-fingerprint-picker';
+    picker.style.setProperty('--xray-picker-bg', selectStyles.backgroundColor);
+    picker.style.setProperty('--xray-picker-color', selectStyles.color);
+    picker.style.setProperty('--xray-picker-border', selectStyles.borderColor);
+    picker.style.setProperty('--xray-picker-radius', selectStyles.borderRadius);
+
+    const trigger = document.createElement('button');
+    trigger.type = 'button';
+    trigger.className = 'xray-fingerprint-trigger';
+    trigger.setAttribute('aria-haspopup', 'listbox');
+    trigger.setAttribute('aria-expanded', 'false');
+
+    const triggerText = document.createElement('span');
+    triggerText.className = 'xray-fingerprint-trigger-text';
+    const triggerArrow = document.createElement('span');
+    triggerArrow.className = 'xray-fingerprint-trigger-arrow';
+    triggerArrow.setAttribute('aria-hidden', 'true');
+    triggerArrow.textContent = '⌄';
+    trigger.append(triggerText, triggerArrow);
+
+    const menu = document.createElement('div');
+    menu.id = 'xray-fingerprint-menu';
+    menu.className = 'xray-fingerprint-menu';
+    menu.setAttribute('role', 'listbox');
+    menu.hidden = true;
+    trigger.setAttribute('aria-controls', menu.id);
+
+    const optionButtons = [];
+    const addOption = (option) => {
+      const optionButton = document.createElement('button');
+      optionButton.type = 'button';
+      optionButton.className = 'xray-fingerprint-option';
+      optionButton.dataset.value = option.value;
+      optionButton.textContent = option.textContent.trim();
+      optionButton.setAttribute('role', 'option');
+      optionButton.disabled = option.disabled;
+      menu.append(optionButton);
+      optionButtons.push(optionButton);
+
+      optionButton.addEventListener('click', () => {
+        fingerprint.value = optionButton.dataset.value;
+        fingerprint.dispatchEvent(new Event('input', { bubbles: true }));
+        fingerprint.dispatchEvent(new Event('change', { bubbles: true }));
+        closeMenu(true);
+      });
+    };
+
+    [...fingerprint.children].forEach((item) => {
+      if (item.tagName === 'OPTGROUP') {
+        const groupLabel = document.createElement('div');
+        groupLabel.className = 'xray-fingerprint-group';
+        groupLabel.textContent = item.label;
+        menu.append(groupLabel);
+        [...item.children].forEach(addOption);
+      } else if (item.tagName === 'OPTION') {
+        addOption(item);
+      }
     });
+
+    const syncSelection = () => {
+      triggerText.textContent = fingerprint.selectedOptions[0]?.textContent.trim() || '';
+      optionButtons.forEach((optionButton) => {
+        const selected = optionButton.dataset.value === fingerprint.value;
+        optionButton.classList.toggle('is-selected', selected);
+        optionButton.setAttribute('aria-selected', String(selected));
+      });
+    };
+
+    const focusSelected = () => {
+      const selected = optionButtons.find(
+        (optionButton) => optionButton.dataset.value === fingerprint.value
+      );
+      (selected || optionButtons.find((optionButton) => !optionButton.disabled))?.focus();
+    };
+
+    const openMenu = () => {
+      menu.hidden = false;
+      picker.classList.add('is-open');
+      trigger.setAttribute('aria-expanded', 'true');
+      window.requestAnimationFrame(focusSelected);
+    };
+
+    function closeMenu(returnFocus = false) {
+      menu.hidden = true;
+      picker.classList.remove('is-open');
+      trigger.setAttribute('aria-expanded', 'false');
+      if (returnFocus) trigger.focus();
+    }
+
+    trigger.addEventListener('click', () => {
+      if (menu.hidden) openMenu();
+      else closeMenu();
+    });
+    trigger.addEventListener('keydown', (event) => {
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        openMenu();
+      }
+    });
+    menu.addEventListener('keydown', (event) => {
+      const enabledOptions = optionButtons.filter((optionButton) => !optionButton.disabled);
+      const currentIndex = enabledOptions.indexOf(document.activeElement);
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closeMenu(true);
+        return;
+      }
+      if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
+      event.preventDefault();
+      let nextIndex = currentIndex;
+      if (event.key === 'Home') nextIndex = 0;
+      else if (event.key === 'End') nextIndex = enabledOptions.length - 1;
+      else if (event.key === 'ArrowDown') nextIndex = (currentIndex + 1) % enabledOptions.length;
+      else nextIndex = (currentIndex - 1 + enabledOptions.length) % enabledOptions.length;
+      enabledOptions[nextIndex]?.focus();
+    });
+    document.addEventListener('click', (event) => {
+      if (!picker.contains(event.target)) closeMenu();
+    });
+    fingerprint.addEventListener('change', syncSelection);
+
+    fingerprint.hidden = true;
+    field.append(picker);
+    picker.append(trigger, menu);
+    syncSelection();
   };
 
   const ensureXrayTwoRowStyles = () => {
@@ -23,10 +147,11 @@
     style.textContent = `
       .cnv1-engine-xray .xray-settings-primary {
         display: grid !important;
-        grid-template-columns: minmax(340px, .8fr) minmax(420px, 1.2fr) auto !important;
-        grid-template-areas: "fingerprint sni action" !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        grid-template-areas: "fingerprint sni" !important;
         align-items: end;
-        gap: 10px 12px;
+        gap: 10px 14px;
+        overflow: visible;
         padding: 12px 14px;
       }
       .cnv1-engine-xray .xray-settings-primary .xps2-parameter-title {
@@ -36,20 +161,27 @@
         grid-area: fingerprint !important;
         min-width: 0;
       }
-      .cnv1-engine-xray .xray-settings-primary > .xray-reality-sni {
+      .cnv1-engine-xray .xray-reality-sni-group {
         display: grid;
         grid-area: sni;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: end;
+        min-width: 0;
+        gap: 12px;
+      }
+      .cnv1-engine-xray .xray-reality-sni-group > .xray-reality-sni {
+        display: grid;
         width: 100% !important;
         max-width: none !important;
         min-width: 0;
         gap: 5px;
       }
-      .cnv1-engine-xray .xray-settings-primary > .xray-reality-sni input {
+      .cnv1-engine-xray .xray-reality-sni-group > .xray-reality-sni input {
         width: 100% !important;
         max-width: none !important;
         min-width: 0;
       }
-      .cnv1-engine-xray .xray-settings-primary > label > span {
+      .cnv1-engine-xray .xray-settings-primary label > span {
         display: block !important;
         color: var(--sg-muted);
         font-size: 9.5px;
@@ -59,21 +191,112 @@
       .cnv1-engine-xray .xray-settings-primary .xps2-field-mode > small {
         display: none !important;
       }
-      .cnv1-engine-xray .xray-settings-primary select,
       .cnv1-engine-xray .xray-settings-primary input {
         width: 100%;
         min-width: 0;
         min-height: 42px;
       }
-      .cnv1-engine-xray .xray-settings-primary > .xray-reality-save {
-        grid-area: action;
+      .cnv1-engine-xray .xray-reality-sni-group > .xray-reality-save {
         min-height: 42px;
         padding-inline: 16px;
         white-space: nowrap;
       }
+      .cnv1-engine-xray .xray-fingerprint-picker {
+        position: relative;
+        width: 100%;
+        min-width: 0;
+      }
+      .cnv1-engine-xray .xray-fingerprint-trigger {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+        width: 100%;
+        min-height: 42px;
+        border: 1px solid var(--xray-picker-border, var(--line));
+        border-radius: var(--xray-picker-radius, 8px);
+        background: var(--xray-picker-bg, var(--panel-3));
+        color: var(--xray-picker-color, var(--text));
+        padding: 0 13px;
+        text-align: left;
+        cursor: pointer;
+      }
+      .cnv1-engine-xray .xray-fingerprint-trigger:hover,
+      .cnv1-engine-xray .xray-fingerprint-trigger:focus-visible,
+      .cnv1-engine-xray .xray-fingerprint-picker.is-open .xray-fingerprint-trigger {
+        border-color: var(--blue);
+        outline: none;
+        box-shadow: 0 0 0 2px rgba(98, 168, 255, .13);
+      }
+      .cnv1-engine-xray .xray-fingerprint-trigger-text {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .cnv1-engine-xray .xray-fingerprint-trigger-arrow {
+        margin-left: 12px;
+        color: var(--sg-muted, var(--muted));
+        font-size: 17px;
+        line-height: 1;
+        transition: transform .16s ease;
+      }
+      .cnv1-engine-xray .xray-fingerprint-picker.is-open .xray-fingerprint-trigger-arrow {
+        transform: rotate(180deg);
+      }
+      .cnv1-engine-xray .xray-fingerprint-menu {
+        position: absolute;
+        z-index: 120;
+        top: calc(100% + 6px);
+        right: 0;
+        left: 0;
+        max-height: min(430px, calc(100vh - 150px));
+        overflow-y: auto;
+        border: 1px solid var(--xray-picker-border, var(--line));
+        border-radius: var(--xray-picker-radius, 8px);
+        background: var(--xray-picker-bg, var(--panel-3));
+        color: var(--xray-picker-color, var(--text));
+        padding: 6px;
+        box-shadow: 0 18px 42px rgba(0, 0, 0, .34);
+      }
+      .cnv1-engine-xray .xray-fingerprint-menu[hidden] {
+        display: none !important;
+      }
+      .cnv1-engine-xray .xray-fingerprint-group {
+        padding: 9px 10px 5px;
+        color: var(--sg-muted, var(--muted));
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: .045em;
+        text-transform: uppercase;
+      }
+      .cnv1-engine-xray .xray-fingerprint-option {
+        display: block;
+        width: 100%;
+        min-height: 36px;
+        border: 1px solid transparent;
+        border-radius: 7px;
+        background: transparent;
+        color: inherit;
+        padding: 7px 10px;
+        text-align: left;
+        cursor: pointer;
+      }
+      .cnv1-engine-xray .xray-fingerprint-option:hover,
+      .cnv1-engine-xray .xray-fingerprint-option:focus-visible {
+        border-color: rgba(98, 168, 255, .34);
+        background: rgba(98, 168, 255, .14);
+        outline: none;
+      }
+      .cnv1-engine-xray .xray-fingerprint-option.is-selected {
+        border-color: rgba(98, 168, 255, .58);
+        background: rgba(98, 168, 255, .24);
+        font-weight: 750;
+      }
+      .cnv1-engine-xray .xray-fingerprint-option:disabled {
+        display: none;
+      }
       .cnv1-engine-xray .xray-settings-identity {
         display: grid !important;
-        grid-template-columns: minmax(0, 1.4fr) minmax(300px, .6fr) !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
         grid-template-areas: none !important;
         align-items: end;
         gap: 10px 14px;
@@ -123,28 +346,22 @@
       .cnv1-engine-xray .xray-reality-form-anchor {
         display: none !important;
       }
-      @media (max-width: 1100px) {
-        .cnv1-engine-xray .xray-settings-primary {
-          grid-template-columns: minmax(0, 1fr) auto !important;
-          grid-template-areas:
-            "fingerprint fingerprint"
-            "sni action" !important;
-        }
-      }
       @media (max-width: 900px) {
+        .cnv1-engine-xray .xray-settings-primary,
         .cnv1-engine-xray .xray-settings-identity {
           grid-template-columns: minmax(0, 1fr) !important;
         }
-      }
-      @media (max-width: 700px) {
         .cnv1-engine-xray .xray-settings-primary {
-          grid-template-columns: minmax(0, 1fr) !important;
           grid-template-areas:
             "fingerprint"
-            "sni"
-            "action" !important;
+            "sni" !important;
         }
-        .cnv1-engine-xray .xray-settings-primary > .xray-reality-save {
+      }
+      @media (max-width: 620px) {
+        .cnv1-engine-xray .xray-reality-sni-group {
+          grid-template-columns: minmax(0, 1fr);
+        }
+        .cnv1-engine-xray .xray-reality-sni-group > .xray-reality-save {
           width: 100%;
         }
       }
@@ -211,7 +428,10 @@
     submitButton.classList.add('xray-reality-save');
     submitButton.textContent = 'Сохранить SNI';
     submitButton.setAttribute('form', form.id);
-    fingerprintRow.append(serverNameLabel, submitButton);
+    const sniGroup = document.createElement('div');
+    sniGroup.className = 'xray-reality-sni-group';
+    sniGroup.append(serverNameLabel, submitButton);
+    fingerprintRow.append(sniGroup);
 
     const identityRow = document.createElement('article');
     identityRow.className = 'xps2-parameter-row is-visible xray-settings-identity';
