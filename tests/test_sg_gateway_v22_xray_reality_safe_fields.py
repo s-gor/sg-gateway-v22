@@ -9,6 +9,7 @@ from app.main import create_app
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT_PATH = ROOT / "app/web/static/sg-xmux-settings-v1.js"
+CSS_PATH = ROOT / "app/web/static/sg-xmux-settings-v1.css"
 
 
 def test_fingerprint_uses_sg_dropdown_instead_of_native_popup() -> None:
@@ -57,31 +58,22 @@ def test_xray_client_settings_use_equal_halves() -> None:
 
 
 def test_xray_primary_row_resets_legacy_grid_placement() -> None:
-    script = SCRIPT_PATH.read_text(encoding="utf-8")
+    style = CSS_PATH.read_text(encoding="utf-8")
 
     assert (
         ".xray-settings-primary > .xps2-field-mode {\n"
-        "        grid-area: fingerprint !important;\n"
-        "        width: 100%;\n"
-        "        max-width: none !important;"
-    ) in script
+        "  width: 100% !important;\n"
+        "  max-width: none !important;"
+    ) in style
     assert (
         ".xray-reality-sni-group > .xray-reality-sni,\n"
-        "      .cnv1-engine-xray .xray-reality-sni-group > .xray-reality-save {\n"
-        "        grid-area: auto !important;\n"
-        "        grid-column: auto !important;\n"
-        "        grid-row: auto !important;"
-    ) in script
-    assert (
-        ".xray-reality-sni-group > .xray-reality-sni {\n"
-        "        grid-column: 1 !important;\n"
-        "        grid-row: 1 !important;"
-    ) in script
-    assert (
-        ".xray-reality-sni-group > .xray-reality-save {\n"
-        "        grid-column: 2 !important;\n"
-        "        grid-row: 1 !important;"
-    ) in script
+        ".cnv1-engine-xray .xray-reality-sni-group > .xray-reality-save {\n"
+        "  grid-area: auto !important;\n"
+        "  grid-column: auto !important;\n"
+        "  grid-row: auto !important;"
+    ) in style
+    assert ".xray-reality-compact-grid > .xray-reality-sni { grid-area: sni; }" in style
+    assert "\n.xray-reality-sni { grid-area: sni; }\n" not in style
 
 
 def test_public_xray_form_changes_only_sni(
