@@ -1490,7 +1490,6 @@ def create_app() -> Flask:
     def update_amneziawg():
         current = get_connection_settings("amneziawg")
         config = dict(current.config)
-        config["dns"] = request.form.get("dns", config.get("dns", "1.1.1.1"))
         config["server_public_key"] = request.form.get(
             "server_public_key",
             config.get("server_public_key", "PLACEHOLDER_SERVER_PUBLIC_KEY"),
@@ -1511,7 +1510,6 @@ def create_app() -> Flask:
     def update_amneziawg3():
         current = get_connection_settings("amneziawg3")
         config = dict(current.config)
-        config["dns"] = request.form.get("dns", config.get("dns", "1.1.1.1"))
         config["server_public_key"] = request.form.get(
             "server_public_key", config.get("server_public_key", "")
         )
