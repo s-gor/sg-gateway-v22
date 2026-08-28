@@ -8,6 +8,7 @@ from app.main import create_app
 
 
 ROOT = Path(__file__).resolve().parents[1]
+TEMPLATE_PATH = ROOT / "app/web/templates/connections.html"
 SCRIPT_PATH = ROOT / "app/web/static/sg-xmux-settings-v1.js"
 CSS_PATH = ROOT / "app/web/static/sg-xmux-settings-v1.css"
 
@@ -21,29 +22,34 @@ def test_fingerprint_native_menu_uses_readable_theme_colors() -> None:
     assert "getComputedStyle(fingerprint)" in script
 
 
-def test_reality_panel_keeps_only_sni_editable_and_adds_copy_actions() -> None:
+def test_xray_client_settings_are_two_open_rows() -> None:
+    template = TEMPLATE_PATH.read_text(encoding="utf-8")
     script = SCRIPT_PATH.read_text(encoding="utf-8")
 
-    assert "configureCompactRealityPanel" in script
-    assert "hostField.closest('label')?.remove()" in script
-    assert "portField.closest('label')?.remove()" in script
-    assert "field.readOnly = true" in script
-    assert "field.removeAttribute('name')" in script
-    assert "xray-reality-copy" in script
+    assert 'id="xray-reality-form"' in template
+    assert 'class="xps2-parameter-row is-visible xray-settings-primary"' in template
+    assert 'class="xps2-parameter-row is-visible xray-settings-identity"' in template
+    assert 'form="xray-reality-form"' in template
+    assert 'name="server_name"' in template
+    assert 'data-copy-target="xray-reality-public-key"' in template
+    assert 'data-copy-target="xray-reality-short-id"' in template
+    assert 'id="xray-reality-public-key"' in template
+    assert 'id="xray-reality-short-id"' in template
+    assert "Reality-ключи и общий адрес" not in template
+    assert "configureCompactRealityPanel" not in script
+    assert "bindRealityCopyActions" in script
     assert "navigator.clipboard.writeText(field.value)" in script
-    assert "Сохранить SNI" in script
-    assert "bindRealityPortToApply" not in script
-    assert "reality_tcp_port" not in script
 
 
-def test_reality_panel_has_compact_two_row_layout() -> None:
+def test_xray_client_settings_have_compact_responsive_grid() -> None:
     css = CSS_PATH.read_text(encoding="utf-8")
 
-    assert ".xray-reality-compact-grid" in css
-    assert 'grid-template-areas:\n    "sni sni"\n    "public short"' in css
-    assert ".xray-reality-value-row" in css
-    assert ".xray-reality-copy" in css
-    assert "@media (max-width: 760px)" in css
+    assert ".xray-settings-primary" in css
+    assert "grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto" in css
+    assert ".xray-settings-identity" in css
+    assert "grid-template-columns: minmax(0, 1.45fr) minmax(260px, .55fr)" in css
+    assert ".xray-copy-icon" in css
+    assert "@media (max-width: 900px)" in css
 
 
 def test_public_xray_form_changes_only_sni(
