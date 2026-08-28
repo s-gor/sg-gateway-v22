@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -38,3 +39,70 @@ def test_clean_install_checks_awg30_before_creating_any_client() -> None:
     assert "ip link show dev awg3" in bootstrap
     assert 'awg show awg3 listen-port)" = "586"' in bootstrap
     assert "SG_GATEWAY_AWG3_PUBLIC_KEY" in bootstrap
+
+
+def test_clean_seed_requests_all_six_no_certificate_profiles(monkeypatch) -> None:
+    from app import install_seed
+
+    settings = {
+        "xray": SimpleNamespace(host="", port=443, config={}),
+        "amneziawg": SimpleNamespace(host="", port=585, config={}),
+        "amneziawg3": SimpleNamespace(host="", port=586, config={}),
+        "mihomo": SimpleNamespace(host="", port=2099, config={}),
+    }
+    environment = {
+        "SG_UPDATE_MODE": "0",
+        "SG_SEED_PUBLIC_ADDRESS": "203.0.113.10",
+        "SG_GATEWAY_COUNTRY_CODE": "fr",
+        "SG_SEED_VLESS_ENCRYPTION": "mlkem768-test",
+        "SG_SEED_XRAY_PUBLIC_KEY": "xray-public-test",
+        "SG_SEED_XRAY_SHORT_ID": "0123456789abcdef",
+        "SG_SEED_AWG_PUBLIC_KEY": "awg-public-test",
+        "SG_SEED_XRAY_PORT": "443",
+        "SG_SEED_AWG_PORT": "585",
+        "SG_SEED_REALITY_SNI": "www.bing.com",
+        "SG_SEED_REALITY_TARGET": "www.bing.com:443",
+        "SG_SEED_CREATE_ADMIN": "1",
+    }
+    for name, value in environment.items():
+        monkeypatch.setenv(name, value)
+
+    created: dict[str, str] = {}
+    monkeypatch.setattr(install_seed, "init_db", lambda: None)
+    monkeypatch.setattr(
+        install_seed,
+        "get_connection_settings",
+        lambda engine: settings[engine],
+    )
+    monkeypatch.setattr(
+        install_seed,
+        "update_connection_settings",
+        lambda engine, host, port, config: True,
+    )
+    monkeypatch.setattr(
+        install_seed,
+        "_synchronize_xray_credentials",
+        lambda **kwargs: 0,
+    )
+    monkeypatch.setattr(install_seed, "count_clients", lambda: 0)
+
+    def capture_client(name: str, requested: str) -> int:
+        created["name"] = name
+        created["requested"] = requested
+        return 1
+
+    monkeypatch.setattr(install_seed, "create_client", capture_client)
+
+    install_seed.seed_or_migrate()
+
+    assert created["name"] == "sg-admin"
+    requested = set(created["requested"].split(","))
+    assert requested == {
+        "xray_reality_tcp",
+        "xray_xhttp_reality",
+        "amneziawg",
+        "amneziawg3",
+        "mihomo",
+        "sgclient",
+    }
+    assert "amneziawg31" not in requested
