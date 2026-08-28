@@ -5,18 +5,13 @@
     );
     if (!fingerprint) return;
 
-    const styles = getComputedStyle(fingerprint);
-    const channels = (styles.backgroundColor.match(/\d+(?:\.\d+)?/g) || [])
-      .slice(0, 3)
-      .map(Number);
-    const luminance = channels.length === 3
-      ? (0.2126 * channels[0]) + (0.7152 * channels[1]) + (0.0722 * channels[2])
-      : 0;
-
-    fingerprint.style.colorScheme = luminance < 128 ? 'dark' : 'light';
+    // Windows Chrome may keep a light native popup even when the closed select
+    // is dark. Give the popup an explicit light palette so every option stays
+    // readable in both application themes.
+    fingerprint.style.colorScheme = 'light';
     fingerprint.querySelectorAll('option, optgroup').forEach((item) => {
-      item.style.backgroundColor = styles.backgroundColor;
-      item.style.color = styles.color;
+      item.style.backgroundColor = '#ffffff';
+      item.style.color = '#17212b';
     });
   };
 
@@ -28,7 +23,7 @@
     style.textContent = `
       .cnv1-engine-xray .xray-settings-primary {
         display: grid !important;
-        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto !important;
+        grid-template-columns: minmax(340px, .8fr) minmax(420px, 1.2fr) auto !important;
         grid-template-areas: "fingerprint sni action" !important;
         align-items: end;
         gap: 10px 12px;
@@ -39,12 +34,20 @@
       }
       .cnv1-engine-xray .xray-settings-primary > .xps2-field-mode {
         grid-area: fingerprint !important;
+        min-width: 0;
       }
       .cnv1-engine-xray .xray-settings-primary > .xray-reality-sni {
         display: grid;
         grid-area: sni;
+        width: 100% !important;
+        max-width: none !important;
         min-width: 0;
         gap: 5px;
+      }
+      .cnv1-engine-xray .xray-settings-primary > .xray-reality-sni input {
+        width: 100% !important;
+        max-width: none !important;
+        min-width: 0;
       }
       .cnv1-engine-xray .xray-settings-primary > label > span {
         display: block !important;
@@ -70,7 +73,7 @@
       }
       .cnv1-engine-xray .xray-settings-identity {
         display: grid !important;
-        grid-template-columns: minmax(0, 1.45fr) minmax(260px, .55fr) !important;
+        grid-template-columns: minmax(0, 1.4fr) minmax(300px, .6fr) !important;
         grid-template-areas: none !important;
         align-items: end;
         gap: 10px 14px;
@@ -120,18 +123,20 @@
       .cnv1-engine-xray .xray-reality-form-anchor {
         display: none !important;
       }
-      @media (max-width: 900px) {
+      @media (max-width: 1100px) {
         .cnv1-engine-xray .xray-settings-primary {
           grid-template-columns: minmax(0, 1fr) auto !important;
           grid-template-areas:
             "fingerprint fingerprint"
             "sni action" !important;
         }
+      }
+      @media (max-width: 900px) {
         .cnv1-engine-xray .xray-settings-identity {
           grid-template-columns: minmax(0, 1fr) !important;
         }
       }
-      @media (max-width: 620px) {
+      @media (max-width: 700px) {
         .cnv1-engine-xray .xray-settings-primary {
           grid-template-columns: minmax(0, 1fr) !important;
           grid-template-areas:
