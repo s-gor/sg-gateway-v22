@@ -20,49 +20,15 @@ jobs:
       - name: Patch memory attribution
         run: |
           python3 - <<'PY'
+          import base64
           from pathlib import Path
 
           path = Path("app/main.py")
           source = path.read_text(encoding="utf-8")
-
           marker = "\n\ndef _resource_state(percent: int) -> tuple[str, str]:\n"
-          helper = '''
-
-
-def _sg_gateway_process_rss(
-    proc_root: Path = Path("/proc"),
-    app_root: Path | None = None,
-) -> int:
-    root = (app_root or Path(__file__).resolve().parents[1]).resolve()
-    venv_root = str((root / ".venv").resolve())
-    allowed_apps = ("app.production:app", "sg_hostd.app:app")
-    total = 0
-
-    if not proc_root.exists():
-        return total
-
-    for item in proc_root.iterdir():
-        if not item.name.isdigit():
-            continue
-        try:
-            command = (item / "cmdline").read_bytes().replace(b"\\0", b" ").decode(
-                "utf-8", errors="replace"
-            )
-            if venv_root not in command:
-                continue
-            if not any(application in command for application in allowed_apps):
-                continue
-            status = (item / "status").read_text(encoding="utf-8")
-        except OSError:
-            continue
-
-        match = re.search(r"VmRSS:\\s+(\\d+)\\s+kB", status)
-        if match:
-            total += int(match.group(1)) * 1024
-
-    return total
-'''
-
+          helper = base64.b64decode(
+              "CgoKZGVmIF9zZ19nYXRld2F5X3Byb2Nlc3NfcnNzKAogICAgcHJvY19yb290OiBQYXRoID0gUGF0aCgiL3Byb2MiKSwKICAgIGFwcF9yb290OiBQYXRoIHwgTm9uZSA9IE5vbmUsCikgLT4gaW50OgogICAgcm9vdCA9IChhcHBfcm9vdCBvciBQYXRoKF9fZmlsZV9fKS5yZXNvbHZlKCkucGFyZW50c1sxXSkucmVzb2x2ZSgpCiAgICB2ZW52X3Jvb3QgPSBzdHIoKHJvb3QgLyAiLnZlbnYiKS5yZXNvbHZlKCkpCiAgICBhbGxvd2VkX2FwcHMgPSAoImFwcC5wcm9kdWN0aW9uOmFwcCIsICJzZ19ob3N0ZC5hcHA6YXBwIikKICAgIHRvdGFsID0gMAoKICAgIGlmIG5vdCBwcm9jX3Jvb3QuZXhpc3RzKCk6CiAgICAgICAgcmV0dXJuIHRvdGFsCgogICAgZm9yIGl0ZW0gaW4gcHJvY19yb290Lml0ZXJkaXIoKToKICAgICAgICBpZiBub3QgaXRlbS5uYW1lLmlzZGlnaXQoKToKICAgICAgICAgICAgY29udGludWUKICAgICAgICB0cnk6CiAgICAgICAgICAgIGNvbW1hbmQgPSAoaXRlbSAvICJjbWRsaW5lIikucmVhZF9ieXRlcygpLnJlcGxhY2UoYiJcMCIsIGIiICIpLmRlY29kZSgKICAgICAgICAgICAgICAgICJ1dGYtOCIsIGVycm9ycz0icmVwbGFjZSIKICAgICAgICAgICAgKQogICAgICAgICAgICBpZiB2ZW52X3Jvb3Qgbm90IGluIGNvbW1hbmQ6CiAgICAgICAgICAgICAgICBjb250aW51ZQogICAgICAgICAgICBpZiBub3QgYW55KGFwcGxpY2F0aW9uIGluIGNvbW1hbmQgZm9yIGFwcGxpY2F0aW9uIGluIGFsbG93ZWRfYXBwcyk6CiAgICAgICAgICAgICAgICBjb250aW51ZQogICAgICAgICAgICBzdGF0dXMgPSAoaXRlbSAvICJzdGF0dXMiKS5yZWFkX3RleHQoZW5jb2Rpbmc9InV0Zi04IikKICAgICAgICBleGNlcHQgT1NFcnJvcjoKICAgICAgICAgICAgY29udGludWUKCiAgICAgICAgbWF0Y2ggPSByZS5zZWFyY2gociJWbVJTUzpccysoXGQrKVxzK2tCIiwgc3RhdHVzKQogICAgICAgIGlmIG1hdGNoOgogICAgICAgICAgICB0b3RhbCArPSBpbnQobWF0Y2guZ3JvdXAoMSkpICogMTAyNAoKICAgIHJldHVybiB0b3RhbAo="
+          ).decode("utf-8")
           old_call = '    panel_rss = _process_rss(("python", "waitress"))\n'
           new_call = '    panel_rss = _sg_gateway_process_rss()\n'
 
@@ -80,7 +46,6 @@ def _sg_gateway_process_rss(
           PY
 
           rm -f .github/workflows/patch-dashboard-memory-attribution.yml
-
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add app/main.py .github/workflows/patch-dashboard-memory-attribution.yml
