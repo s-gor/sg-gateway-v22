@@ -101,18 +101,31 @@
 .page-connections .awgd-v31-service-actions form { margin: 0; }
 .page-connections .awgd-v31-service-actions .button { min-height: 34px; padding: 7px 11px; }
 
-/* Compact Xray parameters: hide rows without controls and align fingerprint like shared AWG DNS. */
+/* Compact Xray parameters and aligned Reality settings. */
 .page-connections .xps2-parameter-row[data-profile-panel="reality_tcp"],
 .page-connections .xps2-parameter-row[data-profile-panel="xhttp_reality"] {
   display: none !important;
 }
 .page-connections .xps2-parameter-row[data-fingerprint-panel] {
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 420px);
+  display: flex !important;
   align-items: center;
+  justify-content: space-between;
   gap: 18px;
+  min-height: 0;
   padding: 14px 16px;
 }
+.page-connections .xps2-parameter-row[data-fingerprint-panel] .xps2-parameter-title {
+  display: grid;
+  flex: 1 1 auto;
+  grid-column: auto;
+  min-width: 0;
+}
+.page-connections .xps2-parameter-row[data-fingerprint-panel] .xps2-parameter-title strong {
+  font-size: 14px;
+}
 .page-connections .xps2-parameter-row[data-fingerprint-panel] .xps2-field-mode {
+  flex: 0 1 420px;
+  width: 100%;
   align-self: center;
   margin: 0;
 }
@@ -123,17 +136,89 @@
 .page-connections .xps2-parameter-row[data-fingerprint-panel] select {
   min-height: 38px;
 }
+.page-connections .xps2-actions {
+  margin: 0 18px;
+  border: 1px solid var(--sg-line-soft);
+  border-radius: 11px;
+  background: var(--sg-panel);
+  padding: 14px 16px;
+}
+.page-connections .xps2-actions > p {
+  max-width: none;
+  flex: 1 1 auto;
+}
+.page-connections .cnv1-engine-xray > .cnv1-advanced {
+  margin: 0 36px 18px;
+}
+.page-connections .cnv1-engine-xray > .cnv1-advanced > summary {
+  padding: 0 16px;
+}
+.page-connections .cnv1-engine-xray > .cnv1-advanced .cnv1-advanced-body {
+  padding: 14px 16px 16px;
+}
+.page-connections .cnv1-engine-xray > .cnv1-advanced .cnv1-engine-form {
+  gap: 14px;
+  margin-top: 0;
+  border-top: 0;
+  padding: 0;
+}
+.page-connections .cnv1-engine-xray > .cnv1-advanced .cnv1-form-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.page-connections .cnv1-engine-xray > .cnv1-advanced .cnv1-form-grid > label:nth-child(1) {
+  grid-column: 1;
+  grid-row: 1;
+}
+.page-connections .cnv1-engine-xray > .cnv1-advanced .cnv1-form-grid > label:nth-child(2) {
+  grid-column: 2;
+  grid-row: 1;
+}
+.page-connections .cnv1-engine-xray > .cnv1-advanced .cnv1-form-grid > label:nth-child(3) {
+  grid-column: 1;
+  grid-row: 2;
+}
+.page-connections .cnv1-engine-xray > .cnv1-advanced .cnv1-form-grid > label:nth-child(5) {
+  grid-column: 2;
+  grid-row: 2;
+}
+.page-connections .cnv1-engine-xray > .cnv1-advanced .cnv1-form-grid > label:nth-child(4) {
+  grid-column: 1 / -1;
+  grid-row: 3;
+}
+.page-connections .cnv1-engine-xray > .cnv1-advanced textarea[name="public_key"] {
+  height: 42px;
+  min-height: 42px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  resize: none;
+  white-space: pre;
+}
+.page-connections .cnv1-engine-xray > .cnv1-advanced .cnv1-form-actions {
+  padding-top: 14px;
+}
 
 @media (max-width: 1320px) {
   .page-connections .awgd-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 900px) {
   .page-connections .xps2-parameter-row[data-fingerprint-panel] {
-    grid-template-columns: 1fr;
     align-items: stretch;
+    flex-direction: column;
   }
-  .page-connections .xps2-parameter-row[data-fingerprint-panel] .xps2-parameter-title {
-    grid-column: auto;
+  .page-connections .xps2-parameter-row[data-fingerprint-panel] .xps2-field-mode {
+    flex-basis: auto;
+    max-width: none;
+  }
+  .page-connections .cnv1-engine-xray > .cnv1-advanced {
+    margin: 0 18px 18px;
+  }
+  .page-connections .cnv1-engine-xray > .cnv1-advanced .cnv1-form-grid {
+    grid-template-columns: 1fr;
+  }
+  .page-connections .cnv1-engine-xray > .cnv1-advanced .cnv1-form-grid > label {
+    grid-column: 1;
+    grid-row: auto;
   }
 }
 @media (max-width: 820px) {
@@ -141,6 +226,11 @@
   .page-connections .awgd-shared-dns { grid-template-columns: 1fr; }
   .page-connections .awgd-shared-dns-form { grid-template-columns: minmax(0, 1fr) auto; }
   .page-connections .awgd-card-v31 .awgd-v31-parameter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 650px) {
+  .page-connections .xps2-actions {
+    margin: 0;
+  }
 }
 @media (max-width: 620px) {
   .page-connections .awgd-grid { padding-inline: 12px; }
