@@ -30,6 +30,15 @@ def test_reality_identity_fields_are_read_only_and_not_submitted() -> None:
     assert "aria-readonly" in script
 
 
+def test_reality_port_is_mirrored_into_main_xray_apply() -> None:
+    script = SCRIPT_PATH.read_text(encoding="utf-8")
+
+    assert "bindRealityPortToApply" in script
+    assert "mirror.name = 'reality_tcp_port'" in script
+    assert "profilesForm.addEventListener('submit', syncPort)" in script
+    assert "portField.addEventListener('input', syncPort)" in script
+
+
 def test_public_xray_form_syncs_listener_port_and_preserves_identity(
     tmp_path: Path, monkeypatch
 ) -> None:
