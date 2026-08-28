@@ -60,6 +60,13 @@ def test_sg_gateway_rss_excludes_unrelated_python_processes(tmp_path: Path) -> N
     assert main._sg_gateway_process_rss(proc_root, app_root) == 125_000 * 1024
 
 
+def test_sg_gateway_rss_returns_zero_when_proc_is_unavailable(tmp_path: Path) -> None:
+    assert main._sg_gateway_process_rss(
+        tmp_path / "missing-proc",
+        tmp_path / "opt" / "sg-gateway",
+    ) == 0
+
+
 def test_dashboard_uses_scoped_sg_gateway_process_accounting() -> None:
     source = Path(main.__file__).read_text(encoding="utf-8")
 
