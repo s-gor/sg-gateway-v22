@@ -1,5 +1,52 @@
 (() => {
+  const configureFingerprintMenu = () => {
+    const fingerprint = document.querySelector(
+      '[data-fingerprint-panel] select[name="fingerprint"]'
+    );
+    if (!fingerprint) return;
+
+    const styles = getComputedStyle(fingerprint);
+    const channels = (styles.backgroundColor.match(/\d+(?:\.\d+)?/g) || [])
+      .slice(0, 3)
+      .map(Number);
+    const luminance = channels.length === 3
+      ? (0.2126 * channels[0]) + (0.7152 * channels[1]) + (0.0722 * channels[2])
+      : 0;
+
+    fingerprint.style.colorScheme = luminance < 128 ? 'dark' : 'light';
+    fingerprint.querySelectorAll('option, optgroup').forEach((item) => {
+      item.style.backgroundColor = styles.backgroundColor;
+      item.style.color = styles.color;
+    });
+  };
+
+  const lockRealityIdentity = () => {
+    const fields = [
+      document.querySelector('.cnv1-engine-xray textarea[name="public_key"]'),
+      document.querySelector('.cnv1-engine-xray input[name="short_id"]'),
+    ].filter(Boolean);
+
+    fields.forEach((field) => {
+      field.readOnly = true;
+      field.removeAttribute('name');
+      field.setAttribute('aria-readonly', 'true');
+      field.dataset.serverManaged = '1';
+      field.title = 'Значение управляется сервером';
+
+      const label = field.closest('label');
+      if (label && !label.querySelector('[data-server-managed-note]')) {
+        const note = document.createElement('small');
+        note.dataset.serverManagedNote = '1';
+        note.textContent = 'Управляется сервером · только чтение';
+        label.append(note);
+      }
+    });
+  };
+
   const ready = () => {
+    configureFingerprintMenu();
+    lockRealityIdentity();
+
     const form = document.querySelector('[data-xmux-form]');
     if (form) {
       const details = form.querySelector('[data-xmux-extra]');
