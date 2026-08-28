@@ -1,0 +1,88 @@
+name: Apply dashboard memory attribution patch
+
+on:
+  push:
+    branches:
+      - feature/dashboard-memory-attribution
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/dashboard-memory-attribution
+          fetch-depth: 0
+
+      - name: Patch memory attribution
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("app/main.py")
+          source = path.read_text(encoding="utf-8")
+
+          marker = "\n\ndef _resource_state(percent: int) -> tuple[str, str]:\n"
+          helper = '''
+
+
+def _sg_gateway_process_rss(
+    proc_root: Path = Path("/proc"),
+    app_root: Path | None = None,
+) -> int:
+    root = (app_root or Path(__file__).resolve().parents[1]).resolve()
+    venv_root = str((root / ".venv").resolve())
+    allowed_apps = ("app.production:app", "sg_hostd.app:app")
+    total = 0
+
+    if not proc_root.exists():
+        return total
+
+    for item in proc_root.iterdir():
+        if not item.name.isdigit():
+            continue
+        try:
+            command = (item / "cmdline").read_bytes().replace(b"\\0", b" ").decode(
+                "utf-8", errors="replace"
+            )
+            if venv_root not in command:
+                continue
+            if not any(application in command for application in allowed_apps):
+                continue
+            status = (item / "status").read_text(encoding="utf-8")
+        except OSError:
+            continue
+
+        match = re.search(r"VmRSS:\\s+(\\d+)\\s+kB", status)
+        if match:
+            total += int(match.group(1)) * 1024
+
+    return total
+'''
+
+          old_call = '    panel_rss = _process_rss(("python", "waitress"))\n'
+          new_call = '    panel_rss = _sg_gateway_process_rss()\n'
+
+          if "def _sg_gateway_process_rss(" not in source:
+              if marker not in source:
+                  raise SystemExit("resource-state insertion marker not found")
+              source = source.replace(marker, helper + marker, 1)
+
+          if old_call in source:
+              source = source.replace(old_call, new_call, 1)
+          elif new_call not in source:
+              raise SystemExit("dashboard panel RSS call not found")
+
+          path.write_text(source, encoding="utf-8")
+          PY
+
+          rm -f .github/workflows/patch-dashboard-memory-attribution.yml
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/main.py .github/workflows/patch-dashboard-memory-attribution.yml
+          git commit -m "fix: scope dashboard memory to SG-Gateway processes"
+          git push origin HEAD:feature/dashboard-memory-attribution
