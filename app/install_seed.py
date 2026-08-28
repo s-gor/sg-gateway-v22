@@ -7,7 +7,8 @@ from typing import Any
 from app.connections.settings import get_connection_settings, update_connection_settings
 from app.clients.repository import count_clients, create_client
 from app.constants import AMNEZIAWG3_UDP_PORT, AMNEZIAWG_UDP_PORT
-from app.db import connect, init_db
+from app.db import connect, get_database_path, init_db
+from app.maintenance.seeded_admin_awg3 import mark_seeded_admin_pending
 
 _PLACEHOLDER_PREFIXES = ("PLACEHOLDER_", "CHANGEME", "TODO")
 
@@ -226,11 +227,13 @@ def seed_or_migrate() -> None:
     ):
         admin_client_id = create_client(
             "sg-admin",
-            "xray_reality_tcp,xray_xhttp_reality,amneziawg,amneziawg3,mihomo,sgclient",
+            "xray_reality_tcp,xray_xhttp_reality,amneziawg,mihomo,sgclient",
         )
         if not admin_client_id:
             raise RuntimeError("Не удалось создать первого клиента sg-admin")
         created_admin = True
+        if not update_mode:
+            mark_seeded_admin_pending(get_database_path())
 
     mode = "migration" if update_mode else "seed"
     print(
