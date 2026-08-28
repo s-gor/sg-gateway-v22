@@ -175,6 +175,34 @@ def _prepare_client_protocols(values) -> list[str]:
             continue
         protocols.append(token)
 
+    selected_xray = [token for token in protocols if token.startswith("xray_")]
+    if selected_xray:
+        overview = xray_profiles_overview()
+        profiles = overview.get("profiles")
+        if not isinstance(profiles, list):
+            profiles = []
+        titles: dict[str, str] = {}
+        ready: set[str] = set()
+        for profile in profiles:
+            profile_id = str(getattr(profile, "id", "") or "").strip().lower()
+            if not profile_id:
+                continue
+            profile_token = f"xray_{profile_id}"
+            titles[profile_token] = str(
+                getattr(profile, "title", "") or profile_id
+            ).strip()
+            if bool(getattr(profile, "ready", False)):
+                ready.add(profile_token)
+
+        unavailable = [token for token in selected_xray if token not in ready]
+        if unavailable:
+            token = unavailable[0]
+            title = titles.get(token, token.removeprefix("xray_"))
+            raise ValueError(
+                f"Xray-профиль «{title}» выключен или не готов на сервере. "
+                "Обновите страницу и выберите доступный профиль."
+            )
+
     has_subscription_source = any(
         token in _CLIENT_SUBSCRIPTION_SOURCES
         or token == "xray"
@@ -184,7 +212,6 @@ def _prepare_client_protocols(values) -> list[str]:
     if has_subscription_source:
         protocols.append("sgclient")
     return protocols
-
 
 def normalize_country_code(value: str | None) -> str:
     code = (value or "unknown").strip().lower()
@@ -1092,9 +1119,9 @@ def create_app() -> Flask:
 
     @app.post("/clients")
     def add_client():
-        protocols = _prepare_client_protocols(request.form.getlist("protocols"))
-        access = ",".join(protocols)
         try:
+            protocols = _prepare_client_protocols(request.form.getlist("protocols"))
+            access = ",".join(protocols)
             client_id = create_client(
                 name=request.form.get("name", ""),
                 access=access,
@@ -1170,8 +1197,8 @@ def create_app() -> Flask:
         snapshot = snapshot_client(client_id)
         if snapshot is None:
             abort(404)
-        protocols = _prepare_client_protocols(request.form.getlist("protocols"))
         try:
+            protocols = _prepare_client_protocols(request.form.getlist("protocols"))
             updated = update_client(
                 client_id,
                 request.form.get("name", ""),
@@ -1200,8 +1227,8 @@ def create_app() -> Flask:
         snapshot = snapshot_client(client_id)
         if snapshot is None:
             abort(404)
-        protocols = _prepare_client_protocols(request.form.getlist("protocols"))
         try:
+            protocols = _prepare_client_protocols(request.form.getlist("protocols"))
             updated = update_device(
                 client_id,
                 device_id,
@@ -1387,9 +1414,9 @@ def create_app() -> Flask:
         if client is None:
             abort(404)
         snapshot = snapshot_client(client_id)
-        protocols = _prepare_client_protocols(request.form.getlist("protocols"))
-        access = ",".join(protocols)
         try:
+            protocols = _prepare_client_protocols(request.form.getlist("protocols"))
+            access = ",".join(protocols)
             device_id = create_device(
                 client_id,
                 request.form.get("name", ""),
