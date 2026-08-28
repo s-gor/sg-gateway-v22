@@ -156,3 +156,24 @@ def test_applied_awg_export_rejects_missing_generation_specific_field(
     _patch_deployment(monkeypatch, engine, config)
 
     assert exports.is_export_ready(_client(), engine, _device()) is False
+
+
+def test_applied_awg_export_rejects_malformed_config_json(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    deployment = ClientDeployment(
+        engine="amneziawg",
+        status="applied",
+        engine_object_id="object-id",
+        config_json="{not-json",
+        device_id=7,
+    )
+    monkeypatch.setattr(
+        exports,
+        "_deployments",
+        lambda client, device=None: {"amneziawg": deployment},
+    )
+
+    assert exports.is_export_ready(
+        _client(), "amneziawg", _device()
+    ) is False
