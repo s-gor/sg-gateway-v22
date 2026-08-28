@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import nullcontext
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -41,7 +42,7 @@ def test_clean_install_checks_awg30_before_creating_any_client() -> None:
     assert "SG_GATEWAY_AWG3_PUBLIC_KEY" in bootstrap
 
 
-def test_clean_seed_requests_all_six_no_certificate_profiles(monkeypatch) -> None:
+def test_clean_seed_defers_awg3_until_its_systemd_unit_exists(monkeypatch) -> None:
     from app import install_seed
 
     settings = {
@@ -101,8 +102,139 @@ def test_clean_seed_requests_all_six_no_certificate_profiles(monkeypatch) -> Non
         "xray_reality_tcp",
         "xray_xhttp_reality",
         "amneziawg",
-        "amneziawg3",
         "mihomo",
         "sgclient",
     }
+    assert "amneziawg3" not in requested
     assert "amneziawg31" not in requested
+
+
+def test_post_runtime_finalizer_adds_only_awg3_and_preserves_existing_access(
+    monkeypatch,
+) -> None:
+    from app.maintenance import seeded_admin_awg3
+
+    row = {"id": 7, "name": "sg-admin", "expires_at": None}
+
+    class FakeConnection:
+        def execute(self, query: str, params: tuple[str, ...]):
+            assert "FROM clients" in query
+            assert params == ("sg-admin",)
+            return SimpleNamespace(fetchone=lambda: row)
+
+    monkeypatch.setattr(seeded_admin_awg3, "init_db", lambda: None)
+    monkeypatch.setattr(
+        seeded_admin_awg3,
+        "connect",
+        lambda: nullcontext(FakeConnection()),
+    )
+    monkeypatch.setattr(
+        seeded_admin_awg3,
+        "get_primary_device",
+        lambda client_id: SimpleNamespace(id=19) if client_id == 7 else None,
+    )
+    existing = [
+        "xray_reality_tcp",
+        "xray_xhttp_reality",
+        "amneziawg",
+        "mihomo",
+        "sgclient",
+    ]
+    monkeypatch.setattr(
+        seeded_admin_awg3,
+        "device_access_tokens",
+        lambda device_id: list(existing) if device_id == 19 else [],
+    )
+    captured: dict[str, object] = {}
+
+    def capture_update(
+        client_id: int,
+        name: str,
+        expires_at: str | None,
+        access: str,
+    ) -> bool:
+        captured.update(
+            client_id=client_id,
+            name=name,
+            expires_at=expires_at,
+            access=access,
+        )
+        return True
+
+    monkeypatch.setattr(seeded_admin_awg3, "update_client", capture_update)
+
+    assert seeded_admin_awg3.ensure_seeded_admin_awg3() is True
+    assert captured == {
+        "client_id": 7,
+        "name": "sg-admin",
+        "expires_at": None,
+        "access": ",".join(existing + ["amneziawg3"]),
+    }
+    assert "amneziawg31" not in str(captured["access"])
+
+
+def test_post_runtime_finalizer_is_idempotent(monkeypatch) -> None:
+    from app.maintenance import seeded_admin_awg3
+
+    row = {"id": 7, "name": "sg-admin", "expires_at": None}
+
+    class FakeConnection:
+        def execute(self, query: str, params: tuple[str, ...]):
+            return SimpleNamespace(fetchone=lambda: row)
+
+    monkeypatch.setattr(seeded_admin_awg3, "init_db", lambda: None)
+    monkeypatch.setattr(
+        seeded_admin_awg3,
+        "connect",
+        lambda: nullcontext(FakeConnection()),
+    )
+    monkeypatch.setattr(
+        seeded_admin_awg3,
+        "get_primary_device",
+        lambda client_id: SimpleNamespace(id=19),
+    )
+    monkeypatch.setattr(
+        seeded_admin_awg3,
+        "device_access_tokens",
+        lambda device_id: ["amneziawg", "amneziawg3", "sgclient"],
+    )
+    monkeypatch.setattr(
+        seeded_admin_awg3,
+        "update_client",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("idempotent finalizer must not rewrite credentials")
+        ),
+    )
+
+    assert seeded_admin_awg3.ensure_seeded_admin_awg3() is False
+
+
+def test_installer_finalizes_awg3_after_units_and_before_awg31() -> None:
+    installer = (ROOT / "install.sh").read_text(encoding="utf-8")
+
+    units = 'run_stage 8 "Создание systemd-служб" stage_systemd_units'
+    awg3 = (
+        'run_quiet "Этап 10/10 · Добавление AWG3 в стартовый профиль" '
+        "run_seeded_admin_awg3_finalizer"
+    )
+    awg31 = (
+        'run_quiet "Этап 10/10 · Подготовка независимого профиля AWG31" '
+        "run_awg31_stage3a_migration"
+    )
+    apply_runtime = (
+        'run_quiet "Этап 10/10 · Применение подтверждённого Xray и клиентов" '
+        "stage9_apply_runtime"
+    )
+
+    assert units in installer
+    assert awg3 in installer
+    assert awg31 in installer
+    assert apply_runtime in installer
+    assert installer.index(units) < installer.index(awg3)
+    assert installer.index(awg3) < installer.index(awg31)
+    assert installer.index(awg31) < installer.index(apply_runtime)
+
+    function_body = installer.split("run_seeded_admin_awg3_finalizer()", 1)[1]
+    function_body = function_body.split("\n}", 1)[0]
+    assert "UPDATE_MODE == 0" in function_body
+    assert "CREATE_SG_ADMIN" in function_body
