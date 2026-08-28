@@ -23,12 +23,12 @@ def test_awg30_apply_bootstraps_an_empty_server_runtime() -> None:
     assert '["systemctl", "restart", AWG3_SERVICE]' in apply_body
 
 
-def test_clean_install_verifies_seeded_sg_admin_awg30_profile() -> None:
+def test_clean_install_verifies_complete_seeded_sg_admin_profile_set() -> None:
     workflow = (ROOT / ".github/workflows/clean-install-awg3-smoke.yml").read_text(
         encoding="utf-8"
     )
 
-    seeded_step = "Verify seeded sg-admin AWG3 profile"
+    seeded_step = "Verify seeded sg-admin complete profile set"
     additional_step = "Create and apply additional AWG3 client"
     assert seeded_step in workflow
     assert additional_step in workflow
@@ -37,14 +37,29 @@ def test_clean_install_verifies_seeded_sg_admin_awg30_profile() -> None:
     seeded = workflow.split(f"- name: {seeded_step}", 1)[1]
     seeded = seeded.split(f"- name: {additional_step}", 1)[0]
     assert "systemctl is-active --quiet sg-gateway-awg3.service" in seeded
+    assert "systemctl is-active --quiet sg-gateway-awg31.service" in seeded
     assert "test -S /run/amneziawg/awg3.sock" in seeded
+    assert "test -S /run/amneziawg/awg31.sock" in seeded
     assert "ip link show dev awg3" in seeded
+    assert "ip link show dev awg31" in seeded
     assert "grep -q '^\\[Peer\\]' /etc/amnezia/amneziawg/awg3.conf" in seeded
     assert "test ! -e /var/lib/sg-gateway/.seeded-admin-awg3.pending" in seeded
     assert 'awg show awg3 listen-port)" = "586"' in seeded
+    assert 'awg show awg31 listen-port)" = "587"' in seeded
     assert "SG_GATEWAY_AWG3_PUBLIC_KEY" in seeded
     assert "assert int(peers) == 1" in seeded
     assert "assert int(seeded) == 1" in seeded
+    for access in (
+        "xray_reality_tcp",
+        "xray_xhttp_reality",
+        "amneziawg",
+        "amneziawg3",
+        "amneziawg31",
+        "mihomo",
+        "sgclient",
+    ):
+        assert f'"{access}"' in seeded
+    assert "assert actual_access == expected_access" in seeded
 
 
 def test_clean_seed_defers_awg3_until_its_systemd_unit_exists(
