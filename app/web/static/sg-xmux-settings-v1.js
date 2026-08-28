@@ -43,9 +43,33 @@
     });
   };
 
+  const bindRealityPortToApply = () => {
+    const portField = document.querySelector(
+      '.cnv1-engine-xray form[action$="/connections/xray"] input[name="port"]'
+    );
+    const profilesForm = document.getElementById('xps2-form');
+    if (!portField || !profilesForm) return;
+
+    let mirror = profilesForm.querySelector('input[name="reality_tcp_port"]');
+    if (!mirror) {
+      mirror = document.createElement('input');
+      mirror.type = 'hidden';
+      mirror.name = 'reality_tcp_port';
+      profilesForm.append(mirror);
+    }
+
+    const syncPort = () => {
+      mirror.value = portField.value;
+    };
+    portField.addEventListener('input', syncPort);
+    profilesForm.addEventListener('submit', syncPort);
+    syncPort();
+  };
+
   const ready = () => {
     configureFingerprintMenu();
     lockRealityIdentity();
+    bindRealityPortToApply();
 
     const form = document.querySelector('[data-xmux-form]');
     if (form) {
