@@ -42,7 +42,10 @@ def test_clean_install_checks_awg30_before_creating_any_client() -> None:
     assert "SG_GATEWAY_AWG3_PUBLIC_KEY" in bootstrap
 
 
-def test_clean_seed_defers_awg3_until_its_systemd_unit_exists(monkeypatch) -> None:
+def test_clean_seed_defers_awg3_until_its_systemd_unit_exists(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
     from app import install_seed
 
     settings = {
@@ -53,6 +56,7 @@ def test_clean_seed_defers_awg3_until_its_systemd_unit_exists(monkeypatch) -> No
     }
     environment = {
         "SG_UPDATE_MODE": "0",
+        "SG_GATEWAY_DATA_DIR": str(tmp_path),
         "SG_SEED_PUBLIC_ADDRESS": "203.0.113.10",
         "SG_GATEWAY_COUNTRY_CODE": "fr",
         "SG_SEED_VLESS_ENCRYPTION": "mlkem768-test",
@@ -107,6 +111,9 @@ def test_clean_seed_defers_awg3_until_its_systemd_unit_exists(monkeypatch) -> No
     }
     assert "amneziawg3" not in requested
     assert "amneziawg31" not in requested
+    assert (tmp_path / ".seeded-admin-awg3.pending").read_text(
+        encoding="utf-8"
+    ).strip() == "sg-admin"
 
 
 def test_post_runtime_finalizer_adds_only_awg3_and_preserves_existing_access(
@@ -209,32 +216,41 @@ def test_post_runtime_finalizer_is_idempotent(monkeypatch) -> None:
     assert seeded_admin_awg3.ensure_seeded_admin_awg3() is False
 
 
-def test_installer_finalizes_awg3_after_units_and_before_awg31() -> None:
+def test_update_without_clean_seed_marker_does_not_modify_clients(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    from app.maintenance import seeded_admin_awg3
+
+    database = tmp_path / "sg-gateway.sqlite"
+    monkeypatch.setattr(
+        seeded_admin_awg3,
+        "init_db",
+        lambda: (_ for _ in ()).throw(
+            AssertionError("markerless update must not open or mutate the database")
+        ),
+    )
+
+    assert seeded_admin_awg3.ensure_seeded_admin_awg3(database=database) is False
+
+
+def test_stage3a_cli_finalizes_seeded_awg3_before_awg31_migration() -> None:
     installer = (ROOT / "install.sh").read_text(encoding="utf-8")
+    stage3a = (ROOT / "app/maintenance/awg31_stage3a.py").read_text(
+        encoding="utf-8"
+    )
 
     units = 'run_stage 8 "Создание systemd-служб" stage_systemd_units'
-    awg3 = (
-        'run_quiet "Этап 10/10 · Добавление AWG3 в стартовый профиль" '
-        "run_seeded_admin_awg3_finalizer"
-    )
     awg31 = (
         'run_quiet "Этап 10/10 · Подготовка независимого профиля AWG31" '
         "run_awg31_stage3a_migration"
     )
-    apply_runtime = (
-        'run_quiet "Этап 10/10 · Применение подтверждённого Xray и клиентов" '
-        "stage9_apply_runtime"
-    )
-
     assert units in installer
-    assert awg3 in installer
     assert awg31 in installer
-    assert apply_runtime in installer
-    assert installer.index(units) < installer.index(awg3)
-    assert installer.index(awg3) < installer.index(awg31)
-    assert installer.index(awg31) < installer.index(apply_runtime)
+    assert installer.index(units) < installer.index(awg31)
 
-    function_body = installer.split("run_seeded_admin_awg3_finalizer()", 1)[1]
-    function_body = function_body.split("\n}", 1)[0]
-    assert "UPDATE_MODE == 0" in function_body
-    assert "CREATE_SG_ADMIN" in function_body
+    finalize = "seeded_awg3_created = ensure_seeded_admin_awg3(database=database)"
+    migrate = "result = installer.migrate(database=database)"
+    assert finalize in stage3a
+    assert migrate in stage3a
+    assert stage3a.index(finalize) < stage3a.index(migrate)
