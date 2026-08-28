@@ -97,14 +97,16 @@ def test_invalid_connection_port_does_not_crash_route(tmp_path, monkeypatch):
     assert current.port == original.port
 
 
-
-def test_invalid_connection_port_shows_feedback(tmp_path, monkeypatch):
+def test_xray_route_ignores_legacy_endpoint_fields_and_shows_success(
+    tmp_path, monkeypatch
+):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("SG_GATEWAY_ADMIN_PASSWORD", "secret")
     app = create_app()
     client = app.test_client()
     client.post("/login", data={"password": "secret"})
 
+    original = get_connection_settings("xray")
     response = client.post(
         "/connections/xray",
         data={
@@ -116,8 +118,11 @@ def test_invalid_connection_port_shows_feedback(tmp_path, monkeypatch):
         },
         follow_redirects=True,
     )
+    current = get_connection_settings("xray")
     body = response.get_data(as_text=True)
 
     assert response.status_code == 200
-    assert "Настройки Xray не применены" in body
-    assert "Проверьте адрес и порт" in body
+    assert current.host == original.host
+    assert current.port == original.port
+    assert current.config["server_name"] == "www.cloudflare.com"
+    assert "Настройки Xray сохранены" in body
