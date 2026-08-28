@@ -473,9 +473,28 @@ html[data-theme="light"] .xps2-salamander {
   gap: 6px;
 }
 
-.xray-reality-sni { grid-area: sni; }
-.xray-reality-public { grid-area: public; }
-.xray-reality-short { grid-area: short; }
+.xray-reality-compact-grid > .xray-reality-sni { grid-area: sni; }
+.xray-reality-compact-grid > .xray-reality-public { grid-area: public; }
+.xray-reality-compact-grid > .xray-reality-short { grid-area: short; }
+
+.cnv1-engine-xray .xray-settings-primary > .xps2-field-mode {
+  width: 100% !important;
+  max-width: none !important;
+  justify-self: stretch;
+}
+
+.cnv1-engine-xray .xray-reality-sni-group {
+  width: 100%;
+  max-width: none;
+}
+
+.cnv1-engine-xray .xray-reality-sni-group > .xray-reality-sni,
+.cnv1-engine-xray .xray-reality-sni-group > .xray-reality-save {
+  grid-area: auto !important;
+  grid-column: auto !important;
+  grid-row: auto !important;
+  align-self: end;
+}
 
 .xray-reality-value-row {
   display: grid;
