@@ -30,7 +30,7 @@ def test_reinstall_smoke_covers_the_real_same_server_lifecycle():
         "Run official full uninstall",
         "Verify deterministic post-uninstall state",
         "Reinstall on the same Ubuntu server",
-        "Verify seeded sg-admin AWG3 profile after reinstall",
+        "Verify seeded sg-admin complete profile set after reinstall",
         "Create and apply additional AWG3 client after reinstall",
         "Verify second installation and both userspace profiles",
     )
@@ -43,5 +43,16 @@ def test_reinstall_smoke_covers_the_real_same_server_lifecycle():
     assert "assert int(peers) == 1" in body
     assert "assert int(seeded) == 1" in body
     assert "sudo test ! -e /var/lib/sg-gateway/.seeded-admin-awg3.pending" in body
+    for access in (
+        "xray_reality_tcp",
+        "xray_xhttp_reality",
+        "amneziawg",
+        "amneziawg3",
+        "amneziawg31",
+        "mihomo",
+        "sgclient",
+    ):
+        assert f'"{access}"' in body
+    assert "assert actual_access == expected_access" in body
     assert 'show awg3 listen-port)' in body
     assert 'show awg31 listen-port)' in body
