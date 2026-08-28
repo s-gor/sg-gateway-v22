@@ -9,6 +9,7 @@ from app.main import create_app
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT_PATH = ROOT / "app/web/static/sg-xmux-settings-v1.js"
+CSS_PATH = ROOT / "app/web/static/sg-xmux-settings-v1.css"
 
 
 def test_fingerprint_uses_sg_dropdown_instead_of_native_popup() -> None:
@@ -54,6 +55,25 @@ def test_xray_client_settings_use_equal_halves() -> None:
     assert script.count("grid-template-columns: repeat(2, minmax(0, 1fr))") >= 2
     assert ".xray-copy-icon" in script
     assert "@media (max-width: 900px)" in script
+
+
+def test_xray_primary_row_resets_legacy_grid_placement() -> None:
+    style = CSS_PATH.read_text(encoding="utf-8")
+
+    assert (
+        ".xray-settings-primary > .xps2-field-mode {\n"
+        "  width: 100% !important;\n"
+        "  max-width: none !important;"
+    ) in style
+    assert (
+        ".xray-reality-sni-group > .xray-reality-sni,\n"
+        ".cnv1-engine-xray .xray-reality-sni-group > .xray-reality-save {\n"
+        "  grid-area: auto !important;\n"
+        "  grid-column: auto !important;\n"
+        "  grid-row: auto !important;"
+    ) in style
+    assert ".xray-reality-compact-grid > .xray-reality-sni { grid-area: sni; }" in style
+    assert "\n.xray-reality-sni { grid-area: sni; }\n" not in style
 
 
 def test_public_xray_form_changes_only_sni(
