@@ -16,6 +16,9 @@ on:
       - deploy/sg-gateway-awg3-userspace.sh
       - deploy/sg-gateway-awg31.service
       - deploy/sg-gateway-awg31-userspace.sh
+      - app/install_seed.py
+      - app/maintenance/awg31_stage3a.py
+      - app/maintenance/seeded_admin_awg3.py
       - app/clients/**
       - app/engines/provisioning.py
       - hostd/sg_hostd/awg3_runtime.py
@@ -32,6 +35,9 @@ on:
       - deploy/sg-gateway-awg3-userspace.sh
       - deploy/sg-gateway-awg31.service
       - deploy/sg-gateway-awg31-userspace.sh
+      - app/install_seed.py
+      - app/maintenance/awg31_stage3a.py
+      - app/maintenance/seeded_admin_awg3.py
       - app/clients/**
       - app/engines/provisioning.py
       - hostd/sg_hostd/awg3_runtime.py
@@ -99,8 +105,11 @@ jobs:
           sudo test -f /opt/sg-gateway/VERSION
           sudo test -f /etc/sg-gateway/runtime.env
           sudo test -f /etc/sg-gateway/sg-gateway.env
+          sudo test ! -e /var/lib/sg-gateway/.seeded-admin-awg3.pending
+          sudo grep -q '^\[Peer\]' /etc/amnezia/amneziawg/awg3.conf
           sudo systemctl is-active --quiet sg-gateway.service
           sudo systemctl is-active --quiet sg-hostd.service
+          sudo systemctl is-active --quiet sg-gateway-awg3.service
 
       - name: Run official full uninstall
         run: |
@@ -150,14 +159,19 @@ jobs:
           SG_GATEWAY_APT_WAIT_SECONDS: "900"
         run: sudo -E bash install.sh
 
-      - name: Verify initialized AWG3 immediately after reinstall
+      - name: Verify seeded sg-admin complete profile set after reinstall
         run: |
           sudo systemctl is-active --quiet sg-gateway-awg3.service
+          sudo systemctl is-active --quiet sg-gateway-awg31.service
           sudo test -S /run/amneziawg/awg3.sock
+          sudo test -S /run/amneziawg/awg31.sock
           sudo ip link show dev awg3
+          sudo ip link show dev awg31
           sudo test -s /etc/amnezia/amneziawg/awg3.conf
-          ! sudo grep -q '^\[Peer\]' /etc/amnezia/amneziawg/awg3.conf
+          sudo grep -q '^\[Peer\]' /etc/amnezia/amneziawg/awg3.conf
+          sudo test ! -e /var/lib/sg-gateway/.seeded-admin-awg3.pending
           test "$(sudo /opt/sg-gateway/awg3/bin/awg show awg3 listen-port)" = "586"
+          test "$(sudo /opt/sg-gateway/awg31/bin/awg show awg31 listen-port)" = "587"
           sudo awk -F= '
             $1 == "SG_GATEWAY_AWG3_PUBLIC_KEY" && length($2) >= 40 { ready=1 }
             END { exit(ready ? 0 : 1) }
@@ -170,6 +184,7 @@ jobs:
             runuser -u sg-gateway -- env \
               PYTHONPATH=/opt/sg-gateway:/opt/sg-gateway/hostd \
               /opt/sg-gateway/.venv/bin/python - <<"PY"
+          from app.clients.repository import device_access_tokens
           from app.db import connect
 
           with connect() as connection:
@@ -177,11 +192,43 @@ jobs:
                   "SELECT COUNT(*) FROM device_credentials WHERE engine = ?",
                   ("amneziawg3",),
               ).fetchone()[0]
-          assert int(peers) == 0, peers
+              seeded = connection.execute(
+                  """
+                  SELECT COUNT(*)
+                  FROM device_credentials dc
+                  JOIN devices d ON d.id = dc.device_id
+                  JOIN clients c ON c.id = d.client_id
+                  WHERE dc.engine = ? AND c.name = ?
+                  """,
+                  ("amneziawg3", "sg-admin"),
+              ).fetchone()[0]
+              primary = connection.execute(
+                  """
+                  SELECT d.id
+                  FROM devices d
+                  JOIN clients c ON c.id = d.client_id
+                  WHERE c.name = ? AND d.is_primary = 1
+                  """,
+                  ("sg-admin",),
+              ).fetchone()
+          assert int(peers) == 1, peers
+          assert int(seeded) == 1, seeded
+          assert primary is not None, "sg-admin primary device is missing"
+          actual_access = set(device_access_tokens(int(primary["id"])))
+          expected_access = {
+              "xray_reality_tcp",
+              "xray_xhttp_reality",
+              "amneziawg",
+              "amneziawg3",
+              "amneziawg31",
+              "mihomo",
+              "sgclient",
+          }
+          assert actual_access == expected_access, (actual_access, expected_access)
           PY
           '
 
-      - name: Create and apply first AWG3 client after reinstall
+      - name: Create and apply additional AWG3 client after reinstall
         run: |
           sudo bash -c '
             set -a

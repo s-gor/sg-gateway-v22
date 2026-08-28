@@ -30,6 +30,7 @@ from app.maintenance.awg31_stage3a_common import (
 )
 from app.maintenance.awg31_stage3a_data import DataMixin
 from app.maintenance.awg31_stage3a_runtime import RuntimeMixin
+from app.maintenance.seeded_admin_awg3 import ensure_seeded_admin_awg3
 
 
 class Stage3AInstaller(RuntimeMixin, DataMixin):
@@ -228,9 +229,12 @@ def _parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
+    database = args.database.resolve()
+    os.environ["SG_GATEWAY_DATA_DIR"] = str(database.parent)
     installer = Stage3AInstaller(source_root=args.source_root, root=args.root)
     if args.command == "migrate":
-        result = installer.migrate(database=args.database)
+        seeded_awg3_created = ensure_seeded_admin_awg3(database=database)
+        result = installer.migrate(database=database)
         print(
             json.dumps(
                 {
@@ -238,12 +242,13 @@ def main(argv: list[str] | None = None) -> int:
                     "total_credentials": result.total_credentials,
                     "server_config": str(result.server_config),
                     "peer_configs": result.peer_configs,
+                    "seeded_awg3_created": seeded_awg3_created,
                 },
                 sort_keys=True,
             )
         )
     else:
-        installer.uninstall(database=args.database, purge_data=args.purge_data)
+        installer.uninstall(database=database, purge_data=args.purge_data)
     return 0
 
 
