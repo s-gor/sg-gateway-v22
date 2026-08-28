@@ -76,6 +76,21 @@ def test_xray_primary_row_resets_legacy_grid_placement() -> None:
     assert "\n.xray-reality-sni { grid-area: sni; }\n" not in style
 
 
+def test_fingerprint_menu_is_opaque_and_viewport_aware() -> None:
+    script = SCRIPT_PATH.read_text(encoding="utf-8")
+
+    assert "--xray-picker-menu-bg: #10253a" in script
+    assert "background: var(--xray-picker-menu-bg)" in script
+    assert "html[data-theme=\"light\"] .cnv1-engine-xray .xray-fingerprint-menu" in script
+    assert "const positionMenu = () =>" in script
+    assert "const spaceBelow = window.innerHeight - rect.bottom - viewportGap" in script
+    assert "const openUp = spaceBelow < preferredHeight && spaceAbove > spaceBelow" in script
+    assert "menu.classList.toggle('opens-up', openUp)" in script
+    assert "menu.style.maxHeight = `${availableHeight}px`" in script
+    assert "window.addEventListener('resize', repositionOpenMenu)" in script
+    assert "window.addEventListener('scroll', repositionOpenMenu, true)" in script
+
+
 def test_public_xray_form_changes_only_sni(
     tmp_path: Path, monkeypatch
 ) -> None:
