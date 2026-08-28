@@ -62,6 +62,14 @@ def test_verify_package_source_accepts_exact_awg31_manifest(tmp_path: Path) -> N
     assert result["production_files"] >= len(ASSETS)
 
 
+def test_awg31_manifest_includes_seeded_awg3_install_dependencies() -> None:
+    manifest = json.loads((ROOT / "release-manifest.json").read_text(encoding="utf-8"))
+    production = set(manifest["awg31"]["production_files"])
+
+    assert "app/install_seed.py" in production
+    assert "app/maintenance/seeded_admin_awg3.py" in production
+
+
 @pytest.mark.parametrize("failure", ["missing", "bad-sha", "unexpected"])
 def test_verify_package_source_rejects_incomplete_or_tampered_payload(
     tmp_path: Path, failure: str,
