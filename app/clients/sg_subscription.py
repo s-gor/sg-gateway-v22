@@ -180,7 +180,7 @@ def build_keenetic_subscription_body(client: Client, device_id: int) -> str:
 
 
 def _subscription_label(client_name: str, device: dict, profile_name: str) -> str:
-    device_name = "Основное устройство" if device.get("primary") else str(device.get("name") or "Устройство")
+    device_name = str(device.get("name") or "Устройство")
     return f"{client_name} · {device_name} · {profile_name}"
 
 
@@ -222,6 +222,7 @@ def _ready_uri_lines(document: dict) -> list[str]:
             lines.append(_with_fragment(str(profile["uri"]), label))
     return lines
 
+
 def build_compatible_subscription_body(client: Client) -> str:
     """Return the proven v2rayN-style Base64 transport for all ready URI profiles."""
     document = build_sg_subscription_document(client)
@@ -229,6 +230,7 @@ def build_compatible_subscription_body(client: Client) -> str:
     if decoded:
         decoded += "\n"
     return base64.b64encode(decoded.encode("utf-8")).decode("ascii")
+
 
 def build_sg_subscription_text(client: Client) -> str:
     """Build the SG v1 human-readable envelope with URI and SG-CONFIG records."""
@@ -244,7 +246,7 @@ def build_sg_subscription_text(client: Client) -> str:
     ]
 
     for device in document["devices"]:
-        device_name = "Основное устройство" if device.get("primary") else str(device.get("name") or "Устройство")
+        device_name = str(device.get("name") or "Устройство")
         lines.append(
             "# SG-DEVICE "
             + json.dumps(
@@ -262,7 +264,11 @@ def build_sg_subscription_text(client: Client) -> str:
             if not profile.get("ready"):
                 continue
             if profile.get("format") == "uri" and profile.get("uri"):
-                label = _subscription_label(client.name, device, str(profile.get("name") or profile.get("id") or "Профиль"))
+                label = _subscription_label(
+                    client.name,
+                    device,
+                    str(profile.get("name") or profile.get("id") or "Профиль"),
+                )
                 lines.append(_with_fragment(str(profile["uri"]), label))
             elif profile.get("format") == "config" and profile.get("config"):
                 lines.append(_config_marker(profile, device))
