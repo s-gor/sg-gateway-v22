@@ -188,7 +188,7 @@ def _append_caption(svg: str, payload: str) -> str:
     return ET.tostring(root, encoding="unicode", xml_declaration=True)
 
 
-def build_qr_svg(payload: str, *, include_caption: bool = True) -> str:
+def build_qr_svg(payload: str, *, include_caption: bool = False) -> str:
     """Build an SVG QR, optionally with a human-readable caption.
 
     VLESS Encryption adds a large client key to the URL. Error correction L

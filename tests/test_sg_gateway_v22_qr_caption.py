@@ -11,6 +11,28 @@ from app.clients.qr import build_qr_svg
 
 ROOT = Path(__file__).resolve().parents[1]
 SVG = "{http://www.w3.org/2000/svg}"
+PROFILE_CASES = [
+    ("# SG-Gateway AmneziaWG\n[Interface]\n", "AmneziaWG 2.0"),
+    ("# SG-Gateway AmneziaWG 3.0\n[Interface]\n", "AmneziaWG 3.0"),
+    ("awg31://import/v1/example", "AmneziaWG 3.1"),
+    (
+        "vless://id@example.com:443?type=tcp&security=reality#test",
+        "VLESS Reality TCP",
+    ),
+    (
+        "vless://id@example.com:443?type=xhttp&security=reality#test",
+        "VLESS XHTTP Reality",
+    ),
+    (
+        "vless://id@example.com:443?type=xhttp&security=tls#test",
+        "VLESS XHTTP TLS",
+    ),
+    ("hysteria2://example", "Hysteria 2"),
+    ("mieru://example", "Mieru"),
+    ('{"profiles": [{"protocol": "mieru"}]}', "Mieru JSON"),
+    ("anytls://example", "AnyTLS"),
+    ("tuic://example", "TUIC v5"),
+]
 
 
 def _texts(svg: str) -> list[str]:
@@ -33,16 +55,16 @@ def _raw_qr_svg(payload: str) -> str:
     return buffer.getvalue().decode("utf-8")
 
 
-def test_subscription_qr_has_two_line_caption_by_default() -> None:
-    svg = build_qr_svg("https://vpn.example/sub/token")
+def test_subscription_qr_can_add_two_line_caption() -> None:
+    svg = build_qr_svg(
+        "https://vpn.example/sub/token",
+        include_caption=True,
+    )
     assert _texts(svg) == ["SG · ПОДПИСКА", "Все назначенные профили"]
 
 
-def test_subscription_qr_can_omit_embedded_caption() -> None:
-    svg = build_qr_svg(
-        "https://vpn.example/sub/token",
-        include_caption=False,
-    )
+def test_subscription_qr_omits_embedded_caption_by_default() -> None:
+    svg = build_qr_svg("https://vpn.example/sub/token")
     root = ET.fromstring(svg)
     view_box = [float(value) for value in root.attrib["viewBox"].split()]
 
@@ -71,38 +93,25 @@ def test_subscription_qr_modals_have_distinct_top_titles() -> None:
               <small>Сканируйте в приложении</small>""" in template
 
 
-@pytest.mark.parametrize(
-    ("payload", "profile_name"),
-    [
-        ("# SG-Gateway AmneziaWG\n[Interface]\n", "AmneziaWG 2.0"),
-        ("# SG-Gateway AmneziaWG 3.0\n[Interface]\n", "AmneziaWG 3.0"),
-        ("awg31://import/v1/example", "AmneziaWG 3.1"),
-        (
-            "vless://id@example.com:443?type=tcp&security=reality#test",
-            "VLESS Reality TCP",
-        ),
-        (
-            "vless://id@example.com:443?type=xhttp&security=reality#test",
-            "VLESS XHTTP Reality",
-        ),
-        (
-            "vless://id@example.com:443?type=xhttp&security=tls#test",
-            "VLESS XHTTP TLS",
-        ),
-        ("hysteria2://example", "Hysteria 2"),
-        ("mieru://example", "Mieru"),
-        ('{"profiles": [{"protocol": "mieru"}]}', "Mieru JSON"),
-        ("anytls://example", "AnyTLS"),
-        ("tuic://example", "TUIC v5"),
-    ],
-)
-def test_single_qr_names_profile(payload: str, profile_name: str) -> None:
-    svg = build_qr_svg(payload)
+@pytest.mark.parametrize(("payload", "profile_name"), PROFILE_CASES)
+def test_single_qr_caption_names_profile(payload: str, profile_name: str) -> None:
+    svg = build_qr_svg(payload, include_caption=True)
     assert _texts(svg) == ["SG · ОДИНОЧНЫЙ ПРОФИЛЬ", profile_name]
 
 
-def test_caption_extends_canvas() -> None:
-    root = ET.fromstring(build_qr_svg("tuic://example"))
+@pytest.mark.parametrize("payload", [payload for payload, _ in PROFILE_CASES])
+def test_all_profile_qr_are_captionless_by_default(payload: str) -> None:
+    svg = build_qr_svg(payload)
+    root = ET.fromstring(svg)
+    view_box = [float(value) for value in root.attrib["viewBox"].split()]
+
+    assert _texts(svg) == []
+    assert view_box[3] == view_box[2]
+    assert root.find(f"{SVG}rect") is None
+
+
+def test_caption_extends_canvas_when_requested() -> None:
+    root = ET.fromstring(build_qr_svg("tuic://example", include_caption=True))
     view_box = [float(value) for value in root.attrib["viewBox"].split()]
     height = float(root.attrib["height"].removesuffix("mm"))
 
@@ -114,7 +123,9 @@ def test_caption_extends_canvas() -> None:
 def test_caption_does_not_change_encoded_qr_matrix() -> None:
     payload = "vless://id@example.com:443?type=xhttp&security=reality#test"
     raw_root = ET.fromstring(_raw_qr_svg(payload))
-    captioned_root = ET.fromstring(build_qr_svg(payload))
+    captioned_root = ET.fromstring(
+        build_qr_svg(payload, include_caption=True)
+    )
 
     raw_path = raw_root.find(f"{SVG}path")
     captioned_path = captioned_root.find(f"{SVG}path")
