@@ -13,16 +13,14 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def test_update_channel_defaults_are_consistent_and_old_repo_is_gone() -> None:
     assert panel_updates.GITHUB_REPO == "s-gor/sg-gateway-v22"
-    # dev-02206 is intentionally isolated from public main/stable branches.
-    # The shell updater retains main only as its generic fallback; hostd always
-    # passes the configured channel explicitly.
-    assert panel_updates.GITHUB_BRANCH == "dev-02206"
+    # Stable releases track the immutable stable-02206 channel by default.
+    assert panel_updates.GITHUB_BRANCH == "stable-02206"
     update = (ROOT / "deploy" / "update-from-github.sh").read_text(encoding="utf-8")
     bootstrap = (ROOT / "deploy" / "install-from-github.sh").read_text(encoding="utf-8")
     assert 'REPOSITORY="s-gor/sg-gateway-v22"' in update
-    assert '${SG_GATEWAY_GITHUB_BRANCH:-${SG_GATEWAY_UPDATE_BRANCH:-main}}' in update
-    assert "dev-02206" in bootstrap
-    assert "SG_GATEWAY_ALLOW_DEVELOPMENT" in bootstrap
+    assert '${SG_GATEWAY_GITHUB_BRANCH:-${SG_GATEWAY_UPDATE_BRANCH:-stable-02206}}' in update
+    assert "stable-02206" in bootstrap
+    assert "SG_GATEWAY_ALLOW_DEVELOPMENT" not in bootstrap
     assert "raw.githubusercontent.com/%s/%s/deploy/update-from-github.sh" in bootstrap
     assert "sudo env SG_GATEWAY_GITHUB_BRANCH=%s bash" in bootstrap
     assert "raw.githubusercontent.com/s-gor/sg-gateway/main/deploy/update-from-github.sh" not in bootstrap
@@ -46,7 +44,7 @@ def test_overview_queries_configured_channel_not_main(monkeypatch) -> None:
     assert seen == ["https://api.github.test/repos/s-gor/sg-gateway-v22/commits/dev-v22"]
 
 
-def test_02204_without_baseline_can_bootstrap_to_dev_02206(monkeypatch) -> None:
+def test_02204_without_baseline_can_bootstrap_to_stable_02206(monkeypatch) -> None:
     monkeypatch.setattr(panel_updates, "_CACHE", None)
     monkeypatch.setattr(panel_updates, "_read_state", lambda: {})
     monkeypatch.setattr(panel_updates, "source_fingerprint", lambda: "local-fingerprint")

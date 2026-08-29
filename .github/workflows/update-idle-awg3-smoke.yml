@@ -3,7 +3,7 @@ name: Update repairs idle AWG3 smoke
 on:
   pull_request:
     branches:
-      - dev-02206
+      - main
     paths:
       - deploy/update-from-github.sh
       - app/maintenance/awg3_idle_bootstrap.py
@@ -12,8 +12,9 @@ on:
       - .github/workflows/update-idle-awg3-smoke.yml
   push:
     branches:
-      - dev-02206
-      - test/awg3-idle-update
+      - release/0.1.0-022.06
+      - stable-02206
+      - main
     paths:
       - deploy/update-from-github.sh
       - app/maintenance/awg3_idle_bootstrap.py

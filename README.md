@@ -4,7 +4,7 @@
 
 > **Один сервер. Одна панель. Семейный VPN без серверной акробатики.**
 
-![Версия](https://img.shields.io/badge/version-0.1.0--022.04-3b82f6)
+![Версия](https://img.shields.io/badge/version-0.1.0--022.06-3b82f6)
 ![Ubuntu](https://img.shields.io/badge/Ubuntu-native-E95420?logo=ubuntu&logoColor=white)
 ![Xray](https://img.shields.io/badge/Xray-supported-2563EB)
 ![AmneziaWG](https://img.shields.io/badge/AmneziaWG-supported-6D5BD0)
@@ -13,30 +13,24 @@
 ![WARP](https://img.shields.io/badge/WARP-supported-F38020?logo=cloudflare&logoColor=white)
 ![systemd](https://img.shields.io/badge/deploy-systemd-16A085)
 ![HTTPS](https://img.shields.io/badge/HTTPS-Let%27s_Encrypt-003A70?logo=letsencrypt&logoColor=white)
-![Status](https://img.shields.io/badge/status-022.04--STABLE-16A34A)
+![Status](https://img.shields.io/badge/status-022.06--STABLE-16A34A)
 
-> **Актуальная версия — 0.1.0-022.04 STABLE.** Это полноценный стабильный выпуск, а не тестовая ветка и не Release Candidate.
+> **Актуальная версия — 0.1.0-022.06 STABLE.** Это финальный стабильный выпуск линии 022.06.
 
-## Что нового в SG-Gateway 0.1.0-022.04
+## Что нового в SG-Gateway 0.1.0-022.06
 
-- **Dual Stack IPv4 + IPv6.** SG-Gateway определяет оба семейства адресов, сохраняет их в состоянии сервера и не считает отсутствие IPv6 аварией установки.
-- **Family Routing.** Для каждого правила явно выбирается `SG-Gateway · IPv4`, `SG-Gateway · IPv6`, `WARP · IPv4`, `WARP · IPv6` или `Заблокировать`. Скрытого fallback между IPv4 и IPv6 нет.
-- **AWG3 userspace.** Добавлена отдельная линия AmneziaWG 3 рядом с AWG2, со своей службой, runtime и клиентскими конфигурациями.
-- **WARP больше не ломает Clean Install.** WARP создаётся вручную после установки, а доступность IPv4 и IPv6 проверяется независимо.
-- **XHTTP и XMUX.** Добавлены управляемые XMUX-пресеты, экспертный режим, нормализация XHTTP Reality в `stream-one` и отдельный клиентский mode для XHTTP TLS.
-- **Hysteria 2 Gecko.** Доступны режимы Off, Salamander и Gecko с управляемым FinalMask.
-- **Персональная SG Subscription.** У каждого устройства есть собственная ссылка, QR-код и независимые credentials; миграция не перевыпускает уже работающие доступы.
-- **Подписки для роутеров.** Для каждого устройства доступны `OpenWrt · HomeProxy SUB`, отдельный VLESS-фид `Keenetic · Xkeen UI SUB` и универсальный Router JSON для внешних интеграторов. Старые SUB-ссылки продолжают работать.
-- **Безопасный Update.** Обновление сохраняет базу, сертификаты, assets, AWG3 runtime, GeoFiles и активные службы; перед переключением создаётся Safety Backup, при ошибке выполняется rollback.
-- **Очистка старых копий.** В Maintenance появилась кнопка **«Удалить старые»**: она показывает количество и объём, требует подтверждения и сохраняет две последние SQLite-копии, не затрагивая Full Backup и Safety Backup.
-- **Full Backup и Restore.** Расширены проверка архива, перенос на новый сервер, страховочная копия перед восстановлением и финальная проверка runtime.
-- **Новый интерфейс Connections.** Три VLESS-карточки имеют одинаковую компактную высоту, XHTTP mode и TCP-порт выровнены, лишний разделитель Hysteria 2 удалён.
-- **Поддержка слабого разрешения.** Добавлена отдельная компактная раскладка для узких и низких экранов без скрытия действий.
-- **Production и диагностика.** Усилены проверки установки, atomic-обновление GeoFiles, журнал операций и диагностика без вывода чувствительных значений.
+- Независимые AWG 2.0, AWG 3.0 и AWG 3.1 с отдельными runtime и credentials.
+- Полный профильный набор для первого `sg-admin`.
+- Атомарное создание клиентов и fail-closed проверка экспортов.
+- Переносимые Full Backup/Restore с проверкой сервисов и safety rollback.
+- Безопасный exact-commit Update с source integrity и сохранением runtime.
+- Публичные стабильные команды Clean Install, Update и Full Uninstall.
+- Исправленные системные индикаторы памяти и диска.
+- Накопленные исправления интерфейса, QR, подписок и работы на низком разрешении.
 
-Полное описание выпуска и выполненных проверок: **[SG-Gateway 0.1.0-022.04 — описание релиза](PUBLICATION-02204.md)**.
+Полное описание выпуска: **[SG-Gateway 0.1.0-022.06 — описание релиза](PUBLICATION-02206.md)**.
 
-Если у вас уже установлена frozen-версия `0.1.0-021.12`, используйте обычную команду **Update** ниже. Историческая 021.12 сохранена отдельно и не изменялась.
+Для перехода с `0.1.0-022.04` используйте обычную команду **Update** ниже. Исторические стабильные ветки не изменяются.
 
 SG-Gateway устанавливается на **один самостоятельный Ubuntu-сервер** и превращает его в готовый VPN-шлюз с удобным веб-интерфейсом.
 
@@ -53,7 +47,7 @@ SG-Gateway устанавливается на **один самостоятел
 Для чистой Ubuntu:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/main/deploy/install-from-github.sh | sudo env SG_GATEWAY_GITHUB_BRANCH=main bash
+curl -4 -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/stable-02206/deploy/install-from-github.sh | sudo env SG_GATEWAY_GITHUB_BRANCH=stable-02206 bash
 ```
 
 Если SG-Gateway уже установлен, Clean Install останавливается до изменений и предлагает отдельную команду Update.
@@ -61,7 +55,7 @@ curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/main/deploy/in
 ### Update — существующий SG-Gateway
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/main/deploy/update-from-github.sh | sudo env SG_GATEWAY_GITHUB_BRANCH=main bash
+curl -4 -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/stable-02206/deploy/update-from-github.sh | sudo env SG_GATEWAY_GITHUB_BRANCH=stable-02206 bash
 ```
 
 Update не запускает полный installer и не переустанавливает Nginx, Certbot, Xray, AmneziaWG, Mihomo, sing-box или WARP helper. Перед переключением кода создаётся safety backup, а после обновления проверяются HTTPS, Clients, Nginx и runtime.
@@ -69,7 +63,7 @@ Update не запускает полный installer и не переустан
 ### Full Uninstall — полное удаление SG-Gateway
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/main/deploy/full-uninstall-ubuntu.sh | sudo env SG_GATEWAY_GITHUB_BRANCH=main bash
+curl -4 -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/stable-02206/deploy/uninstall-from-github.sh | sudo env SG_GATEWAY_GITHUB_BRANCH=stable-02206 bash
 ```
 
 Подтверждение:
@@ -86,6 +80,16 @@ DELETE SG-GATEWAY
 
 
 ## История предыдущих выпусков
+
+<details>
+<summary><strong>SG-Gateway 0.1.0-022.04</strong></summary>
+
+Предыдущий стабильный выпуск сохранён в ветке `stable-02204`.
+
+Полное описание: **[SG-Gateway 0.1.0-022.04 — описание релиза](PUBLICATION-02204.md)**.
+
+</details>
+
 
 <details>
 <summary><strong>SG-Gateway 0.1.0-021.12</strong></summary>

@@ -6,11 +6,10 @@ UNINSTALLER = ROOT / "deploy" / "full-uninstall-ubuntu.sh"
 WORKFLOW = ROOT / ".github" / "workflows" / "reinstall-after-full-uninstall-smoke.yml"
 
 CANONICAL_REINSTALL_COMMAND = (
-    "curl -fsSL "
-    "https://raw.githubusercontent.com/s-gor/sg-gateway-v22/dev-02206/"
+    "curl -4 -fsSL "
+    "https://raw.githubusercontent.com/s-gor/sg-gateway-v22/stable-02206/"
     "deploy/install-from-github.sh | sudo env "
-    "SG_GATEWAY_ALLOW_DEVELOPMENT=1 "
-    "SG_GATEWAY_GITHUB_BRANCH=dev-02206 bash"
+    "SG_GATEWAY_GITHUB_BRANCH=stable-02206 bash"
 )
 
 

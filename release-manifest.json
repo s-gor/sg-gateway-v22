@@ -1,6 +1,6 @@
 {
-  "build": "DEV-02206",
-  "channel": "dev-02206",
+  "build": "MAIN-02206-STABLE",
+  "channel": "stable-02206",
   "client_access_model": {
     "awg2_awg3_independent_selection": true,
     "hysteria_auth_per_device": true,
@@ -254,7 +254,7 @@
     "sg_admin_enter_defaults_to_yes": true,
     "stage9_exact_failure_logging": true,
     "template_endpoint_audit": true,
-    "version": "02206-dev",
+    "version": "02206-stable",
     "warp_panel_port_v017": true,
     "xhttp_reality_stream_one_migration": true
   },
@@ -283,7 +283,7 @@
     },
     "panel": {
       "automatic_rollback": true,
-      "channel": "dev-02206",
+      "channel": "stable-02206",
       "full_code_backup": true,
       "health_checks": [
         "sg-hostd",
@@ -297,7 +297,7 @@
         "cores"
       ],
       "requirements_change_blocks_panel_only_update": true,
-      "source": "github-dev-02206-exact-commit",
+      "source": "github-stable-02206-exact-commit",
       "staging": true
     }
   },
@@ -453,7 +453,7 @@
     "manifest": "SOURCE-SHA256SUMS",
     "mode": "git-blob-sha256"
   },
-  "status": "DEVELOPMENT",
+  "status": "STABLE",
   "system_ui_02110": {
     "cpu_breakdown_margin_top_px": -16,
     "cpu_title_margin_bottom_px": 6,

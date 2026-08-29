@@ -378,4 +378,4 @@ printf '[SG-Gateway] EC2 готов к чистой установке SG-Gatewa
 printf '[SG-Gateway] Системные пакеты Ubuntu не удалялись.\n'
 printf '[SG-Gateway] Журнал: %s\n' "$UNINSTALL_LOG"
 printf '\n[SG-Gateway] Для повторной установки SG-Gateway выполните:\n'
-printf '%s\n' 'curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/dev-02206/deploy/install-from-github.sh | sudo env SG_GATEWAY_ALLOW_DEVELOPMENT=1 SG_GATEWAY_GITHUB_BRANCH=dev-02206 bash'
+printf '%s\n' 'curl -4 -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/stable-02206/deploy/install-from-github.sh | sudo env SG_GATEWAY_GITHUB_BRANCH=stable-02206 bash'

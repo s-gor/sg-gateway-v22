@@ -5,7 +5,9 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - dev-02206
+      - release/0.1.0-022.06
+      - stable-02206
+      - main
     paths:
       - .github/workflows/reinstall-after-full-uninstall-smoke.yml
       - tests/test_sg_gateway_v22_reinstall_after_full_uninstall.py
@@ -24,7 +26,7 @@ on:
       - hostd/sg_hostd/awg3_runtime.py
   pull_request:
     branches:
-      - dev-02206
+      - main
     paths:
       - .github/workflows/reinstall-after-full-uninstall-smoke.yml
       - tests/test_sg_gateway_v22_reinstall_after_full_uninstall.py

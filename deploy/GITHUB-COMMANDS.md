@@ -1,21 +1,33 @@
-# SG-Gateway · команды GitHub
+# SG-Gateway 0.1.0-022.06 · команды GitHub
 
-Канал: `dev-02206`. Поддерживается Ubuntu 24.04.
+Канал: `stable-02206`. Поддерживается Ubuntu 24.04.
 
 ## Чистая установка
 
-Команда предназначена только для сервера без установленного SG-Gateway:
+Только для сервера без установленного SG-Gateway:
 
 ```bash
-curl -4 -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/dev-02206/deploy/install-from-github.sh | sudo env SG_GATEWAY_ALLOW_DEVELOPMENT=1 SG_GATEWAY_GITHUB_BRANCH=dev-02206 bash
+curl -4 -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/stable-02206/deploy/install-from-github.sh | sudo env SG_GATEWAY_GITHUB_BRANCH=stable-02206 bash
+```
+
+## Обновление
+
+Для уже установленного SG-Gateway:
+
+```bash
+curl -4 -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/stable-02206/deploy/update-from-github.sh | sudo env SG_GATEWAY_GITHUB_BRANCH=stable-02206 bash
 ```
 
 ## Полное удаление
 
-Команда запускает официальный полный деинсталлятор. Он удаляет приложение, конфигурацию, базу, резервные копии, SG-службы и установленные SG runtime. Системные пакеты Ubuntu остаются установленными.
-
-Перед удалением деинсталлятор потребует ввести точно `DELETE SG-GATEWAY`:
+Удаляются приложение, конфигурация, база, резервные копии, SG-службы и установленные SG runtime. Системные пакеты Ubuntu остаются установленными.
 
 ```bash
-curl -4 -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/dev-02206/deploy/uninstall-from-github.sh | sudo env SG_GATEWAY_ALLOW_DEVELOPMENT=1 SG_GATEWAY_GITHUB_BRANCH=dev-02206 bash
+curl -4 -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/stable-02206/deploy/uninstall-from-github.sh | sudo env SG_GATEWAY_GITHUB_BRANCH=stable-02206 bash
+```
+
+Для подтверждения необходимо ввести точно:
+
+```text
+DELETE SG-GATEWAY
 ```
