@@ -73,12 +73,13 @@ def test_subscription_qr_omits_embedded_caption_by_default() -> None:
     assert root.find(f"{SVG}rect") is None
 
 
-def test_subscription_endpoints_request_captionless_qr() -> None:
+def test_subscription_endpoints_use_captionless_default_qr() -> None:
     source = (
         ROOT / "app/clients/sg_subscription_http_v4.py"
     ).read_text(encoding="utf-8")
 
-    assert "build_qr_svg(url, include_caption=False)" in source
+    assert "build_qr_svg(url)" in source
+    assert "build_qr_svg(url, include_caption=" not in source
 
 
 def test_subscription_qr_modals_have_distinct_top_titles() -> None:

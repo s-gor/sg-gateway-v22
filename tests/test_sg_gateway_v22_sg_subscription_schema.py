@@ -29,7 +29,7 @@ def _device(device_id: int, name: str, primary: bool) -> Device:
     )
 
 
-def test_canonical_profile_ids_preserve_v1_order_with_independent_awg3() -> None:
+def test_canonical_profile_ids_preserve_v1_order_with_independent_awg_profiles() -> None:
     assert subscription.canonical_profile_ids() == (
         "xray_reality_tcp",
         "xray_xhttp_reality",
@@ -37,11 +37,13 @@ def test_canonical_profile_ids_preserve_v1_order_with_independent_awg3() -> None
         "xray_hysteria2",
         "amneziawg",
         "amneziawg3",
+        "amneziawg31",
         "mieru",
         "anytls",
         "tuic",
     )
     assert "amneziawg3" in subscription.canonical_profile_ids()
+    assert "amneziawg31" in subscription.canonical_profile_ids()
 
 
 def test_anytls_and_tuic_uris_are_canonicalized() -> None:
@@ -118,7 +120,7 @@ def test_document_is_client_scoped_multi_device_and_counts_assigned_ready(monkey
     ]
     assert document["devices"][1]["profiles"][1]["ready"] is False
     assert all(
-        profile["id"] != "amneziawg3"
+        profile["id"] not in {"amneziawg3", "amneziawg31"}
         for device in document["devices"]
         for profile in device["profiles"]
     )

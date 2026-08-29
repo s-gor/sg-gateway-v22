@@ -42,7 +42,7 @@ def _qr_response(url: str):
     if not url:
         abort(409)
     try:
-        svg = build_qr_svg(url, include_caption=False)
+        svg = build_qr_svg(url)
     except ClientQrError as exc:
         return Response(str(exc), status=409, mimetype="text/plain")
     return Response(svg, mimetype="image/svg+xml")
