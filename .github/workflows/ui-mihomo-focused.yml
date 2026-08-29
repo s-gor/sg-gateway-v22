@@ -1,0 +1,17 @@
+name: Mihomo UI focused contract
+
+on:
+  push:
+    branches: [ui/visible-mihomo-restart]
+  workflow_dispatch:
+
+jobs:
+  focused:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install pytest
+      - run: python -m pytest -q tests/test_sg_gateway_v22_mihomo_service_tools_ui.py
