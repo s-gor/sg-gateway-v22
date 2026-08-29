@@ -1,4 +1,5 @@
 from io import BytesIO
+from pathlib import Path
 from xml.etree import ElementTree as ET
 
 import pytest
@@ -8,6 +9,7 @@ import qrcode.image.svg
 from app.clients.qr import build_qr_svg
 
 
+ROOT = Path(__file__).resolve().parents[1]
 SVG = "{http://www.w3.org/2000/svg}"
 
 
@@ -31,9 +33,42 @@ def _raw_qr_svg(payload: str) -> str:
     return buffer.getvalue().decode("utf-8")
 
 
-def test_subscription_qr_has_two_line_caption() -> None:
+def test_subscription_qr_has_two_line_caption_by_default() -> None:
     svg = build_qr_svg("https://vpn.example/sub/token")
     assert _texts(svg) == ["SG · ПОДПИСКА", "Все назначенные профили"]
+
+
+def test_subscription_qr_can_omit_embedded_caption() -> None:
+    svg = build_qr_svg(
+        "https://vpn.example/sub/token",
+        include_caption=False,
+    )
+    root = ET.fromstring(svg)
+    view_box = [float(value) for value in root.attrib["viewBox"].split()]
+
+    assert _texts(svg) == []
+    assert view_box[3] == view_box[2]
+    assert root.find(f"{SVG}rect") is None
+
+
+def test_subscription_endpoints_request_captionless_qr() -> None:
+    source = (
+        ROOT / "app/clients/sg_subscription_http_v4.py"
+    ).read_text(encoding="utf-8")
+
+    assert "build_qr_svg(url, include_caption=False)" in source
+
+
+def test_subscription_qr_modals_have_distinct_top_titles() -> None:
+    template = (
+        ROOT / "app/web/templates/_sg_subscription_dual.html"
+    ).read_text(encoding="utf-8")
+
+    assert template.count('class="sg-smart-qr-meta"') == 2
+    assert """<strong>Универсальная подписка</strong>
+              <small>Сканируйте в приложении</small>""" in template
+    assert """<strong>SG подписка</strong>
+              <small>Сканируйте в приложении</small>""" in template
 
 
 @pytest.mark.parametrize(
