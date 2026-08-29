@@ -61,6 +61,7 @@ jobs:
           import re
           import subprocess
           from pathlib import Path
+
           expected = {}
           for line_no, raw in enumerate(Path("SOURCE-SHA256SUMS").read_text(encoding="utf-8").splitlines(), 1):
               if not raw.strip():
@@ -72,15 +73,42 @@ jobs:
               if file_path in expected:
                   raise SystemExit(f"duplicate checksum path: {file_path}")
               expected[file_path] = digest
-          tracked = set(subprocess.check_output(["git", "ls-files"], text=True, encoding="utf-8").splitlines())
+
+          tracked = set(
+              subprocess.check_output(
+                  ["git", "ls-files"],
+                  text=True,
+                  encoding="utf-8",
+              ).splitlines()
+          )
           tracked.discard("SOURCE-SHA256SUMS")
+
           if tracked != set(expected):
-              raise SystemExit(f"checksum inventory mismatch: missing={sorted(tracked-set(expected))} extra={sorted(set(expected)-tracked)}")
+              raise SystemExit(
+                  f"checksum inventory mismatch: missing={sorted(tracked-set(expected))} "
+                  f"extra={sorted(set(expected)-tracked)}"
+              )
+
           for file_path in sorted(tracked):
-              actual = hashlib.sha256(Path(file_path).read_bytes()).hexdigest()
+              proc = subprocess.Popen(
+                  ["git", "show", f"HEAD:{file_path}"],
+                  stdout=subprocess.PIPE,
+              )
+              assert proc.stdout is not None
+              digest = hashlib.sha256()
+              while True:
+                  chunk = proc.stdout.read(1024 * 1024)
+                  if not chunk:
+                      break
+                  digest.update(chunk)
+              rc = proc.wait()
+              if rc != 0:
+                  raise SystemExit(f"git show failed for {file_path}: rc={rc}")
+              actual = digest.hexdigest()
               if actual != expected[file_path]:
                   raise SystemExit(f"source hash mismatch: {file_path}")
-          print(f"Source integrity OK: {len(tracked)} files")
+
+          print(f"Git-blob source integrity OK: {len(tracked)} files")
           PY
 
       - name: Build and verify FULL release
