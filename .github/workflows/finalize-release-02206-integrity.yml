@@ -1,0 +1,58 @@
+name: Finalize release 02206 integrity
+
+on:
+  push:
+    branches:
+      - fix/release-02206-git-blob-integrity
+    paths:
+      - .github/workflows/finalize-release-02206-integrity.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout fix branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/release-02206-git-blob-integrity
+          fetch-depth: 1
+
+      - name: Rebuild final checksum inventory
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import subprocess
+          from pathlib import Path
+
+          excluded = {
+              'SOURCE-SHA256SUMS',
+              '.github/workflows/finalize-release-02206-integrity.yml',
+          }
+          tracked = subprocess.check_output(
+              ['git', 'ls-files'], text=True, encoding='utf-8'
+          ).splitlines()
+          tracked = sorted(item for item in tracked if item not in excluded)
+          rows = [
+              f"{hashlib.sha256(Path(item).read_bytes()).hexdigest()}  {item}"
+              for item in tracked
+          ]
+          assert len(rows) == 632, len(rows)
+          Path('SOURCE-SHA256SUMS').write_text(
+              '\n'.join(rows) + '\n', encoding='utf-8', newline='\n'
+          )
+          print(f'Final source inventory: {len(rows)} files')
+          PY
+
+      - name: Commit checksum inventory only
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add SOURCE-SHA256SUMS
+          test "$(git diff --cached --name-only)" = "SOURCE-SHA256SUMS"
+          git commit -m "ci: bind release workflow to source inventory"
+          git push origin HEAD:fix/release-02206-git-blob-integrity
