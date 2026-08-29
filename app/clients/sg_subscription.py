@@ -48,6 +48,12 @@ def _canonical_uri(profile_id: str, value: str) -> str:
     return urlunsplit((parts.scheme, parts.netloc, "/", query, parts.fragment))
 
 
+def _subscription_device_name(device: dict) -> str:
+    if device.get("primary"):
+        return ""
+    return str(device.get("name") or "").strip()
+
+
 def _profile_entry(client: Client, device, spec: tuple[str, ...]) -> dict:
     profile_id, _, export_kind, name, protocol, payload_kind = spec
     entry = {
@@ -89,10 +95,11 @@ def build_sg_subscription_document(client: Client) -> dict:
             total_assigned += 1
             if profile["ready"]:
                 total_ready += 1
+        is_primary = bool(device.is_primary)
         devices.append({
             "id": device.id,
-            "name": device.name,
-            "primary": bool(device.is_primary),
+            "name": "" if is_primary else str(device.name or "").strip(),
+            "primary": is_primary,
             "enabled": bool(device.enabled),
             "expires_at": device.expires_at,
             "profiles": profiles,
@@ -153,7 +160,7 @@ def build_router_subscription_document(client: Client, device_id: int) -> dict |
         },
         "device": {
             "id": int(device.get("id") or 0),
-            "name": str(device.get("name") or ""),
+            "name": _subscription_device_name(device),
             "primary": bool(device.get("primary")),
             "expires_at": device.get("expires_at"),
         },
@@ -180,8 +187,12 @@ def build_keenetic_subscription_body(client: Client, device_id: int) -> str:
 
 
 def _subscription_label(client_name: str, device: dict, profile_name: str) -> str:
-    device_name = str(device.get("name") or "Устройство")
-    return f"{client_name} · {device_name} · {profile_name}"
+    parts = [client_name]
+    device_name = _subscription_device_name(device)
+    if device_name:
+        parts.append(device_name)
+    parts.append(profile_name)
+    return " · ".join(parts)
 
 
 def _with_fragment(uri: str, label: str) -> str:
@@ -198,7 +209,7 @@ def _config_marker(profile: dict, device: dict) -> str:
         "profile": profile.get("id"),
         "name": profile.get("name"),
         "device_id": device.get("id"),
-        "device": device.get("name"),
+        "device": _subscription_device_name(device),
         "primary": bool(device.get("primary")),
         "encoding": "base64url",
         "data": encoded,
@@ -246,13 +257,12 @@ def build_sg_subscription_text(client: Client) -> str:
     ]
 
     for device in document["devices"]:
-        device_name = str(device.get("name") or "Устройство")
         lines.append(
             "# SG-DEVICE "
             + json.dumps(
                 {
                     "id": device.get("id"),
-                    "name": device_name,
+                    "name": _subscription_device_name(device),
                     "primary": bool(device.get("primary")),
                     "enabled": bool(device.get("enabled")),
                 },
