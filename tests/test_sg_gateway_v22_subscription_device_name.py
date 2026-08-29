@@ -32,41 +32,70 @@ def _load_module(monkeypatch):
     return module
 
 
+def _profile(uri: str) -> dict:
+    return {
+        "id": "xray_reality_tcp",
+        "name": "VLESS Reality TCP",
+        "format": "uri",
+        "ready": True,
+        "uri": uri,
+    }
+
+
 def _document() -> dict:
     return {
         "client": {"name": "Test9"},
-        "summary": {"devices": 1, "profiles_assigned": 1, "profiles_ready": 1},
+        "summary": {"devices": 2, "profiles_assigned": 2, "profiles_ready": 2},
         "devices": [
             {
                 "id": 7,
-                "name": "Телефон Test9",
+                "name": "",
                 "primary": True,
                 "enabled": True,
-                "profiles": [
-                    {
-                        "id": "xray_reality_tcp",
-                        "name": "VLESS Reality TCP",
-                        "format": "uri",
-                        "ready": True,
-                        "uri": "vless://uuid@example.test:443?security=reality",
-                    }
-                ],
-            }
+                "profiles": [_profile("vless://primary@example.test:443?security=reality")],
+            },
+            {
+                "id": 8,
+                "name": "Планшет",
+                "primary": False,
+                "enabled": True,
+                "profiles": [_profile("vless://tablet@example.test:443?security=reality")],
+            },
         ],
     }
 
 
-def test_primary_device_keeps_its_real_name_in_subscription_outputs(monkeypatch):
+def test_subscription_document_hides_primary_name_and_keeps_added_device_name(monkeypatch):
+    module = _load_module(monkeypatch)
+    module.list_devices = lambda _client_id: [
+        SimpleNamespace(id=7, name="Старое основное имя", is_primary=True, enabled=True, expires_at=None),
+        SimpleNamespace(id=8, name="Планшет", is_primary=False, enabled=True, expires_at=None),
+    ]
+    module.device_access_tokens = lambda _device_id: []
+
+    client = SimpleNamespace(id=1, name="Test9", enabled=True, expires_at=None)
+    document = module.build_sg_subscription_document(client)
+
+    assert document["devices"][0]["name"] == ""
+    assert document["devices"][1]["name"] == "Планшет"
+
+
+def test_subscription_outputs_omit_primary_name_and_show_added_device_name(monkeypatch):
     module = _load_module(monkeypatch)
     module.build_sg_subscription_document = lambda _client: _document()
     client = SimpleNamespace(name="Test9")
 
     text = module.build_sg_subscription_text(client)
     decoded = base64.b64decode(module.build_compatible_subscription_body(client)).decode("utf-8")
-    uri_line = next(line for line in decoded.splitlines() if line.startswith("vless://"))
-    label = unquote(urlsplit(uri_line).fragment)
+    labels = {
+        urlsplit(line).username: unquote(urlsplit(line).fragment)
+        for line in decoded.splitlines()
+        if line.startswith("vless://")
+    }
 
-    assert '"name":"Телефон Test9"' in text
-    assert label == "Test9 · Телефон Test9 · VLESS Reality TCP"
+    assert '"id":7,"name":"","primary":true' in text
+    assert '"id":8,"name":"Планшет","primary":false' in text
+    assert labels["primary"] == "Test9 · VLESS Reality TCP"
+    assert labels["tablet"] == "Test9 · Планшет · VLESS Reality TCP"
     assert "Основное устройство" not in text
     assert "Основное устройство" not in decoded
