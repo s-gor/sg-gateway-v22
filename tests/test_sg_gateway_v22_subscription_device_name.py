@@ -99,3 +99,40 @@ def test_subscription_outputs_omit_primary_name_and_show_added_device_name(monke
     assert labels["tablet"] == "Test9 · Планшет · VLESS Reality TCP"
     assert "Основное устройство" not in text
     assert "Основное устройство" not in decoded
+
+
+def test_sg_subscription_keeps_awg20_awg30_and_awg31_distinct(monkeypatch):
+    module = _load_module(monkeypatch)
+    device = SimpleNamespace(
+        id=7,
+        name="",
+        is_primary=True,
+        enabled=True,
+        expires_at=None,
+    )
+    module.list_devices = lambda _client_id: [device]
+    module.device_access_tokens = lambda _device_id: [
+        "amneziawg",
+        "amneziawg3",
+        "amneziawg31",
+    ]
+    module.protocol_ready = lambda *_args, **_kwargs: True
+    module.build_protocol_export = lambda _client, kind, _device: SimpleNamespace(
+        body=f"config-{kind}",
+        media_type="text/plain; charset=utf-8",
+    )
+
+    client = SimpleNamespace(id=1, name="Test9", enabled=True, expires_at=None)
+    document = module.build_sg_subscription_document(client)
+    profiles = document["devices"][0]["profiles"]
+
+    assert [
+        (item["id"], item["name"], item["config"])
+        for item in profiles
+    ] == [
+        ("amneziawg", "AmneziaWG 2.0", "config-amneziawg"),
+        ("amneziawg3", "AmneziaWG 3.0", "config-amneziawg3"),
+        ("amneziawg31", "AmneziaWG 3.1", "config-amneziawg31"),
+    ]
+    assert document["summary"]["profiles_assigned"] == 3
+    assert document["summary"]["profiles_ready"] == 3
