@@ -18,6 +18,22 @@ def test_routing_layout_is_ported_from_sg_client_096():
     assert 'data-r096-tab="geofiles"' in template
 
 
+def test_custom_routing_preset_opens_user_rules_editor():
+    template = (ROOT / "app/web/templates/routing.html").read_text(encoding="utf-8")
+    for marker in (
+        "data-r096-user-rules",
+        "data-r096-user-rules-toggle",
+        "data-r096-user-rules-label",
+        "event.preventDefault()",
+        "userRules.open = !userRules.open",
+        "input.value === 'custom' && input.checked",
+        "userRules.open = true",
+        "userRules.scrollIntoView",
+    ):
+        assert marker in template
+    assert "{% if preset == 'custom' %}open{% endif %}" in template
+
+
 def test_routing_themes_match_current_sg_gateway_palettes():
     css = (ROOT / "app/web/static/sg-routing-client096.css").read_text(encoding="utf-8")
     for color in (

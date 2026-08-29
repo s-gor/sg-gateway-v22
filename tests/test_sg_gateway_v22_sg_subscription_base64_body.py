@@ -45,7 +45,7 @@ def test_base64_transport_contains_only_ready_uri_profiles_with_labels(monkeypat
     assert len(lines) == 2
     assert lines[0].startswith("vless://")
     assert lines[1].startswith("mierus://")
-    assert unquote(urlsplit(lines[0]).fragment) == "Base64 Client · Основное устройство · Reality"
+    assert unquote(urlsplit(lines[0]).fragment) == "Base64 Client · Reality"
     assert unquote(urlsplit(lines[1]).fragment) == "Base64 Client · Phone · Mieru"
     assert "AmneziaWG" not in decoded
     assert "tuic://" not in decoded
@@ -61,5 +61,6 @@ def test_empty_ready_uri_set_encodes_to_empty_string(monkeypatch) -> None:
     assert subscription.build_compatible_subscription_body(_client()) == ""
 
 
-def test_awg3_is_an_independent_canonical_config_profile() -> None:
+def test_awg3_profiles_are_independent_canonical_config_profiles() -> None:
     assert "amneziawg3" in subscription.canonical_profile_ids()
+    assert "amneziawg31" in subscription.canonical_profile_ids()

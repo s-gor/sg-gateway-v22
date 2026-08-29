@@ -21,12 +21,16 @@ COUNTRY_NAMES = {
     "unknown": "Страна не выбрана",
 }
 
+
 def normalize_country_code(value: str | None) -> str:
     code = (value or "unknown").strip().lower()
     return code if code in COUNTRY_NAMES else "unknown"
 
+
 def country_name(code: str | None) -> str:
     return COUNTRY_NAMES.get(normalize_country_code(code), COUNTRY_NAMES["unknown"])
+
+
 from app.db import connect
 
 
@@ -43,11 +47,13 @@ class ConnectionSummary:
     public_host: str
 
 
-
-
 def _country_for(settings) -> str:
+    configured = normalize_country_code(str(settings.config.get("country_code") or "unknown"))
+    if configured != "unknown":
+        return configured
     detected = lookup_country_code(settings.host)
     return detected if detected != "unknown" else "unknown"
+
 
 def list_connections() -> list[ConnectionSummary]:
     with connect() as connection:
@@ -71,6 +77,15 @@ def list_connections() -> list[ConnectionSummary]:
     mihomo_public_host = public_host(mihomo.host)
     awg3_public_host = public_host(awg3.host)
 
+    # Prefer the country already stored by the installer/settings layer. A
+    # fresh process must not parse the full GeoIP database just to render a
+    # page when the country is already known. GeoIP remains the fallback for
+    # legacy/unknown settings only.
+    awg_country = _country_for(awg)
+    xray_country = _country_for(xray)
+    mihomo_country = _country_for(mihomo)
+    awg3_country = _country_for(awg3)
+
     return [
         ConnectionSummary(
             name="amneziawg",
@@ -79,8 +94,8 @@ def list_connections() -> list[ConnectionSummary]:
             port=f"UDP {awg.port}",
             clients=counts.get("amneziawg", 0),
             note=f"Адрес: {awg_public_host}:{awg.port}",
-            country_code=_country_for(awg),
-            country_name=country_name(_country_for(awg)),
+            country_code=awg_country,
+            country_name=country_name(awg_country),
             public_host=awg_public_host,
         ),
         ConnectionSummary(
@@ -90,8 +105,8 @@ def list_connections() -> list[ConnectionSummary]:
             port=f"TCP {xray.port}",
             clients=counts.get("xray", 0),
             note=f"Адрес: {xray_public_host}:{xray.port}",
-            country_code=_country_for(xray),
-            country_name=country_name(_country_for(xray)),
+            country_code=xray_country,
+            country_name=country_name(xray_country),
             public_host=xray_public_host,
         ),
         ConnectionSummary(
@@ -105,8 +120,8 @@ def list_connections() -> list[ConnectionSummary]:
             ),
             clients=counts.get("mihomo", 0),
             note=f"Адрес: {mihomo_public_host}; Mieru / AnyTLS / TUIC v5",
-            country_code=_country_for(mihomo),
-            country_name=country_name(_country_for(mihomo)),
+            country_code=mihomo_country,
+            country_name=country_name(mihomo_country),
             public_host=mihomo_public_host,
         ),
         ConnectionSummary(
@@ -116,8 +131,8 @@ def list_connections() -> list[ConnectionSummary]:
             port=f"UDP {awg3.port}",
             clients=counts.get("amneziawg3", 0),
             note=f"Адрес: {awg3_public_host}:{awg3.port}",
-            country_code=_country_for(awg3),
-            country_name=country_name(_country_for(awg3)),
+            country_code=awg3_country,
+            country_name=country_name(awg3_country),
             public_host=awg3_public_host,
         ),
     ]

@@ -62,6 +62,10 @@
   <!-- SG_DEVICE_EXPANDED_CLEANUP_V1_LAST_CSS -->
   <link rel="stylesheet" href="{{ url_for('static', filename='sg-device-expanded-cleanup-v1.css') }}?v={{ app_version }}-device-expanded-cleanup-v1">
   {% endif %}
+  {% if active_page|default('') == 'maintenance' %}
+  <script src="{{ url_for('static', filename='sg-maintenance-recovery-v1.js') }}?v={{ app_version }}-maintenance-recovery-v2" defer></script>
+  <script src="{{ url_for('static', filename='sg-clients-keys-download-v1.js') }}?v={{ app_version }}-clients-keys-https-sqlite-v2" defer></script>
+  {% endif %}
 </head>
 <body class="sg-body page-{{ active_page|default('system') }}">
   <div class="sg-shell" id="sg-shell">
@@ -144,7 +148,7 @@
                alt="{{ server_identity.country_name }}" width="26" height="18">
           <div class="sg-server-copy">
             <div class="sg-server-name">{{ server_identity.name }}</div>
-            <div class="sg-server-version">v{{ app_version }}</div>
+            <div class="sg-server-version">{{ app_version[-5:] }}</div>
           </div>
         </div>
         <div class="sg-server-meta">
@@ -182,7 +186,7 @@
           </div>
         </div>
 
-        <div class="sg-version-label">v{{ app_version }}</div>
+        <div class="sg-version-label">{{ app_version[-5:] }}</div>
 
         <div class="sg-health-pill {{ 'ok' if panel_health == 'ok' else 'warning' }}">
           <span class="sg-health-dot"></span>

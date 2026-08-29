@@ -7,15 +7,15 @@ import secrets
 import shlex
 import shutil
 import subprocess
+import tarfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Sequence
 
 from app.maintenance.panel_updates import GITHUB_BRANCH
 
-JOB_DIR = Path(
-    os.getenv("SG_GATEWAY_OPERATION_JOB_DIR", "/var/lib/sg-gateway/security/jobs")
-)
+DEFAULT_JOB_DIR = "/var/log/sg-gateway/operation-jobs"
+JOB_DIR = Path(os.getenv("SG_GATEWAY_OPERATION_JOB_DIR", DEFAULT_JOB_DIR))
 REQUEST = Path(
     os.getenv("SG_GATEWAY_SECURITY_STATE_DIR", "/var/lib/sg-gateway/security")
 ) / "tls-request.json"
@@ -25,6 +25,7 @@ RUNNER = Path("/opt/sg-gateway/hostd/sg_hostd/operation_job_runner.py")
 PYTHON = Path("/opt/sg-gateway/.venv/bin/python")
 PANEL_ACCESS_SCRIPT = Path("/opt/sg-gateway/deploy/configure-panel-access.sh")
 PANEL_UPDATE_SCRIPT = Path("/opt/sg-gateway/deploy/update-from-github.sh")
+AWG3_REPAIR_SCRIPT = Path("/opt/sg-gateway/deploy/repair-awg3-runtime.sh")
 
 
 def _utc_now() -> str:
@@ -110,7 +111,7 @@ export SG_GATEWAY_ENV=production
 export SG_GATEWAY_DATA_DIR=/var/lib/sg-gateway
 export SG_GATEWAY_LOG_DIR=/var/log/sg-gateway
 export SG_GATEWAY_SECURITY_STATE_DIR=/var/lib/sg-gateway/security
-export SG_GATEWAY_OPERATION_JOB_DIR=/var/lib/sg-gateway/security/jobs
+export SG_GATEWAY_OPERATION_JOB_DIR={shlex.quote(str(JOB_DIR))}
 export SG_GATEWAY_TLS_LIVE_LOG=1
 cd /opt/sg-gateway
 STATUS={shlex.quote(str(status_path))}
@@ -233,13 +234,47 @@ def run_tls_maintenance(action: str) -> dict[str, Any]:
     }
 
 
+def _pending_restore_job_context() -> tuple[str, dict[str, Any]]:
+    title = "Полное восстановление SG-Gateway"
+    extra: dict[str, Any] = {
+        "restart_expected": True,
+        "restore_profile": "full",
+    }
+    try:
+        from sg_hostd import full_backup_runtime as full
+
+        archive = full._backup_dir() / full.RESTORE_UPLOAD_NAME
+        if not archive.is_file():
+            return title, extra
+        with tarfile.open(archive, "r:gz") as tar:
+            member = tar.getmember("manifest.json")
+            if member.size > 1024 * 1024:
+                return title, extra
+            stream = tar.extractfile(member)
+            if stream is None:
+                return title, extra
+            manifest = json.loads(stream.read().decode("utf-8"))
+        if isinstance(manifest, dict) and manifest.get("clients_keys_profile") is True:
+            return (
+                "Восстановление клиентов и ключей",
+                {
+                    "restart_expected": True,
+                    "restore_profile": "clients-and-keys",
+                },
+            )
+    except (OSError, KeyError, tarfile.TarError, ValueError, json.JSONDecodeError):
+        pass
+    return title, extra
+
+
 def start_full_backup_restore_job() -> dict[str, Any]:
+    title, extra = _pending_restore_job_context()
     return _start(
         "full_backup_restore",
-        "Полное восстановление SG-Gateway",
+        title,
         "/maintenance?tab=backups",
         "/maintenance?tab=backups",
-        {"restart_expected": True},
+        extra,
     )
 
 
@@ -259,7 +294,7 @@ def start_panel_update_job() -> dict[str, Any]:
         raise RuntimeError(f"Не найден {PANEL_UPDATE_SCRIPT}")
     return _start(
         "panel_update_channel",
-        f"Безопасное обновление SG-Gateway из GitHub {GITHUB_BRANCH}",
+        "Безопасное обновление SG-Gateway из GitHub",
         "/maintenance?tab=updates&refresh=1",
         "/maintenance?tab=updates",
         {"channel": GITHUB_BRANCH, "restart_expected": True},
@@ -270,6 +305,20 @@ f"SG_GATEWAY_GITHUB_BRANCH={GITHUB_BRANCH}",
 str(PANEL_UPDATE_SCRIPT),
         ),
     )
+
+# SG_GATEWAY_02206_AWG3_REPAIR_JOB_V2
+def start_awg3_repair_job() -> dict[str, Any]:
+    if not AWG3_REPAIR_SCRIPT.is_file():
+        raise RuntimeError(f"Не найден {AWG3_REPAIR_SCRIPT}")
+    return _start(
+        "awg3_runtime_repair",
+        "Восстановление AWG3 runtime",
+        "/maintenance?tab=updates&refresh=1",
+        "/maintenance?tab=updates",
+        {"engine": "amneziawg3"},
+        command=("/bin/bash", str(AWG3_REPAIR_SCRIPT)),
+    )
+
 
 def start_core_update_job(engine: str) -> dict[str, Any]:
     if engine not in {"mihomo", "sing-box", "wgcf"}:

@@ -1,0 +1,280 @@
+# Contract: install, fully uninstall, and install again on the same Ubuntu host.
+name: Reinstall after full uninstall smoke
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - release/0.1.0-022.06
+      - stable-02206
+      - main
+    paths:
+      - .github/workflows/reinstall-after-full-uninstall-smoke.yml
+      - tests/test_sg_gateway_v22_reinstall_after_full_uninstall.py
+      - tests/test_sg_gateway_v22_awg30_idle_bootstrap.py
+      - install.sh
+      - deploy/full-uninstall-ubuntu.sh
+      - deploy/sg-gateway-awg3.service
+      - deploy/sg-gateway-awg3-userspace.sh
+      - deploy/sg-gateway-awg31.service
+      - deploy/sg-gateway-awg31-userspace.sh
+      - app/install_seed.py
+      - app/maintenance/awg31_stage3a.py
+      - app/maintenance/seeded_admin_awg3.py
+      - app/clients/**
+      - app/engines/provisioning.py
+      - hostd/sg_hostd/awg3_runtime.py
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/reinstall-after-full-uninstall-smoke.yml
+      - tests/test_sg_gateway_v22_reinstall_after_full_uninstall.py
+      - tests/test_sg_gateway_v22_awg30_idle_bootstrap.py
+      - install.sh
+      - deploy/full-uninstall-ubuntu.sh
+      - deploy/sg-gateway-awg3.service
+      - deploy/sg-gateway-awg3-userspace.sh
+      - deploy/sg-gateway-awg31.service
+      - deploy/sg-gateway-awg31-userspace.sh
+      - app/install_seed.py
+      - app/maintenance/awg31_stage3a.py
+      - app/maintenance/seeded_admin_awg3.py
+      - app/clients/**
+      - app/engines/provisioning.py
+      - hostd/sg_hostd/awg3_runtime.py
+
+permissions:
+  contents: read
+
+jobs:
+  reinstall-after-full-uninstall:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Checkout candidate
+        uses: actions/checkout@v4
+
+      - name: Verify reinstall command contract
+        run: |
+          python3 - <<'PY'
+          import runpy
+          namespace = runpy.run_path("tests/test_sg_gateway_v22_reinstall_after_full_uninstall.py")
+          namespace["test_full_uninstall_prints_the_canonical_reinstall_command"]()
+          namespace["test_reinstall_smoke_covers_the_real_same_server_lifecycle"]()
+          PY
+
+      - name: Confirm virgin SG-Gateway state
+        run: |
+          sudo test ! -e /opt/sg-gateway
+          sudo test ! -e /etc/sg-gateway
+          sudo test ! -e /var/lib/sg-gateway
+          sudo test ! -e /etc/systemd/system/sg-gateway.service
+
+      - name: Seed first install parameters
+        run: |
+          PUBLIC_IP="$(curl -4 -fsS --max-time 15 https://api.ipify.org)"
+          python3 - "$PUBLIC_IP" <<'PY'
+          import ipaddress
+          import sys
+          ip = ipaddress.ip_address(sys.argv[1])
+          assert ip.version == 4 and ip.is_global, ip
+          PY
+          sudo tee /root/sg-gateway-02206-installer-resume.env >/dev/null <<EOF
+          PANEL_PORT=63443
+          XRAY_PORT=443
+          AWG_PORT=585
+          REALITY_TARGET=www.bing.com:443
+          REALITY_SNI=www.bing.com
+          ADMIN_PASSWORD=FirstInstallTest2026
+          ADMIN_PASSWORD_HASH=
+          PUBLIC_ADDRESS=$PUBLIC_IP
+          SERVER_NAME=sg-gateway-first
+          COUNTRY_CODE=us
+          CREATE_SG_ADMIN=1
+          SECRET_KEY=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+          EOF
+          sudo chmod 0600 /root/sg-gateway-02206-installer-resume.env
+
+      - name: Run first native install
+        env:
+          SG_GATEWAY_SOURCE_DIR: ${{ github.workspace }}
+          SG_GATEWAY_APT_WAIT_SECONDS: "900"
+        run: sudo -E bash install.sh
+
+      - name: Verify first installation
+        run: |
+          sudo test -f /opt/sg-gateway/VERSION
+          sudo test -f /etc/sg-gateway/runtime.env
+          sudo test -f /etc/sg-gateway/sg-gateway.env
+          sudo test ! -e /var/lib/sg-gateway/.seeded-admin-awg3.pending
+          sudo grep -q '^\[Peer\]' /etc/amnezia/amneziawg/awg3.conf
+          sudo systemctl is-active --quiet sg-gateway.service
+          sudo systemctl is-active --quiet sg-hostd.service
+          sudo systemctl is-active --quiet sg-gateway-awg3.service
+
+      - name: Run official full uninstall
+        run: |
+          printf 'DELETE SG-GATEWAY\n' | sudo script -qec \
+            "bash '$GITHUB_WORKSPACE/deploy/full-uninstall-ubuntu.sh'" \
+            /dev/null
+
+      - name: Verify deterministic post-uninstall state
+        run: |
+          sudo test ! -e /opt/sg-gateway
+          sudo test ! -e /etc/sg-gateway
+          sudo test ! -e /var/lib/sg-gateway
+          sudo test ! -e /var/log/sg-gateway
+          sudo test ! -e /etc/systemd/system/sg-gateway.service
+          sudo test ! -e /etc/systemd/system/sg-hostd.service
+          sudo test ! -e /etc/systemd/system/sg-gateway-awg.service
+          sudo test ! -e /etc/systemd/system/sg-gateway-awg3.service
+          sudo test ! -e /etc/systemd/system/sg-gateway-awg31.service
+          sudo test ! -e /run/amneziawg/awg3.sock
+          sudo test ! -e /run/amneziawg/awg31.sock
+          ! id sg-gateway
+          ! getent group sg-gateway
+          command -v nginx
+
+      - name: Seed second install parameters
+        run: |
+          PUBLIC_IP="$(curl -4 -fsS --max-time 15 https://api.ipify.org)"
+          sudo tee /root/sg-gateway-02206-installer-resume.env >/dev/null <<EOF
+          PANEL_PORT=63443
+          XRAY_PORT=443
+          AWG_PORT=585
+          REALITY_TARGET=www.bing.com:443
+          REALITY_SNI=www.bing.com
+          ADMIN_PASSWORD=SecondInstallTest2026
+          ADMIN_PASSWORD_HASH=
+          PUBLIC_ADDRESS=$PUBLIC_IP
+          SERVER_NAME=sg-gateway-second
+          COUNTRY_CODE=fr
+          CREATE_SG_ADMIN=1
+          SECRET_KEY=fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210
+          EOF
+          sudo chmod 0600 /root/sg-gateway-02206-installer-resume.env
+
+      - name: Reinstall on the same Ubuntu server
+        env:
+          SG_GATEWAY_SOURCE_DIR: ${{ github.workspace }}
+          SG_GATEWAY_APT_WAIT_SECONDS: "900"
+        run: sudo -E bash install.sh
+
+      - name: Verify seeded sg-admin complete profile set after reinstall
+        run: |
+          sudo systemctl is-active --quiet sg-gateway-awg3.service
+          sudo systemctl is-active --quiet sg-gateway-awg31.service
+          sudo test -S /run/amneziawg/awg3.sock
+          sudo test -S /run/amneziawg/awg31.sock
+          sudo ip link show dev awg3
+          sudo ip link show dev awg31
+          sudo test -s /etc/amnezia/amneziawg/awg3.conf
+          sudo grep -q '^\[Peer\]' /etc/amnezia/amneziawg/awg3.conf
+          sudo test ! -e /var/lib/sg-gateway/.seeded-admin-awg3.pending
+          test "$(sudo /opt/sg-gateway/awg3/bin/awg show awg3 listen-port)" = "586"
+          test "$(sudo /opt/sg-gateway/awg31/bin/awg show awg31 listen-port)" = "587"
+          sudo awk -F= '
+            $1 == "SG_GATEWAY_AWG3_PUBLIC_KEY" && length($2) >= 40 { ready=1 }
+            END { exit(ready ? 0 : 1) }
+          ' /etc/sg-gateway/engine-secrets.env
+          sudo bash -c '
+            set -a
+            source /etc/sg-gateway/runtime.env
+            source /etc/sg-gateway/sg-gateway.env
+            set +a
+            runuser -u sg-gateway -- env \
+              PYTHONPATH=/opt/sg-gateway:/opt/sg-gateway/hostd \
+              /opt/sg-gateway/.venv/bin/python - <<"PY"
+          from app.clients.repository import device_access_tokens
+          from app.db import connect
+
+          with connect() as connection:
+              peers = connection.execute(
+                  "SELECT COUNT(*) FROM device_credentials WHERE engine = ?",
+                  ("amneziawg3",),
+              ).fetchone()[0]
+              seeded = connection.execute(
+                  """
+                  SELECT COUNT(*)
+                  FROM device_credentials dc
+                  JOIN devices d ON d.id = dc.device_id
+                  JOIN clients c ON c.id = d.client_id
+                  WHERE dc.engine = ? AND c.name = ?
+                  """,
+                  ("amneziawg3", "sg-admin"),
+              ).fetchone()[0]
+              primary = connection.execute(
+                  """
+                  SELECT d.id
+                  FROM devices d
+                  JOIN clients c ON c.id = d.client_id
+                  WHERE c.name = ? AND d.is_primary = 1
+                  """,
+                  ("sg-admin",),
+              ).fetchone()
+          assert int(peers) == 1, peers
+          assert int(seeded) == 1, seeded
+          assert primary is not None, "sg-admin primary device is missing"
+          actual_access = set(device_access_tokens(int(primary["id"])))
+          expected_access = {
+              "xray_reality_tcp",
+              "xray_xhttp_reality",
+              "amneziawg",
+              "amneziawg3",
+              "amneziawg31",
+              "mihomo",
+              "sgclient",
+          }
+          assert actual_access == expected_access, (actual_access, expected_access)
+          PY
+          '
+
+      - name: Create and apply additional AWG3 client after reinstall
+        run: |
+          sudo bash -c '
+            set -a
+            source /etc/sg-gateway/runtime.env
+            source /etc/sg-gateway/sg-gateway.env
+            set +a
+            runuser -u sg-gateway -- env \
+              PYTHONPATH=/opt/sg-gateway:/opt/sg-gateway/hostd \
+              /opt/sg-gateway/.venv/bin/python - <<"PY"
+          from app.clients.repository import create_client, delete_client
+          from app.clients.runtime import apply_clients_runtime
+
+          client_id = create_client("ci-reinstall-awg3", "amneziawg3")
+          if not client_id:
+              raise SystemExit("AWG3 client was not created after reinstall")
+          try:
+              result = apply_clients_runtime()
+          except Exception:
+              delete_client(client_id)
+              raise
+          print(result.get("message") or result)
+          PY
+          '
+
+      - name: Verify second installation and both userspace profiles
+        run: |
+          sudo test -f /opt/sg-gateway/VERSION
+          sudo test -f /etc/sg-gateway/runtime.env
+          sudo test -f /etc/sg-gateway/sg-gateway.env
+          sudo systemctl is-active --quiet sg-gateway.service
+          sudo systemctl is-active --quiet sg-hostd.service
+          sudo systemctl is-active --quiet sg-gateway-awg3.service
+          sudo systemctl is-active --quiet sg-gateway-awg31.service
+          sudo test -S /run/amneziawg/awg3.sock
+          sudo test -S /run/amneziawg/awg31.sock
+          sudo ip link show dev awg3
+          sudo ip link show dev awg31
+          test "$(sudo /opt/sg-gateway/awg3/bin/awg show awg3 listen-port)" = "586"
+          test "$(sudo /opt/sg-gateway/awg31/bin/awg show awg31 listen-port)" = "587"
+
+      - name: Print diagnostics on failure
+        if: failure()
+        run: |
+          sudo systemctl status sg-gateway.service sg-hostd.service sg-gateway-awg3.service sg-gateway-awg31.service --no-pager || true
+          sudo journalctl -b -u sg-gateway.service -u sg-hostd.service -u sg-gateway-awg3.service -u sg-gateway-awg31.service -n 200 --no-pager || true
+          sudo tail -n 200 /var/log/sg-gateway-installer-02206.log || true
+          sudo tail -n 200 /var/log/sg-gateway-full-uninstall-02206.log || true

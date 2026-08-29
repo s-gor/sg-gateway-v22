@@ -6,10 +6,18 @@ ConditionPathExists=/etc/amnezia/amneziawg/awg3.conf
 ConditionPathExists=/opt/sg-gateway/awg3/bin/amneziawg-go
 
 [Service]
-Type=oneshot
-RemainAfterExit=yes
+Type=simple
+Environment=WG_PROCESS_FOREGROUND=1
 ExecStart=/opt/sg-gateway/deploy/sg-gateway-awg3-userspace.sh up
-ExecStop=/opt/sg-gateway/deploy/sg-gateway-awg3-userspace.sh down
+# systemctl restart must not report success before the userspace interface is
+# actually usable. apply_awg3() calls `awg show awg3` immediately afterwards.
+ExecStartPost=/usr/bin/timeout 15 /bin/bash -c 'until [[ -S /run/amneziawg/awg3.sock ]] && /usr/sbin/ip link show dev awg3 >/dev/null 2>&1 && /opt/sg-gateway/awg3/bin/awg show awg3 listen-port 2>/dev/null | /usr/bin/grep -qx 586; do sleep 0.1; done'
+Restart=on-failure
+RestartSec=2
+RuntimeDirectory=amneziawg
+# AWG3.0 and AWG3.1 share /run/amneziawg. Stopping either service must not
+# remove the other profile's control socket and terminate its userspace daemon.
+RuntimeDirectoryPreserve=yes
 TimeoutStartSec=60
 TimeoutStopSec=30
 

@@ -8,8 +8,9 @@ from pathlib import Path
 
 import pytest
 
+from app.maintenance import full_backups as panel_full_backups
 from sg_hostd import full_backup_runtime as full_backup
-from sg_hostd.full_backup_verify_runtime import VERIFY_UPLOAD_NAME, verify_uploaded_full_backup
+from sg_hostd.full_backup_verify_runtime import VERIFIED_UPLOAD_NAME, VERIFY_UPLOAD_NAME, verify_uploaded_full_backup
 
 
 def _patch_paths(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> tuple[Path, Path, Path]:
@@ -76,6 +77,7 @@ def test_full_backup_verify_accepts_restore_compatible_archive(monkeypatch, tmp_
     }
     assert len(payload["sha256"]) == 64
     assert not archive.exists()
+    assert (backup_dir / VERIFIED_UPLOAD_NAME).is_file()
     assert not (data_dir / "sg-gateway.sqlite").exists()
 
 
@@ -86,6 +88,7 @@ def test_full_backup_verify_rejects_broken_archive_and_cleans_upload(monkeypatch
     with pytest.raises((tarfile.TarError, OSError, RuntimeError)):
         verify_uploaded_full_backup()
     assert not archive.exists()
+    assert not (backup_dir / VERIFIED_UPLOAD_NAME).exists()
 
 
 def test_full_backup_verify_rejects_archive_without_database(monkeypatch, tmp_path):
@@ -107,3 +110,35 @@ def test_full_backup_verify_rejects_archive_without_database(monkeypatch, tmp_pa
         verify_uploaded_full_backup()
     assert not archive.exists()
     assert not (data_dir / "sg-gateway.sqlite").exists()
+
+
+def test_verified_backup_is_staged_for_restore_only_after_sha_recheck(monkeypatch, tmp_path):
+    monkeypatch.setattr(panel_full_backups, "get_full_backup_dir", lambda: tmp_path)
+    archive = tmp_path / panel_full_backups.VERIFIED_UPLOAD_NAME
+    archive.write_bytes(b"verified full backup payload")
+    sha256 = panel_full_backups._sha256(archive)
+
+    metadata = panel_full_backups.save_verified_full_backup(
+        "SG-Gateway-FULL-test.sgbackup",
+        {"sha256": sha256, "source_version": "0.1.0-022.04"},
+    )
+    assert panel_full_backups.get_verified_full_backup() == metadata
+
+    staged = panel_full_backups.stage_verified_full_backup_for_restore()
+    assert staged == metadata
+    assert not archive.exists()
+    assert (tmp_path / panel_full_backups.RESTORE_UPLOAD_NAME).read_bytes() == b"verified full backup payload"
+    assert panel_full_backups.get_verified_full_backup() is None
+
+
+def test_verified_backup_changed_after_check_is_rejected(monkeypatch, tmp_path):
+    monkeypatch.setattr(panel_full_backups, "get_full_backup_dir", lambda: tmp_path)
+    archive = tmp_path / panel_full_backups.VERIFIED_UPLOAD_NAME
+    archive.write_bytes(b"verified full backup payload")
+    panel_full_backups.save_verified_full_backup("backup.sgbackup", {"sha256": panel_full_backups._sha256(archive)})
+    archive.write_bytes(b"changed full backup payload!")
+
+    with pytest.raises(RuntimeError, match="изменился"):
+        panel_full_backups.stage_verified_full_backup_for_restore()
+    assert not archive.exists()
+    assert not (tmp_path / panel_full_backups.VERIFIED_METADATA_NAME).exists()

@@ -44,14 +44,39 @@ def test_all_eight_vendor_files_are_required():
         assert (ROOT / "vendor" / "cores" / name).is_file()
 
 
-def test_dkms_reinstall_cleans_only_pinned_stale_state():
+def test_dkms_reinstall_cleans_stale_module_and_forces_frozen_awg2():
     installer = read("install.sh")
+    assert 'ip link delete awg0' in installer
+    assert 'ip link delete awg3' in installer
+    assert 'modprobe -r amneziawg' in installer
+    assert "grep -q '^amneziawg ' /proc/modules" in installer
     assert 'dkms remove -m amneziawg -v "$AMNEZIAWG_DKMS_VERSION" --all' in installer
     assert 'rm -rf "/var/lib/dkms/amneziawg/${AMNEZIAWG_DKMS_VERSION}"' in installer
     assert 'rm -rf "/usr/src/amneziawg-${AMNEZIAWG_DKMS_VERSION}"' in installer
-    assert 'dkms add -m amneziawg -v "$AMNEZIAWG_DKMS_VERSION"' in installer
-    assert 'dkms build -m amneziawg -v "$AMNEZIAWG_DKMS_VERSION"' in installer
-    assert 'dkms install -m amneziawg -v "$AMNEZIAWG_DKMS_VERSION"' in installer
+    assert 'find "/lib/modules/$(uname -r)" -type f' in installer
+    assert "-path '*/updates/dkms/*' -delete" in installer
+    assert 'dkms install -m amneziawg -v "$AMNEZIAWG_DKMS_VERSION" --force' in installer
+    assert 'modinfo -F version amneziawg' in installer
+    assert '/sys/module/amneziawg/version' in installer
+    assert '[[ "$module_version" =~ ^1\. ]]' in installer
+
+
+def test_update_preserves_only_real_awg2_runtime():
+    installer = read("install.sh")
+    ready = installer[installer.index("amneziawg_runtime_ready() {"):installer.index("install_amneziawg_from_vendor() {")]
+    assert 'tools_version="$(awg --version' in ready
+    assert 'module_version="$(modinfo -F version amneziawg' in ready
+    assert '/sys/module/amneziawg/version' in ready
+    assert '[[ "$tools_version" == *"v1."* ]]' in ready
+    assert '[[ "$module_version" =~ ^1\. ]]' in ready
+
+
+def test_full_uninstall_removes_orphaned_awg_dkms_module_files():
+    uninstall = read("deploy/full-uninstall-ubuntu.sh")
+    assert 'dkms remove -m amneziawg -v 1.0.0 --all' in uninstall
+    assert 'find /lib/modules -type f' in uninstall
+    assert "-path '*/updates/dkms/*' -delete" in uninstall
+    assert uninstall.index('find /lib/modules -type f') < uninstall.index('depmod -a')
 
 
 def test_stage7_accepts_runtime_conflict_without_hiding_route_failures():

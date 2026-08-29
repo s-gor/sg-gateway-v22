@@ -1,0 +1,123 @@
+from __future__ import annotations
+
+import json
+import re
+
+from flask import Flask, Response, abort, request
+
+from app.clients.exports import build_subscription
+from app.clients.router_subscription_store import (
+    build_keenetic_subscription_url,
+    build_openwrt_subscription_url,
+    build_router_subscription_download_url,
+    build_router_subscription_url,
+    get_router_subscription_access,
+)
+from app.clients.sg_subscription import (
+    SG_ROUTER_SUBSCRIPTION_FORMAT,
+    SG_ROUTER_SUBSCRIPTION_VERSION,
+    build_keenetic_subscription_body,
+    build_router_subscription_document,
+)
+
+PUBLIC_ENDPOINT = "router_subscription_v1"
+OPENWRT_PUBLIC_ENDPOINT = "router_openwrt_subscription_v1"
+KEENETIC_PUBLIC_ENDPOINT = "router_keenetic_subscription_v1"
+
+
+def _safe_filename(value: str) -> str:
+    clean = re.sub(r"[^A-Za-z0-9._-]+", "-", str(value or "router")).strip("-.")
+    return (clean or "router")[:80]
+
+
+def register_router_subscription(app: Flask) -> None:
+    if PUBLIC_ENDPOINT not in app.view_functions:
+        def feed(token: str):
+            access = get_router_subscription_access(token)
+            if access is None:
+                abort(404)
+            client, device = access
+            document = build_router_subscription_document(client, device.id)
+            if document is None:
+                abort(404)
+            body = json.dumps(document, ensure_ascii=False, indent=2) + "\n"
+            response = Response(body, content_type="application/json; charset=utf-8")
+            response.headers["Cache-Control"] = "no-store, max-age=0"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["X-Content-Type-Options"] = "nosniff"
+            response.headers["X-SG-Router-Format"] = SG_ROUTER_SUBSCRIPTION_FORMAT
+            response.headers["X-SG-Router-Version"] = str(SG_ROUTER_SUBSCRIPTION_VERSION)
+            response.headers["X-SG-Router-Profiles"] = str(
+                (document.get("summary") or {}).get("profiles", 0)
+            )
+            if request.args.get("download") == "1":
+                filename = _safe_filename(f"{client.name}-{device.name}")
+                response.headers["Content-Disposition"] = (
+                    f'attachment; filename="SG-Router-{filename}.json"'
+                )
+            return response
+
+        app.add_url_rule(
+            "/sg/router/v1/<token>.json",
+            endpoint=PUBLIC_ENDPOINT,
+            view_func=feed,
+            methods=["GET"],
+        )
+
+    if OPENWRT_PUBLIC_ENDPOINT not in app.view_functions:
+        def openwrt_feed(token: str):
+            access = get_router_subscription_access(token)
+            if access is None:
+                abort(404)
+            client, device = access
+            export = build_subscription(client, device)
+            if not export.body:
+                abort(404)
+            response = Response(export.body + "\n", content_type="text/plain; charset=utf-8")
+            response.headers["Cache-Control"] = "no-store, max-age=0"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["X-Content-Type-Options"] = "nosniff"
+            response.headers["X-SG-Router-Target"] = "openwrt-homeproxy"
+            return response
+
+        app.add_url_rule(
+            "/sg/router/openwrt/v1/<token>.sub",
+            endpoint=OPENWRT_PUBLIC_ENDPOINT,
+            view_func=openwrt_feed,
+            methods=["GET"],
+        )
+
+    if KEENETIC_PUBLIC_ENDPOINT not in app.view_functions:
+        def keenetic_feed(token: str):
+            access = get_router_subscription_access(token)
+            if access is None:
+                abort(404)
+            client, device = access
+            body = build_keenetic_subscription_body(client, device.id)
+            if not body:
+                abort(404)
+            response = Response(body, content_type="text/plain; charset=utf-8")
+            response.headers["Cache-Control"] = "no-store, max-age=0"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["X-Content-Type-Options"] = "nosniff"
+            response.headers["X-SG-Router-Target"] = "keenetic-xkeen-ui"
+            return response
+
+        app.add_url_rule(
+            "/sg/router/keenetic/v1/<token>.sub",
+            endpoint=KEENETIC_PUBLIC_ENDPOINT,
+            view_func=keenetic_feed,
+            methods=["GET"],
+        )
+
+    if not getattr(app, "_sg_router_subscription_v1_template_context", False):
+        def template_context():
+            return {
+                "keenetic_subscription_url": build_keenetic_subscription_url,
+                "openwrt_subscription_url": build_openwrt_subscription_url,
+                "router_subscription_url": build_router_subscription_url,
+                "router_subscription_download_url": build_router_subscription_download_url,
+            }
+
+        app.context_processor(template_context)
+        app._sg_router_subscription_v1_template_context = True

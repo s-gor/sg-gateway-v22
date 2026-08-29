@@ -90,7 +90,7 @@ def get_client_by_subscription_token(token: str) -> Client | None:
     return get_client(client_id)
 
 
-def _base_url() -> str:
+def subscription_base_url() -> str:
     tls = tls_overview()
     public_url = str(tls.get("public_url") or "").strip()
     if tls.get("https_ready") and public_url:
@@ -112,7 +112,7 @@ def _base_url() -> str:
 
 def build_sg_subscription_url(client: Client) -> str:
     token = ensure_client_subscription_token(client.id)
-    base = _base_url()
+    base = subscription_base_url()
     if not token or not base:
         return ""
     return f"{base}/sg/sub/v1/{quote(token, safe='')}"

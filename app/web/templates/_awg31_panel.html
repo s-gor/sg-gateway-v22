@@ -1,0 +1,74 @@
+{% set awg31_ready = awg31_status.status == 'ok' and awg31_status.payload.get('status') == 'active' %}
+<section class="awgd-card awgd-card-v31" id="awg31-settings" data-awg31-profile="awg31">
+  <header class="awgd-head">
+    <div class="awgd-title">
+      <span class="awgd-generation">AWG3.1</span>
+      <div>
+        <strong>AmneziaWG 3.1</strong>
+        <small>Изолированный userspace runtime 3.1 · AWG2 и AWG3.0 не заменяются.</small>
+      </div>
+    </div>
+    <span class="cnv1-engine-status {{ 'success' if awg31_ready else 'warning' }}">
+      <span></span>{{ 'Настроено' if awg31_ready else 'Готов к первому запуску' }}
+    </span>
+  </header>
+
+  <section class="cnv1-endpoint-card sg-ljd-nested">
+    <div class="cnv1-endpoint-main">
+      <img src="{{ country_flag_url(awg3_country) }}" alt="{{ country_name(awg3_country) }}" width="30" height="20">
+      <div>
+        <span>ВНЕШНЯЯ ТОЧКА</span>
+        <strong>{{ awg31_public_host }}:587 · DNS {{ awg_dns.dns }}</strong>
+        <small>{{ country_name(awg3_country) }}</small>
+        <small class="awgd-v31-technical" hidden>UDP 587 · интерфейс awg31 · 10.131.0.0/24</small>
+      </div>
+    </div>
+  </section>
+
+  <form method="post" action="/connections/amneziawg31" class="cnv1-engine-form cnv1-engine-form-compact awgd-v31-form" hidden>
+    <div class="cnv1-compact-fields awgd-compact-single">
+      <label class="awgd-dns-field"><span>DNS</span><input type="text" value="{{ awg31_settings.dns }}" readonly></label>
+    </div>
+
+    <details class="cnv1-advanced sg-ljd-nested awgd-v31-advanced">
+      <summary><span>Дополнительно · параметры сервера</span><span>{{ 'Настроены' if awg31_settings.advanced_security else 'Создадутся автоматически' }}</span></summary>
+      <div class="cnv1-advanced-body">
+        <p class="awgd-v31-note">Сервер и клиенты получают один набор параметров. Приватный HeaderProtectionKey в интерфейсе не отображается.</p>
+        <div class="cnv1-form-grid awgd-v31-parameter-grid">
+          {% for name in ('I1', 'I2', 'I3', 'I4', 'I5') %}
+          <label><span>{{ name }}</span><input type="text" name="{{ name }}" maxlength="1024" value="{{ awg31_settings.parameters[name] }}"></label>
+          {% endfor %}
+          {% for name in ('Jc', 'Jmin', 'Jmax') %}
+          <label><span>{{ name }}</span><input type="number" name="{{ name }}" min="0" max="65535" value="{{ awg31_settings.parameters[name] }}" required></label>
+          {% endfor %}
+          {% for name in ('S1', 'S2', 'S3', 'S4') %}
+          <label><span>{{ name }}</span><input type="number" name="{{ name }}" min="12" max="65535" value="{{ awg31_settings.parameters[name] }}" required></label>
+          {% endfor %}
+          {% for name in ('H1', 'H2', 'H3', 'H4') %}
+          <label><span>{{ name }}</span><input type="text" name="{{ name }}" pattern="[0-9]+(-[0-9]+)?" value="{{ awg31_settings.parameters[name] }}" required></label>
+          {% endfor %}
+          {% for name in ('ContentPaddingAddition', 'RekeyAfterTime', 'RekeyTimeout', 'RejectAfterTime', 'KeepaliveTimeout', 'MaxHandshakeAttempts') %}
+          <label><span>{{ name }}</span><input type="text" name="{{ name }}" pattern="[0-9]+(-[0-9]+)?" value="{{ awg31_settings.parameters[name] }}" required></label>
+          {% endfor %}
+          {% for name in ('RandomTrailers', 'DisableCookies') %}
+          <label><span>{{ name }}</span><select name="{{ name }}"><option value="on" {{ 'selected' if awg31_settings.parameters[name] == 'on' else '' }}>on</option><option value="off" {{ 'selected' if awg31_settings.parameters[name] == 'off' else '' }}>off</option></select></label>
+          {% endfor %}
+        </div>
+      </div>
+    </details>
+
+    <footer class="cnv1-form-actions">
+      <span>Адрес подключения: {{ awg31_public_host }}:587</span>
+      <button class="button primary" type="submit">Сохранить</button>
+    </footer>
+  </form>
+
+  <details class="awgd-v31-service sg-ljd-nested" hidden>
+    <summary><span>Служба AWG 3.1</span><span>Управление</span></summary>
+    <div class="awgd-v31-service-actions">
+      {% for action, label in (('start', 'Start'), ('stop', 'Stop'), ('restart', 'Restart'), ('status', 'Status')) %}
+      <form method="post" action="/connections/amneziawg31/service/{{ action }}"><button class="button" type="submit">{{ label }}</button></form>
+      {% endfor %}
+    </div>
+  </details>
+</section>

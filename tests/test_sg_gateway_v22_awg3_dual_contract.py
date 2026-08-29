@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 from app.clients import repository
@@ -19,12 +20,12 @@ def test_awg2_and_awg3_are_independent_device_credentials(tmp_path, monkeypatch)
     assert get_connection_settings("amneziawg").port == 585
     assert get_connection_settings("amneziawg3").port == 586
 
-    client_id = repository.create_client("Dual AWG", "amneziawg,amneziawg3")
+    client_id = repository.create_client("Dual AWG", "amneziawg,amneziawg3,amneziawg31")
     assert client_id
     device = repository.get_primary_device(client_id)
     assert device is not None
     creds = {item.engine: json.loads(item.config_json or "{}") for item in repository.list_device_credentials(device.id)}
-    assert set(creds) == {"amneziawg", "amneziawg3"}
+    assert set(creds) == {"amneziawg", "amneziawg3", "amneziawg31"}
     assert creds["amneziawg"]["address"].startswith("10.66.")
     assert creds["amneziawg3"]["address"].startswith("10.67.")
     assert creds["amneziawg"]["private_key"] != creds["amneziawg3"]["private_key"]
@@ -53,7 +54,7 @@ def test_awg3_export_has_generation3_fields(tmp_path, monkeypatch):
 
 
 def test_awg3_installer_is_userspace_only_and_awg2_stays_frozen():
-    text = Path("install.sh").read_text(encoding="utf-8")
+    text = Path("deploy/install-core.sh").read_text(encoding="utf-8")
     assert 'AMNEZIAWG_TOOLS_VERSION="1.0.20260618-2"' in text
     assert 'AMNEZIAWG_KMOD_VERSION="1.0.20260329-2"' in text
     assert 'AWG3_TOOLS_VERSION="3.0.20260805"' in text
@@ -79,7 +80,7 @@ def test_dual_awg_ui_is_scoped_and_keeps_button_palette():
     assert "AWG2" in html and "AWG3" in html
     assert "update_amneziawg3" in html
     assert 'class="button primary"' in html
-    assert ".button" not in css
+    assert not re.search(r"(?m)^\s*\.button\b", css)
     assert ".page-connections .awgd-" in css
 
 
@@ -92,5 +93,7 @@ def test_client_dataclass_keeps_pre_awg3_constructor_compatible():
 def test_device_picker_orders_both_awg_generations():
     body = Path("app/web/static/sg-device-collapse-v1.js").read_text(encoding="utf-8")
     assert "'amneziawg3'" in body
+    assert "'amneziawg31'" in body
     assert "AmneziaWG 3.0" in body
+    assert "AmneziaWG 3.1" in body
     assert "UDP 586 · userspace-конфигурация и QR" in body

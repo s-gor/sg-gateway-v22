@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import json
+from datetime import UTC, datetime
 from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
 
 from app.clients.exports import build_protocol_export, protocol_ready
@@ -9,6 +10,8 @@ from app.clients.repository import Client, device_access_tokens, list_devices
 
 SG_SUBSCRIPTION_FORMAT = "sg-subscription"
 SG_SUBSCRIPTION_VERSION = 1
+SG_ROUTER_SUBSCRIPTION_FORMAT = "sg-router-subscription"
+SG_ROUTER_SUBSCRIPTION_VERSION = 1
 
 _PROFILE_SPECS = (
     ("xray_reality_tcp", "xray_reality_tcp", "xray-reality-tcp", "VLESS Reality TCP", "vless", "uri"),
@@ -17,6 +20,7 @@ _PROFILE_SPECS = (
     ("xray_hysteria2", "xray_hysteria2", "hysteria2", "Hysteria 2", "hysteria2", "uri"),
     ("amneziawg", "amneziawg", "amneziawg", "AmneziaWG 2.0", "amneziawg", "config"),
     ("amneziawg3", "amneziawg3", "amneziawg3", "AmneziaWG 3.0", "amneziawg", "config"),
+    ("amneziawg31", "amneziawg31", "amneziawg31", "AmneziaWG 3.1", "amneziawg", "config"),
     ("mieru", "mihomo", "mieru", "Mieru", "mieru", "uri"),
     ("anytls", "anytls", "anytls", "AnyTLS", "anytls", "uri"),
     ("tuic", "tuic", "tuic", "TUIC v5", "tuic", "uri"),
@@ -45,6 +49,12 @@ def _canonical_uri(profile_id: str, value: str) -> str:
     return urlunsplit((parts.scheme, parts.netloc, "/", query, parts.fragment))
 
 
+def _subscription_device_name(device: dict) -> str:
+    if device.get("primary"):
+        return ""
+    return str(device.get("name") or "").strip()
+
+
 def _profile_entry(client: Client, device, spec: tuple[str, ...]) -> dict:
     profile_id, _, export_kind, name, protocol, payload_kind = spec
     entry = {
@@ -60,7 +70,7 @@ def _profile_entry(client: Client, device, spec: tuple[str, ...]) -> dict:
         export = build_protocol_export(client, export_kind, device)
         if not export.body:
             return entry
-    except Exception:
+    except Exception:  # noqa: BLE001 - one broken export must not break the whole feed
         return entry
     entry["ready"] = True
     entry["media_type"] = export.media_type
@@ -86,10 +96,11 @@ def build_sg_subscription_document(client: Client) -> dict:
             total_assigned += 1
             if profile["ready"]:
                 total_ready += 1
+        is_primary = bool(device.is_primary)
         devices.append({
             "id": device.id,
-            "name": device.name,
-            "primary": bool(device.is_primary),
+            "name": "" if is_primary else str(device.name or "").strip(),
+            "primary": is_primary,
             "enabled": bool(device.enabled),
             "expires_at": device.expires_at,
             "profiles": profiles,
@@ -113,9 +124,76 @@ def build_sg_subscription_document(client: Client) -> dict:
     }
 
 
+def build_router_subscription_document(client: Client, device_id: int) -> dict | None:
+    """Build the small device-scoped JSON contract used by router subscriptions."""
+    document = build_sg_subscription_document(client)
+    device = next(
+        (item for item in document["devices"] if int(item.get("id") or 0) == int(device_id)),
+        None,
+    )
+    if device is None or not device.get("enabled"):
+        return None
+
+    profiles = []
+    for profile in device.get("profiles", []):
+        if not profile.get("ready"):
+            continue
+        payload_type = str(profile.get("format") or "")
+        value = str(profile.get("uri") or profile.get("config") or "")
+        if payload_type not in {"uri", "config"} or not value:
+            continue
+        profiles.append({
+            "id": str(profile.get("id") or ""),
+            "name": str(profile.get("name") or ""),
+            "protocol": str(profile.get("protocol") or ""),
+            "type": payload_type,
+            "value": value,
+        })
+
+    return {
+        "format": SG_ROUTER_SUBSCRIPTION_FORMAT,
+        "version": SG_ROUTER_SUBSCRIPTION_VERSION,
+        "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
+        "scope": "device",
+        "client": {
+            "id": client.id,
+            "name": client.name,
+        },
+        "device": {
+            "id": int(device.get("id") or 0),
+            "name": _subscription_device_name(device),
+            "primary": bool(device.get("primary")),
+            "expires_at": device.get("expires_at"),
+        },
+        "summary": {
+            "profiles": len(profiles),
+        },
+        "profiles": profiles,
+    }
+
+
+def build_keenetic_subscription_body(client: Client, device_id: int) -> str:
+    """Return the plain VLESS feed consumed by Xkeen UI on Keenetic."""
+    document = build_router_subscription_document(client, device_id)
+    if document is None:
+        return ""
+    links = [
+        str(profile.get("value") or "").strip()
+        for profile in document.get("profiles", [])
+        if profile.get("protocol") == "vless"
+        and profile.get("type") == "uri"
+        and str(profile.get("value") or "").strip().startswith("vless://")
+    ]
+    return "\n".join(links) + ("\n" if links else "")
+
+
 def _subscription_label(client_name: str, device: dict, profile_name: str) -> str:
-    device_name = "Основное устройство" if device.get("primary") else str(device.get("name") or "Устройство")
-    return f"{client_name} · {device_name} · {profile_name}"
+    parts = [client_name]
+    device_name = _subscription_device_name(device)
+    if device_name:
+        parts.append(device_name)
+    parts.append(profile_name)
+    return " · ".join(parts)
 
 
 def _with_fragment(uri: str, label: str) -> str:
@@ -132,7 +210,7 @@ def _config_marker(profile: dict, device: dict) -> str:
         "profile": profile.get("id"),
         "name": profile.get("name"),
         "device_id": device.get("id"),
-        "device": device.get("name"),
+        "device": _subscription_device_name(device),
         "primary": bool(device.get("primary")),
         "encoding": "base64url",
         "data": encoded,
@@ -156,6 +234,7 @@ def _ready_uri_lines(document: dict) -> list[str]:
             lines.append(_with_fragment(str(profile["uri"]), label))
     return lines
 
+
 def build_compatible_subscription_body(client: Client) -> str:
     """Return the proven v2rayN-style Base64 transport for all ready URI profiles."""
     document = build_sg_subscription_document(client)
@@ -163,6 +242,7 @@ def build_compatible_subscription_body(client: Client) -> str:
     if decoded:
         decoded += "\n"
     return base64.b64encode(decoded.encode("utf-8")).decode("ascii")
+
 
 def build_sg_subscription_text(client: Client) -> str:
     """Build the SG v1 human-readable envelope with URI and SG-CONFIG records."""
@@ -178,13 +258,12 @@ def build_sg_subscription_text(client: Client) -> str:
     ]
 
     for device in document["devices"]:
-        device_name = "Основное устройство" if device.get("primary") else str(device.get("name") or "Устройство")
         lines.append(
             "# SG-DEVICE "
             + json.dumps(
                 {
                     "id": device.get("id"),
-                    "name": device_name,
+                    "name": _subscription_device_name(device),
                     "primary": bool(device.get("primary")),
                     "enabled": bool(device.get("enabled")),
                 },
@@ -196,7 +275,11 @@ def build_sg_subscription_text(client: Client) -> str:
             if not profile.get("ready"):
                 continue
             if profile.get("format") == "uri" and profile.get("uri"):
-                label = _subscription_label(client.name, device, str(profile.get("name") or profile.get("id") or "Профиль"))
+                label = _subscription_label(
+                    client.name,
+                    device,
+                    str(profile.get("name") or profile.get("id") or "Профиль"),
+                )
                 lines.append(_with_fragment(str(profile["uri"]), label))
             elif profile.get("format") == "config" and profile.get("config"):
                 lines.append(_config_marker(profile, device))

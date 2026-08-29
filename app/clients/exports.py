@@ -16,6 +16,9 @@ from app.clients.repository import (
 )
 from app.config import load_config
 from app.connections.settings import get_connection_settings
+from app.connections.awg31 import ENDPOINT as AWG31_ENDPOINT
+from app.connections.awg31 import config_lines as awg31_config_lines
+from app.connections.awg31 import get_settings as get_awg31_settings
 from app.connections.public_endpoint import public_host, working_tls_domain
 from app.mihomo.service import build_device_yaml
 from app.net import format_host, format_host_port
@@ -88,6 +91,92 @@ def _format_endpoint(host: str, port: int) -> str:
     return format_host_port(host, port)
 
 
+_AWG_EXPORT_REQUIRED_FIELDS: dict[str, tuple[str, ...]] = {
+    "amneziawg": (
+        "private_key",
+        "address",
+        "server_public_key",
+        "endpoint",
+        "jc",
+        "jmin",
+        "jmax",
+        "s1",
+        "s2",
+        "h1",
+        "h2",
+        "h3",
+        "h4",
+    ),
+    "amneziawg3": (
+        "private_key",
+        "address",
+        "server_public_key",
+        "endpoint",
+        "jc",
+        "jmin",
+        "jmax",
+        "s1",
+        "s2",
+        "s3",
+        "s4",
+        "h1",
+        "h2",
+        "h3",
+        "h4",
+        "header_protection_key",
+        "content_padding_addition",
+        "rekey_after_time",
+        "rekey_timeout",
+        "reject_after_time",
+        "keepalive_timeout",
+        "max_handshake_attempts",
+    ),
+    "amneziawg31": (
+        "private_key",
+        "address",
+        "server_public_key",
+        "endpoint",
+        "header_protection_key",
+        "jc",
+        "jmin",
+        "jmax",
+        "s1",
+        "s2",
+        "s3",
+        "s4",
+        "h1",
+        "h2",
+        "h3",
+        "h4",
+        "contentpaddingaddition",
+        "rekeyaftertime",
+        "rekeytimeout",
+        "rejectaftertime",
+        "keepalivetimeout",
+        "maxhandshakeattempts",
+        "randomtrailers",
+        "disablecookies",
+    ),
+}
+
+
+def _export_config_value_present(config: dict, name: str) -> bool:
+    if name not in config or config[name] is None:
+        return False
+    value = config[name]
+    return not isinstance(value, str) or bool(value.strip())
+
+
+def _awg_export_config_ready(engine: str, config: dict) -> bool:
+    required = _AWG_EXPORT_REQUIRED_FIELDS.get(engine)
+    if required is None:
+        return True
+    return all(
+        _export_config_value_present(config, name)
+        for name in required
+    )
+
+
 def is_export_ready(
     client: Client,
     engine: str,
@@ -95,11 +184,25 @@ def is_export_ready(
 ) -> bool:
     resolved = _resolve_device(client, device)
     deployment = _deployments(client, device).get(engine)
-    return bool(
+    if not (
         client.enabled
         and (resolved is None or resolved.enabled)
         and deployment is not None
         and deployment.status == "applied"
+    ):
+        return False
+
+    if engine not in _AWG_EXPORT_REQUIRED_FIELDS:
+        return True
+    if not deployment.config_json:
+        return False
+    try:
+        config = json.loads(deployment.config_json)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return False
+    return bool(
+        isinstance(config, dict)
+        and _awg_export_config_ready(engine, config)
     )
 
 
@@ -200,10 +303,77 @@ MaxHandshakeAttempts = {config.get("max_handshake_attempts", "")}
 PublicKey = {config.get("server_public_key", "")}
 Endpoint = {endpoint}
 AllowedIPs = {config.get("allowed_ips", "0.0.0.0/0, ::/0")}
-PersistentKeepalive = {config.get("persistent_keepalive", "25-35")}
+PersistentKeepalive = {config.get("persistent_keepalive", 25)}
 """
     return ClientExport(
         filename=f"sg-gateway-{_slug(client, device)}-amneziawg3.conf",
+        media_type="text/plain; charset=utf-8",
+        body=body,
+    )
+
+
+def build_awg31_config(client: Client, device: Device | None = None) -> ClientExport:
+    config = _deployment_config(client, "amneziawg31", device)
+    settings = get_awg31_settings()
+    endpoint_host = _public_export_host(settings.host)
+    endpoint = (
+        _format_endpoint(endpoint_host, settings.port)
+        if endpoint_host
+        else AWG31_ENDPOINT
+    )
+    parameter_lines = "\n".join(awg31_config_lines(settings))
+    body = f"""# SG-Gateway AmneziaWG 3.1
+# Access: {_label(client, device)}
+# Profile: awg31
+# Transport: UDP
+
+[Interface]
+PrivateKey = {config.get('private_key', '')}
+Address = {config.get('address', '')}
+DNS = {settings.dns}
+{parameter_lines}
+
+[Peer]
+PublicKey = {config.get('server_public_key') or settings.server_public_key}
+Endpoint = {endpoint}
+AllowedIPs = {config.get('allowed_ips', '0.0.0.0/0, ::/0')}
+PersistentKeepalive = {config.get('persistent_keepalive', 25)}
+"""
+    return ClientExport(
+        filename=f"sg-gateway-{_slug(client, device)}-amneziawg31.conf",
+        media_type="text/plain; charset=utf-8",
+        body=body,
+    )
+
+
+def build_awg31_uri(client: Client, device: Device | None = None) -> ClientExport:
+    from app.connections.awg31_uri import encode_awg31_uri
+
+    config = _deployment_config(client, "amneziawg31", device)
+    settings = get_awg31_settings()
+    endpoint_host = _public_export_host(settings.host)
+    endpoint = (
+        _format_endpoint(endpoint_host, settings.port)
+        if endpoint_host
+        else AWG31_ENDPOINT
+    )
+    config_export = build_awg31_config(client, device)
+    body = encode_awg31_uri(
+        {
+            "private_key": str(config.get("private_key", "")),
+            "public_key": str(
+                config.get("server_public_key") or settings.server_public_key
+            ),
+            "address": str(config.get("address", "")),
+            "allowed_ips": str(config.get("allowed_ips", "0.0.0.0/0, ::/0")),
+            "endpoint": endpoint,
+            "persistent_keepalive": int(config.get("persistent_keepalive", 25)),
+            "parameters": settings.parameters,
+            "config": config_export.body,
+        }
+    )
+    return ClientExport(
+        filename=f"sg-gateway-{_slug(client, device)}-amneziawg31-uri.txt",
         media_type="text/plain; charset=utf-8",
         body=body,
     )
@@ -570,6 +740,8 @@ def protocol_engine(kind: str) -> str:
     return {
         "amneziawg": "amneziawg",
         "amneziawg3": "amneziawg3",
+        "amneziawg31": "amneziawg31",
+        "amneziawg31-uri": "amneziawg31",
         "xray": "xray",
         "xray-reality-tcp": "xray",
         "xray-xhttp-reality": "xray",
@@ -592,6 +764,8 @@ def build_protocol_export(
     builders = {
         "amneziawg": build_awg_config,
         "amneziawg3": build_awg3_config,
+        "amneziawg31": build_awg31_config,
+        "amneziawg31-uri": build_awg31_uri,
         "xray": build_xray_link,
         "xray-reality-tcp": lambda item, access=None: build_xray_profile_link(item, "reality_tcp", access),
         "xray-xhttp-reality": lambda item, access=None: build_xray_profile_link(item, "xhttp_reality", access),

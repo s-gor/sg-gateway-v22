@@ -56,8 +56,10 @@ def test_state_binding_occurs_after_final_verification_while_rollback_is_still_a
 def test_fix19_channel_and_production_invariants_survive_state_binding() -> None:
     body = UPDATER.read_text(encoding="utf-8")
     assert 'REPOSITORY="s-gor/sg-gateway-v22"' in body
-    assert '${SG_GATEWAY_GITHUB_BRANCH:-${SG_GATEWAY_UPDATE_BRANCH:-dev-v22}}' in body
-    assert 'print(items[-1] if items else "app.production:app")' in body
+    assert '${SG_GATEWAY_GITHUB_BRANCH:-${SG_GATEWAY_UPDATE_BRANCH:-stable-02206}}' in body
+    assert 'PANEL_PRODUCTION_WSGI="app.production:app"' in body
+    assert 'printf \'%s\\n\' "$PANEL_PRODUCTION_WSGI"' in body
+    assert "migrate_panel_wsgi_service()" in body
     assert '[[ -f "$SOURCE_DIR/app/production.py" ]]' in body
     assert 'REPOSITORY="s-gor/sg-gateway"' not in body
     assert "dev-02205" not in body

@@ -2,14 +2,17 @@
 set -Eeuo pipefail
 
 REPOSITORY="s-gor/sg-gateway-v22"
-BRANCH="${SG_GATEWAY_GITHUB_BRANCH:-${SG_GATEWAY_UPDATE_BRANCH:-dev-v22}}"
+BRANCH="${SG_GATEWAY_GITHUB_BRANCH:-${SG_GATEWAY_UPDATE_BRANCH:-stable-02206}}"
 ARCHIVE_URL="https://github.com/${REPOSITORY}/archive/refs/heads/${BRANCH}.tar.gz"
 TEMP_DIR=""
+MIN_FREE_MIB="${SG_GATEWAY_INSTALL_MIN_FREE_MIB:-1024}"
 
 fail() {
   printf '[SG-Gateway] ERROR: %s\n' "$*" >&2
   exit 1
 }
+
+[[ "$BRANCH" == "stable-02206" ]] || fail "stable installer is pinned to stable-02206; requested branch: $BRANCH"
 
 cleanup() {
   if [[ -n "$TEMP_DIR" && -d "$TEMP_DIR" ]]; then
@@ -27,9 +30,75 @@ if [[ -f /opt/sg-gateway/VERSION && -f /etc/sg-gateway/runtime.env && -f /etc/sg
   printf '[SG-Gateway] SG-Gateway %s is already installed.\n' "${installed_version:-unknown}"
   printf '[SG-Gateway] Clean Install is blocked on an existing server.\n'
   printf '[SG-Gateway] Use the dedicated Update command:\n'
-  printf 'curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/dev-v22/deploy/update-from-github.sh | sudo bash\n'
+  printf 'curl -fsSL https://raw.githubusercontent.com/%s/%s/deploy/update-from-github.sh | sudo env SG_GATEWAY_GITHUB_BRANCH=%s bash\n' "$REPOSITORY" "$BRANCH" "$BRANCH"
   exit 2
 fi
+
+require_supported_ubuntu() {
+  [[ -r /etc/os-release ]] || fail "cannot detect the operating system; Ubuntu 24.04 is required"
+  # shellcheck disable=SC1091
+  . /etc/os-release
+  [[ "${ID:-}" == "ubuntu" ]] || fail "Ubuntu 24.04 is required; detected ${PRETTY_NAME:-unknown system}"
+  [[ "${VERSION_ID:-}" == "24.04" ]] || fail "only Ubuntu 24.04 is supported; detected ${PRETTY_NAME:-Ubuntu ${VERSION_ID:-unknown}}"
+  printf '[SG-Gateway] Supported system: %s\n' "${PRETTY_NAME:-Ubuntu 24.04}"
+}
+
+wait_for_cloud_init() {
+  if ! command -v cloud-init >/dev/null 2>&1; then
+    printf '[SG-Gateway] cloud-init not present; continuing with local Ubuntu state.\n'
+    return 0
+  fi
+
+  printf '[SG-Gateway] Waiting for cloud-init to finish...\n'
+  if ! cloud-init status --wait; then
+    fail "cloud-init did not finish successfully; resolve the Ubuntu first-boot state and rerun the installer"
+  fi
+  printf '[SG-Gateway] cloud-init: ready.\n'
+}
+
+require_free_space() {
+  local path="$1" label="$2" available_kib required_kib available_mib
+  [[ "$MIN_FREE_MIB" =~ ^[0-9]+$ ]] || fail "SG_GATEWAY_INSTALL_MIN_FREE_MIB must be a non-negative integer"
+  available_kib="$(df -Pk "$path" 2>/dev/null | awk 'NR == 2 {print $4}')"
+  [[ "$available_kib" =~ ^[0-9]+$ ]] || fail "cannot determine free disk space for $label ($path)"
+  required_kib=$(( MIN_FREE_MIB * 1024 ))
+  available_mib=$(( available_kib / 1024 ))
+  if (( available_kib < required_kib )); then
+    fail "not enough free disk space for clean install on $label: need at least ${MIN_FREE_MIB} MiB, available ${available_mib} MiB"
+  fi
+  printf '[SG-Gateway] Disk preflight %s: %s MiB free (minimum %s MiB).\n' "$label" "$available_mib" "$MIN_FREE_MIB"
+}
+
+prepare_clean_ubuntu() {
+  command -v apt-get >/dev/null 2>&1 || fail "apt-get is required to prepare Ubuntu"
+
+  printf '[SG-Gateway] Updating clean Ubuntu before SG-Gateway installation...\n'
+  apt-get -o Dpkg::Use-Pty=0 update
+  env DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a \
+    apt-get -o Dpkg::Use-Pty=0 full-upgrade -y
+  env DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a \
+    apt-get -o Dpkg::Use-Pty=0 autoremove -y
+
+  if [[ -e /var/run/reboot-required ]]; then
+    printf '[SG-Gateway] Ubuntu update completed, but a reboot is required before SG-Gateway can be installed.\n'
+    printf '[SG-Gateway] Run: reboot\n'
+    printf '[SG-Gateway] After login, repeat the same SG-Gateway install command.\n'
+    exit 10
+  fi
+
+  printf '[SG-Gateway] Ubuntu update: complete; reboot not required.\n'
+}
+
+# A fresh cloud image can still be expanding its disk or applying first-boot
+# package changes when SSH becomes available. Wait for that work first, then
+# fully update Ubuntu before downloading or mutating any SG-Gateway state.
+require_supported_ubuntu
+wait_for_cloud_init
+require_free_space /tmp "temporary storage"
+require_free_space /opt "installation storage"
+prepare_clean_ubuntu
+require_free_space /tmp "temporary storage after Ubuntu update"
+require_free_space /opt "installation storage after Ubuntu update"
 
 missing_packages=()
 command -v curl >/dev/null 2>&1 || missing_packages+=(curl)
@@ -50,7 +119,7 @@ for command in curl tar gzip; do
 done
 
 TEMP_DIR="$(mktemp -d /tmp/sg-gateway-github-install.XXXXXX)"
-ARCHIVE="$TEMP_DIR/sg-gateway-main.tar.gz"
+ARCHIVE="$TEMP_DIR/sg-gateway-stable-02206.tar.gz"
 SOURCE_DIR="$TEMP_DIR/source"
 mkdir -p "$SOURCE_DIR"
 
@@ -67,6 +136,7 @@ tar -xzf "$ARCHIVE" -C "$SOURCE_DIR" --strip-components=1
 [[ -d "$SOURCE_DIR/app" ]] || fail "application source is missing from the GitHub archive"
 
 printf '[SG-Gateway] GitHub source version: %s\n' "$(tr -d '\r\n' < "$SOURCE_DIR/VERSION")"
+printf '[SG-Gateway] STABLE channel: stable-02206\n'
 printf '[SG-Gateway] Starting the native Ubuntu CLEAN installer...\n'
 SG_GATEWAY_SOURCE_DIR="$SOURCE_DIR" bash "$SOURCE_DIR/install.sh"
 

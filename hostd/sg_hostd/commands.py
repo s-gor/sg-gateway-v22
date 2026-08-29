@@ -16,6 +16,7 @@ from sg_hostd.operation_jobs import (
     start_panel_update_job,
     start_core_update_job,
     start_full_backup_restore_job,
+    start_awg3_repair_job,
 )
 
 from sg_hostd.client_runtime import (
@@ -29,6 +30,12 @@ from sg_hostd.privileged_runtime import execute_privileged_action
 
 from sg_hostd.mihomo_runtime import execute_mihomo_action
 from sg_hostd.full_backup_runtime import create_full_backup_archive, restore_uploaded_full_backup
+from sg_hostd.data_backup_runtime import (
+    create_data_backup_archive,
+    promote_uploaded_data_backup,
+    verify_uploaded_data_backup,
+)
+from sg_hostd.runtime_contracts import inspect_runtime_contract
 
 
 @dataclass(frozen=True)
@@ -685,6 +692,88 @@ def _system_diagnostics() -> HostCommandResult:
     )
 
 
+# SG_GATEWAY_02206_DATA_BACKUP_COMMANDS_V1
+def _runtime_contract_status() -> HostCommandResult:
+    try:
+        payload = inspect_runtime_contract(
+            strict_optional=False,
+            include_all_critical=True,
+        )
+    except Exception as exc:
+        return HostCommandResult(
+            command="runtime.contract", status="error",
+            message=f"Runtime Contract не выполнен: {exc}", payload={},
+        )
+    return HostCommandResult(
+        command="runtime.contract",
+        status="ok" if payload.get("ok") else "error",
+        message=str(payload.get("message") or "Runtime Contract"),
+        payload=payload,
+    )
+
+
+# SG_GATEWAY_02206_AWG3_REPAIR_COMMAND_V2
+def _awg3_runtime_repair_start() -> HostCommandResult:
+    try:
+        payload = start_awg3_repair_job()
+    except Exception as exc:
+        return HostCommandResult(
+            command="runtime.awg3.repair.start",
+            status="error",
+            message=f"Не удалось запустить восстановление AWG3 runtime: {exc}",
+            payload={},
+        )
+    return HostCommandResult(
+        command="runtime.awg3.repair.start",
+        status="ok",
+        message="Восстановление AWG3 runtime запущено",
+        payload=payload,
+    )
+
+
+def _data_backup_create() -> HostCommandResult:
+    try:
+        payload = create_data_backup_archive()
+    except Exception as exc:
+        return HostCommandResult(
+            command="backup.data.create", status="error",
+            message=f"Не удалось создать backup клиентов и настроек: {exc}", payload={},
+        )
+    return HostCommandResult(
+        command="backup.data.create", status="ok",
+        message=f"Backup клиентов и настроек создан: {payload.get('name', '')}", payload=payload,
+    )
+
+
+def _data_backup_verify() -> HostCommandResult:
+    try:
+        payload = verify_uploaded_data_backup()
+    except Exception as exc:
+        return HostCommandResult(
+            command="backup.data.verify", status="error",
+            message=f"DATA backup не прошёл проверку: {exc}", payload={},
+        )
+    return HostCommandResult(
+        command="backup.data.verify", status="ok",
+        message="DATA backup проверен", payload=payload,
+    )
+
+
+def _data_backup_promote() -> HostCommandResult:
+    try:
+        payload = promote_uploaded_data_backup()
+    except Exception as exc:
+        return HostCommandResult(
+            command="backup.data.promote", status="error",
+            message=f"DATA restore не подготовлен: {exc}", payload={},
+        )
+    return HostCommandResult(
+        command="backup.data.promote", status="ok",
+        message="DATA backup проверен Runtime Contract и подготовлен к переносимому restore",
+        payload=payload,
+    )
+
+
 def _full_backup_create() -> HostCommandResult:
     try:
         payload = create_full_backup_archive()
@@ -766,6 +855,11 @@ _COMMANDS: dict[str, Callable[[], HostCommandResult]] = {
     "xray.salamander.status": _xray_salamander_status,
     "nftables.status": _nftables_status,
     "system.diagnostics": _system_diagnostics,
+    "runtime.contract": _runtime_contract_status,
+    "runtime.awg3.repair.start": _awg3_runtime_repair_start,
+    "backup.data.create": _data_backup_create,
+    "backup.data.verify": _data_backup_verify,
+    "backup.data.promote": _data_backup_promote,
     "backup.full.create": _full_backup_create,
     "backup.full.restore.start": _full_backup_restore_start,
     "backup.full.restore": _full_backup_restore,

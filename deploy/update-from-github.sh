@@ -2,9 +2,107 @@
 set -Eeuo pipefail
 
 REPOSITORY="s-gor/sg-gateway-v22"
-BRANCH="${SG_GATEWAY_GITHUB_BRANCH:-${SG_GATEWAY_UPDATE_BRANCH:-dev-v22}}"
+BRANCH="${SG_GATEWAY_GITHUB_BRANCH:-${SG_GATEWAY_UPDATE_BRANCH:-stable-02206}}"
 ARCHIVE_URL="https://github.com/${REPOSITORY}/archive/refs/heads/${BRANCH}.tar.gz"
 GIT_URL="https://github.com/${REPOSITORY}.git"
+BOOTSTRAP_GIT_URL="${SG_GATEWAY_GIT_URL:-$GIT_URL}"
+BOOTSTRAP_RAW_BASE="${SG_GATEWAY_RAW_BASE_URL:-https://raw.githubusercontent.com/${REPOSITORY}}"
+BOOTSTRAP_DIR=""
+
+bootstrap_fail() {
+  printf '[SG-Gateway Update] bootstrap error: %s\n' "$*" >&2
+  return 1
+}
+
+bootstrap_cleanup() {
+  if [[ -n "$BOOTSTRAP_DIR" && -d "$BOOTSTRAP_DIR" ]]; then
+    rm -rf -- "$BOOTSTRAP_DIR"
+  fi
+}
+
+bootstrap_urlencode_ref() {
+  python3 - "$1" <<'PYURL'
+import sys
+from urllib.parse import quote
+
+print(quote(sys.argv[1], safe=""))
+PYURL
+}
+
+bootstrap_resolve_commit() {
+  local resolved="${SG_GATEWAY_SOURCE_COMMIT:-}"
+  local encoded
+  if [[ "$resolved" =~ ^[0-9a-fA-F]{40}$ ]]; then
+    printf '%s\n' "${resolved,,}"
+    return 0
+  fi
+  if command -v git >/dev/null 2>&1; then
+    resolved="$(git ls-remote --exit-code "$BOOTSTRAP_GIT_URL" "refs/heads/$BRANCH" 2>/dev/null | awk 'NR==1 {print $1}' || true)"
+  fi
+  if [[ ! "$resolved" =~ ^[0-9a-fA-F]{40}$ ]]; then
+    encoded="$(bootstrap_urlencode_ref "$BRANCH")"
+    resolved="$(
+      curl -4 -fsSL --max-time 20 -A 'SG-Gateway-Updater' \
+        "https://api.github.com/repos/${REPOSITORY}/commits/${encoded}" 2>/dev/null \
+      | python3 -c 'import json,re,sys; value=str(json.load(sys.stdin).get("sha") or "").strip(); print(value.lower() if re.fullmatch(r"[0-9a-fA-F]{40}", value) else "")' \
+        2>/dev/null || true
+    )"
+  fi
+  [[ "$resolved" =~ ^[0-9a-fA-F]{40}$ ]] || bootstrap_fail "cannot resolve exact commit for update channel $BRANCH"
+  printf '%s\n' "${resolved,,}"
+}
+
+post_update_awg3_bootstrap() {
+  local prefix="${SG_GATEWAY_PREFIX:-/opt/sg-gateway}"
+  local config_dir="${SG_GATEWAY_CONFIG_DIR:-/etc/sg-gateway}"
+  local data_dir="${SG_GATEWAY_DATA_DIR:-/var/lib/sg-gateway}"
+  local python="$prefix/.venv/bin/python"
+  local module="$prefix/app/maintenance/awg3_idle_bootstrap.py"
+
+  [[ -x "$python" && -f "$module" ]] || return 0
+
+  printf '[SG-Gateway Update] Checking AWG3.0 first-start state...\n'
+  # Persisted env files contain passwords, hashes and keys. They are data,
+  # not shell programs: sourcing them can expand values such as $3 or execute
+  # substitutions. The AWG3 bootstrap reads runtime.env and engine secrets
+  # through its data parser; only the path overrides below must be exported.
+
+  PYTHONPATH="$prefix:$prefix/hostd" \
+  SG_GATEWAY_APP_ROOT="$prefix" \
+  SG_GATEWAY_CONFIG_DIR="$config_dir" \
+  SG_GATEWAY_DATA_DIR="$data_dir" \
+    "$python" -B -m app.maintenance.awg3_idle_bootstrap
+}
+
+bootstrap_main() {
+  command -v curl >/dev/null 2>&1 || bootstrap_fail "required command is missing: curl"
+  command -v python3 >/dev/null 2>&1 || bootstrap_fail "required command is missing: python3"
+  command -v bash >/dev/null 2>&1 || bootstrap_fail "required command is missing: bash"
+
+  local commit core rc
+  commit="$(bootstrap_resolve_commit)"
+  BOOTSTRAP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/sg-gateway-update-bootstrap.XXXXXX")"
+  core="$BOOTSTRAP_DIR/update-from-github-core.sh"
+  trap bootstrap_cleanup EXIT
+  trap 'exit 130' INT TERM
+
+  printf '[SG-Gateway Update] Bootstrap commit: %s\n' "$commit"
+  curl -4 -fL --retry 6 --retry-all-errors --retry-delay 2 --connect-timeout 20 \
+    "$BOOTSTRAP_RAW_BASE/$commit/deploy/update-from-github-core.sh" -o "$core"
+  [[ -s "$core" ]] || bootstrap_fail "downloaded core updater is empty"
+  head -n 1 "$core" | grep -Eq '^#!.*(ba)?sh([[:space:]]|$)' || \
+    bootstrap_fail "downloaded core updater has no shell shebang"
+  grep -Fq 'SG_GATEWAY_UPDATE_CORE' "$core" || \
+    bootstrap_fail "downloaded file is not the SG-Gateway core updater"
+  bash -n "$core" || bootstrap_fail "downloaded core updater failed syntax validation"
+
+  set +e
+  SG_GATEWAY_SOURCE_COMMIT="$commit" bash "$core" "$@"
+  rc=$?
+  set -e
+  (( rc == 0 )) || return "$rc"
+  post_update_awg3_bootstrap
+}
 
 PREFIX="/opt/sg-gateway"
 CONFIG_DIR="/etc/sg-gateway"
@@ -13,6 +111,7 @@ BACKUP_ROOT="/root/sg-gateway-update-safety"
 BACKUP_KEEP="${SG_GATEWAY_UPDATE_BACKUP_KEEP:-2}"
 BACKUP_HEADROOM_MB="${SG_GATEWAY_UPDATE_BACKUP_HEADROOM_MB:-256}"
 PANEL_SERVICE="sg-gateway.service"
+PANEL_PRODUCTION_WSGI="app.production:app"
 HOSTD_SERVICE="sg-hostd.service"
 AWG3_SERVICE="sg-gateway-awg3.service"
 AWG3_CONFIG="/etc/amnezia/amneziawg/awg3.conf"
@@ -648,7 +747,7 @@ run_stage() {
 }
 
 # SG_GATEWAY_02205_WSGI_ISOLATED_VALIDATION_V1
-panel_wsgi_target() {
+installed_panel_wsgi_target() {
   local raw
   raw="$(systemctl show -p ExecStart --value "$PANEL_SERVICE" 2>/dev/null || true)"
   python3 - "$raw" <<'PYWSGITARGET'
@@ -660,8 +759,59 @@ items = re.findall(
     r"(?<![A-Za-z0-9_.])([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*:[A-Za-z_]\w*)(?![A-Za-z0-9_])",
     raw,
 )
-print(items[-1] if items else "app.production:app")
+print(items[-1] if items else "")
 PYWSGITARGET
+}
+
+panel_wsgi_target() {
+  printf '%s\n' "$PANEL_PRODUCTION_WSGI"
+}
+
+# SG_GATEWAY_02204E_UPDATE_PRODUCTION_WSGI_FIX1
+migrate_panel_wsgi_service() {
+  local unit="/etc/systemd/system/sg-gateway.service"
+  local current after
+  [[ -f "$unit" ]] || fail "panel systemd unit is missing: $unit"
+
+  current="$(installed_panel_wsgi_target)"
+  if [[ "$current" == "$PANEL_PRODUCTION_WSGI" ]]; then
+    printf '[SG-Gateway Update] Panel WSGI target: %s (already current).\n' "$current"
+    return 0
+  fi
+  [[ -n "$current" ]] || fail "cannot determine installed panel WSGI target"
+
+  python3 - "$unit" "$PANEL_PRODUCTION_WSGI" <<'PYMIGRATEWSGI'
+import re
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+target = sys.argv[2]
+body = path.read_text(encoding="utf-8")
+lines = body.splitlines(keepends=True)
+pattern = re.compile(
+    r"(?<![A-Za-z0-9_.])([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*:[A-Za-z_]\w*)(?![A-Za-z0-9_])"
+)
+hits = []
+for index, line in enumerate(lines):
+    if not line.startswith("ExecStart="):
+        continue
+    matches = list(pattern.finditer(line))
+    if len(matches) == 1:
+        hits.append((index, matches[0]))
+if len(hits) != 1:
+    raise SystemExit(f"expected exactly one WSGI target in ExecStart, found {len(hits)}")
+index, match = hits[0]
+line = lines[index]
+lines[index] = line[:match.start()] + target + line[match.end():]
+path.write_text("".join(lines), encoding="utf-8", newline="")
+PYMIGRATEWSGI
+
+  systemctl daemon-reload
+  after="$(installed_panel_wsgi_target)"
+  [[ "$after" == "$PANEL_PRODUCTION_WSGI" ]] || \
+    fail "panel WSGI migration failed: expected $PANEL_PRODUCTION_WSGI, got ${after:-unknown}"
+  printf '[SG-Gateway Update] Panel WSGI migrated: %s -> %s\n' "$current" "$after"
 }
 
 validate_candidate_wsgi_target() {
@@ -738,7 +888,25 @@ os.chdir(prefix)
 sys.path.insert(0, str(prefix))
 module_name, object_name = target.split(":", 1)
 module = importlib.import_module(module_name)
-getattr(module, object_name)
+application = getattr(module, object_name)
+if target == "app.production:app":
+    with application.test_request_context("/"):
+        context = {}
+        for processor in application.template_context_processors[None]:
+            context.update(processor())
+    required = (
+        "sg_subscription_universal_url",
+        "sg_subscription_native_url",
+        "router_subscription_url",
+        "openwrt_subscription_url",
+        "keenetic_subscription_url",
+    )
+    missing = [name for name in required if not callable(context.get(name))]
+    if missing:
+        raise SystemExit(
+            "production WSGI is missing required template context: " + ", ".join(missing)
+        )
+    print("Production template context: OK")
 print(f"Panel WSGI import: OK ({target}) with isolated data/log")
 PYDEPLOYEDWSGI
   chmod 0700 "$TEMP_DIR"
@@ -1008,6 +1176,8 @@ deploy_source() {
   runuser -u sg-gateway -- test -x "$PREFIX/.venv/bin/python"
   runuser -u sg-gateway -- "$PREFIX/.venv/bin/python" -c \
     'import flask, jinja2, waitress; print("Python runtime: OK")'
+
+  migrate_panel_wsgi_service
 }
 
 restart_panel() {
@@ -1072,6 +1242,8 @@ verify_final() {
   systemctl is-active --quiet "$HOSTD_SERVICE"
   systemctl is-active --quiet "$PANEL_SERVICE"
   systemctl is-active --quiet nginx.service
+  [[ "$(installed_panel_wsgi_target)" == "$PANEL_PRODUCTION_WSGI" ]] || \
+    fail "panel service is not running the production WSGI entrypoint"
 }
 
 bind_panel_update_state() {
@@ -1140,7 +1312,7 @@ main() {
   prepare_source
 
   run_stage 2 "Safety Backup: SG state + TLS + AWG3 runtime" create_safety_backup
-  run_stage 3 "Обновление только исходников SG-Gateway" deploy_source "$SOURCE_DIR"
+  run_stage 3 "Обновление исходников SG-Gateway + WSGI migration" deploy_source "$SOURCE_DIR"
   run_stage 4 "Python/UI проверка без изменения runtime" validate_deployed_panel
   run_stage 5 "Перезапуск только panel + hostd" restart_panel
   run_stage 6 "Проверка HTTPS, Clients, Nginx и runtime" verify_final
@@ -1164,4 +1336,5 @@ main() {
   printf '[SG-Gateway Update] ============================================================\n'
 }
 
-main "$@"
+trap - ERR INT TERM EXIT
+bootstrap_main "$@"

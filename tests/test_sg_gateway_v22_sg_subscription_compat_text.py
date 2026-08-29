@@ -48,28 +48,28 @@ def test_text_envelope_preserves_v1_headers_devices_ready_uris_and_awg2_config(m
         "# devices=2", "# profiles-assigned=4", "# profiles-ready=3",
     ]
     devices = [json.loads(line.removeprefix("# SG-DEVICE ")) for line in lines if line.startswith("# SG-DEVICE ")]
-    assert devices[0] == {"id": 101, "name": "Основное устройство", "primary": True, "enabled": True}
+    assert devices[0] == {"id": 101, "name": "", "primary": True, "enabled": True}
     assert devices[1] == {"id": 102, "name": "Phone", "primary": False, "enabled": True}
     uris = [line for line in lines if line.startswith(("vless://", "mierus://"))]
     assert len(uris) == 2
-    assert unquote(urlsplit(uris[0]).fragment) == "Compat Client · Основное устройство · VLESS XHTTP Reality"
+    assert unquote(urlsplit(uris[0]).fragment) == "Compat Client · VLESS XHTTP Reality"
     assert unquote(urlsplit(uris[1]).fragment) == "Compat Client · Phone · Mieru"
     assert not any("tuic://" in line for line in lines)
     markers = [json.loads(line.removeprefix("# SG-CONFIG ")) for line in lines if line.startswith("# SG-CONFIG ")]
     assert len(markers) == 1
     assert markers[0]["profile"] == "amneziawg"
     assert markers[0]["device_id"] == 101
+    assert markers[0]["device"] == ""
     padded = markers[0]["data"] + "=" * (-len(markers[0]["data"]) % 4)
     assert base64.urlsafe_b64decode(padded).decode() == "[Interface]\nPrivateKey = test\n"
 
 
-def test_fragment_replacement_and_awg3_exclusion() -> None:
+def test_fragment_replacement_and_awg_profile_order() -> None:
     value = subscription._with_fragment("vless://u@host:443?q=1#old", "Новая метка")
     assert urlsplit(value).query == "q=1"
     assert unquote(urlsplit(value).fragment) == "Новая метка"
     assert subscription._with_fragment("plain-text", "ignored") == "plain-text"
-    assert "amneziawg3" in subscription.canonical_profile_ids()
     assert subscription.canonical_profile_ids() == (
         "xray_reality_tcp", "xray_xhttp_reality", "xray_xhttp_tls", "xray_hysteria2",
-        "amneziawg", "amneziawg3", "mieru", "anytls", "tuic",
+        "amneziawg", "amneziawg3", "amneziawg31", "mieru", "anytls", "tuic",
     )

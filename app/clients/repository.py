@@ -16,6 +16,7 @@ PRIMARY_DEVICE_NAME = "Основной доступ"
 SUPPORTED_ENGINES = (
     "amneziawg",
     "amneziawg3",
+    "amneziawg31",
     "xray",
     "mihomo",
     "anytls",
@@ -184,7 +185,7 @@ def _parse_access(access: str) -> tuple[list[str], list[str], list[str]]:
     aliases = {
         "recommended": "xray_xhttp_reality,sgclient",
         "full": (
-            "amneziawg,amneziawg3,xray_reality_tcp,xray_xhttp_reality,"
+            "amneziawg,amneziawg3,amneziawg31,xray_reality_tcp,xray_xhttp_reality,"
             "xray_xhttp_tls,xray_hysteria2,sgclient"
         ),
         "xray": "xray_reality_tcp,xray_xhttp_reality",
@@ -256,7 +257,41 @@ def _create_device_rows(
     access_label = client_name if is_primary else f"{client_name} · {device_name}"
 
     for engine in engines:
-        object_id, config_json = build_engine_config(engine, device_id, access_label)
+        if engine == "amneziawg31":
+            from app.clients.awg31_lifecycle import build_credential_payload
+            from app.connections.awg31 import DEFAULT_PARAMETERS, FIELD_NAMES, validate_parameters
+
+            row = connection.execute(
+                "SELECT config_json FROM connection_settings WHERE engine = 'amneziawg31'"
+            ).fetchone()
+            try:
+                settings_raw = json.loads(row["config_json"] or "{}") if row else {}
+            except (TypeError, ValueError, json.JSONDecodeError):
+                settings_raw = {}
+            parameters = validate_parameters(
+                {
+                    name: settings_raw.get(
+                        name, settings_raw.get(name.lower(), DEFAULT_PARAMETERS[name])
+                    )
+                    for name in FIELD_NAMES
+                }
+            )
+
+            payload = build_credential_payload(
+                device_id=device_id,
+                device_name=device_name,
+                is_primary=is_primary,
+                client_name=client_name,
+                settings_parameters=parameters,
+                server_public_key=str(settings_raw.get("server_public_key") or ""),
+                header_protection_key=str(
+                    settings_raw.get("header_protection_key") or ""
+                ),
+            )
+            object_id = str(payload["public_key"])
+            config_json = json.dumps(payload, ensure_ascii=False, sort_keys=True)
+        else:
+            object_id, config_json = build_engine_config(engine, device_id, access_label)
         if engine == "xray":
             payload = json.loads(config_json)
             payload["profiles"] = xray_profiles or list(DEFAULT_XRAY_PROFILES)
@@ -619,7 +654,42 @@ def _sync_device_access(
             )
             continue
 
-        object_id, config_json = build_engine_config(engine, device_id, label)
+        if engine == "amneziawg31":
+            from app.clients.awg31_lifecycle import build_credential_payload
+            from app.connections.awg31 import DEFAULT_PARAMETERS, FIELD_NAMES, validate_parameters
+
+            settings_row = connection.execute(
+                "SELECT config_json FROM connection_settings WHERE engine = 'amneziawg31'"
+            ).fetchone()
+            try:
+                settings_raw = (
+                    json.loads(settings_row["config_json"] or "{}")
+                    if settings_row
+                    else {}
+                )
+            except (TypeError, ValueError, json.JSONDecodeError):
+                settings_raw = {}
+            parameters = validate_parameters(
+                {
+                    name: settings_raw.get(
+                        name, settings_raw.get(name.lower(), DEFAULT_PARAMETERS[name])
+                    )
+                    for name in FIELD_NAMES
+                }
+            )
+
+            payload = build_credential_payload(
+                device_id=device_id,
+                device_name=device_name,
+                is_primary=is_primary,
+                client_name=client_name,
+                settings_parameters=parameters,
+                server_public_key=str(settings_raw.get("server_public_key") or ""),
+            )
+            object_id = str(payload["public_key"])
+            config_json = json.dumps(payload, ensure_ascii=False, sort_keys=True)
+        else:
+            object_id, config_json = build_engine_config(engine, device_id, label)
         if engine == "xray":
             payload = json.loads(config_json)
             payload["profiles"] = xray_profiles or list(DEFAULT_XRAY_PROFILES)
@@ -837,6 +907,17 @@ def delete_client(client_id: int) -> bool:
         return False
     log_operation("client.delete", f"client:{client_id}", "Клиент и все его доступы удалены")
     return True
+
+
+def delete_awg31_peer(device_id: int) -> bool:
+    """Remove only the independent AWG31 credential for one device."""
+    init_db()
+    with connect() as connection:
+        cursor = connection.execute(
+            "DELETE FROM device_credentials WHERE device_id = ? AND engine = 'amneziawg31'",
+            (device_id,),
+        )
+    return bool(cursor.rowcount)
 
 
 def snapshot_client(client_id: int) -> ClientSnapshot | None:

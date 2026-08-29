@@ -3,11 +3,13 @@ from __future__ import annotations
 from flask import Flask, jsonify
 
 from sg_hostd.commands import execute_command, list_allowed_commands
+from sg_hostd.disk_cleanup import start_disk_cleanup_job
 from sg_hostd.dual_stack_runtime import refresh_runtime_metadata
 from sg_hostd.full_backup_verify_runtime import verify_uploaded_full_backup
 
 
 FULL_BACKUP_VERIFY_COMMAND = "backup.full.verify"
+SYSTEM_DISK_CLEANUP_COMMAND = "system.disk.cleanup.start"
 
 
 def create_app() -> Flask:
@@ -29,7 +31,10 @@ def create_app() -> Flask:
 
     @app.get("/commands")
     def commands():
-        allowed = sorted(set(list_allowed_commands()) | {FULL_BACKUP_VERIFY_COMMAND})
+        allowed = sorted(
+            set(list_allowed_commands())
+            | {FULL_BACKUP_VERIFY_COMMAND, SYSTEM_DISK_CLEANUP_COMMAND}
+        )
         return jsonify({"commands": allowed})
 
     @app.post("/commands/<path:command>")
@@ -48,6 +53,23 @@ def create_app() -> Flask:
                     "command": command,
                     "status": "error",
                     "message": f"Full backup verification failed: {exc}",
+                    "payload": {},
+                }), 403
+
+        if command == SYSTEM_DISK_CLEANUP_COMMAND:
+            try:
+                payload = start_disk_cleanup_job()
+                return jsonify({
+                    "command": command,
+                    "status": "ok",
+                    "message": "Очистка диска запущена в живом терминале",
+                    "payload": payload,
+                }), 200
+            except Exception as exc:
+                return jsonify({
+                    "command": command,
+                    "status": "error",
+                    "message": f"Не удалось запустить очистку диска: {exc}",
                     "payload": {},
                 }), 403
 

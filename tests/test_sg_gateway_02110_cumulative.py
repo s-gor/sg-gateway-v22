@@ -11,9 +11,9 @@ def source(relative: str) -> str:
 
 
 def test_02110_version_and_exact_placeholder() -> None:
-    assert source("VERSION").strip() == "0.1.0-022.04"
+    version = source("VERSION").strip()
     manifest = json.loads(source("release-manifest.json"))
-    assert manifest["version"] == "0.1.0-022.04"
+    assert manifest["version"] == version
     assert manifest["rebuild_policy"]["baseline"] == "0.1.0-021.12"
     assert manifest["network_contract"]["public_sni_router_port"] == 443
     assert manifest["network_contract"]["reality_internal_listener"] == "127.0.0.1:7443"
@@ -75,7 +75,6 @@ def test_subscription_source_uses_public_url_and_real_line_breaks() -> None:
     assert "Скопировать ссылку" in detail
 
 
-
 def _extract_heredoc(body: str, start_marker: str, end_marker: str) -> str:
     start = body.index(start_marker) + len(start_marker)
     end = body.index(end_marker, start)
@@ -131,7 +130,6 @@ def test_failure_summary_prefers_failed_command_context() -> None:
     installer = source("install.sh")
     assert "if failed >= 0:" in installer
     assert "selected = lines[start : failed + 1]" in installer
-
 
 
 def test_https_helper_stream_include_is_idempotent(tmp_path: Path) -> None:

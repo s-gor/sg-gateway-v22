@@ -16,8 +16,9 @@ def test_verify_and_restore_share_one_upload_path_without_false_confirmation():
     assert 'verifyButton.addEventListener("click", () => {' in text
     assert 'form.dataset.sgConfirmBypass = "1"' in text
     assert "delete form.dataset.sgConfirmBypass" in text
-    assert "Проверка ничего не меняет." in text
-    assert "готов к проверке / восстановлению" in text
+    assert "Сначала проверьте файл." in text
+    assert "проверен и готов к восстановлению" in text
+    assert 'name="backup_action" value="restore_verified"' in text
 
 
 def test_verify_and_restore_actions_cannot_overflow_restore_area():

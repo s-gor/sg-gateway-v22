@@ -3,6 +3,7 @@ import re
 import shutil
 import time
 from pathlib import Path
+from urllib.parse import urlsplit
 from flask import Flask, Response, abort, flash, jsonify, redirect, render_template, request, send_file, url_for
 
 from app.clients.access import build_access_cards
@@ -19,6 +20,7 @@ from app.clients.exports import (
     protocol_ready,
 )
 from app.clients.qr import ClientQrError, build_qr_svg
+from app.clients.awg31_stage2 import register_awg31
 from app.clients.runtime import ClientWorkflowError, apply_clients_runtime
 from app.clients.repository import (
     count_clients,
@@ -46,6 +48,11 @@ from app.system_activity import collect_system_activity
 from app.connections.geoip_country import lookup_country_code
 from app.connections.service import list_connections
 from app.connections.settings import get_connection_settings, update_connection_settings
+from app.connections.awg_dns import (
+    SharedAwgDnsError,
+    get_shared_awg_dns,
+    set_shared_awg_dns,
+)
 from app.db import init_db
 from app.help.content import get_topic, list_topics
 from app.maintenance.backups import (
@@ -59,10 +66,18 @@ from app.maintenance.backups import (
     restore_safety_backup,
 )
 from app.maintenance.full_backups import (
+    get_data_backup,
     get_full_backup,
+    get_verified_data_backup,
+    get_verified_full_backup,
+    list_data_backups,
     list_full_backups,
-    stage_uploaded_full_backup,
+    save_verified_data_backup,
+    save_verified_full_backup,
+    stage_uploaded_data_backup_for_verification,
     stage_uploaded_full_backup_for_verification,
+    stage_verified_data_backup_for_restore,
+    stage_verified_full_backup_for_restore,
 )
 from app.maintenance.diagnostics import build_diagnostic_report, build_diagnostic_report_json
 from app.maintenance.health import collect_health_checks, health_summary
@@ -147,6 +162,30 @@ COUNTRY_OPTIONS = [
 COUNTRY_NAMES = dict(COUNTRY_OPTIONS)
 
 
+# SG_GATEWAY_02206_AWG_ONLY_PROTOCOLS_V3
+_CLIENT_SUBSCRIPTION_SOURCES = {"mihomo", "anytls", "tuic"}
+
+
+def _prepare_client_protocols(values) -> list[str]:
+    # Add SG Client only when at least one subscription source is selected.
+    protocols: list[str] = []
+    for value in values:
+        token = str(value or "").strip().lower()
+        if not token or token == "sgclient" or token in protocols:
+            continue
+        protocols.append(token)
+
+    has_subscription_source = any(
+        token in _CLIENT_SUBSCRIPTION_SOURCES
+        or token == "xray"
+        or token.startswith("xray_")
+        for token in protocols
+    )
+    if has_subscription_source:
+        protocols.append("sgclient")
+    return protocols
+
+
 def normalize_country_code(value: str | None) -> str:
     code = (value or "unknown").strip().lower()
     if not re.fullmatch(r"[a-z]{2}|unknown", code):
@@ -156,6 +195,18 @@ def normalize_country_code(value: str | None) -> str:
 
 def country_name(code: str | None) -> str:
     return COUNTRY_NAMES.get(normalize_country_code(code), COUNTRY_NAMES["unknown"])
+
+
+def _safe_login_next(value: str | None) -> str:
+    target = str(value or "/").strip() or "/"
+    parsed = urlsplit(target)
+    if parsed.scheme or parsed.netloc or not target.startswith("/") or target.startswith("//"):
+        return "/"
+
+    stale_client = re.fullmatch(r"/clients/(\d+)", parsed.path)
+    if stale_client and get_client(int(stale_client.group(1))) is None:
+        return "/clients"
+    return target
 
 
 def _format_bytes(value: int) -> str:
@@ -197,6 +248,41 @@ def _process_rss(names: tuple[str, ...]) -> int:
         match = re.search(r"VmRSS:\s+(\d+)\s+kB", status)
         if match:
             total += int(match.group(1)) * 1024
+    return total
+
+
+
+def _sg_gateway_process_rss(
+    proc_root: Path = Path("/proc"),
+    app_root: Path | None = None,
+) -> int:
+    root = (app_root or Path(__file__).resolve().parents[1]).resolve()
+    venv_root = str((root / ".venv").resolve())
+    allowed_apps = ("app.production:app", "sg_hostd.app:app")
+    total = 0
+
+    if not proc_root.exists():
+        return total
+
+    for item in proc_root.iterdir():
+        if not item.name.isdigit():
+            continue
+        try:
+            command = (item / "cmdline").read_bytes().replace(b"\0", b" ").decode(
+                "utf-8", errors="replace"
+            )
+            if venv_root not in command:
+                continue
+            if not any(application in command for application in allowed_apps):
+                continue
+            status = (item / "status").read_text(encoding="utf-8")
+        except OSError:
+            continue
+
+        match = re.search(r"VmRSS:\s+(\d+)\s+kB", status)
+        if match:
+            total += int(match.group(1)) * 1024
+
     return total
 
 
@@ -393,7 +479,7 @@ def _dashboard_resources() -> dict:
     used_percent = round(used * 100 / total) if total else 0
     memory_state, memory_label = _resource_state(used_percent)
 
-    panel_rss = _process_rss(("python", "waitress"))
+    panel_rss = _sg_gateway_process_rss()
     web_rss = _process_rss(("nginx",))
 
     # Build one non-overlapping partition of total RAM for the detail rows.
@@ -537,6 +623,7 @@ def create_app() -> Flask:
     app.secret_key = config.secret_key
 
     init_db()
+    register_awg31(app)
 
     @app.before_request
     def protect_panel():
@@ -575,7 +662,7 @@ def create_app() -> Flask:
 
     @app.post("/login")
     def login_post():
-        next_url = request.form.get("next") or "/"
+        next_url = _safe_login_next(request.form.get("next"))
         if verify_password(request.form.get("password", "")):
             login_user()
             return redirect(next_url)
@@ -885,7 +972,13 @@ def create_app() -> Flask:
         kind = str(job.get("kind") or "")
         if kind == "tls_issue":
             active = "security"
-        elif kind == "full_backup_restore" or kind.startswith("xray_update_"):
+        elif kind == "full_backup_restore":
+            active = "maintenance"
+        elif (
+            kind in {"awg3_runtime_repair", "panel_update_channel"}
+            or kind.startswith("xray_update_")
+            or kind.startswith("core_update_")
+        ):
             active = "maintenance"
         else:
             active = "connections"
@@ -999,7 +1092,7 @@ def create_app() -> Flask:
 
     @app.post("/clients")
     def add_client():
-        protocols = request.form.getlist("protocols")
+        protocols = _prepare_client_protocols(request.form.getlist("protocols"))
         access = ",".join(protocols)
         try:
             client_id = create_client(
@@ -1077,7 +1170,7 @@ def create_app() -> Flask:
         snapshot = snapshot_client(client_id)
         if snapshot is None:
             abort(404)
-        protocols = request.form.getlist("protocols")
+        protocols = _prepare_client_protocols(request.form.getlist("protocols"))
         try:
             updated = update_client(
                 client_id,
@@ -1107,7 +1200,7 @@ def create_app() -> Flask:
         snapshot = snapshot_client(client_id)
         if snapshot is None:
             abort(404)
-        protocols = request.form.getlist("protocols")
+        protocols = _prepare_client_protocols(request.form.getlist("protocols"))
         try:
             updated = update_device(
                 client_id,
@@ -1294,7 +1387,7 @@ def create_app() -> Flask:
         if client is None:
             abort(404)
         snapshot = snapshot_client(client_id)
-        protocols = request.form.getlist("protocols")
+        protocols = _prepare_client_protocols(request.form.getlist("protocols"))
         access = ",".join(protocols)
         try:
             device_id = create_device(
@@ -1411,17 +1504,27 @@ def create_app() -> Flask:
             connections=list_connections(),
             awg_settings=get_connection_settings("amneziawg"),
             awg3_settings=get_connection_settings("amneziawg3"),
+            awg_dns=get_shared_awg_dns(),
             xray_settings=get_connection_settings("xray"),
             xray_profiles=xray_profiles_overview(),
             mihomo=mihomo_overview(),
             client_total=count_clients(),
         )
 
+    @app.post("/connections/awg-dns")
+    def update_awg_dns():
+        try:
+            state = set_shared_awg_dns(request.form.get("dns", ""))
+        except SharedAwgDnsError as exc:
+            flash(f"DNS клиентов AWG не сохранён: {exc}", "error")
+        else:
+            flash(f"DNS {state.dns} применён к AWG 2.0, 3.0 и 3.1.", "success")
+        return redirect(url_for("connections") + "#awg-dns")
+
     @app.post("/connections/amneziawg")
     def update_amneziawg():
         current = get_connection_settings("amneziawg")
         config = dict(current.config)
-        config["dns"] = request.form.get("dns", config.get("dns", "1.1.1.1"))
         config["server_public_key"] = request.form.get(
             "server_public_key",
             config.get("server_public_key", "PLACEHOLDER_SERVER_PUBLIC_KEY"),
@@ -1442,7 +1545,6 @@ def create_app() -> Flask:
     def update_amneziawg3():
         current = get_connection_settings("amneziawg3")
         config = dict(current.config)
-        config["dns"] = request.form.get("dns", config.get("dns", "1.1.1.1"))
         config["server_public_key"] = request.form.get(
             "server_public_key", config.get("server_public_key", "")
         )
@@ -1617,12 +1719,21 @@ def create_app() -> Flask:
         panel_updates = None
         core_updates = None
         geofiles_updates = None
+        runtime_contract = None
         if tab == "updates":
             refresh_updates = request.args.get("refresh") == "1"
             updates = xray_update_overview(refresh=refresh_updates)
             panel_updates = panel_update_overview(refresh=refresh_updates)
             core_updates = core_update_overview(refresh=refresh_updates)
             geofiles_updates = geofiles_overview()
+            runtime_result = run_hostd_command("runtime.contract", timeout=20)
+            runtime_contract = dict(runtime_result.payload or {})
+            if not runtime_contract:
+                runtime_contract = {
+                    "ok": False,
+                    "checks": [],
+                    "message": runtime_result.message or "Runtime Contract недоступен",
+                }
         backups = list_backups()
         return render_template(
             "maintenance.html",
@@ -1632,11 +1743,15 @@ def create_app() -> Flask:
             panel_updates=panel_updates,
             core_updates=core_updates,
             geofiles_updates=geofiles_updates,
+            runtime_contract=runtime_contract,
             diagnostics=collect_diagnostics(),
             health_checks=collect_health_checks(),
             backups=backups,
             backup_cleanup=backup_cleanup_preview(backups),
+            data_backups=list_data_backups(),
+            verified_data_backup=get_verified_data_backup(),
             full_backups=list_full_backups(),
+            verified_full_backup=get_verified_full_backup(),
             operations=list_operations(),
             release=get_release_manifest(),
         )
@@ -1648,6 +1763,20 @@ def create_app() -> Flask:
             flash(f"Обновление SG-Gateway не запущено: {result.message}", "error")
             return redirect(url_for("maintenance", tab="updates"))
         return redirect(url_for("operation_job", job_id=str(result.payload.get("job_id") or "")))
+
+    # SG_GATEWAY_02206_AWG3_REPAIR_ROUTE_V2
+    @app.post("/maintenance/runtime/awg3/repair")
+    def awg3_runtime_repair_start():
+        result = run_hostd_command("runtime.awg3.repair.start", timeout=20)
+        if result.status != "ok":
+            flash(result.message or "Восстановление AWG3 runtime не запущено", "error")
+            return redirect(url_for("maintenance", tab="updates", refresh="1"))
+        return redirect(
+            url_for(
+                "operation_job",
+                job_id=str(result.payload.get("job_id") or ""),
+            )
+        )
 
     @app.post("/maintenance/core/update/<engine>")
     def core_update_start(engine: str):
@@ -1668,6 +1797,106 @@ def create_app() -> Flask:
             flash(f"Обновление Xray не запущено: {result.message}", "error")
             return redirect(url_for("maintenance", tab="updates"))
         return redirect(url_for("operation_job", job_id=str(result.payload.get("job_id") or "")))
+
+    # SG_GATEWAY_02206_DATA_BACKUP_ROUTES_V1
+    @app.post("/maintenance/data-backups")
+    def create_data_backup_route():
+        result = run_hostd_command("backup.data.create", timeout=180)
+        if result.status != "ok":
+            flash(result.message or "Не удалось создать backup клиентов и настроек", "error")
+            return redirect(url_for("maintenance", tab="backups"))
+        name = str(result.payload.get("name") or "")
+        flash(f"Backup клиентов и настроек создан: {name}", "success")
+        return redirect(url_for("maintenance", tab="backups"))
+
+    @app.get("/maintenance/data-backups/<name>/download")
+    def download_data_backup_route(name: str):
+        backup = get_data_backup(name)
+        if backup is None:
+            abort(404)
+        return send_file(
+            backup.path, as_attachment=True, download_name=backup.name,
+            mimetype="application/octet-stream",
+        )
+
+    @app.post("/maintenance/data-backups/restore")
+    def restore_data_backup_route():
+        backup_action = request.form.get("backup_action", "").strip().lower()
+        if backup_action == "restore_verified":
+            try:
+                stage_verified_data_backup_for_restore()
+            except (OSError, RuntimeError, ValueError) as exc:
+                flash(str(exc), "error")
+                return redirect(url_for("maintenance", tab="backups"))
+
+            promoted = run_hostd_command("backup.data.promote", timeout=180)
+            if promoted.status != "ok":
+                flash(promoted.message or "DATA restore не подготовлен", "error")
+                return redirect(url_for("maintenance", tab="backups"))
+
+            result = run_hostd_command("backup.full.restore.start", timeout=20)
+            if result.status != "ok":
+                flash(result.message or "DATA restore не запущен", "error")
+                return redirect(url_for("maintenance", tab="backups"))
+            return redirect(
+                url_for(
+                    "operation_job",
+                    job_id=str(result.payload.get("job_id") or ""),
+                )
+            )
+
+        if backup_action != "verify":
+            flash("Сначала выберите и проверьте DATA .sgbackup", "error")
+            return redirect(url_for("maintenance", tab="backups"))
+
+        upload = request.files.get("backup")
+        original_name = str(getattr(upload, "filename", "") or "").strip() if upload is not None else ""
+        if upload is None or not original_name:
+            flash("Выберите DATA .sgbackup", "error")
+            return redirect(url_for("maintenance", tab="backups"))
+
+        try:
+            stage_uploaded_data_backup_for_verification(upload)
+        except ValueError as exc:
+            log_operation("backup.data.verify", f"backup:{original_name}", str(exc), status="error")
+            flash(str(exc), "error")
+            return redirect(url_for("maintenance", tab="backups"))
+
+        try:
+            result = run_hostd_command("backup.data.verify", timeout=180)
+        except Exception as exc:
+            message = f"Проверка DATA backup не выполнена: {exc}"
+            log_operation("backup.data.verify", f"backup:{original_name}", message, status="error")
+            flash(message, "error")
+            return redirect(url_for("maintenance", tab="backups"))
+
+        if result.status != "ok":
+            message = result.message or "DATA backup не прошёл проверку"
+            log_operation("backup.data.verify", f"backup:{original_name}", message, status="error")
+            flash(f"DATA backup НЕ прошёл проверку: {message}", "error")
+            return redirect(url_for("maintenance", tab="backups"))
+
+        payload = result.payload or {}
+        try:
+            save_verified_data_backup(original_name, payload)
+        except (OSError, RuntimeError, ValueError) as exc:
+            message = f"DATA backup проверен, но не подготовлен к восстановлению: {exc}"
+            log_operation("backup.data.verify", f"backup:{original_name}", message, status="error")
+            flash(message, "error")
+            return redirect(url_for("maintenance", tab="backups"))
+
+        source_version = str(payload.get("source_version") or "unknown")
+        tables = int(payload.get("database_tables") or 0)
+        database_size = _format_bytes(payload.get("database_size_bytes") or 0)
+        certificates = "есть" if payload.get("contains_letsencrypt_certificates") else "нет"
+        message = (
+            f"DATA backup исправен: {original_name}. SG-Gateway {source_version}; "
+            f"SQLite: OK, таблиц {tables}, {database_size}; сертификаты: {certificates}. "
+            "Перед восстановлением будет проверен Runtime Contract целевого сервера."
+        )
+        log_operation("backup.data.verify", f"backup:{original_name}", message)
+        flash(message, "success")
+        return redirect(url_for("maintenance", tab="backups"))
 
     @app.post("/maintenance/full-backups")
     def create_full_backup_route():
@@ -1691,71 +1920,80 @@ def create_app() -> Flask:
 
     @app.post("/maintenance/full-backups/restore")
     def restore_full_backup_route():
+        backup_action = request.form.get("backup_action", "").strip().lower()
+        if backup_action == "restore_verified":
+            try:
+                stage_verified_full_backup_for_restore()
+            except (OSError, RuntimeError, ValueError) as exc:
+                flash(str(exc), "error")
+                return redirect(url_for("maintenance", tab="backups"))
+
+            result = run_hostd_command("backup.full.restore.start", timeout=20)
+            if result.status != "ok":
+                flash(result.message or "Полный restore не запущен", "error")
+                return redirect(url_for("maintenance", tab="backups"))
+            return redirect(
+                url_for(
+                    "operation_job",
+                    job_id=str(result.payload.get("job_id") or ""),
+                )
+            )
+
+        if backup_action != "verify":
+            flash("Сначала выберите и проверьте файл .sgbackup", "error")
+            return redirect(url_for("maintenance", tab="backups"))
+
         upload = request.files.get("backup")
         original_name = str(getattr(upload, "filename", "") or "").strip() if upload is not None else ""
         if upload is None or not original_name:
             flash("Выберите файл .sgbackup", "error")
             return redirect(url_for("maintenance", tab="backups"))
 
-        verify_only = request.form.get("backup_action", "").strip().lower() == "verify"
-        staged = None
         try:
-            if verify_only:
-                staged = stage_uploaded_full_backup_for_verification(upload)
-            else:
-                stage_uploaded_full_backup(upload)
+            stage_uploaded_full_backup_for_verification(upload)
         except ValueError as exc:
-            if verify_only:
-                log_operation("backup.full.verify", f"backup:{original_name}", str(exc), status="error")
+            log_operation("backup.full.verify", f"backup:{original_name}", str(exc), status="error")
             flash(str(exc), "error")
             return redirect(url_for("maintenance", tab="backups"))
 
-        if verify_only:
-            try:
-                result = run_hostd_command("backup.full.verify", timeout=180)
-            except Exception as exc:
-                message = f"Проверка backup не выполнена: {exc}"
-                log_operation("backup.full.verify", f"backup:{original_name}", message, status="error")
-                flash(message, "error")
-                return redirect(url_for("maintenance", tab="backups"))
-            finally:
-                if staged is not None:
-                    staged.unlink(missing_ok=True)
-
-            if result.status != "ok":
-                message = result.message or "Backup не прошёл проверку"
-                log_operation("backup.full.verify", f"backup:{original_name}", message, status="error")
-                flash(f"Backup НЕ прошёл проверку: {message}", "error")
-                return redirect(url_for("maintenance", tab="backups"))
-
-            payload = result.payload or {}
-            sha256 = str(payload.get("sha256") or "")
-            source_version = str(payload.get("source_version") or "unknown")
-            created_at = str(payload.get("created_at") or "не указано")
-            tables = int(payload.get("database_tables") or 0)
-            database_size = _format_bytes(payload.get("database_size_bytes") or 0)
-            certificates = "есть" if payload.get("contains_letsencrypt_certificates") else "нет"
-            message = (
-                f"Backup исправен: {original_name}. "
-                f"SG-Gateway {source_version}; создан {created_at}; "
-                f"SQLite: OK, таблиц {tables}, {database_size}; "
-                f"сертификаты: {certificates}; SHA-256: {sha256}. "
-                "Восстановление не выполнялось."
-            )
-            log_operation("backup.full.verify", f"backup:{original_name}", message)
-            flash(message, "success")
+        try:
+            result = run_hostd_command("backup.full.verify", timeout=180)
+        except Exception as exc:
+            message = f"Проверка backup не выполнена: {exc}"
+            log_operation("backup.full.verify", f"backup:{original_name}", message, status="error")
+            flash(message, "error")
             return redirect(url_for("maintenance", tab="backups"))
 
-        result = run_hostd_command("backup.full.restore.start", timeout=20)
         if result.status != "ok":
-            flash(result.message or "Полный restore не запущен", "error")
+            message = result.message or "Backup не прошёл проверку"
+            log_operation("backup.full.verify", f"backup:{original_name}", message, status="error")
+            flash(f"Backup НЕ прошёл проверку: {message}", "error")
             return redirect(url_for("maintenance", tab="backups"))
-        return redirect(
-            url_for(
-                "operation_job",
-                job_id=str(result.payload.get("job_id") or ""),
-            )
+
+        payload = result.payload or {}
+        try:
+            save_verified_full_backup(original_name, payload)
+        except (OSError, RuntimeError, ValueError) as exc:
+            message = f"Backup проверен, но не подготовлен к восстановлению: {exc}"
+            log_operation("backup.full.verify", f"backup:{original_name}", message, status="error")
+            flash(message, "error")
+            return redirect(url_for("maintenance", tab="backups"))
+
+        sha256 = str(payload.get("sha256") or "")
+        source_version = str(payload.get("source_version") or "unknown")
+        created_at = str(payload.get("created_at") or "не указано")
+        tables = int(payload.get("database_tables") or 0)
+        database_size = _format_bytes(payload.get("database_size_bytes") or 0)
+        certificates = "есть" if payload.get("contains_letsencrypt_certificates") else "нет"
+        message = (
+            f"Backup исправен и готов к восстановлению: {original_name}. "
+            f"SG-Gateway {source_version}; создан {created_at}; "
+            f"SQLite: OK, таблиц {tables}, {database_size}; "
+            f"сертификаты: {certificates}; SHA-256: {sha256}."
         )
+        log_operation("backup.full.verify", f"backup:{original_name}", message)
+        flash(message, "success")
+        return redirect(url_for("maintenance", tab="backups"))
 
     @app.post("/maintenance/backups")
     def create_backup_route():

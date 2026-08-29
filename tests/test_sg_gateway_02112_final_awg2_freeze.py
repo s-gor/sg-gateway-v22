@@ -9,8 +9,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def test_02112_final_awg2_freeze() -> None:
     version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
-    assert version == "0.1.0-022.04"
     release = json.loads((ROOT / "release-manifest.json").read_text(encoding="utf-8"))
+    assert release["version"] == version
     assert release["rebuild_policy"]["baseline"] == "0.1.0-021.12"
 
     req = json.loads((ROOT / "SG-GATEWAY-021-REQUIREMENTS.json").read_text(encoding="utf-8"))

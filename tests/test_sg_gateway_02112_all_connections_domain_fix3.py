@@ -66,9 +66,15 @@ def test_connections_page_uses_public_host_for_every_engine():
 
     assert "<strong>{{ xray_public_host }}</strong>" in page
     assert 'name="host" value="{{ xray_public_host }}"' in page
-    assert "<strong>{{ awg_public_host }}</strong>" in page
+    assert (
+        "<strong>{{ awg_public_host }}:{{ awg_settings.port }} · "
+        "DNS {{ awg_dns.dns }}</strong>"
+    ) in page
     assert 'name="host" value="{{ awg_public_host }}"' in page
-    assert "<strong>{{ awg3_public_host }}</strong>" in page
+    assert (
+        "<strong>{{ awg3_public_host }}:{{ awg3_settings.port }} · "
+        "DNS {{ awg_dns.dns }}</strong>"
+    ) in page
     assert 'name="host" value="{{ awg3_public_host }}"' in page
     assert "AWG2: {{ awg_public_host }}:{{ awg_settings.port }}" in page
     assert "AWG3: {{ awg3_public_host }}:{{ awg3_settings.port }}" in page

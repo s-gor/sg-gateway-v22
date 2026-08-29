@@ -45,6 +45,17 @@ ROOT_COMPONENTS = (
     Path("/etc/nginx/stream-conf.d/sg-gateway-443.conf"),
 )
 
+AWG31_PROFILE_COMPONENTS = (
+    Path("/etc/amnezia/amneziawg/awg31"),
+    Path("/var/lib/sg-gateway/awg31"),
+    Path("/opt/sg-gateway/awg31"),
+    Path("/etc/systemd/system/sg-gateway-awg31.service"),
+)
+AWG31_ENGINE = "amneziawg31"
+AWG31_SERVICE = "sg-gateway-awg31.service"
+_AWG31_RESTORE_MODE = "normal"
+_AWG31_RESTORE_SERVICE = {"enabled": True, "active": True}
+
 # SG_GATEWAY_02111_PORTABLE_RESTORE_V2
 # Only source-of-truth state is overlaid onto a fresh installation.
 PORTABLE_STATE_ROOTS = (
@@ -185,6 +196,14 @@ def _letsencrypt_certificate_domains() -> list[str]:
 
 def _archive_sources() -> tuple[list[Path], list[Path]]:
     roots = [path for path in ROOT_COMPONENTS if path.exists() or path.is_symlink()]
+    for component in AWG31_PROFILE_COMPONENTS:
+        covered = any(
+            component == root or _is_within(component, root)
+            for root in roots
+            if root.is_dir()
+        )
+        if not covered and (component.exists() or component.is_symlink()):
+            roots.append(component)
     data = []
     base = _data_dir()
     for name in DATA_COMPONENTS:
@@ -226,6 +245,136 @@ def _add_path(tar: tarfile.TarFile, source: Path, arcname: str) -> None:
     )
 
 
+def _awg31_service_state() -> dict[str, bool]:
+    return {
+        "enabled": _probe(
+            ["systemctl", "is-enabled", "--quiet", AWG31_SERVICE], timeout=20
+        ).returncode
+        == 0,
+        "active": _probe(
+            ["systemctl", "is-active", "--quiet", AWG31_SERVICE], timeout=20
+        ).returncode
+        == 0,
+    }
+
+
+def _table_exists(database: sqlite3.Connection, name: str) -> bool:
+    return database.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name = ?", (name,)
+    ).fetchone() is not None
+
+
+def _awg31_database_profile(database_path: Path) -> tuple[bool, int]:
+    database = sqlite3.connect(database_path)
+    try:
+        settings = 0
+        credentials = 0
+        if _table_exists(database, "connection_settings"):
+            settings = int(
+                database.execute(
+                    "SELECT COUNT(*) FROM connection_settings WHERE engine = ?",
+                    (AWG31_ENGINE,),
+                ).fetchone()[0]
+            )
+        if _table_exists(database, "device_credentials"):
+            credentials = int(
+                database.execute(
+                    "SELECT COUNT(*) FROM device_credentials WHERE engine = ?",
+                    (AWG31_ENGINE,),
+                ).fetchone()[0]
+            )
+        return bool(settings or credentials), credentials
+    finally:
+        database.close()
+
+
+def _validate_awg31_profile(
+    database_path: Path,
+    components: tuple[Path, Path, Path, Path],
+    *,
+    payload_root: Path | None = None,
+) -> int:
+    def source(path: Path) -> Path:
+        return path if payload_root is None else payload_root / path.relative_to("/")
+
+    config, state, runtime, unit = (source(path) for path in components)
+    required = (
+        config / "awg31.conf",
+        config / "peers",
+        state / "server-private.key",
+        state / "server-public.key",
+        runtime / "bin/awg",
+        runtime / "bin/awg-quick",
+        runtime / "bin/amneziawg-go",
+        unit,
+    )
+    missing = [str(path) for path in required if not path.exists()]
+    if missing:
+        raise RuntimeError(
+            "AWG31 backup payload is incomplete: " + ", ".join(missing)
+        )
+
+    database = sqlite3.connect(database_path)
+    try:
+        if not _table_exists(database, "connection_settings"):
+            raise RuntimeError("AWG31 backup payload is incomplete: connection_settings")
+        if database.execute(
+            "SELECT 1 FROM connection_settings WHERE engine = ?", (AWG31_ENGINE,)
+        ).fetchone() is None:
+            raise RuntimeError("AWG31 backup payload is incomplete: AWG31 settings")
+        duplicates = database.execute(
+            """
+            SELECT device_id, COUNT(*) FROM device_credentials
+            WHERE engine = ? GROUP BY device_id HAVING COUNT(*) != 1
+            """,
+            (AWG31_ENGINE,),
+        ).fetchall()
+        if duplicates:
+            raise RuntimeError("AWG31 backup contains duplicate device credentials")
+        rows = database.execute(
+            "SELECT device_id, config_json FROM device_credentials "
+            "WHERE engine = ? ORDER BY device_id",
+            (AWG31_ENGINE,),
+        ).fetchall()
+        for device_id, raw in rows:
+            try:
+                credential = json.loads(raw or "{}")
+            except (TypeError, ValueError, json.JSONDecodeError) as exc:
+                raise RuntimeError(
+                    f"AWG31 credential {device_id} has invalid config_json"
+                ) from exc
+            if not isinstance(credential, dict) or not credential.get(
+                "private_key"
+            ) or not credential.get("public_key"):
+                raise RuntimeError(f"AWG31 credential {device_id} is incomplete")
+            if not (config / "peers" / f"device-{int(device_id)}.conf").is_file():
+                raise RuntimeError(
+                    f"AWG31 backup payload is incomplete: peer config {device_id}"
+                )
+        return len(rows)
+    finally:
+        database.close()
+
+
+def _awg31_manifest(database_path: Path) -> dict | None:
+    database_has_profile, _ = _awg31_database_profile(database_path)
+    files_have_profile = any(
+        path.exists() or path.is_symlink() for path in AWG31_PROFILE_COMPONENTS
+    )
+    if not database_has_profile and not files_have_profile:
+        return None
+    credentials = _validate_awg31_profile(database_path, AWG31_PROFILE_COMPONENTS)
+    return {
+        "format_version": 1,
+        "engine": AWG31_ENGINE,
+        "profile": "awg31",
+        "credentials": credentials,
+        "components": [str(path) for path in AWG31_PROFILE_COMPONENTS],
+        "service": _awg31_service_state(),
+        "byte_preserving": True,
+    }
+
+
 def create_full_backup_archive(prefix: str = "SG-Gateway-FULL") -> dict:
     _ensure_dirs()
     roots, data_paths = _archive_sources()
@@ -237,6 +386,7 @@ def create_full_backup_archive(prefix: str = "SG-Gateway-FULL") -> dict:
         temp = Path(temp_name)
         db_snapshot = temp / "sg-gateway.sqlite"
         _sqlite_snapshot(_data_dir() / "sg-gateway.sqlite", db_snapshot)
+        awg31_profile = _awg31_manifest(db_snapshot)
 
         components = [str(path) for path in roots]
         components.extend(str(path) for path in data_paths)
@@ -255,6 +405,8 @@ def create_full_backup_archive(prefix: str = "SG-Gateway-FULL") -> dict:
             "excluded_history": ["security/backups", "security/jobs"],
             "components": components,
         }
+        if awg31_profile is not None:
+            manifest["awg31_profile"] = awg31_profile
         manifest_path = temp / "manifest.json"
         manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
@@ -332,6 +484,33 @@ def _read_manifest(path: Path) -> dict:
     if payload.get("format") != FORMAT or int(payload.get("format_version") or 0) != FORMAT_VERSION:
         raise RuntimeError("Unsupported SG-Gateway full backup format")
     return payload
+
+
+def _configure_awg31_restore(manifest: dict, payload_root: Path) -> None:
+    global _AWG31_RESTORE_MODE, _AWG31_RESTORE_SERVICE
+    profile = manifest.get("awg31_profile")
+    if not isinstance(profile, dict):
+        _AWG31_RESTORE_MODE = "legacy"
+        _AWG31_RESTORE_SERVICE = {"enabled": False, "active": False}
+        return
+    if int(profile.get("format_version") or 0) != 1:
+        raise RuntimeError("Unsupported AWG31 backup profile format")
+    db_path = payload_root / _data_dir().relative_to("/") / "sg-gateway.sqlite"
+    _validate_awg31_profile(
+        db_path,
+        AWG31_PROFILE_COMPONENTS,
+        payload_root=payload_root,
+    )
+    service = profile.get("service")
+    _AWG31_RESTORE_SERVICE = (
+        {
+            "enabled": bool(service.get("enabled")),
+            "active": bool(service.get("active")),
+        }
+        if isinstance(service, dict)
+        else {"enabled": True, "active": True}
+    )
+    _AWG31_RESTORE_MODE = "exact"
 
 
 def _read_env(path: Path) -> dict[str, str]:
@@ -503,6 +682,13 @@ def _runtime_subprocess_env() -> dict[str, str]:
                     value = value[1:-1]
             env[key] = value
     env["PYTHONPATH"] = "/opt/sg-gateway:/opt/sg-gateway/hostd"
+    env["SG_GATEWAY_AWG31_RESTORE_MODE"] = _AWG31_RESTORE_MODE
+    env["SG_GATEWAY_AWG31_RESTORE_ENABLED"] = (
+        "1" if _AWG31_RESTORE_SERVICE.get("enabled") else "0"
+    )
+    env["SG_GATEWAY_AWG31_RESTORE_ACTIVE"] = (
+        "1" if _AWG31_RESTORE_SERVICE.get("active") else "0"
+    )
     return env
 
 
@@ -599,8 +785,9 @@ def _rebind_connection_hosts_to_destination() -> None:
     connection = sqlite3.connect(database)
     try:
         connection.execute(
-            "UPDATE connection_settings SET host = ?, updated_at = CURRENT_TIMESTAMP",
-            (host,),
+            "UPDATE connection_settings SET host = ?, updated_at = CURRENT_TIMESTAMP "
+            "WHERE engine != ? AND host != ?",
+            (host, AWG31_ENGINE, host),
         )
         # A transaction captured on the source VPS must never survive a portable
         # restore and override the destination host/runtime on the next apply.
@@ -624,6 +811,7 @@ def _clear_generated_runtime_before_rebuild() -> None:
 
 
 def _restore_payload(payload_root: Path, preserve_machine_env: bool = True) -> None:
+    global _AWG31_RESTORE_MODE
     current_sg = _read_env(CONFIG_DIR / "sg-gateway.env")
     current_runtime = _read_env(CONFIG_DIR / "runtime.env")
 
@@ -641,6 +829,20 @@ def _restore_payload(payload_root: Path, preserve_machine_env: bool = True) -> N
                 _copy_overlay(child, root / child.name)
         else:
             _copy_overlay(source, root)
+
+    profile_sources = tuple(
+        payload_root / path.relative_to("/") for path in AWG31_PROFILE_COMPONENTS
+    )
+    profile_exact = all(path.exists() or path.is_symlink() for path in profile_sources)
+    _AWG31_RESTORE_MODE = "exact" if profile_exact else "legacy"
+    for source, destination in zip(profile_sources, AWG31_PROFILE_COMPONENTS):
+        if profile_exact:
+            _remove_destination(destination)
+            _copy_overlay(source, destination)
+        elif not preserve_machine_env:
+            # Safety rollback to a pre-AWG31 server must remove everything the
+            # failed restore introduced, not merely restore files that existed.
+            _remove_destination(destination)
 
     data_root = payload_root / _data_dir().relative_to("/")
     for name in DATA_COMPONENTS:
@@ -770,6 +972,10 @@ def _validate_runtime_after_restore() -> None:
             raise RuntimeError("SQLite integrity_check failed after restore")
     finally:
         db.close()
+    if _AWG31_RESTORE_MODE == "exact":
+        _validate_awg31_profile(
+            _data_dir() / "sg-gateway.sqlite", AWG31_PROFILE_COMPONENTS
+        )
 
     xray_config = Path("/usr/local/etc/xray/config.json")
     xray = shutil.which("xray") or "/usr/local/bin/xray"
@@ -820,6 +1026,7 @@ def _restart_runtime(*, schedule_panel: bool = True) -> None:
     _restart_xray_required()
     for service in (
         "sg-gateway-awg.service",
+        "sg-gateway-awg31.service",
         "mihomo.service",
         "sg-gateway-singbox.service",
         "nginx.service",
@@ -847,7 +1054,9 @@ def _extract_archive(archive: Path, target: Path) -> dict:
     manifest = target / "manifest.json"
     if not manifest.is_file():
         raise RuntimeError("manifest.json is missing")
-    return _read_manifest(manifest)
+    payload = _read_manifest(manifest)
+    _configure_awg31_restore(payload, target / "payload")
+    return payload
 
 
 def restore_uploaded_full_backup() -> dict:
@@ -873,7 +1082,17 @@ def restore_uploaded_full_backup() -> dict:
         finally:
             db.close()
 
-        _restore_progress("[Restore 2/7] Backup и SQLite проверены")
+        # SG_GATEWAY_02206_RESTORE_RUNTIME_CONTRACT_V1
+        # A portable restore must never touch the live server when the clean
+        # destination installation is already missing a required runtime.
+        from sg_hostd.runtime_contracts import assert_runtime_contract
+
+        assert_runtime_contract(
+            database_path=db_path,
+            strict_optional=True,
+            include_all_critical=True,
+        )
+        _restore_progress("[Restore 2/7] Backup, SQLite и Runtime Contract проверены")
         _restore_progress("[Restore 3/7] Создаю страховочный полный backup текущего сервера")
         safety = create_full_backup_archive(prefix="SG-Gateway-SAFETY")
         try:

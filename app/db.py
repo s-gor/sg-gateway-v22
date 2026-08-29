@@ -118,7 +118,23 @@ DEFAULT_CONNECTIONS = {
             '"allowed_ips":"0.0.0.0/0, ::/0","persistent_keepalive":"25-35","generation":3}'
         ),
     },
-    "xray": {
+    "amneziawg31": {
+    "host": "awg31.internal",
+    "port": 587,
+    "config_json": (
+        '{"profile":"awg31","generation":31,"dns":"1.1.1.1","transport":"udp",'
+        '"endpoint":"awg31.internal:587","allowed_ips":"0.0.0.0/0",'
+        '"server_public_key":"","header_protection_key":"",'
+        '"i1":"","i2":"","i3":"","i4":"","i5":"",'
+        '"jc":4,"jmin":10,"jmax":50,"s1":64,"s2":96,"s3":48,"s4":12,'
+        '"h1":"1085466381","h2":"1525636359","h3":"1894947610","h4":"2767261704",'
+        '"contentpaddingaddition":"10-100","rekeyaftertime":"100-120",'
+        '"rekeytimeout":"3-7","rejectaftertime":"150-180",'
+        '"keepalivetimeout":"5-15","maxhandshakeattempts":"15-20",'
+        '"randomtrailers":"on","disablecookies":"on"}'
+    ),
+},
+"xray": {
         "host": "",
         "port": 443,
         "config_json": (
@@ -318,7 +334,8 @@ def _migrate_clients_to_devices(connection: sqlite3.Connection) -> None:
             """,
             (client_id,),
         ).fetchone()
-        if primary is None:
+        created_primary = primary is None
+        if created_primary:
             cursor = connection.execute(
                 """
                 INSERT INTO devices (
@@ -332,15 +349,20 @@ def _migrate_clients_to_devices(connection: sqlite3.Connection) -> None:
         else:
             primary_id = int(primary["id"])
 
-        legacy = connection.execute(
-            """
-            SELECT engine, status, engine_object_id, config_json, created_at
-            FROM client_deployments
-            WHERE client_id = ?
-            ORDER BY id
-            """,
-            (client_id,),
-        ).fetchall()
+        # Import the legacy table only while creating the primary device.
+        # init_db() runs repeatedly; re-importing missing rows on every call
+        # would resurrect protocols that the user intentionally removed later.
+        legacy = []
+        if created_primary:
+            legacy = connection.execute(
+                """
+                SELECT engine, status, engine_object_id, config_json, created_at
+                FROM client_deployments
+                WHERE client_id = ?
+                ORDER BY id
+                """,
+                (client_id,),
+            ).fetchall()
         for item in legacy:
             config_json = item["config_json"]
             if str(item["engine"]) == "xray":

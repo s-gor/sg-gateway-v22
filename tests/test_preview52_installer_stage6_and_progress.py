@@ -99,12 +99,17 @@ def test_stage6_update_repairs_empty_hosts_instead_of_asserting(tmp_path: Path):
     assert {row["engine"]: row["host"] for row in rows} == {
         "amneziawg": "203.0.113.10",
         "amneziawg3": "203.0.113.10",
+        "amneziawg31": "awg31.internal",
         "mihomo": "203.0.113.10",
         "xray": "203.0.113.10",
     }
     for row in rows:
         config = json.loads(row["config_json"])
-        assert config["country_code"] == "fr"
+        if row["engine"] == "amneziawg31":
+            assert config["profile"] == "awg31"
+            assert "country_code" not in config
+        else:
+            assert config["country_code"] == "fr"
     assert connection.execute("SELECT COUNT(*) FROM clients").fetchone()[0] == 1
 
 

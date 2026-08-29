@@ -5,11 +5,13 @@ PREFIX="/opt/sg-gateway"
 CONFIG_DIR="/etc/sg-gateway"
 DATA_DIR="/var/lib/sg-gateway"
 LOG_DIR="/var/log/sg-gateway"
-UNINSTALL_LOG="/var/log/sg-gateway-full-uninstall-02204.log"
+UNINSTALL_LOG="/var/log/sg-gateway-full-uninstall-02206.log"
 
 PANEL_PORT="63443"
 XRAY_PORT="443"
 AWG_PORT="585"
+AWG3_PORT="586"
+AWG31_PORT="587"
 MIHOMO_PORT="2099"
 XHTTP_REALITY_PORT="8444"
 XHTTP_TLS_PORT="8445"
@@ -62,7 +64,7 @@ if [[ ! "$TLS_DOMAIN" =~ ^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$ ]]
   TLS_DOMAIN=""
 fi
 
-printf '\n%sSG-Gateway 0.1.0-022.04 · ПОЛНОЕ УДАЛЕНИЕ%s\n' "$CYAN" "$RESET"
+printf '\n%sSG-Gateway 0.1.0-022.06 · ПОЛНОЕ УДАЛЕНИЕ%s\n' "$CYAN" "$RESET"
 printf 'Будут удалены приложение, база, настройки, backups, SG-службы и установленные SG runtime.\n'
 printf 'Системные пакеты Ubuntu (nginx, certbot, ufw, Python и т.п.) останутся установленными.\n'
 if [[ -n "$TLS_DOMAIN" ]]; then
@@ -101,14 +103,17 @@ stop_runtime(){
   local service
   for service in \
     sg-gateway.service sg-hostd.service xray.service mihomo.service \
-    sg-gateway-awg.service sg-gateway-awg3.service sg-gateway-singbox.service; do
+    sg-gateway-awg.service sg-gateway-awg3.service sg-gateway-awg31.service sg-gateway-singbox.service; do
     systemctl disable --now "$service" >/dev/null 2>&1 || true
   done
   ip link delete awg0 >/dev/null 2>&1 || true
   ip link delete awg3 >/dev/null 2>&1 || true
-  rm -f /var/run/amneziawg/awg3.sock >/dev/null 2>&1 || true
+  ip link delete awg31 >/dev/null 2>&1 || true
+  rm -f /var/run/amneziawg/awg3.sock /var/run/amneziawg/awg31.sock >/dev/null 2>&1 || true
   if command -v nft >/dev/null 2>&1; then
     nft delete table ip sg_gateway_awg >/dev/null 2>&1 || true
+    nft delete table ip sg_gateway_awg3 >/dev/null 2>&1 || true
+    nft delete table ip sg_gateway_awg31 >/dev/null 2>&1 || true
   fi
 }
 
@@ -116,11 +121,15 @@ remove_service_and_web_config(){
   rm -f \
     /etc/systemd/system/sg-gateway.service \
     /etc/systemd/system/sg-hostd.service \
+    /etc/systemd/system/sg-gateway-awg.service \
+    /etc/systemd/system/sg-gateway-awg3.service \
+    /etc/systemd/system/sg-gateway-awg31.service \
     /etc/systemd/system/xray.service \
     /etc/systemd/system/xray@.service \
     /etc/systemd/system/mihomo.service \
     /etc/systemd/system/sg-gateway-awg.service \
     /etc/systemd/system/sg-gateway-awg3.service \
+    /etc/systemd/system/sg-gateway-awg31.service \
     /etc/systemd/system/sg-gateway-singbox.service
   rm -rf \
     /etc/systemd/system/sg-gateway.service.d \
@@ -227,6 +236,7 @@ remove_application_and_state(){
     /root/sg-gateway-02110-installer-resume.env \
     /root/sg-gateway-02111-installer-resume.env \
     /root/sg-gateway-02112-installer-resume.env \
+    /root/sg-gateway-02206-installer-resume.env \
     /root/sg-gateway-preview48-installer-resume.env \
     /root/sg-gateway-preview50-installer-resume.env \
     /root/sg-gateway-preview51-installer-resume.env \
@@ -260,6 +270,14 @@ remove_engine_runtimes(){
   fi
   rm -rf /var/lib/dkms/amneziawg/1.0.0 /usr/src/amneziawg-1.0.0
   apt-get -o Dpkg::Use-Pty=0 purge -y amneziawg amneziawg-dkms amneziawg-tools >/dev/null 2>&1 || true
+
+  # DKMS can lose its state while leaving a compiled SG module behind.
+  # Remove orphaned amneziawg modules from every installed kernel so a
+  # later Clean Install cannot accidentally reuse an AWG3/experimental ko.
+  find /lib/modules -type f \
+    \( -name 'amneziawg.ko' -o -name 'amneziawg.ko.*' \) \
+    -path '*/updates/dkms/*' -delete
+
   rm -f /usr/bin/awg /usr/bin/awg-quick
   rm -f /usr/share/man/man8/awg.8 /usr/share/man/man8/awg.8.gz /usr/share/man/man8/awg-quick.8 /usr/share/man/man8/awg-quick.8.gz
   rm -f /usr/share/bash-completion/completions/awg /usr/share/bash-completion/completions/awg-quick
@@ -277,7 +295,7 @@ cleanup_firewall(){
     for rule in \
       "${PANEL_PORT}/tcp" "80/tcp" "${XRAY_PORT}/tcp" \
       "${XHTTP_REALITY_PORT}/tcp" "${XHTTP_TLS_PORT}/tcp" \
-      "${AWG_PORT}/udp" "${HYSTERIA2_PORT}/udp" \
+      "${AWG_PORT}/udp" "${AWG3_PORT}/udp" "${AWG31_PORT}/udp" "${HYSTERIA2_PORT}/udp" \
       "${MIHOMO_PORT}/tcp" "${ANYTLS_PORT}/tcp" "${TUIC_PORT}/udp"; do
       ufw --force delete allow "$rule" >/dev/null 2>&1 || true
     done
@@ -286,16 +304,38 @@ cleanup_firewall(){
 }
 
 remove_account_and_verify(){
-  id sg-gateway >/dev/null 2>&1 && userdel sg-gateway >/dev/null 2>&1 || true
+  if id sg-gateway >/dev/null 2>&1; then
+    pkill -TERM -u sg-gateway >/dev/null 2>&1 || true
+    sleep 1
+    pkill -KILL -u sg-gateway >/dev/null 2>&1 || true
+    userdel sg-gateway >/dev/null 2>&1 || true
+  fi
   getent group sg-gateway >/dev/null 2>&1 && groupdel sg-gateway >/dev/null 2>&1 || true
+
+  # userdel/NSS hooks may touch the former service home after the main
+  # state-removal stage. Remove owned paths one final time before the
+  # absence checks so Full Uninstall is deterministic and idempotent.
+  rm -rf "$PREFIX" "$CONFIG_DIR" "$DATA_DIR" "$LOG_DIR" /run/sg-gateway
+
   systemctl daemon-reload
   systemctl reset-failed >/dev/null 2>&1 || true
 
   local bad=0 path
+  if id sg-gateway >/dev/null 2>&1; then
+    echo "Остаток после удаления: пользователь sg-gateway" >&2
+    bad=1
+  fi
+  if getent group sg-gateway >/dev/null 2>&1; then
+    echo "Остаток после удаления: группа sg-gateway" >&2
+    bad=1
+  fi
   for path in \
     "$PREFIX" "$CONFIG_DIR" "$DATA_DIR" \
     /etc/systemd/system/sg-gateway.service \
     /etc/systemd/system/sg-hostd.service \
+    /etc/systemd/system/sg-gateway-awg.service \
+    /etc/systemd/system/sg-gateway-awg3.service \
+    /etc/systemd/system/sg-gateway-awg31.service \
     /etc/systemd/system/xray.service \
     /etc/nginx/stream-conf.d/sg-gateway-443.conf \
     /var/www/sg-gateway-placeholder \
@@ -318,6 +358,10 @@ remove_account_and_verify(){
     echo "Остаток после удаления: /root/sg-gateway-02111-installer-resume.env" >&2
     bad=1
   fi
+  if [[ -e /root/sg-gateway-02206-installer-resume.env ]]; then
+    echo "Остаток после удаления: /root/sg-gateway-02206-installer-resume.env" >&2
+    bad=1
+  fi
   (( bad == 0 )) || return 1
 }
 
@@ -333,3 +377,5 @@ printf '\n%s[SG-Gateway] ПОЛНОЕ УДАЛЕНИЕ ЗАВЕРШЕНО.%s\n' 
 printf '[SG-Gateway] EC2 готов к чистой установке SG-Gateway.\n'
 printf '[SG-Gateway] Системные пакеты Ubuntu не удалялись.\n'
 printf '[SG-Gateway] Журнал: %s\n' "$UNINSTALL_LOG"
+printf '\n[SG-Gateway] Для повторной установки SG-Gateway выполните:\n'
+printf '%s\n' 'curl -4 -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/stable-02206/deploy/install-from-github.sh | sudo env SG_GATEWAY_GITHUB_BRANCH=stable-02206 bash'

@@ -13,6 +13,9 @@
   <!-- SG_DEVICE_COLLAPSE_V1_JS -->
   <script src="{{ url_for('static', filename='sg-device-collapse-v1.js') }}?v={{ app_version }}" defer></script>
   <!-- /SG_DEVICE_COLLAPSE_V1_JS -->
+  <!-- SG_AWG_ONLY_NOTICE_V1_ASSETS -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='sg-awg-only-notice-v1.css') }}?v={{ app_version }}">
+  <script src="{{ url_for('static', filename='sg-awg-only-notice-v1.js') }}?v={{ app_version }}" defer></script>
 {% endblock %}
 
 {% block content %}
@@ -112,17 +115,17 @@
 
       <section class="dv16-subscription state-{{ subscription.status if subscription else 'missing' }}">
         <div class="dv16-subscription-summary">
-          <strong>Legacy SUB устройства</strong>
+          <strong>OpenWrt · HomeProxy SUB</strong>
           {% if subscription and subscription.status == 'applied' and subscription.payload %}
-          <span>Совместимая legacy-подписка устройства.</span>
-          <small>SUB: VLESS Reality TCP · Hysteria2 · AnyTLS · TUIC v5 — только выбранные и готовые.</small>
+          <span>Подписка устройства для HomeProxy-совместимых клиентов.</span>
+          <small>Legacy Base64: VLESS Reality TCP · Hysteria2 · AnyTLS · TUIC v5 — только выбранные и готовые.</small>
           {% else %}
           <span>Подписка ещё не создана.</span>
           {% endif %}
         </div>
         <div class="dv16-subscription-actions">
           {% if subscription and subscription.status == 'applied' and subscription.payload %}
-          <button class="button primary dv16-copy" type="button" data-copy-value="{{ subscription.payload|e }}">Скопировать ссылку</button>
+          <button class="button primary dv16-copy" type="button" data-copy-value="{{ openwrt_subscription_url(client, device)|e }}">Скопировать OpenWrt SUB</button>
           {% if subscription.qr_url %}
           <details class="dv16-qr">
             <summary class="button">QR</summary>
@@ -134,6 +137,47 @@
           {% endif %}
           {% else %}
           <span class="dv16-not-ready">{{ state_labels.get(subscription.status, subscription.status) if subscription else 'Не создано' }}</span>
+          {% endif %}
+        </div>
+      </section>
+
+      {% set keenetic_subscription = keenetic_subscription_url(client, device) if client.enabled and device.enabled else '' %}
+      <section class="dv16-subscription sg-router-subscription {{ 'state-applied' if keenetic_subscription else 'state-missing' }}" data-sg-router-keenetic-subscription-v1>
+        <div class="dv16-subscription-summary">
+          <strong>Keenetic · Xkeen UI SUB</strong>
+          {% if keenetic_subscription %}
+          <span>Персональная подписка устройства для Xkeen UI.</span>
+          <small>Только готовые VLESS: Reality TCP · XHTTP Reality · XHTTP TLS.</small>
+          {% else %}
+          <span>Подписка недоступна для отключённого устройства.</span>
+          {% endif %}
+        </div>
+        <div class="dv16-subscription-actions sg-router-subscription-actions">
+          {% if keenetic_subscription %}
+          <button class="button primary dv16-copy" type="button" data-copy-value="{{ keenetic_subscription|e }}">Скопировать Xkeen UI SUB</button>
+          {% else %}
+          <span class="dv16-not-ready">Недоступно</span>
+          {% endif %}
+        </div>
+      </section>
+
+      {% set router_subscription = router_subscription_url(client, device) if client.enabled and device.enabled else '' %}
+      <section class="dv16-subscription sg-router-subscription {{ 'state-applied' if router_subscription else 'state-missing' }}" data-sg-router-subscription-v1>
+        <div class="dv16-subscription-summary">
+          <strong>Универсальный Router JSON</strong>
+          {% if router_subscription %}
+          <span>Персональная JSON-подписка устройства.</span>
+          <small>Только выбранные и готовые профили. Обновляется при каждом запросе.</small>
+          {% else %}
+          <span>Подписка недоступна для отключённого устройства.</span>
+          {% endif %}
+        </div>
+        <div class="dv16-subscription-actions sg-router-subscription-actions">
+          {% if router_subscription %}
+          <button class="button primary dv16-copy" type="button" data-copy-value="{{ router_subscription|e }}">Скопировать ссылку</button>
+          <a class="button" href="{{ router_subscription_download_url(client, device)|e }}">Скачать JSON</a>
+          {% else %}
+          <span class="dv16-not-ready">Недоступно</span>
           {% endif %}
         </div>
       </section>
@@ -152,7 +196,7 @@
               {% endif %}
               {% if card.show_qr and card.qr_url and card.status == 'applied' %}
               <details class="dv16-qr">
-                <summary class="button">QR</summary>
+                <summary class="button">{{ 'QR · Mieru' if card.kind == 'mihomo' else 'QR' }}</summary>
                 <div class="dv16-qr-popover">
                   <button type="button" aria-label="Закрыть QR" onclick="this.closest('details').removeAttribute('open')">×</button>
                   <img src="{{ card.qr_url }}" alt="QR {{ card.title }}">
@@ -160,13 +204,14 @@
               </details>
               {% endif %}
               {% if card.export_url and card.status == 'applied' %}<a class="button" href="{{ card.export_url }}">{{ 'Скачать ссылку' if card.kind == 'mihomo' else 'Скачать' }}</a>{% endif %}
-              {% if card.secondary_payload and card.status == 'applied' %}<button class="button dv16-copy" type="button" data-copy-value="{{ card.secondary_payload|e }}">Скопировать Mieru JSON</button>{% endif %}
+              {% if card.kind == 'mihomo' and card.payload and card.status == 'applied' %}<button class="button dv16-copy" type="button" data-mieru-router-source="{{ card.payload|e }}" title="Совместимый сокращённый URI для роутеров / ZB">Скопировать Router / ZB</button>{% endif %}
+              {% if card.secondary_payload and card.status == 'applied' %}<button class="button dv16-copy" type="button" data-copy-value="{{ card.secondary_payload|e }}">Скопировать JSON · iPhone</button>{% endif %}
               {% if card.secondary_qr_url and card.status == 'applied' %}
               <details class="dv16-qr">
-                <summary class="button">QR JSON</summary>
+                <summary class="button">QR · iPhone</summary>
                 <div class="dv16-qr-popover">
-                  <button type="button" aria-label="Закрыть QR Mieru JSON" onclick="this.closest('details').removeAttribute('open')">×</button>
-                  <img src="{{ card.secondary_qr_url }}" alt="QR Mieru JSON">
+                  <button type="button" aria-label="Закрыть QR · iPhone" onclick="this.closest('details').removeAttribute('open')">×</button>
+                  <img src="{{ card.secondary_qr_url }}" alt="QR Mieru JSON · iPhone">
                 </div>
               </details>
               {% endif %}
@@ -201,7 +246,6 @@
       <input type="text" name="name" maxlength="60" required placeholder="Телефон, ноутбук или телевизор" autocomplete="off">
     </label>
 
-    <input type="hidden" name="protocols" value="sgclient">
     <section class="dv16-recommended">
       <div>
         <strong>Рекомендуемый набор уже выбран</strong>
@@ -230,7 +274,11 @@
         </label>
         <label class="dv16-protocol">
           <input type="checkbox" name="protocols" value="amneziawg3">
-          <span><strong>AmneziaWG 3</strong><small>AWG3 userspace · отдельная конфигурация и QR</small></span>
+          <span><strong>AmneziaWG 3.0</strong><small>AWG 3.0 userspace · отдельная конфигурация и QR</small></span>
+        </label>
+        <label class="dv16-protocol">
+          <input type="checkbox" name="protocols" value="amneziawg31">
+          <span><strong>AmneziaWG 3.1</strong><small>AWG 3.1 userspace · отдельная конфигурация</small></span>
         </label>
         <label class="dv16-protocol {{ 'is-locked' if not tls.https_ready else '' }}">
           <input type="checkbox" name="protocols" value="anytls" {% if not tls.https_ready %}disabled{% endif %}>
@@ -241,6 +289,8 @@
           <span><strong>TUIC v5</strong><small>{{ 'Доступен' if tls.https_ready else 'Нужен HTTPS' }}</small></span>
         </label>
       </fieldset>
+    <!-- SG_AWG_ONLY_NOTICE_V1_ADD_DEVICE -->
+    <div class="sg-awg-only-note" data-awg-only-note role="status" aria-live="polite">При выборе только AWG-профилей подписка не создаётся. Используйте QR-коды или файлы конфигурации для каждого соединения.</div>
     </details>
 
     <label class="dv16-field">
@@ -282,6 +332,38 @@
       area.remove();
       return ok;
     }
+
+    function buildMieruRouterUri(value) {
+      const text = String(value || '').trim();
+      if (!text.startsWith('mierus://')) return '';
+
+      const hashAt = text.indexOf('#');
+      const fragment = hashAt >= 0 ? text.slice(hashAt) : '';
+      const withoutFragment = hashAt >= 0 ? text.slice(0, hashAt) : text;
+      const queryAt = withoutFragment.indexOf('?');
+      if (queryAt < 0) return '';
+
+      const authority = withoutFragment.slice('mierus://'.length, queryAt);
+      if (!authority || !authority.includes('@')) return '';
+
+      const params = new URLSearchParams(withoutFragment.slice(queryAt + 1));
+      const port = String(params.get('port') || '').trim();
+      const transport = String(params.get('protocol') || 'TCP').trim().toUpperCase();
+      if (!/^\d{1,5}$/.test(port)) return '';
+      const portNumber = Number(port);
+      if (portNumber < 1 || portNumber > 65535) return '';
+
+      return `mieru://${authority}:${portNumber}?transport=${encodeURIComponent(transport)}${fragment}`;
+    }
+
+    document.querySelectorAll('[data-mieru-router-source]').forEach(button => {
+      const converted = buildMieruRouterUri(button.dataset.mieruRouterSource || '');
+      if (converted) {
+        button.dataset.copyValue = converted;
+      } else {
+        button.hidden = true;
+      }
+    });
 
     document.querySelectorAll('[data-copy-value]').forEach(button => {
       button.addEventListener('click', async () => {

@@ -1,3 +1,16 @@
+<link rel="stylesheet" href="{{ url_for('static', filename='sg-device-collapse-v4.css') }}?v={{ app_version }}-devices-collapse-v4-dialog-layout-v2">
+{% macro edit_xray_protocol_card(profiles, profile_id, selected_tokens, unavailable_note) -%}
+  {% set matches = profiles | selectattr('id', 'equalto', profile_id) | list %}
+  {% if matches %}
+    {% set profile = matches[0] %}
+    {% set token = 'xray_' ~ profile.id %}
+    {% set selected = token in selected_tokens %}
+    <label class="dv16-protocol {{ 'is-locked' if not profile.ready and not selected else '' }}">
+      <input type="checkbox" name="protocols" value="{{ token }}" {% if selected %}checked{% endif %} {% if not profile.ready and not selected %}disabled{% endif %}>
+      <span><strong>{{ profile.title }}</strong><small>{% if selected %}Подключён — реквизиты сохранятся{% elif profile.ready %}Доступен для добавления{% elif profile.tls_required %}Нужен HTTPS{% else %}{{ unavailable_note }}{% endif %}</small></span>
+    </label>
+  {% endif %}
+{%- endmacro %}
 {% set primary_tokens = primary_view.protocol_tokens if primary_view else [] %}
 <dialog class="dv16-dialog" id="dv-edit-client-dialog">
   <form method="post" action="{{ url_for('edit_client', client_id=client.id) }}" class="dv16-create-form">
@@ -15,25 +28,35 @@
       <input type="text" name="name" maxlength="80" required value="{{ client.name|e }}" autocomplete="off">
     </label>
 
-    <input type="hidden" name="protocols" value="sgclient">
     <fieldset class="dv16-protocol-list">
       <legend>Каналы основного устройства</legend>
-      {% for profile in xray_profiles.profiles %}
-      {% set token = 'xray_' ~ profile.id %}
-      {% set selected = token in primary_tokens %}
-      <label class="dv16-protocol {{ 'is-locked' if not profile.ready and not selected else '' }}">
-        <input type="checkbox" name="protocols" value="{{ token }}" {% if selected %}checked{% endif %} {% if not profile.ready and not selected %}disabled{% endif %}>
-        <span><strong>{{ profile.title }}</strong><small>{% if selected %}Подключён — реквизиты сохранятся{% elif profile.ready %}Доступен для добавления{% elif profile.tls_required %}Нужен HTTPS{% else %}Сначала включите профиль в Connections{% endif %}</small></span>
-      </label>
+      <!-- SG_PROTOCOL_ORDER_START -->
+      {% for profile_id in ['reality_tcp', 'xhttp_reality'] %}
+        {{ edit_xray_protocol_card(xray_profiles.profiles, profile_id, primary_tokens, 'Сначала включите профиль в Connections') }}
       {% endfor %}
+      <label class="dv16-protocol"><input type="checkbox" name="protocols" value="amneziawg" {% if 'amneziawg' in primary_tokens %}checked{% endif %}><span><strong>AmneziaWG 2.0</strong><small>AWG2 · конфигурация и QR</small></span></label>
+      {% set awg3_selected = 'amneziawg3' in primary_tokens %}
+      <label class="dv16-protocol">
+        <input type="checkbox" name="protocols" value="amneziawg3" {% if awg3_selected %}checked{% endif %}>
+        <span><strong>AmneziaWG 3.0</strong><small>{{ 'Подключён — существующие credentials сохраняются' if awg3_selected else 'AWG 3.0 userspace · конфигурация и QR' }}</small></span>
+      </label>
+      {% set awg31_selected = 'amneziawg31' in primary_tokens %}
+      <label class="dv16-protocol">
+        <input type="checkbox" name="protocols" value="amneziawg31" {% if awg31_selected %}checked{% endif %}>
+        <span><strong>AmneziaWG 3.1</strong><small>{{ 'Подключён — существующие credentials сохраняются' if awg31_selected else 'AWG 3.1 userspace · конфигурация' }}</small></span>
+      </label>
       <label class="dv16-protocol"><input type="checkbox" name="protocols" value="mihomo" {% if 'mihomo' in primary_tokens %}checked{% endif %}><span><strong>Mieru</strong><small>Для SG Client; существующие credentials сохраняются</small></span></label>
-      <label class="dv16-protocol"><input type="checkbox" name="protocols" value="amneziawg" {% if 'amneziawg' in primary_tokens %}checked{% endif %}><span><strong>AmneziaWG 2</strong><small>AWG2 · конфигурация и QR</small></span></label>
-      <label class="dv16-protocol"><input type="checkbox" name="protocols" value="amneziawg3" {% if 'amneziawg3' in primary_tokens %}checked{% endif %}><span><strong>AmneziaWG 3</strong><small>AWG3 userspace · конфигурация и QR</small></span></label>
+      {% for profile_id in ['xhttp_tls', 'hysteria2'] %}
+        {{ edit_xray_protocol_card(xray_profiles.profiles, profile_id, primary_tokens, 'Сначала включите профиль в Connections') }}
+      {% endfor %}
       {% set anytls_selected = 'anytls' in primary_tokens %}
       <label class="dv16-protocol {{ 'is-locked' if not tls.https_ready and not anytls_selected else '' }}"><input type="checkbox" name="protocols" value="anytls" {% if anytls_selected %}checked{% endif %} {% if not tls.https_ready and not anytls_selected %}disabled{% endif %}><span><strong>AnyTLS</strong><small>{{ 'Подключён — пароль сохранится' if anytls_selected else ('Доступен' if tls.https_ready else 'Нужен HTTPS') }}</small></span></label>
       {% set tuic_selected = 'tuic' in primary_tokens %}
       <label class="dv16-protocol {{ 'is-locked' if not tls.https_ready and not tuic_selected else '' }}"><input type="checkbox" name="protocols" value="tuic" {% if tuic_selected %}checked{% endif %} {% if not tls.https_ready and not tuic_selected %}disabled{% endif %}><span><strong>TUIC v5</strong><small>{{ 'Подключён — реквизиты сохранятся' if tuic_selected else ('Доступен' if tls.https_ready else 'Нужен HTTPS') }}</small></span></label>
+      <!-- SG_PROTOCOL_ORDER_END -->
     </fieldset>
+    <!-- SG_AWG_ONLY_NOTICE_V1_EDIT_CLIENT -->
+    <div class="sg-awg-only-note" data-awg-only-note role="status" aria-live="polite">При выборе только AWG-профилей подписка не создаётся. Используйте QR-коды или файлы конфигурации для каждого соединения.</div>
 
     <label class="dv16-field">
       <span>Срок действия клиента</span>
@@ -64,22 +87,35 @@
     </header>
 
     <label class="dv16-field"><span>Название</span><input type="text" name="name" maxlength="60" required value="{{ device.name|e }}" autocomplete="off"></label>
-    <input type="hidden" name="protocols" value="sgclient">
     <fieldset class="dv16-protocol-list">
       <legend>Каналы подключения</legend>
-      {% for profile in xray_profiles.profiles %}
-      {% set token = 'xray_' ~ profile.id %}
-      {% set selected = token in selected_tokens %}
-      <label class="dv16-protocol {{ 'is-locked' if not profile.ready and not selected else '' }}"><input type="checkbox" name="protocols" value="{{ token }}" {% if selected %}checked{% endif %} {% if not profile.ready and not selected %}disabled{% endif %}><span><strong>{{ profile.title }}</strong><small>{% if selected %}Подключён — реквизиты сохранятся{% elif profile.ready %}Доступен для добавления{% elif profile.tls_required %}Нужен HTTPS{% else %}Сначала включите профиль{% endif %}</small></span></label>
+      <!-- SG_PROTOCOL_ORDER_START -->
+      {% for profile_id in ['reality_tcp', 'xhttp_reality'] %}
+        {{ edit_xray_protocol_card(xray_profiles.profiles, profile_id, selected_tokens, 'Сначала включите профиль') }}
       {% endfor %}
+      <label class="dv16-protocol"><input type="checkbox" name="protocols" value="amneziawg" {% if 'amneziawg' in selected_tokens %}checked{% endif %}><span><strong>AmneziaWG 2.0</strong><small>AWG2 · конфигурация и QR</small></span></label>
+      {% set device_awg3_selected = 'amneziawg3' in selected_tokens %}
+      <label class="dv16-protocol">
+        <input type="checkbox" name="protocols" value="amneziawg3" {% if device_awg3_selected %}checked{% endif %}>
+        <span><strong>AmneziaWG 3.0</strong><small>{{ 'Подключён — существующие credentials сохраняются' if device_awg3_selected else 'AWG 3.0 userspace · конфигурация и QR' }}</small></span>
+      </label>
+      {% set device_awg31_selected = 'amneziawg31' in selected_tokens %}
+      <label class="dv16-protocol">
+        <input type="checkbox" name="protocols" value="amneziawg31" {% if device_awg31_selected %}checked{% endif %}>
+        <span><strong>AmneziaWG 3.1</strong><small>{{ 'Подключён — существующие credentials сохраняются' if device_awg31_selected else 'AWG 3.1 userspace · конфигурация' }}</small></span>
+      </label>
       <label class="dv16-protocol"><input type="checkbox" name="protocols" value="mihomo" {% if 'mihomo' in selected_tokens %}checked{% endif %}><span><strong>Mieru</strong><small>Для SG Client</small></span></label>
-      <label class="dv16-protocol"><input type="checkbox" name="protocols" value="amneziawg" {% if 'amneziawg' in selected_tokens %}checked{% endif %}><span><strong>AmneziaWG 2</strong><small>AWG2 · конфигурация и QR</small></span></label>
-      <label class="dv16-protocol"><input type="checkbox" name="protocols" value="amneziawg3" {% if 'amneziawg3' in selected_tokens %}checked{% endif %}><span><strong>AmneziaWG 3</strong><small>AWG3 userspace · конфигурация и QR</small></span></label>
+      {% for profile_id in ['xhttp_tls', 'hysteria2'] %}
+        {{ edit_xray_protocol_card(xray_profiles.profiles, profile_id, selected_tokens, 'Сначала включите профиль') }}
+      {% endfor %}
       {% set anytls_selected = 'anytls' in selected_tokens %}
       <label class="dv16-protocol {{ 'is-locked' if not tls.https_ready and not anytls_selected else '' }}"><input type="checkbox" name="protocols" value="anytls" {% if anytls_selected %}checked{% endif %} {% if not tls.https_ready and not anytls_selected %}disabled{% endif %}><span><strong>AnyTLS</strong><small>{{ 'Подключён — пароль сохранится' if anytls_selected else ('Доступен' if tls.https_ready else 'Нужен HTTPS') }}</small></span></label>
       {% set tuic_selected = 'tuic' in selected_tokens %}
       <label class="dv16-protocol {{ 'is-locked' if not tls.https_ready and not tuic_selected else '' }}"><input type="checkbox" name="protocols" value="tuic" {% if tuic_selected %}checked{% endif %} {% if not tls.https_ready and not tuic_selected %}disabled{% endif %}><span><strong>TUIC v5</strong><small>{{ 'Подключён — реквизиты сохранятся' if tuic_selected else ('Доступен' if tls.https_ready else 'Нужен HTTPS') }}</small></span></label>
+      <!-- SG_PROTOCOL_ORDER_END -->
     </fieldset>
+    <!-- SG_AWG_ONLY_NOTICE_V1_EDIT_DEVICE -->
+    <div class="sg-awg-only-note" data-awg-only-note role="status" aria-live="polite">При выборе только AWG-профилей подписка не создаётся. Используйте QR-коды или файлы конфигурации для каждого соединения.</div>
 
     <label class="dv16-field"><span>Срок действия</span><input type="date" name="expires_at" value="{{ device.expires_at or '' }}"><small>Пустое поле означает бессрочный доступ.</small></label>
     <footer class="dv16-dialog-actions"><button class="button" type="button" data-close-device-edit="{{ device.id }}">Отмена</button><button class="button primary" type="submit">Сохранить и применить</button></footer>
@@ -104,5 +140,41 @@
   document.querySelectorAll('dialog[id^="dv-edit-device-"]').forEach(dialog => {
     dialog.addEventListener('click', event => { if (event.target === dialog) dialog.close(); });
   });
+
+  // SG_ADD_DEVICE_PROTOCOL_ORDER_V2_START
+  const addDeviceProtocolOrder = [
+    'xray_reality_tcp',
+    'xray_xhttp_reality',
+    'amneziawg',
+    'amneziawg3',
+    'amneziawg31',
+    'mihomo',
+    'xray_xhttp_tls',
+    'xray_hysteria2',
+    'anytls',
+    'tuic',
+  ];
+  const addDeviceProtocolList = document.querySelector('#dv46-device-dialog .dv16-protocol-list');
+  if (addDeviceProtocolList) {
+    const protocolCards = [...addDeviceProtocolList.children]
+      .filter(card => card.matches('.dv16-protocol'));
+    const cardsByValue = new Map(
+      protocolCards
+        .map(card => [card.querySelector('input[name="protocols"]')?.value, card])
+        .filter(([value]) => value)
+    );
+    const knownValues = new Set(addDeviceProtocolOrder);
+    addDeviceProtocolOrder.forEach(value => {
+      const card = cardsByValue.get(value);
+      if (card) addDeviceProtocolList.appendChild(card);
+    });
+    protocolCards.forEach(card => {
+      const value = card.querySelector('input[name="protocols"]')?.value;
+      if (value && !knownValues.has(value)) addDeviceProtocolList.appendChild(card);
+    });
+    const awg2Title = cardsByValue.get('amneziawg')?.querySelector('strong');
+    if (awg2Title) awg2Title.textContent = 'AmneziaWG 2.0';
+  }
+  // SG_ADD_DEVICE_PROTOCOL_ORDER_V2_END
 })();
 </script>

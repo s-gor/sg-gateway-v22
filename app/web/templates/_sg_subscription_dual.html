@@ -20,6 +20,10 @@
           <summary class="button">QR</summary>
           <div class="dv16-qr-popover">
             <button type="button" aria-label="Закрыть QR" onclick="this.closest('details').removeAttribute('open')">×</button>
+            <div class="sg-smart-qr-meta">
+              <strong>Универсальная подписка</strong>
+              <small>Сканируйте в приложении</small>
+            </div>
             <img src="/clients/{{ client.id }}/sg-subscription-v1/qr/universal" alt="QR универсальной подписки {{ client.name }}">
           </div>
         </details>
@@ -37,6 +41,10 @@
           <summary class="button">QR</summary>
           <div class="dv16-qr-popover">
             <button type="button" aria-label="Закрыть QR" onclick="this.closest('details').removeAttribute('open')">×</button>
+            <div class="sg-smart-qr-meta">
+              <strong>SG подписка</strong>
+              <small>Сканируйте в приложении</small>
+            </div>
             <img src="/clients/{{ client.id }}/sg-subscription-v1/qr" alt="QR SG Subscription {{ client.name }}">
           </div>
         </details>

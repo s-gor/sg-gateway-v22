@@ -46,3 +46,22 @@ def test_static_systemd_and_deploy_runtime_sources_use_production_wsgi() -> None
             stale.append(candidate.relative_to(ROOT).as_posix())
     assert stale == []
 
+def test_update_migrates_historical_panel_wsgi_to_production() -> None:
+    updater = (ROOT / "deploy/update-from-github.sh").read_text(encoding="utf-8")
+    assert 'PANEL_PRODUCTION_WSGI="app.production:app"' in updater
+    assert "installed_panel_wsgi_target()" in updater
+    assert "migrate_panel_wsgi_service()" in updater
+    assert 'local unit="/etc/systemd/system/sg-gateway.service"' in updater
+    assert "systemctl daemon-reload" in updater
+    deploy = updater[updater.index("deploy_source() {"):updater.index("restart_panel() {")]
+    assert "migrate_panel_wsgi_service" in deploy
+    assert '[[ "$(installed_panel_wsgi_target)" == "$PANEL_PRODUCTION_WSGI" ]]' in updater
+    for helper in (
+        "sg_subscription_universal_url",
+        "sg_subscription_native_url",
+        "router_subscription_url",
+        "openwrt_subscription_url",
+        "keenetic_subscription_url",
+    ):
+        assert f'"{helper}"' in updater
+

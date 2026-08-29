@@ -75,6 +75,12 @@ html[data-theme="light"] body.page-clients .dv16-device-controls .button.sg-warm
   color:#fff8ef !important;
   box-shadow:0 8px 18px rgba(115,80,39,.16) !important;
 }
+
+/* Primary device already has the ОСНОВНОЕ badge; avoid repeating it as a large title. */
+html body.page-clients .dv16-device:not(:has([data-open-device-edit])) .dv16-device-title h2 {
+  display:none !important;
+}
+
 @media(max-width:900px){
   html body.page-clients .dv16-dialog .dv16-protocol-list {
     grid-template-columns:repeat(2,minmax(0,1fr)) !important;

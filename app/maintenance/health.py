@@ -109,6 +109,7 @@ def _salamander_check() -> HealthCheck | None:
         message=details,
     )
 
+
 def _hostd_check() -> HealthCheck:
     result = hostd_health()
     return HealthCheck(

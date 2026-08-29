@@ -13,7 +13,6 @@ def source(relative: str) -> str:
 def test_0219_version_and_manifest_are_synchronized() -> None:
     version = source("VERSION").strip()
     manifest = json.loads(source("release-manifest.json"))
-    assert version == "0.1.0-022.04"
     assert manifest["version"] == version
     assert manifest["rebuild_policy"]["baseline"] == "0.1.0-021.12"
     assert manifest["mieru_export"]["ordinary_uri"] is True
@@ -34,9 +33,22 @@ def test_mieru_link_json_and_two_qr_exports_are_present() -> None:
     assert "secondary_payload=(" in access
     assert "secondary_qr_url=(" in access
     assert 'tertiary_label="Mihomo YAML"' in access
-    assert ">QR JSON<" in template
+    assert "QR · Mieru" in template
+    assert "QR · iPhone" in template
     assert "card.qr_url" in template
     assert "card.secondary_qr_url" in template
+
+
+def test_mieru_router_zb_copy_helper_is_present() -> None:
+    template = source("app/web/templates/client_detail.html")
+    assert 'data-mieru-router-source="{{ card.payload|e }}"' in template
+    assert "Скопировать Router / ZB" in template
+    assert "function buildMieruRouterUri(value)" in template
+    assert "text.startsWith('mierus://')" in template
+    assert "params.get('port')" in template
+    assert "params.get('protocol')" in template
+    assert "?transport=${encodeURIComponent(transport)}" in template
+    assert "button.dataset.copyValue = converted" in template
 
 
 def test_shared_subscription_excludes_mieru_and_uses_real_newlines() -> None:

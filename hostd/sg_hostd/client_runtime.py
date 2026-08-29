@@ -1797,11 +1797,57 @@ def apply_split_mihomo_singbox_runtime() -> dict[str, Any]:
     }
 
 
+def _apply_awg31_runtime() -> EngineResult:
+    engine = "amneziawg31"
+    rows = _deployment_rows(engine)
+    ids = [int(row["client_id"]) for row in rows]
+    previous = _status_snapshot(engine)
+    service = "sg-gateway-awg31.service"
+
+    if not rows:
+        subprocess.run(
+            ["systemctl", "stop", service],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
+        )
+        return EngineResult(engine, True, "Нет активных клиентов AmneziaWG 3.1", 0)
+
+    try:
+        _set_engine_status(engine, ids, "checking")
+        from sg_hostd.awg31_runtime import apply_awg31
+
+        _set_engine_status(engine, ids, "applying")
+        payload = apply_awg31()
+        _set_engine_status(engine, ids, "applied")
+        return EngineResult(
+            engine,
+            True,
+            f"AmneziaWG 3.1 применён; клиентов: {int(payload.get('peers') or len(rows))}",
+            len(rows),
+        )
+    except Exception as exc:
+        restored = bool(
+            _command_ok(["systemctl", "is-active", "--quiet", service], 30)
+            and _command_ok(
+                [str(PREFIX / "awg31/bin/awg"), "show", "awg31"],
+                30,
+            )
+        )
+        _set_failure_status(
+            engine,
+            ids,
+            previous,
+            runtime_restored=restored,
+        )
+        return EngineResult(engine, False, f"AmneziaWG 3.1: {exc}", len(rows))
+
 def apply_all_clients() -> dict[str, Any]:
     """Apply critical engines and report optional engines independently.
 
-    Client catalogue operations are committed when selected AWG2/AWG3 and Xray are
-    healthy. Mieru, AnyTLS, TUIC and SG Client exports remain visible in the
+    Client catalogue operations are committed when selected AWG 2.0, AWG 3.0,
+    AWG 3.1 and Xray runtimes are healthy. Mieru, AnyTLS, TUIC and SG Client exports remain visible in the
     result, but an optional engine can no longer roll back a client create,
     update, delete or the whole SG-Gateway installation.
     """
@@ -1821,6 +1867,15 @@ def apply_all_clients() -> dict[str, Any]:
                 "Другое применение клиентских конфигураций уже выполняется"
             ) from exc
 
+        # SG_GATEWAY_02206_RUNTIME_CONTRACT_V1
+        # Check active critical runtimes before the first engine mutates live state.
+        from sg_hostd.runtime_contracts import assert_runtime_contract
+
+        assert_runtime_contract(
+            database_path=DATA_DIR / "sg-gateway.sqlite",
+            strict_optional=False,
+            include_all_critical=False,
+        )
         _repair_deployment_configs()
 
         from sg_hostd.awg3_runtime import apply_awg3
@@ -1828,6 +1883,7 @@ def apply_all_clients() -> dict[str, Any]:
         critical_results = [
             _apply_awg(),
             apply_awg3(),
+            _apply_awg31_runtime(),
             _apply_xray(),
         ]
         optional_results = [

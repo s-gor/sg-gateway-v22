@@ -19,6 +19,10 @@
 {% set health_class = {'ok':'success', 'warning':'warning', 'error':'danger'}.get(report.health, 'warning') %}
 {% set hostd_label = {'ok':'Работает', 'warning':'Предупреждение', 'error':'Ошибка'}.get(report.hostd.status, report.hostd.status) %}
 {% set configured_connections = connections | selectattr('status', 'equalto', 'Configured') | list %}
+{% set memory_state = 'critical' if resources.memory.percent >= 97 else 'high' if resources.memory.percent >= 92 else 'warning' if resources.memory.percent >= 85 else 'normal' %}
+{% set memory_label = 'Критично' if resources.memory.percent >= 97 else 'Мало свободной памяти' if resources.memory.percent >= 92 else 'Предупреждение' if resources.memory.percent >= 85 else 'Норма' %}
+{% set disk_state = 'critical' if resources.disk.percent >= 95 else 'high' if resources.disk.percent >= 90 else 'warning' if resources.disk.percent >= 80 else 'normal' %}
+{% set disk_label = 'Критично' if resources.disk.percent >= 95 else 'Мало свободного места' if resources.disk.percent >= 90 else 'Предупреждение' if resources.disk.percent >= 80 else 'Норма' %}
 
 <section class="sv1-page">
   <header class="sv1-heading">
@@ -100,7 +104,7 @@
           <div class="sv1-card-kicker">ПАМЯТЬ</div>
           <h2>Оперативная память</h2>
         </div>
-        <span class="sv1-state-pill {{ resources.memory.state }}">{{ resources.memory.state_label }}</span>
+        <span class="sv1-state-pill {{ memory_state }}">{{ memory_label }}</span>
       </header>
 
       <div class="sg-resource-refresh-slot">
@@ -163,7 +167,7 @@
           <div class="sv1-card-kicker">ХРАНИЛИЩЕ</div>
           <h2>Диск данных</h2>
         </div>
-        <span class="sv1-state-pill {{ resources.disk.state }}">{{ resources.disk.state_label }}</span>
+        <span class="sv1-state-pill {{ disk_state }}">{{ disk_label }}</span>
       </header>
 
       <div class="sg-resource-refresh-slot">

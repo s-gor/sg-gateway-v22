@@ -1,6 +1,6 @@
 {
-  "build": "MAIN-02204-STABLE",
-  "channel": "stable-02204",
+  "build": "MAIN-02206-STABLE",
+  "channel": "stable-02206",
   "client_access_model": {
     "awg2_awg3_independent_selection": true,
     "hysteria_auth_per_device": true,
@@ -254,7 +254,7 @@
     "sg_admin_enter_defaults_to_yes": true,
     "stage9_exact_failure_logging": true,
     "template_endpoint_audit": true,
-    "version": "02204-stable",
+    "version": "02206-stable",
     "warp_panel_port_v017": true,
     "xhttp_reality_stream_one_migration": true
   },
@@ -283,7 +283,7 @@
     },
     "panel": {
       "automatic_rollback": true,
-      "channel": "dev-v22",
+      "channel": "stable-02206",
       "full_code_backup": true,
       "health_checks": [
         "sg-hostd",
@@ -297,7 +297,7 @@
         "cores"
       ],
       "requirements_change_blocks_panel_only_update": true,
-      "source": "github-main-exact-commit",
+      "source": "github-stable-02206-exact-commit",
       "staging": true
     }
   },
@@ -322,7 +322,7 @@
     "public_sni_router_port": 443,
     "reality_internal_listener": "127.0.0.1:7443"
   },
-  "next_development_line": "0.1.0-022.05",
+  "next_development_line": "0.1.0-022.07",
   "portable_full_backup": {
     "automatic_safety_backup_before_restore": true,
     "certificate_files_verified_before_success": true,
@@ -359,7 +359,7 @@
     "baseline": "0.1.0-021.12",
     "publication_requires_real_clean_install": true
   },
-  "rebuild_target": "0.1.0-022.04",
+  "rebuild_target": "0.1.0-022.06",
   "rollback": {
     "atomic_application": true,
     "requires_backup": true,
@@ -484,7 +484,7 @@
     ],
     "xray_status_cards_theme_fixed": true
   },
-  "version": "0.1.0-022.04",
+  "version": "0.1.0-022.06",
   "vless_sg_panel_port": {
     "client_contract": {
       "fingerprint_normalized": true,
@@ -544,6 +544,69 @@
     "tag": "warp-core-with-family-gates",
     "trace_verification": "cloudflare-trace-per-ip-family",
     "xray_outbound": "native-wireguard"
+  },
+  "awg31": {
+    "backup_restore": {
+      "format_version": 1,
+      "legacy_without_awg31_supported": true,
+      "rollback_atomic": true,
+      "byte_preserving_credentials_and_profile": true
+    },
+    "engine": "amneziawg31",
+    "profile": "awg31",
+    "production_files": [
+      "app/clients/__init__.py",
+      "app/clients/access.py",
+      "app/clients/awg31_lifecycle.py",
+      "app/clients/awg31_stage2.py",
+      "app/clients/exports.py",
+      "app/clients/repository.py",
+      "app/connections/awg31.py",
+      "app/connections/awg31_uri.py",
+      "app/db.py",
+      "app/install_seed.py",
+      "app/main.py",
+      "app/maintenance/awg31_stage3a.py",
+      "app/maintenance/awg31_stage3a_common.py",
+      "app/maintenance/awg31_stage3a_data.py",
+      "app/maintenance/awg31_stage3a_runtime.py",
+      "app/maintenance/seeded_admin_awg3.py",
+      "app/web/templates/_awg31_panel.html",
+      "app/web/templates/connections.html",
+      "build-run.sh",
+      "deploy/install-core.sh",
+      "deploy/repair-awg31-runtime.sh",
+      "deploy/sg-gateway-awg31-userspace.sh",
+      "deploy/sg-gateway-awg31.service",
+      "deploy/sg-gateway-awg31ctl",
+      "deploy/uninstall-awg31.sh",
+      "deploy/update-from-github-core.sh",
+      "deploy/update-from-github.sh",
+      "hostd/sg_hostd/awg31_commands.py",
+      "hostd/sg_hostd/awg31_integration.py",
+      "hostd/sg_hostd/awg31_runtime.py",
+      "hostd/sg_hostd/clients_keys_backup_patch.py",
+      "hostd/sg_hostd/full_backup_runtime.py",
+      "install.sh",
+      "release-manifest.json",
+      "scripts/package_contract.py",
+      "vendor/cores/amneziawg-tools-3.0.20260805.tar.gz",
+      "vendor/cores/amneziawg-go-linux-amd64-v3.0.0",
+      "vendor/cores/amneziawg-tools-3.1.20260812.tar.gz",
+      "vendor/cores/amneziawg-go-linux-amd64-v3.1.20260814"
+    ],
+    "runtime_assets": {
+      "vendor/cores/amneziawg-tools-3.0.20260805.tar.gz": "090f9383532822a756d078890b447e00af7f46bd30a10f9f47c46d633d807b19",
+      "vendor/cores/amneziawg-go-linux-amd64-v3.0.0": "131110027db6d5dc0e35b19eb5b8a2692676081366c34112088dc68bbb050bcd",
+      "vendor/cores/amneziawg-tools-3.1.20260812.tar.gz": "f18592c499c893b1b87b15de9e707ce265585cf2536698975b6ede8156d14ada",
+      "vendor/cores/amneziawg-go-linux-amd64-v3.1.20260814": "375bc2645df09498aa30215e3b3a09a97626a8e929f409e0edef6564fb8e3110"
+    },
+    "state_paths": [
+      "/etc/amnezia/amneziawg/awg31",
+      "/var/lib/sg-gateway/awg31",
+      "/opt/sg-gateway/awg31",
+      "/etc/systemd/system/sg-gateway-awg31.service"
+    ]
   },
   "xray": {
     "bootstrap_version": "v26.6.27",

@@ -28,7 +28,7 @@ os.environ.setdefault(
 )
 os.environ.setdefault(
     "SG_GATEWAY_OPERATION_JOB_DIR",
-    "/var/lib/sg-gateway/security/jobs",
+    "/var/log/sg-gateway/operation-jobs",
 )
 os.chdir(_PROJECT_ROOT)
 
@@ -69,8 +69,6 @@ def run_xray_update(channel: str) -> int:
     return 0
 
 
-
-
 def run_panel_update() -> int:
     from app.maintenance.panel_updates import GITHUB_BRANCH
 
@@ -88,12 +86,14 @@ def run_panel_update() -> int:
     )
     return int(completed.returncode)
 
+
 def run_core_update(engine: str) -> int:
     from sg_hostd.core_update_runtime import update_core
 
     print(f"[Core Update] Подготавливаю безопасное обновление {engine}", flush=True)
     _dump(update_core(engine))
     return 0
+
 
 def run_full_backup_restore() -> int:
     from sg_hostd.full_backup_runtime import restore_uploaded_full_backup
@@ -102,6 +102,12 @@ def run_full_backup_restore() -> int:
     result = restore_uploaded_full_backup()
     _dump(result)
     return 0
+
+
+def run_disk_cleanup() -> int:
+    from sg_hostd.disk_cleanup import run_disk_cleanup as cleanup
+
+    return cleanup()
 
 
 def main() -> int:
@@ -124,6 +130,8 @@ def main() -> int:
             return run_core_update("sing-box")
         if sys.argv[1] == "core_update_wgcf":
             return run_core_update("wgcf")
+        if sys.argv[1] == "disk_cleanup":
+            return run_disk_cleanup()
         raise RuntimeError(f"Неизвестный тип задачи: {sys.argv[1]}")
     except Exception as exc:
         print(f"[SG-Gateway] ОШИБКА: {exc}", file=sys.stderr, flush=True)
