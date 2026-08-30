@@ -5,22 +5,18 @@ ROOT = Path(__file__).resolve().parents[1]
 TEMPLATE = ROOT / "app/web/templates/_mihomo_panel.html"
 
 
-def _service_tools_fragment() -> str:
+def test_mihomo_service_actions_are_not_exposed_in_panel() -> None:
     source = TEMPLATE.read_text(encoding="utf-8")
-    marker = 'class="mhv2-service-tools"'
-    start = source.index(marker)
-    return source[max(0, start - 40) : start + 700]
 
+    assert 'class="mhv2-service-tools"' not in source
+    assert "Сервисные действия" not in source
+    assert 'name="action" value="restart"' not in source
+    assert "Перезапустить Mihomo" not in source
+    assert "Только для уже применённой конфигурации." not in source
 
-def test_mihomo_service_action_is_always_visible_without_accordion() -> None:
-    fragment = _service_tools_fragment()
-
-    assert "<details" not in fragment
-    assert "<summary" not in fragment
-    assert "Сервисные действия" in fragment
-    assert 'name="action" value="restart"' in fragment
-    assert "Перезапустить Mihomo" in fragment
-    assert "Только для уже применённой конфигурации." in fragment
+    assert 'name="action" value="save"' in source
+    assert 'name="action" value="test"' in source
+    assert 'name="action" value="apply"' in source
 
 
 def test_mihomo_listener_runtime_statuses_are_preserved() -> None:
