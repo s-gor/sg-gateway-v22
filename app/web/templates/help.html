@@ -17,8 +17,8 @@
   <header class="hlpv1-heading">
     <div>
       <div class="hlpv1-kicker"><span></span> SG-GATEWAY / HELP</div>
-      <h1>Help</h1>
-      <p>Короткие практические инструкции по основным разделам SG-Gateway.</p>
+      <h1>Практическая справка SG-Gateway</h1>
+      <p>Полная практическая справка: установка, клиенты, протоколы, подписки, резервные копии и диагностика.</p>
     </div>
 
     <div class="hlpv1-heading-actions">
@@ -37,7 +37,7 @@
       <div>
         <div class="hlpv1-summary-label">Разделы справки</div>
         <div class="hlpv1-summary-value">{{ topic_count }}</div>
-        <div class="hlpv1-summary-note">System, Clients, Connections, Routing, Maintenance, Security</div>
+        <div class="hlpv1-summary-note">Первый запуск, протоколы, подписки, Backup и диагностика</div>
       </div>
     </article>
 
@@ -106,7 +106,7 @@
       <header class="hlpv1-sidebar-head">
         <div>
           <div class="hlpv1-card-kicker">РАЗДЕЛЫ</div>
-          <h2>Справка SG-Gateway</h2>
+          <h2>Практическая справка SG-Gateway</h2>
         </div>
         <span>{{ topic_count }}</span>
       </header>
@@ -174,7 +174,7 @@
             <p>{{ topic.summary }}</p>
           </div>
         </div>
-        <span class="hlpv1-step-pill">{{ topic.body | length }} шага</span>
+        <span class="hlpv1-step-pill">{{ topic.body | length }} пунктов</span>
       </header>
 
       <section class="hlpv1-steps">
@@ -203,25 +203,28 @@
         </header>
 
         <div class="hlpv1-related-grid sg-ljd-tile-grid">
-          {% if topic.slug == 'system' %}
-          <a href="{{ url_for('system') }}"><strong>System</strong><small>Проверить ресурсы и состояние</small><span>→</span></a>
-          <a href="{{ url_for('maintenance') }}"><strong>Maintenance</strong><small>Диагностика и копии</small><span>→</span></a>
-          {% elif topic.slug == 'clients' %}
-          <a href="{{ url_for('clients') }}"><strong>Clients</strong><small>Создать и открыть клиента</small><span>→</span></a>
-          <a href="{{ url_for('connections') }}"><strong>Connections</strong><small>Проверить параметры профиля</small><span>→</span></a>
-          {% elif topic.slug == 'connections' %}
-          <a href="{{ url_for('connections') }}"><strong>Connections</strong><small>Изменить адреса и ключи</small><span>→</span></a>
-          <a href="{{ url_for('routing') }}"><strong>Routing</strong><small>Посмотреть итоговый путь</small><span>→</span></a>
-          {% elif topic.slug == 'routing' %}
-          <a href="{{ url_for('routing') }}"><strong>Routing</strong><small>Открыть фактические пути</small><span>→</span></a>
-          <a href="{{ url_for('clients') }}"><strong>Clients</strong><small>Проверить выданные профили</small><span>→</span></a>
-          {% elif topic.slug == 'maintenance' %}
-          <a href="{{ url_for('maintenance') }}"><strong>Maintenance</strong><small>Копии и журнал операций</small><span>→</span></a>
-          <a href="{{ url_for('recovery') }}"><strong>Recovery</strong><small>Аварийный обзор состояния</small><span>→</span></a>
-          {% else %}
-          <a href="{{ url_for('security') }}"><strong>Security</strong><small>Проверить доступ к панели</small><span>→</span></a>
-          <a href="{{ url_for('download_diagnostics') }}"><strong>Diagnostics</strong><small>Скачать системный отчёт</small><span>→</span></a>
-          {% endif %}
+          {% if topic.slug == 'quickstart' %}
+<a href="{{ url_for('system') }}"><strong>System</strong><small>Начать с состояния сервера</small><span>→</span></a>
+<a href="{{ url_for('connections') }}"><strong>Connections</strong><small>Проверить готовность протоколов</small><span>→</span></a>
+{% elif topic.slug in ['system', 'troubleshooting'] %}
+<a href="{{ url_for('system') }}"><strong>System</strong><small>Проверить ресурсы и службы</small><span>→</span></a>
+<a href="{{ url_for('maintenance') }}"><strong>Maintenance</strong><small>Журнал, диагностика и repair</small><span>→</span></a>
+{% elif topic.slug in ['clients', 'subscriptions'] %}
+<a href="{{ url_for('clients') }}"><strong>Clients</strong><small>Клиенты, устройства и экспорты</small><span>→</span></a>
+<a href="{{ url_for('connections') }}"><strong>Connections</strong><small>Проверить серверные профили</small><span>→</span></a>
+{% elif topic.slug in ['connections', 'awg', 'xray', 'mihomo'] %}
+<a href="{{ url_for('connections') }}"><strong>Connections</strong><small>Настройки и состояние протоколов</small><span>→</span></a>
+<a href="{{ url_for('clients') }}"><strong>Clients</strong><small>Выдать профиль устройству</small><span>→</span></a>
+{% elif topic.slug == 'routing' %}
+<a href="{{ url_for('routing') }}"><strong>Routing</strong><small>Правила, GeoFiles и WARP</small><span>→</span></a>
+<a href="{{ url_for('system') }}"><strong>System</strong><small>Проверить IPv4 и IPv6</small><span>→</span></a>
+{% elif topic.slug in ['backups', 'updates'] %}
+<a href="{{ url_for('maintenance') }}"><strong>Maintenance</strong><small>Backup, Restore и операции</small><span>→</span></a>
+<a href="{{ url_for('recovery') }}"><strong>Recovery</strong><small>Аварийный обзор состояния</small><span>→</span></a>
+{% else %}
+<a href="{{ url_for('security') }}"><strong>Security</strong><small>HTTPS и доступ к панели</small><span>→</span></a>
+<a href="{{ url_for('download_diagnostics') }}"><strong>Diagnostics</strong><small>Скачать системный отчёт</small><span>→</span></a>
+{% endif %}
         </div>
       </section>
 
