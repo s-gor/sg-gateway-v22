@@ -201,17 +201,14 @@
       <button class="button" type="submit" name="action" value="save">Сохранить</button>
       <button class="button" type="submit" name="action" value="test">Проверить</button>
       <button class="button primary sg-ljd-key-action" type="submit" name="action" value="apply">Применить</button>
+      <button class="button" type="submit" name="action" value="restart">Перезапустить</button>
+      <span class="mhv2-restart-note">Только для уже применённой конфигурации.</span>
       {% if mihomo.backups %}
       <button class="button danger" type="submit" name="action" value="rollback"
               data-sg-confirm="Откатить последнее изменение Mihomo и восстановить предыдущую конфигурацию?" data-sg-confirm-title="Откатить Mihomo" data-sg-confirm-button="Откатить" data-sg-confirm-tone="danger">
         Откатить
       </button>
       {% endif %}
-    </div>
-
-    <div class="mhv2-restart-row">
-      <button class="button" type="submit" name="action" value="restart">Перезапустить</button>
-      <span>Только для уже применённой конфигурации.</span>
     </div>
   </form>
 
@@ -234,17 +231,15 @@
 #mihomo .mhv2-form-compact {
   gap: 10px;
 }
-#mihomo .mhv2-restart-row {
-  display: flex;
+#mihomo .mhv2-actions {
   align-items: center;
   justify-content: center;
   flex-wrap: wrap;
-  gap: 10px;
-  padding-top: 0;
 }
-#mihomo .mhv2-restart-row span {
+#mihomo .mhv2-restart-note {
   color: var(--sg-muted);
   font-size: 10px;
+  white-space: nowrap;
 }
 </style>
 
