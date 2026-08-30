@@ -1,0 +1,52 @@
+name: Restore AWG-only Help wording contract
+
+on:
+  push:
+    branches: [docs/02206-guide-help]
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: docs/02206-guide-help
+          fetch-depth: 0
+      - name: Restore wording and refresh integrity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("app/help/content.py")
+          source = path.read_text(encoding="utf-8")
+          old = "Можно выбрать только нужные протоколы. AWG-only клиент или устройство создаётся без обязательного Xray или SG Client access."
+          new = "Если выбраны только AmneziaWG 2.0, AmneziaWG 3.0 и AmneziaWG 3.1, клиент и соединения создаются нормально, но SG Client subscription не формируется."
+          if old not in source:
+              raise SystemExit("AWG-only Help wording anchor missing")
+          path.write_text(source.replace(old, new, 1), encoding="utf-8")
+          PY
+
+          git rm .github/workflows/fix-help-awg-only-copy.yml
+
+          python3 - <<'PY'
+          import hashlib
+          import subprocess
+          from pathlib import Path
+
+          paths = subprocess.check_output(["git", "ls-files"], text=True, encoding="utf-8").splitlines()
+          paths = [path for path in paths if path != "SOURCE-SHA256SUMS"]
+          rows = [
+              f"{hashlib.sha256(Path(path).read_bytes()).hexdigest()}  {path}"
+              for path in sorted(paths)
+          ]
+          Path("SOURCE-SHA256SUMS").write_text("\n".join(rows) + "\n", encoding="utf-8")
+          PY
+
+          git add app/help/content.py SOURCE-SHA256SUMS
+          git commit -m "help: restore AWG-only creation wording contract"
+          git push origin HEAD:docs/02206-guide-help
