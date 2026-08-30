@@ -1,0 +1,82 @@
+name: Restore AWG header and label
+
+on:
+  push:
+    branches: [tmp/awg-label-revert-final]
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: tmp/awg-label-revert-final
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Restore original AWG header and correct generation text
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          panel_path = Path("app/web/templates/_awg31_panel.html")
+          panel = panel_path.read_text(encoding="utf-8")
+          panel, count = re.subn(
+              r'\n<style id="sg-awg-header-density-fix">.*?</style>\s*$',
+              '\n',
+              panel,
+              flags=re.S,
+          )
+          if count != 1:
+              raise SystemExit(f"expected one AWG density override, removed {count}")
+          panel_path.write_text(panel, encoding="utf-8")
+
+          page_path = Path("app/web/templates/connections.html")
+          page = page_path.read_text(encoding="utf-8")
+          old = "UDP VPN · ДВА ПОКОЛЕНИЯ"
+          new = "UDP VPN · ТРИ ПОКОЛЕНИЯ"
+          if page.count(old) != 1:
+              raise SystemExit(f"expected one old AWG label, found {page.count(old)}")
+          page_path.write_text(page.replace(old, new, 1), encoding="utf-8")
+
+          test_path = Path("tests/test_sg_gateway_v22_awg_cards_unified_ui.py")
+          test = test_path.read_text(encoding="utf-8")
+          test = re.sub(
+              r'\ndef test_awg_shell_header_.*\Z',
+              '''\n\ndef test_awg_header_keeps_original_layout_and_names_three_generations() -> None:\n    panel = _read("app/web/templates/_awg31_panel.html")\n    page = _read("app/web/templates/connections.html")\n    stylesheet = _read("app/web/static/sg-awg-dual-v1.css")\n\n    assert 'id="sg-awg-header-density-fix"' not in panel\n    assert "UDP VPN · ТРИ ПОКОЛЕНИЯ" in page\n    assert "UDP VPN · ДВА ПОКОЛЕНИЯ" not in page\n    assert ".page-connections .awgd-shell > .cnv1-engine-head { border-bottom: 1px solid var(--sg-line-soft); }" in stylesheet\n    assert "padding: 14px 18px 18px;" in stylesheet\n''',
+              test,
+              flags=re.S,
+          )
+          test_path.write_text(test, encoding="utf-8")
+          PY
+      - name: Run focused tests
+        run: |
+          python -m pip install pytest
+          python -m pytest -q \
+            tests/test_sg_gateway_v22_awg_cards_unified_ui.py \
+            tests/test_sg_gateway_v22_mihomo_service_tools_ui.py \
+            tests/test_sg_gateway_v22_mihomo_restart_services.py
+      - name: Commit final source state
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/fix-awg-label-and-restore-header.yml
+          python3 - <<'PY'
+          import hashlib
+          import subprocess
+          from pathlib import Path
+
+          paths = subprocess.check_output(["git", "ls-files"], text=True, encoding="utf-8").splitlines()
+          paths = [path for path in paths if path != "SOURCE-SHA256SUMS"]
+          rows = []
+          for path in sorted(paths):
+              rows.append(f"{hashlib.sha256(Path(path).read_bytes()).hexdigest()}  {path}")
+          Path("SOURCE-SHA256SUMS").write_text("\n".join(rows) + "\n", encoding="utf-8")
+          PY
+          git add app/web/templates/_awg31_panel.html app/web/templates/connections.html tests/test_sg_gateway_v22_awg_cards_unified_ui.py SOURCE-SHA256SUMS
+          git commit -m "ui: restore AWG header and name three generations"
+          git push origin HEAD:tmp/awg-label-revert-final
