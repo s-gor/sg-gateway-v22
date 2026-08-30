@@ -42,10 +42,11 @@ def execute_mihomo_action(action: str) -> MihomoRuntimeResult:
             ),
         }
     )
+    module = "app.mihomo.restart_services" if action == "restart" else "app.mihomo.helper"
 
     try:
         result = subprocess.run(
-            [str(python), "-m", "app.mihomo.helper", action],
+            [str(python), "-m", module, action],
             capture_output=True,
             text=True,
             timeout=180,
