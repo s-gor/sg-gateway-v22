@@ -20,6 +20,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           python3 - <<'PY'
+          import re
           from pathlib import Path
 
           template_path = Path("app/web/templates/help.html")
@@ -38,25 +39,6 @@ jobs:
                   raise SystemExit(f"help template anchor missing: {old}")
               template = template.replace(old, new, 1)
 
-          old_related = '''          {% if topic.slug == 'system' %}
-          <a href="{{ url_for('system') }}"><strong>System</strong><small>Проверить ресурсы и состояние</small><span>→</span></a>
-          <a href="{{ url_for('maintenance') }}"><strong>Maintenance</strong><small>Диагностика и копии</small><span>→</span></a>
-          {% elif topic.slug == 'clients' %}
-          <a href="{{ url_for('clients') }}"><strong>Clients</strong><small>Создать и открыть клиента</small><span>→</span></a>
-          <a href="{{ url_for('connections') }}"><strong>Connections</strong><small>Проверить параметры профиля</small><span>→</span></a>
-          {% elif topic.slug == 'connections' %}
-          <a href="{{ url_for('connections') }}"><strong>Connections</strong><small>Изменить адреса и ключи</small><span>→</span></a>
-          <a href="{{ url_for('routing') }}"><strong>Routing</strong><small>Посмотреть итоговый путь</small><span>→</span></a>
-          {% elif topic.slug == 'routing' %}
-          <a href="{{ url_for('routing') }}"><strong>Routing</strong><small>Открыть фактические пути</small><span>→</span></a>
-          <a href="{{ url_for('clients') }}"><strong>Clients</strong><small>Проверить выданные профили</small><span>→</span></a>
-          {% elif topic.slug == 'maintenance' %}
-          <a href="{{ url_for('maintenance') }}"><strong>Maintenance</strong><small>Копии и журнал операций</small><span>→</span></a>
-          <a href="{{ url_for('recovery') }}"><strong>Recovery</strong><small>Аварийный обзор состояния</small><span>→</span></a>
-          {% else %}
-          <a href="{{ url_for('security') }}"><strong>Security</strong><small>Проверить доступ к панели</small><span>→</span></a>
-          <a href="{{ url_for('download_diagnostics') }}"><strong>Diagnostics</strong><small>Скачать системный отчёт</small><span>→</span></a>
-          {% endif %}'''
           new_related = '''          {% if topic.slug == 'quickstart' %}
           <a href="{{ url_for('system') }}"><strong>System</strong><small>Начать с состояния сервера</small><span>→</span></a>
           <a href="{{ url_for('connections') }}"><strong>Connections</strong><small>Проверить готовность протоколов</small><span>→</span></a>
@@ -79,9 +61,16 @@ jobs:
           <a href="{{ url_for('security') }}"><strong>Security</strong><small>HTTPS и доступ к панели</small><span>→</span></a>
           <a href="{{ url_for('download_diagnostics') }}"><strong>Diagnostics</strong><small>Скачать системный отчёт</small><span>→</span></a>
           {% endif %}'''
-          if old_related not in template:
-              raise SystemExit("help related-links block anchor missing")
-          template = template.replace(old_related, new_related, 1)
+          pattern = re.compile(
+              r'(?s)(        <div class="hlpv1-related-grid sg-ljd-tile-grid">\n).*?(\n        </div>\n      </section>)'
+          )
+          template, count = pattern.subn(
+              lambda match: match.group(1) + new_related + match.group(2),
+              template,
+              count=1,
+          )
+          if count != 1:
+              raise SystemExit(f"help related-links region count: {count}")
           template_path.write_text(template, encoding="utf-8")
 
           readme_path = Path("README.md")
