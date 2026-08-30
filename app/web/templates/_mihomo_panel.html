@@ -14,15 +14,6 @@
   </header>
 
   <div class="mhv2-compact-meta">
-    <section class="mhv2-compact-endpoint sg-ljd-nested">
-      <div>
-        <span>ПУБЛИЧНЫЙ ENDPOINT</span>
-        <strong>{{ mihomo_public_host or 'Не определён' }}</strong>
-        <small>{{ country_name(mihomo.settings.country_code) }} · {{ mihomo.settings.endpoint_source }}</small>
-      </div>
-      <span class="mhv2-listener-count">{{ mihomo.listener_active }} / {{ mihomo.listener_total }} работают</span>
-    </section>
-
     {% if mihomo.has_pending_changes %}
     <section class="mhv2-pending sg-ljd-warning">
       <strong>Есть неприменённые изменения</strong>
@@ -176,10 +167,6 @@
         <details class="mhv2-advanced">
           <summary>Дополнительно</summary>
           <div class="mhv2-advanced-body two">
-            <label>
-              <span>ALPN</span>
-              <input type="text" name="tuic_alpn" value="{{ mihomo.settings.tuic_alpn }}">
-            </label>
             <label>
               <span>Congestion controller</span>
               <select name="tuic_congestion_controller">
