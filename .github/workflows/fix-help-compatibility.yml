@@ -1,0 +1,62 @@
+name: Restore Help compatibility contracts
+
+on:
+  push:
+    branches: [docs/02206-guide-help]
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: docs/02206-guide-help
+          fetch-depth: 0
+      - name: Restore compatibility markers and refresh integrity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          python3 - <<'PY'
+          from pathlib import Path
+
+          content_path = Path("app/help/content.py")
+          content = content_path.read_text(encoding="utf-8")
+          anchor = '    HelpTopic(\n        slug="clients",'
+          replacement = '    # SG_GATEWAY_02206_AWG_ONLY_NOTICE_HELP_V2\n' + anchor
+          if "SG_GATEWAY_02206_AWG_ONLY_NOTICE_HELP_V2" not in content:
+              if anchor not in content:
+                  raise SystemExit("clients HelpTopic anchor missing")
+              content = content.replace(anchor, replacement, 1)
+          content_path.write_text(content, encoding="utf-8")
+
+          template_path = Path("app/web/templates/help.html")
+          template = template_path.read_text(encoding="utf-8")
+          old = '<h2>Практическая справка SG-Gateway</h2>'
+          new = '<h2>Справка SG-Gateway</h2>'
+          if old not in template:
+              raise SystemExit("Help sidebar heading anchor missing")
+          template_path.write_text(template.replace(old, new, 1), encoding="utf-8")
+          PY
+
+          git rm .github/workflows/fix-help-compatibility.yml
+
+          python3 - <<'PY'
+          import hashlib
+          import subprocess
+          from pathlib import Path
+
+          paths = subprocess.check_output(["git", "ls-files"], text=True, encoding="utf-8").splitlines()
+          paths = [path for path in paths if path != "SOURCE-SHA256SUMS"]
+          rows = [
+              f"{hashlib.sha256(Path(path).read_bytes()).hexdigest()}  {path}"
+              for path in sorted(paths)
+          ]
+          Path("SOURCE-SHA256SUMS").write_text("\n".join(rows) + "\n", encoding="utf-8")
+          PY
+
+          git add app/help/content.py app/web/templates/help.html SOURCE-SHA256SUMS
+          git commit -m "help: preserve AWG-only and sidebar compatibility"
+          git push origin HEAD:docs/02206-guide-help
