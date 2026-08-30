@@ -1,0 +1,37 @@
+name: Refresh UI source integrity
+
+on:
+  push:
+    branches: [ui/visible-mihomo-restart]
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ui/visible-mihomo-restart
+      - name: Regenerate inventory and remove temporary workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/refresh-ui-source-integrity.yml
+          python3 - <<'PY'
+          import hashlib
+          import subprocess
+          from pathlib import Path
+
+          paths = subprocess.check_output(["git", "ls-files"], text=True, encoding="utf-8").splitlines()
+          paths = [path for path in paths if path != "SOURCE-SHA256SUMS"]
+          rows = []
+          for path in sorted(paths):
+              digest = hashlib.sha256(Path(path).read_bytes()).hexdigest()
+              rows.append(f"{digest}  {path}")
+          Path("SOURCE-SHA256SUMS").write_text("\n".join(rows) + "\n", encoding="utf-8")
+          PY
+          git add SOURCE-SHA256SUMS
+          git commit -m "Refresh UI source integrity"
+          git push origin HEAD:ui/visible-mihomo-restart
