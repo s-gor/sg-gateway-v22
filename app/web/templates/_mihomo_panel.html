@@ -14,6 +14,15 @@
   </header>
 
   <div class="mhv2-compact-meta">
+    <section class="mhv2-compact-endpoint sg-ljd-nested">
+      <div>
+        <span>ПУБЛИЧНЫЙ ENDPOINT</span>
+        <strong>{{ mihomo_public_host or 'Не определён' }}</strong>
+        <small>{{ country_name(mihomo.settings.country_code) }} · {{ mihomo.settings.endpoint_source }}</small>
+      </div>
+      <span class="mhv2-listener-count">{{ mihomo.listener_active }} / {{ mihomo.listener_total }} работают</span>
+    </section>
+
     {% if mihomo.has_pending_changes %}
     <section class="mhv2-pending sg-ljd-warning">
       <strong>Есть неприменённые изменения</strong>
@@ -199,6 +208,11 @@
       </button>
       {% endif %}
     </div>
+
+    <div class="mhv2-restart-row">
+      <button class="button" type="submit" name="action" value="restart">Перезапустить</button>
+      <span>Только для уже применённой конфигурации.</span>
+    </div>
   </form>
 
   <p class="mhv2-runtime-note">
@@ -207,6 +221,33 @@
     установку панели.
   </p>
 </section>
+
+<style>
+#mihomo .mhv2-compact-meta {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+#mihomo .mhv2-compact-endpoint {
+  margin-bottom: 0;
+}
+#mihomo .mhv2-form-compact {
+  gap: 10px;
+}
+#mihomo .mhv2-restart-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 10px;
+  border-top: 1px solid var(--sg-line-soft);
+  padding-top: 10px;
+}
+#mihomo .mhv2-restart-row span {
+  color: var(--sg-muted);
+  font-size: 10px;
+}
+</style>
 
 <script id="sg-mihomo-runtime-switches-v1">
 (() => {
