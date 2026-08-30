@@ -1,0 +1,121 @@
+name: Apply 022.06 documentation publication
+
+on:
+  push:
+    branches: [docs/02206-guide-help]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: docs/02206-guide-help
+          fetch-depth: 0
+      - name: Patch documentation entry points and refresh integrity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          python3 - <<'PY'
+          from pathlib import Path
+
+          template_path = Path("app/web/templates/help.html")
+          template = template_path.read_text(encoding="utf-8")
+          replacements = {
+              "<h1>Help</h1>\n      <p>Короткие практические инструкции по основным разделам SG-Gateway.</p>":
+                  "<h1>Практическая справка SG-Gateway</h1>\n      <p>Полная практическая справка: установка, клиенты, протоколы, подписки, резервные копии и диагностика.</p>",
+              "<div class=\"hlpv1-summary-note\">System, Clients, Connections, Routing, Maintenance, Security</div>":
+                  "<div class=\"hlpv1-summary-note\">Первый запуск, протоколы, подписки, Backup и диагностика</div>",
+              "<h2>Справка SG-Gateway</h2>": "<h2>Практическая справка SG-Gateway</h2>",
+              "<span class=\"hlpv1-step-pill\">{{ topic.body | length }} шага</span>":
+                  "<span class=\"hlpv1-step-pill\">{{ topic.body | length }} пунктов</span>",
+          }
+          for old, new in replacements.items():
+              if old not in template:
+                  raise SystemExit(f"help template anchor missing: {old}")
+              template = template.replace(old, new, 1)
+
+          old_related = '''          {% if topic.slug == 'system' %}
+          <a href="{{ url_for('system') }}"><strong>System</strong><small>Проверить ресурсы и состояние</small><span>→</span></a>
+          <a href="{{ url_for('maintenance') }}"><strong>Maintenance</strong><small>Диагностика и копии</small><span>→</span></a>
+          {% elif topic.slug == 'clients' %}
+          <a href="{{ url_for('clients') }}"><strong>Clients</strong><small>Создать и открыть клиента</small><span>→</span></a>
+          <a href="{{ url_for('connections') }}"><strong>Connections</strong><small>Проверить параметры профиля</small><span>→</span></a>
+          {% elif topic.slug == 'connections' %}
+          <a href="{{ url_for('connections') }}"><strong>Connections</strong><small>Изменить адреса и ключи</small><span>→</span></a>
+          <a href="{{ url_for('routing') }}"><strong>Routing</strong><small>Посмотреть итоговый путь</small><span>→</span></a>
+          {% elif topic.slug == 'routing' %}
+          <a href="{{ url_for('routing') }}"><strong>Routing</strong><small>Открыть фактические пути</small><span>→</span></a>
+          <a href="{{ url_for('clients') }}"><strong>Clients</strong><small>Проверить выданные профили</small><span>→</span></a>
+          {% elif topic.slug == 'maintenance' %}
+          <a href="{{ url_for('maintenance') }}"><strong>Maintenance</strong><small>Копии и журнал операций</small><span>→</span></a>
+          <a href="{{ url_for('recovery') }}"><strong>Recovery</strong><small>Аварийный обзор состояния</small><span>→</span></a>
+          {% else %}
+          <a href="{{ url_for('security') }}"><strong>Security</strong><small>Проверить доступ к панели</small><span>→</span></a>
+          <a href="{{ url_for('download_diagnostics') }}"><strong>Diagnostics</strong><small>Скачать системный отчёт</small><span>→</span></a>
+          {% endif %}'''
+          new_related = '''          {% if topic.slug == 'quickstart' %}
+          <a href="{{ url_for('system') }}"><strong>System</strong><small>Начать с состояния сервера</small><span>→</span></a>
+          <a href="{{ url_for('connections') }}"><strong>Connections</strong><small>Проверить готовность протоколов</small><span>→</span></a>
+          {% elif topic.slug in ['system', 'troubleshooting'] %}
+          <a href="{{ url_for('system') }}"><strong>System</strong><small>Проверить ресурсы и службы</small><span>→</span></a>
+          <a href="{{ url_for('maintenance') }}"><strong>Maintenance</strong><small>Журнал, диагностика и repair</small><span>→</span></a>
+          {% elif topic.slug in ['clients', 'subscriptions'] %}
+          <a href="{{ url_for('clients') }}"><strong>Clients</strong><small>Клиенты, устройства и экспорты</small><span>→</span></a>
+          <a href="{{ url_for('connections') }}"><strong>Connections</strong><small>Проверить серверные профили</small><span>→</span></a>
+          {% elif topic.slug in ['connections', 'awg', 'xray', 'mihomo'] %}
+          <a href="{{ url_for('connections') }}"><strong>Connections</strong><small>Настройки и состояние протоколов</small><span>→</span></a>
+          <a href="{{ url_for('clients') }}"><strong>Clients</strong><small>Выдать профиль устройству</small><span>→</span></a>
+          {% elif topic.slug == 'routing' %}
+          <a href="{{ url_for('routing') }}"><strong>Routing</strong><small>Правила, GeoFiles и WARP</small><span>→</span></a>
+          <a href="{{ url_for('system') }}"><strong>System</strong><small>Проверить IPv4 и IPv6</small><span>→</span></a>
+          {% elif topic.slug in ['backups', 'updates'] %}
+          <a href="{{ url_for('maintenance') }}"><strong>Maintenance</strong><small>Backup, Restore и операции</small><span>→</span></a>
+          <a href="{{ url_for('recovery') }}"><strong>Recovery</strong><small>Аварийный обзор состояния</small><span>→</span></a>
+          {% else %}
+          <a href="{{ url_for('security') }}"><strong>Security</strong><small>HTTPS и доступ к панели</small><span>→</span></a>
+          <a href="{{ url_for('download_diagnostics') }}"><strong>Diagnostics</strong><small>Скачать системный отчёт</small><span>→</span></a>
+          {% endif %}'''
+          if old_related not in template:
+              raise SystemExit("help related-links block anchor missing")
+          template = template.replace(old_related, new_related, 1)
+          template_path.write_text(template, encoding="utf-8")
+
+          readme_path = Path("README.md")
+          readme = readme_path.read_text(encoding="utf-8")
+          readme_anchor = "Полное описание выпуска: **[SG-Gateway 0.1.0-022.06 — описание релиза](PUBLICATION-02206.md)**.\n\n"
+          readme_insert = readme_anchor + "## Документация 022.06\n\n- **[Полная справка по установке и эксплуатации](docs/SG-GATEWAY-02206-GUIDE.md)**\n- **[Все отличия 022.06 от 022.04](docs/CHANGES-02204-TO-02206.md)**\n- **[Команды Clean Install, Update и Full Uninstall](deploy/GITHUB-COMMANDS.md)**\n\nВ полной справке заранее оставлены восемь мест для новых скриншотов; изображения будут добавлены отдельным обновлением документации.\n\n"
+          if readme_anchor not in readme:
+              raise SystemExit("README publication anchor missing")
+          readme_path.write_text(readme.replace(readme_anchor, readme_insert, 1), encoding="utf-8")
+
+          publication_path = Path("PUBLICATION-02206.md")
+          publication = publication_path.read_text(encoding="utf-8")
+          publication_anchor = "Версия завершает линию 022.06 и объединяет независимые AWG 2.0, AWG 3.0 и AWG 3.1, безопасное обновление, переносимые резервные копии, персональные подписки и накопленные исправления панели.\n\n"
+          publication_insert = publication_anchor + "## Документация\n\n- **[Полная справка SG-Gateway 022.06](docs/SG-GATEWAY-02206-GUIDE.md)** — установка, первый запуск, протоколы, клиенты, подписки, Routing, HTTPS, Backup/Restore и диагностика.\n- **[Отличия 022.06 от 022.04](docs/CHANGES-02204-TO-02206.md)** — полный перечень новых возможностей и функций, унаследованных от предыдущего выпуска.\n- **[Публичные команды GitHub](deploy/GITHUB-COMMANDS.md)** — Clean Install, Update и Full Uninstall.\n\nВ руководстве зарезервированы восемь пронумерованных мест для новых скриншотов.\n\n"
+          if publication_anchor not in publication:
+              raise SystemExit("PUBLICATION-02206 anchor missing")
+          publication_path.write_text(publication.replace(publication_anchor, publication_insert, 1), encoding="utf-8")
+          PY
+
+          git rm .github/workflows/apply-02206-documentation.yml
+
+          python3 - <<'PY'
+          import hashlib
+          import subprocess
+          from pathlib import Path
+
+          paths = subprocess.check_output(["git", "ls-files"], text=True, encoding="utf-8").splitlines()
+          paths = [path for path in paths if path != "SOURCE-SHA256SUMS"]
+          rows = []
+          for path in sorted(paths):
+              rows.append(f"{hashlib.sha256(Path(path).read_bytes()).hexdigest()}  {path}")
+          Path("SOURCE-SHA256SUMS").write_text("\n".join(rows) + "\n", encoding="utf-8")
+          PY
+
+          git add README.md PUBLICATION-02206.md app/web/templates/help.html SOURCE-SHA256SUMS
+          git commit -m "docs: publish complete 022.06 help and guide"
+          git push origin HEAD:docs/02206-guide-help
