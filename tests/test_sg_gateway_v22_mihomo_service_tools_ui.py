@@ -40,4 +40,7 @@ def test_mihomo_compact_spacing_contract() -> None:
     assert "margin-bottom: 6px;" in source
     assert "#mihomo .mhv2-form-compact" in source
     assert "gap: 10px;" in source
-    assert "justify-content: flex-start;" in source
+    assert "justify-content: center;" in source
+    restart_css = source.split("#mihomo .mhv2-restart-row {", 1)[1].split("}", 1)[0]
+    assert "border-top" not in restart_css
+    assert "padding-top: 0;" in restart_css
