@@ -34,6 +34,7 @@ TOPICS = [
             "Если статус непонятен, откройте Maintenance, журнал операций или скачайте диагностику до перезапуска и переустановки.",
         ],
     ),
+    # SG_GATEWAY_02206_AWG_ONLY_NOTICE_HELP_V2
     HelpTopic(
         slug="clients",
         title="Клиенты и устройства",
