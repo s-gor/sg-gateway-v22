@@ -38,3 +38,17 @@ def test_awg31_card_matches_shared_status_and_control_structure() -> None:
     assert '<details class="awgd-v31-service sg-ljd-nested" hidden>' in panel
     assert "/connections/amneziawg31/service/" in panel
     assert ".page-connections .awgd-card-v31 { grid-column: 1 / -1; }" not in stylesheet
+
+
+def test_awg_shell_header_is_compact_without_persistent_divider() -> None:
+    panel = _read("app/web/templates/_awg31_panel.html")
+
+    assert 'id="sg-awg-header-density-fix"' in panel
+    assert ".page-connections .awgd-shell > .cnv1-engine-head" in panel
+    header_css = panel.split(".page-connections .awgd-shell > .cnv1-engine-head {", 1)[1].split("}", 1)[0]
+    assert "border-bottom: 0;" in header_css
+    assert "padding: 14px 18px 8px;" in header_css
+    assert ".page-connections .awgd-shell > .cnv1-engine-head .awgd-footer" in panel
+    assert "padding: 0;" in panel
+    assert ".page-connections .awgd-shell > .awgd-grid" in panel
+    assert "padding-top: 8px;" in panel
