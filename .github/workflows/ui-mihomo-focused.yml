@@ -19,3 +19,4 @@ jobs:
           tests/test_sg_gateway_v22_mihomo_service_tools_ui.py
           tests/test_sg_gateway_v22_mihomo_panel_cleanup_ui.py
           tests/test_sg_gateway_v22_mihomo_restart_services.py
+          tests/test_sg_gateway_v22_awg_cards_unified_ui.py
