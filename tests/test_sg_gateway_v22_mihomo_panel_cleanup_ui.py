@@ -12,10 +12,12 @@ def _css_block(source: str, selector: str) -> str:
     return source[start : end + 1]
 
 
-def test_mihomo_panel_removes_only_the_approved_elements() -> None:
+def test_mihomo_panel_keeps_compact_endpoint_and_approved_controls() -> None:
     source = TEMPLATE.read_text(encoding="utf-8")
 
-    assert "mhv2-compact-endpoint" not in source
+    assert "mhv2-compact-endpoint" in source
+    assert "mihomo.listener_active" in source
+    assert "mihomo.listener_total" in source
     assert 'name="tuic_alpn"' not in source
 
     for control in (
