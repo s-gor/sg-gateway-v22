@@ -60,6 +60,7 @@ def test_text_envelope_preserves_v1_headers_devices_ready_uris_and_awg2_config(m
     assert markers[0]["profile"] == "amneziawg"
     assert markers[0]["device_id"] == 101
     assert markers[0]["device"] == ""
+    assert "primary" not in markers[0]
     padded = markers[0]["data"] + "=" * (-len(markers[0]["data"]) % 4)
     assert base64.urlsafe_b64decode(padded).decode() == "[Interface]\nPrivateKey = test\n"
 
