@@ -1,0 +1,92 @@
+name: Verify exact AWG label candidate
+
+on:
+  push:
+    branches:
+      - verify/02206-awg-primary-subscription-label-e7cd63de
+
+permissions:
+  contents: read
+
+jobs:
+  verify-exact-sha:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact candidate SHA
+        uses: actions/checkout@v4
+        with:
+          ref: e7cd63deab9c3a34b6aee910c61017ff8a8b9c6e
+          fetch-depth: 1
+
+      - name: Confirm exact candidate identity
+        run: |
+          test "$(git rev-parse HEAD)" = "e7cd63deab9c3a34b6aee910c61017ff8a8b9c6e"
+          test "$(git rev-parse HEAD^{tree})" = "1f13f46d9c589c4e81ddb9a1cfda5a3aa63bb6d1"
+
+      - name: Verify source integrity
+        run: |
+          python3 -B - <<'PY'
+          import hashlib
+          import re
+          import subprocess
+          from pathlib import Path
+
+          expected = {}
+          for line_no, raw in enumerate(Path("SOURCE-SHA256SUMS").read_text(encoding="utf-8").splitlines(), 1):
+              if not raw.strip():
+                  continue
+              match = re.fullmatch(r"([0-9a-f]{64})  (.+)", raw)
+              if match is None:
+                  raise SystemExit(f"invalid SOURCE-SHA256SUMS line {line_no}: {raw!r}")
+              digest, path = match.groups()
+              if path in expected:
+                  raise SystemExit(f"duplicate checksum path: {path}")
+              expected[path] = digest
+
+          tracked = set(subprocess.check_output(["git", "ls-files"], text=True, encoding="utf-8").splitlines())
+          tracked.discard("SOURCE-SHA256SUMS")
+          if tracked != set(expected):
+              raise SystemExit(
+                  f"checksum inventory mismatch: missing={sorted(tracked-set(expected))} "
+                  f"extra={sorted(set(expected)-tracked)}"
+              )
+
+          for path in sorted(tracked):
+              content = subprocess.check_output(["git", "show", f"HEAD:{path}"])
+              actual = hashlib.sha256(content).hexdigest()
+              if actual != expected[path]:
+                  raise SystemExit(f"source hash mismatch: {path}")
+
+          print(f"Exact candidate source integrity OK: {len(tracked)} files")
+          PY
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+
+      - name: Check Python syntax and release manifest
+        run: |
+          python -B -c "from pathlib import Path; files=list(Path('app').rglob('*.py'))+list(Path('engines').rglob('*.py'))+list(Path('tests').rglob('*.py')); [compile(p.read_text(encoding='utf-8'), str(p), 'exec') for p in files]; print(f'syntax ok: {len(files)} files')"
+          python -B -c "import json, pathlib; manifest=json.loads(pathlib.Path('release-manifest.json').read_text(encoding='utf-8')); version=pathlib.Path('VERSION').read_text(encoding='utf-8').strip(); assert manifest['version']==version; assert manifest['status']=='STABLE'; assert manifest['channel']=='stable-02206'; assert manifest['build']=='MAIN-02206-STABLE'; print('manifest ok')"
+
+      - name: Run focused subscription tests
+        run: python -m pytest tests/test_sg_gateway_v22_sg_subscription_compat_text.py
+
+      - name: Run complete test suite
+        run: python -m pytest tests
+
+      - name: Build and verify FULL package
+        run: |
+          command -v zip
+          command -v unzip
+          VERSION="$(tr -d '[:space:]' < VERSION)"
+          OUT="/tmp/SG-Gateway-${VERSION}-FULL.run"
+          bash build-run.sh "$OUT"
+          bash "$OUT" --verify-only
