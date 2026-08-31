@@ -175,14 +175,11 @@
                   <strong>{{ profile.title }}</strong>
                   <span>{{ profile.transport }} · {{ profile.security }}</span>
                 </div>
-                {% if profile.id not in ['reality_tcp', 'xhttp_reality'] %}
-                <label class="xps2-field-port">
+                <div class="xps2-field-port xps2-system-port">
                   <span>{{ 'UDP-порт' if profile.id == 'hysteria2' else 'TCP-порт' }}</span>
-                  <input type="number" min="1" max="65535"
-                         name="{{ profile.id }}_port" value="{{ profile.port }}"
-                         {% if locked %}disabled{% endif %}>
-                </label>
-                {% endif %}
+                  <output>{{ profile.port }}</output>
+                  <small>Системный порт SG-Gateway</small>
+                </div>
                 {% if profile.mode %}
                 {% if profile.id == 'xhttp_reality' %}
                 <input type="hidden" name="{{ profile.id }}_mode" value="stream-one">
@@ -301,8 +298,6 @@
         <div class="cnv1-advanced-body">
           <form method="post" action="{{ url_for('update_xray') }}" class="cnv1-engine-form">
             <div class="cnv1-form-grid">
-              <label class="cnv1-field-wide"><span>Публичный адрес или домен</span><input type="text" name="host" value="{{ xray_public_host }}" required></label>
-              <label><span>Reality TCP-порт</span><input type="number" name="port" min="1" max="65535" value="{{ xray_settings.port }}" required></label>
               <label><span>Reality SNI</span><input type="text" name="server_name" value="{{ xray_settings.config.get('server_name', 'bing.com') }}"></label>
               <label><span>Reality public key</span><textarea name="public_key" rows="3">{{ xray_settings.config.get('public_key', '') }}</textarea></label>
               <label><span>Short ID</span><input type="text" name="short_id" value="{{ xray_settings.config.get('short_id', '') }}"></label>

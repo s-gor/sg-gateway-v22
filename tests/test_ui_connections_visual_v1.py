@@ -100,7 +100,6 @@ def test_connections_visual_v1_css_exists():
     assert "grid-template-columns: minmax(0, 1fr) minmax(0, 1fr)" in final
 
 
-
 def test_connections_protocol_cards_show_only_real_controls_as_fields():
     template = (ROOT / "app/web/templates/connections.html").read_text(encoding="utf-8")
     css = (ROOT / "app/web/static/sg-xmux-settings-v1.css").read_text(encoding="utf-8")
@@ -128,10 +127,12 @@ def test_reality_xhttp_fixed_mode_is_native_hidden_form_value_not_fake_control()
     assert "Reality XHTTP mode is rendered by the main form as a hidden stream-one" in js
 
 
-def test_connections_protocol_cards_keep_all_mutable_form_contracts():
+def test_connections_protocol_cards_keep_mutable_non_port_form_contracts():
     template = (ROOT / "app/web/templates/connections.html").read_text(encoding="utf-8")
+    assert 'name="{{ profile.id }}_port"' not in template
+    assert "<output>{{ profile.port }}</output>" in template
+    assert "Системный порт SG-Gateway" in template
     for field in (
-        'name="{{ profile.id }}_port"',
         'name="{{ profile.id }}_mode"',
         'name="{{ profile.id }}_path"',
         'name="hysteria2_obfs_mode"',
@@ -199,6 +200,7 @@ def test_xhttp_tls_mode_helper_is_hidden_without_affecting_responsive_layout():
     assert "height: 120px;" not in stacked
     assert "height: 112px;" not in stacked
 
+
 def test_connections_dark_classic_theme_is_scoped_and_loaded_last():
     base = (ROOT / "app/web/templates/base.html").read_text(encoding="utf-8")
     css = (ROOT / "app/web/static/sg-connections-dark-classic-v1.css").read_text(encoding="utf-8")
@@ -213,6 +215,7 @@ def test_connections_dark_classic_theme_is_scoped_and_loaded_last():
     assert ".xps2-choice-status.active" in css
     assert ".xps2-salamander-modes input:checked + span" in css
     assert "#xray-xmux .xmux1-mode input:checked + span" in css
+
 
 def test_connections_dark_classic_depth_pass_restores_blue_glass_hierarchy():
     css = (ROOT / "app/web/static/sg-connections-dark-classic-v1.css").read_text(encoding="utf-8")

@@ -561,10 +561,7 @@ def save_settings(form: Any) -> bool:
             "country_code": metadata["country_code"],
             "domain": metadata["domain"],
             "mieru_enabled": bool(form.get("mieru_enabled")),
-            "mieru_port": _int(
-                form.get("mieru_port"),
-                _int(config.get("mieru_port"), current.port or 2099),
-            ),
+            "mieru_port": _int(config.get("mieru_port"), current.port or 2099),
             "mieru_transport": (
                 "UDP"
                 if str(form.get("mieru_transport", "TCP")).upper() == "UDP"
@@ -586,10 +583,7 @@ def save_settings(form: Any) -> bool:
                 form.get("mieru_user_hint_mandatory")
             ),
             "anytls_enabled": bool(form.get("anytls_enabled")),
-            "anytls_port": _int(
-                form.get("anytls_port"),
-                _int(config.get("anytls_port"), 8443),
-            ),
+            "anytls_port": _int(config.get("anytls_port"), 8443),
             "anytls_padding_scheme": str(
                 form.get(
                     "anytls_padding_scheme",
@@ -597,10 +591,7 @@ def save_settings(form: Any) -> bool:
                 )
             ),
             "tuic_enabled": bool(form.get("tuic_enabled")),
-            "tuic_port": _int(
-                form.get("tuic_port"),
-                _int(config.get("tuic_port"), 10443),
-            ),
+            "tuic_port": _int(config.get("tuic_port"), 10443),
             "tuic_congestion_controller": str(
                 form.get(
                     "tuic_congestion_controller",
