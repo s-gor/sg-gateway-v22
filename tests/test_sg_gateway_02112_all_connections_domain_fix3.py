@@ -80,7 +80,11 @@ def test_connections_page_uses_public_host_for_every_engine():
     assert "AWG3: {{ awg3_public_host }}:{{ awg3_settings.port }}" in page
     assert "Xray Reality: {{ xray_public_host }}:{{ xray_settings.port }}" in page
     assert "Mihomo: {{ mihomo_public_host }}" in page
-    assert "<strong>{{ mihomo_public_host or 'Не определён' }}</strong>" in mihomo_panel
+
+    # Mihomo still receives the same resolved public endpoint from the service,
+    # but the fixed endpoint is intentionally not rendered as a separate card.
+    assert "mihomo_public_host" not in mihomo_panel
+    assert "mhv2-compact-endpoint" not in mihomo_panel
 
     # Client exports use the same central endpoint policy, so every connection
     # and every downloadable/QR/subscription payload follows one domain-first rule.

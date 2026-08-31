@@ -138,12 +138,21 @@ def test_connections_ui_has_no_editable_server_port_controls() -> None:
     for field in ("mieru_port", "anytls_port", "tuic_port"):
         assert f'name="{field}"' not in mihomo
 
-    assert "Системный порт SG-Gateway" in template
-    assert "Системный порт SG-Gateway" in mihomo
-    assert "{{ profile.port }}" in template
-    assert "{{ mihomo.settings.mieru_port }}" in mihomo
-    assert "{{ mihomo.settings.anytls_port }}" in mihomo
-    assert "{{ mihomo.settings.tuic_port }}" in mihomo
+
+def test_mihomo_ui_hides_fixed_listener_metadata_entirely() -> None:
+    mihomo = (ROOT / "app/web/templates/_mihomo_panel.html").read_text(encoding="utf-8")
+
+    assert "mhv2-compact-endpoint" not in mihomo
+    assert "mihomo.listener_active" not in mihomo
+    assert "mihomo.listener_total" not in mihomo
+    assert "mhv2-system-port" not in mihomo
+    assert "Системный порт SG-Gateway" not in mihomo
+    for value in (
+        "{{ mihomo.settings.mieru_port }}",
+        "{{ mihomo.settings.anytls_port }}",
+        "{{ mihomo.settings.tuic_port }}",
+    ):
+        assert value not in mihomo
 
 
 def test_real_user_controls_remain_available() -> None:
