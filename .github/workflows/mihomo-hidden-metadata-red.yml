@@ -24,6 +24,8 @@ jobs:
           tests/test_sg_gateway_v22_server_managed_ports.py
           tests/test_sg_gateway_v22_mihomo_panel_cleanup_ui.py
           tests/test_sg_gateway_v22_mihomo_service_tools_ui.py
+          tests/test_connections_layout_v24.py
+          tests/test_sg_gateway_02112_all_connections_domain_fix3.py
       - name: Refresh tracked source checksums
         run: |
           python - <<'PY'
@@ -33,6 +35,8 @@ jobs:
           manifest = Path("SOURCE-SHA256SUMS")
           targets = (
               "app/web/templates/_mihomo_panel.html",
+              "tests/test_connections_layout_v24.py",
+              "tests/test_sg_gateway_02112_all_connections_domain_fix3.py",
               "tests/test_sg_gateway_v22_mihomo_panel_cleanup_ui.py",
               "tests/test_sg_gateway_v22_mihomo_service_tools_ui.py",
               "tests/test_sg_gateway_v22_server_managed_ports.py",
