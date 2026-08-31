@@ -1,4 +1,4 @@
-name: Port lock contract
+name: Apply server-managed port contract once
 
 on:
   push:
@@ -6,21 +6,373 @@ on:
       - fix/02206-lock-server-ports
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  verify:
+  apply:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: fix/02206-lock-server-ports
           fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       - name: Install test dependencies
         run: python -m pip install -r requirements-dev.txt
-      - name: Run server-managed port contract
+      - name: Apply minimal production and contract changes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              file = Path(path)
+              text = file.read_text(encoding="utf-8")
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{path}: expected one anchor, found {count}: {old[:80]!r}")
+              file.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          # Xray profile apply: every listener keeps the already stored server port.
+          replace_once(
+              "app/xray/profiles.py",
+              '"reality_tcp_port": _port(form.get("reality_tcp_port"), int(settings.port or 443)),',
+              '"reality_tcp_port": int(current["reality_tcp_port"]),',
+          )
+          replace_once(
+              "app/xray/profiles.py",
+              '"xhttp_reality_port": _port(form.get("xhttp_reality_port"), 8444),',
+              '"xhttp_reality_port": int(current["xhttp_reality_port"]),',
+          )
+          replace_once(
+              "app/xray/profiles.py",
+              '''"xhttp_tls_port": _port(
+                  form.get("xhttp_tls_port"), int(current["xhttp_tls_port"])
+              ),''',
+              '"xhttp_tls_port": int(current["xhttp_tls_port"]),',
+          )
+          replace_once(
+              "app/xray/profiles.py",
+              '''"hysteria2_port": _port(
+                  form.get("hysteria2_port"), int(current["hysteria2_port"])
+              ),''',
+              '"hysteria2_port": int(current["hysteria2_port"]),',
+          )
+
+          # Mihomo/sing-box apply: ignore forged form ports and preserve stored listeners.
+          replace_once(
+              "app/mihomo/service.py",
+              '''"mieru_port": _int(
+                      form.get("mieru_port"),
+                      _int(config.get("mieru_port"), current.port or 2099),
+                  ),''',
+              '"mieru_port": _int(config.get("mieru_port"), current.port or 2099),',
+          )
+          replace_once(
+              "app/mihomo/service.py",
+              '''"anytls_port": _int(
+                      form.get("anytls_port"),
+                      _int(config.get("anytls_port"), 8443),
+                  ),''',
+              '"anytls_port": _int(config.get("anytls_port"), 8443),',
+          )
+          replace_once(
+              "app/mihomo/service.py",
+              '''"tuic_port": _int(
+                      form.get("tuic_port"),
+                      _int(config.get("tuic_port"), 10443),
+                  ),''',
+              '"tuic_port": _int(config.get("tuic_port"), 10443),',
+          )
+
+          # Xray UI: render every listener port as a server-managed value.
+          replace_once(
+              "app/web/templates/connections.html",
+              '''                {% if profile.id not in ['reality_tcp', 'xhttp_reality'] %}
+              <label class="xps2-field-port">
+                <span>{{ 'UDP-порт' if profile.id == 'hysteria2' else 'TCP-порт' }}</span>
+                <input type="number" min="1" max="65535"
+                       name="{{ profile.id }}_port" value="{{ profile.port }}"
+                       {% if locked %}disabled{% endif %}>
+              </label>
+              {% endif %}''',
+              '''                <div class="xps2-field-port xps2-system-port">
+                <span>{{ 'UDP-порт' if profile.id == 'hysteria2' else 'TCP-порт' }}</span>
+                <output>{{ profile.port }}</output>
+                <small>Системный порт SG-Gateway</small>
+              </div>''',
+          )
+          replace_once(
+              "app/web/templates/connections.html",
+              '''              <label class="cnv1-field-wide"><span>Публичный адрес или домен</span><input type="text" name="host" value="{{ xray_public_host }}" required></label>
+              <label><span>Reality TCP-порт</span><input type="number" name="port" min="1" max="65535" value="{{ xray_settings.port }}" required></label>
+''',
+              "",
+          )
+
+          # Mihomo UI: keep transport and protocol options, replace only port inputs.
+          replace_once(
+              "app/web/templates/_mihomo_panel.html",
+              '''          <label>
+            <span>Порт</span>
+            <input type="number" min="1" max="65535"
+                   name="mieru_port" value="{{ mihomo.settings.mieru_port }}">
+          </label>''',
+              '''          <div class="mhv2-system-port">
+            <span>Порт</span>
+            <output>{{ mihomo.settings.mieru_port }}</output>
+            <small>Системный порт SG-Gateway</small>
+          </div>''',
+          )
+          replace_once(
+              "app/web/templates/_mihomo_panel.html",
+              '''          <label>
+            <span>TCP-порт</span>
+            <input type="number" min="1" max="65535"
+                   name="anytls_port" value="{{ mihomo.settings.anytls_port }}">
+          </label>''',
+              '''          <div class="mhv2-system-port">
+            <span>TCP-порт</span>
+            <output>{{ mihomo.settings.anytls_port }}</output>
+            <small>Системный порт SG-Gateway</small>
+          </div>''',
+          )
+          replace_once(
+              "app/web/templates/_mihomo_panel.html",
+              '''          <label>
+            <span>UDP-порт</span>
+            <input type="number" min="1" max="65535"
+                   name="tuic_port" value="{{ mihomo.settings.tuic_port }}">
+          </label>''',
+              '''          <div class="mhv2-system-port">
+            <span>UDP-порт</span>
+            <output>{{ mihomo.settings.tuic_port }}</output>
+            <small>Системный порт SG-Gateway</small>
+          </div>''',
+          )
+          replace_once(
+              "app/web/templates/_mihomo_panel.html",
+              '''#mihomo .mhv2-restart-note {
+  color: var(--sg-muted);
+  font-size: 10px;
+  white-space: nowrap;
+}
+''',
+              '''#mihomo .mhv2-restart-note {
+  color: var(--sg-muted);
+  font-size: 10px;
+  white-space: nowrap;
+}
+#mihomo .mhv2-system-port {
+  display: grid;
+  gap: 6px;
+}
+#mihomo .mhv2-system-port > span {
+  color: var(--sg-muted);
+  font-size: 10px;
+  font-weight: 750;
+}
+#mihomo .mhv2-system-port > output {
+  display: flex;
+  align-items: center;
+  min-height: 42px;
+  border: 1px solid var(--sg-line);
+  border-radius: 10px;
+  background: var(--sg-panel-deep);
+  color: var(--sg-text);
+  padding: 0 12px;
+  font: inherit;
+}
+#mihomo .mhv2-system-port > small {
+  color: var(--sg-muted);
+  font-size: 10px;
+}
+''',
+          )
+
+          css = Path("app/web/static/sg-xray-profiles-v2.css")
+          css_text = css.read_text(encoding="utf-8")
+          marker = '''.xps2-parameter-row input {
+  width: 100%;
+}
+'''
+          addition = marker + '''
+.xps2-system-port {
+  display: grid;
+  gap: 6px;
+}
+
+.xps2-system-port > span {
+  color: var(--sg-muted);
+  font-size: 10px;
+  font-weight: 750;
+}
+
+.xps2-system-port > output {
+  display: flex;
+  align-items: center;
+  min-height: 2.55rem;
+  border: 1px solid var(--sg-line);
+  border-radius: .7rem;
+  background: var(--sg-panel-deep);
+  color: var(--sg-text);
+  padding: 0 12px;
+  font: inherit;
+}
+
+.xps2-system-port > small {
+  color: var(--sg-muted);
+  font-size: 10px;
+}
+'''
+          if css_text.count(marker) != 1:
+              raise SystemExit("xray CSS anchor not found exactly once")
+          css.write_text(css_text.replace(marker, addition, 1), encoding="utf-8")
+
+          # Correct the new contract's dynamic XHTTP field assertion.
+          replace_once(
+              "tests/test_sg_gateway_v22_server_managed_ports.py",
+              '''    assert 'name="xhttp_tls_mode"' in template
+''',
+              '''    assert 'name="{{ profile.id }}_mode"' in template
+    assert "XHTTP mode клиента" in template
+''',
+          )
+
+          # Replace the old partial-port contract with the complete one.
+          old_test = '''def test_connections_hide_core_xray_ports_but_keep_fingerprint_selector() -> None:
+    template = _read("app/web/templates/connections.html")
+
+    assert "<strong>Client Fingerprint</strong>" in template
+    assert 'name="fingerprint"' in template
+
+    guard = "{% if profile.id not in ['reality_tcp', 'xhttp_reality'] %}"
+    assert guard in template
+    guard_start = template.index(guard)
+    guard_end = template.index("{% endif %}", guard_start)
+    guarded_port_block = template[guard_start:guard_end]
+
+    assert 'name="{{ profile.id }}_port"' in guarded_port_block
+    assert "xps2-system-port" not in template
+    assert "Системный порт SG-Gateway" not in template
+'''
+          new_test = '''def test_connections_render_all_xray_ports_as_system_values() -> None:
+    template = _read("app/web/templates/connections.html")
+
+    assert "<strong>Client Fingerprint</strong>" in template
+    assert 'name="fingerprint"' in template
+    assert 'name="{{ profile.id }}_port"' not in template
+    assert 'name="port" min="1" max="65535"' not in template
+    assert "xps2-system-port" in template
+    assert "Системный порт SG-Gateway" in template
+    assert "<output>{{ profile.port }}</output>" in template
+'''
+          replace_once(
+              "tests/test_sg_gateway_v22_awg30_clean_install_and_port_ui.py",
+              old_test,
+              new_test,
+          )
+
+          # Layout contract: listener ports are outputs, not POST fields.
+          replace_once(
+              "tests/test_connections_layout_v24.py",
+              '''    for field in (
+        'name="mieru_enabled"', 'name="mieru_port"', 'name="mieru_transport"',
+        'name="anytls_enabled"', 'name="anytls_port"',
+        'name="tuic_enabled"', 'name="tuic_port"',
+    ):
+        assert field in panel
+''',
+              '''    for field in (
+        'name="mieru_enabled"', 'name="mieru_transport"',
+        'name="anytls_enabled"',
+        'name="tuic_enabled"',
+    ):
+        assert field in panel
+    for field in ("mieru_port", "anytls_port", "tuic_port"):
+        assert f'name="{field}"' not in panel
+    for value in (
+        "{{ mihomo.settings.mieru_port }}",
+        "{{ mihomo.settings.anytls_port }}",
+        "{{ mihomo.settings.tuic_port }}",
+    ):
+        assert value in panel
+    assert "Системный порт SG-Gateway" in panel
+''',
+          )
+          PY
+      - name: Remove one-time workflow and refresh source integrity
+        run: |
+          git rm .github/workflows/port-lock-diagnostic.yml
+          python - <<'PY'
+          import hashlib
+          import subprocess
+          from pathlib import Path
+
+          paths = sorted(
+              path
+              for path in subprocess.check_output(
+                  ["git", "ls-files"], text=True, encoding="utf-8"
+              ).splitlines()
+              if path != "SOURCE-SHA256SUMS"
+              and Path(path).is_file()
+          )
+          Path("SOURCE-SHA256SUMS").write_text(
+              "\n".join(
+                  f"{hashlib.sha256(Path(path).read_bytes()).hexdigest()}  {path}"
+                  for path in paths
+              ) + "\n",
+              encoding="utf-8",
+          )
+          PY
+      - name: Run focused port and UI contracts
         env:
           PYTHONPATH: .
-        run: python -m pytest -q tests/test_sg_gateway_v22_server_managed_ports.py
+        run: |
+          python -m pytest -q \
+            tests/test_sg_gateway_v22_server_managed_ports.py \
+            tests/test_sg_gateway_v22_awg30_clean_install_and_port_ui.py \
+            tests/test_connections_layout_v24.py \
+            tests/test_sg_gateway_v22_xray_fingerprint.py \
+            tests/test_xray_profile_flow_v23.py
+      - name: Run full repository tests
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q
+      - name: Restore tracked runtime fixture and recheck integrity
+        run: |
+          git checkout -- data/sg-gateway.sqlite || true
+          python - <<'PY'
+          import hashlib
+          import subprocess
+          from pathlib import Path
+
+          paths = sorted(
+              path
+              for path in subprocess.check_output(
+                  ["git", "ls-files"], text=True, encoding="utf-8"
+              ).splitlines()
+              if path != "SOURCE-SHA256SUMS"
+              and Path(path).is_file()
+          )
+          Path("SOURCE-SHA256SUMS").write_text(
+              "\n".join(
+                  f"{hashlib.sha256(Path(path).read_bytes()).hexdigest()}  {path}"
+                  for path in paths
+              ) + "\n",
+              encoding="utf-8",
+          )
+          PY
+          source_tests=$(git ls-files 'tests/*source*integrity*.py')
+          if [ -n "$source_tests" ]; then python -m pytest -q $source_tests; fi
+          python -m compileall -q app
+      - name: Commit completed fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "fix: make server listener ports read-only"
+          git push origin HEAD:fix/02206-lock-server-ports
