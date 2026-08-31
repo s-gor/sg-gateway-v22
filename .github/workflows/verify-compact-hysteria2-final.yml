@@ -1,0 +1,67 @@
+name: Verify exact compact Hysteria2 candidate
+
+on:
+  push:
+    branches:
+      - verify/02206-compact-hysteria2-controls-final
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact candidate SHA
+        uses: actions/checkout@v4
+        with:
+          ref: f8849827bb4fbdabb0c67d0e5749b2710724c0a7
+          fetch-depth: 2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+      - name: Verify ancestry and exact change set
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "f8849827bb4fbdabb0c67d0e5749b2710724c0a7"
+          test "$(git rev-parse HEAD^)" = "43de5ec841741aa3f620bc5110a403f20134d541"
+          git diff --name-only HEAD^ HEAD | sort | tee /tmp/changed-files.txt
+          test "$(wc -l < /tmp/changed-files.txt)" -eq 5
+          grep -Fxq SOURCE-SHA256SUMS /tmp/changed-files.txt
+          grep -Fxq app/web/static/sg-xray-profiles-v2.css /tmp/changed-files.txt
+          grep -Fxq app/web/templates/connections.html /tmp/changed-files.txt
+          grep -Fxq tests/test_hysteria2_salamander_v016.py /tmp/changed-files.txt
+          grep -Fxq tests/test_sg_gateway_v22_hysteria2_compact_controls_ui.py /tmp/changed-files.txt
+      - name: Verify tracked source integrity
+        run: |
+          set -euo pipefail
+          test "$(wc -l < SOURCE-SHA256SUMS)" -eq 644
+          sha256sum -c SOURCE-SHA256SUMS
+      - name: Run focused contracts
+        run: |
+          python -m pytest -q \
+            tests/test_sg_gateway_v22_hysteria2_compact_controls_ui.py \
+            tests/test_hysteria2_gecko_db_init_02204.py \
+            tests/test_hysteria2_salamander_v016.py \
+            tests/test_hysteria2_uri_cleanup_02204.py \
+            tests/test_sg_gateway_v22_hysteria2_gecko.py \
+            tests/test_sg_gateway_v22_server_managed_ports.py \
+            tests/test_sg_gateway_v22_xray_hidden_fixed_metadata.py \
+            tests/test_ui_connections_visual_v1.py \
+            tests/test_sg_gateway_021_full_publication_ru.py
+      - name: Run full repository suite
+        run: python -m pytest -q
+      - name: Restore runtime samples
+        run: git restore --worktree data/sg-gateway.sqlite data/system-activity.json
+      - name: Build and verify FULL package
+        run: |
+          set -euo pipefail
+          VERSION="$(tr -d '[:space:]' < VERSION)"
+          OUT="/tmp/SG-Gateway-${VERSION}-FULL.run"
+          bash build-run.sh "$OUT"
+          bash "$OUT" --verify-only
+          test -z "$(git status --porcelain)"
