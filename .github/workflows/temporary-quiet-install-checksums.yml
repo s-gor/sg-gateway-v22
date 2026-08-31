@@ -18,9 +18,8 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Apply native quiet-stage change and refresh checksums
+      - name: Refresh source checksums
         run: |
-          python3 -c 'from pathlib import Path; p=Path("install.sh"); b=p.read_text(encoding="utf-8"); old="  if [[ \"$number\" == \"1\" ]]; then\n    run_live \"$CURRENT_LABEL\" \"$function_name\"\n  else\n    run_quiet \"$CURRENT_LABEL\" \"$function_name\"\n  fi\n"; new="  run_quiet \"$CURRENT_LABEL\" \"$function_name\"\n"; assert b.count(old)==1, b.count(old); p.write_text(b.replace(old,new),encoding="utf-8")'
           python3 - <<'PY'
           import hashlib
           import subprocess
@@ -33,8 +32,11 @@ jobs:
               rows.append(f"{hashlib.sha256(Path(name).read_bytes()).hexdigest()}  {name}")
           Path("SOURCE-SHA256SUMS").write_text("\n".join(rows) + "\n", encoding="utf-8")
           PY
+          if git diff --quiet -- SOURCE-SHA256SUMS; then
+            exit 0
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add install.sh SOURCE-SHA256SUMS
-          git commit -m "install: keep every native stage quiet"
+          git add SOURCE-SHA256SUMS
+          git commit -m "chore: refresh source checksums"
           git push
