@@ -23,6 +23,7 @@ jobs:
           python -m pytest -q
           tests/test_sg_gateway_v22_server_managed_ports.py
           tests/test_sg_gateway_v22_mihomo_panel_cleanup_ui.py
+          tests/test_sg_gateway_v22_mihomo_service_tools_ui.py
       - name: Refresh tracked source checksums
         run: |
           python - <<'PY'
@@ -33,6 +34,7 @@ jobs:
           targets = (
               "app/web/templates/_mihomo_panel.html",
               "tests/test_sg_gateway_v22_mihomo_panel_cleanup_ui.py",
+              "tests/test_sg_gateway_v22_mihomo_service_tools_ui.py",
               "tests/test_sg_gateway_v22_server_managed_ports.py",
           )
           lines = manifest.read_text(encoding="utf-8").splitlines()
