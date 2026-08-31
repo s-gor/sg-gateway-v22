@@ -203,14 +203,22 @@ def _with_fragment(uri: str, label: str) -> str:
     return urlunsplit((parts.scheme, parts.netloc, parts.path, parts.query, quote(label, safe="")))
 
 
-def _config_marker(profile: dict, device: dict) -> str:
+def _config_device_label(client_name: str, device: dict) -> str:
+    parts = [str(client_name or "").strip()]
+    device_name = _subscription_device_name(device)
+    if device_name:
+        parts.append(device_name)
+    return " · ".join(part for part in parts if part)
+
+
+def _config_marker(profile: dict, device: dict, client_name: str) -> str:
     raw = str(profile.get("config") or "").encode("utf-8")
     encoded = base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
     metadata = {
         "profile": profile.get("id"),
         "name": profile.get("name"),
         "device_id": device.get("id"),
-        "device": _subscription_device_name(device),
+        "device": _config_device_label(client_name, device),
         "encoding": "base64url",
         "data": encoded,
     }
@@ -250,7 +258,7 @@ def build_sg_subscription_text(client: Client) -> str:
     lines = [
         "# SG-SUBSCRIPTION/1",
         "# scope=client",
-        f"# client={client.name}",
+        f"# client-name={client.name}",
         f"# devices={summary['devices']}",
         f"# profiles-assigned={summary['profiles_assigned']}",
         f"# profiles-ready={summary['profiles_ready']}",
@@ -281,6 +289,6 @@ def build_sg_subscription_text(client: Client) -> str:
                 )
                 lines.append(_with_fragment(str(profile["uri"]), label))
             elif profile.get("format") == "config" and profile.get("config"):
-                lines.append(_config_marker(profile, device))
+                lines.append(_config_marker(profile, device, client.name))
 
     return "\n".join(lines) + "\n"
