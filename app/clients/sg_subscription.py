@@ -211,7 +211,6 @@ def _config_marker(profile: dict, device: dict) -> str:
         "name": profile.get("name"),
         "device_id": device.get("id"),
         "device": _subscription_device_name(device),
-        "primary": bool(device.get("primary")),
         "encoding": "base64url",
         "data": encoded,
     }
