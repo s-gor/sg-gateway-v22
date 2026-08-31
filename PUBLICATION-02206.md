@@ -19,7 +19,7 @@
 - **Безопасное создание клиентов:** неполные AWG credentials и отключённые Xray-профили не выдаются как рабочие; изменения откатываются атомарно.
 - **Full Backup/Restore:** сохраняются база, клиенты, ключи, сертификаты и runtime-состояние; восстановление проверяет сервисы и выполняет safety rollback при ошибке.
 - **Безопасный Update:** exact commit, source integrity, Safety Backup, staging, проверка panel/hostd/runtime и автоматический rollback.
-- **Публичные команды GitHub:** отдельные стабильные команды Clean Install, Update и Full Uninstall.
+- **Публичные команды GitHub:** Clean Install закреплён одновременно на стабильный канал и проверенный source commit; Update и Full Uninstall используют стабильный канал.
 - **Системная диагностика:** исправлена атрибуция памяти и пороги предупреждений диска и RAM.
 - **Интерфейс:** унифицированы карточки AWG, QR и загрузка ключей, операции восстановления и адаптация для низкого разрешения.
 
@@ -34,6 +34,7 @@
 - Full Uninstall и повторная установка на том же сервере;
 - создание и применение дополнительного AWG 3.0 клиента;
 - активные AWG 3.0 и AWG 3.1 interfaces, sockets и порты `586/587`;
+- имена AWG 2.0, AWG 3.0 и AWG 3.1 в подписке первого администратора после чистой установки: `sg-admin`, без резервного суффикса `Устройство`;
 - реальная чистая установка пользователем после публикации обеих GitHub-команд.
 
 ## Команды
@@ -41,7 +42,12 @@
 ### Clean Install
 
 ```bash
-curl -4 -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/stable-02206/deploy/install-from-github.sh | sudo env SG_GATEWAY_GITHUB_BRANCH=stable-02206 bash
+curl -4 -fsSL \
+  https://raw.githubusercontent.com/s-gor/sg-gateway-v22/e7cd63deab9c3a34b6aee910c61017ff8a8b9c6e/deploy/install-from-github.sh \
+| sudo env \
+  SG_GATEWAY_GITHUB_BRANCH=stable-02206 \
+  SG_GATEWAY_SOURCE_COMMIT=e7cd63deab9c3a34b6aee910c61017ff8a8b9c6e \
+  bash
 ```
 
 ### Update
