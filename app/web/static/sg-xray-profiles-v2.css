@@ -210,33 +210,6 @@
   width: 100%;
 }
 
-.xps2-system-port {
-  display: grid;
-  gap: 6px;
-}
-
-.xps2-system-port > span {
-  color: var(--sg-muted);
-  font-size: 10px;
-  font-weight: 750;
-}
-
-.xps2-system-port > output {
-  display: flex;
-  align-items: center;
-  min-height: 2.55rem;
-  border: 1px solid var(--sg-line);
-  border-radius: .7rem;
-  background: var(--sg-panel-deep);
-  color: var(--sg-text);
-  padding: 0 12px;
-  font: inherit;
-}
-
-.xps2-system-port > small {
-  color: var(--sg-muted);
-  font-size: 10px;
-}
 
 .xps2-parameter-note {
   align-self: center;

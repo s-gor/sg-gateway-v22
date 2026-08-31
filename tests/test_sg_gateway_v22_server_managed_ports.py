@@ -129,15 +129,18 @@ def test_mihomo_listener_ports_ignore_forged_form_values(monkeypatch) -> None:
     assert saved["config"]["tuic_port"] == 20443
 
 
-def test_connections_ui_has_no_editable_server_port_controls() -> None:
+def test_connections_ui_hides_server_listener_ports_entirely() -> None:
     template = (ROOT / "app/web/templates/connections.html").read_text(encoding="utf-8")
     mihomo = (ROOT / "app/web/templates/_mihomo_panel.html").read_text(encoding="utf-8")
 
     assert 'name="{{ profile.id }}_port"' not in template
     assert 'name="port" min="1" max="65535"' not in template
+    assert "xps2-system-port" not in template
+    assert "xps2-field-port" not in template
+    assert "<output>{{ profile.port }}</output>" not in template
+    assert "Системный порт SG-Gateway" not in template
     for field in ("mieru_port", "anytls_port", "tuic_port"):
         assert f'name="{field}"' not in mihomo
-
 
 def test_mihomo_ui_hides_fixed_listener_metadata_entirely() -> None:
     mihomo = (ROOT / "app/web/templates/_mihomo_panel.html").read_text(encoding="utf-8")

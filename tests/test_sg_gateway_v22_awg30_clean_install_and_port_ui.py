@@ -26,13 +26,14 @@ def test_clean_installers_pin_independent_awg30_runtime_assets() -> None:
         assert 'AWG3_GO_VENDOR_FILE="amneziawg-go-linux-amd64-v3.1.20260814"' not in installer
 
 
-def test_connections_render_all_xray_ports_as_system_values() -> None:
+def test_connections_hide_all_xray_system_port_metadata() -> None:
     template = _read("app/web/templates/connections.html")
 
     assert "<strong>Client Fingerprint</strong>" in template
     assert 'name="fingerprint"' in template
     assert 'name="{{ profile.id }}_port"' not in template
     assert 'name="port" min="1" max="65535"' not in template
-    assert "xps2-system-port" in template
-    assert "Системный порт SG-Gateway" in template
-    assert "<output>{{ profile.port }}</output>" in template
+    assert "xps2-system-port" not in template
+    assert "xps2-field-port" not in template
+    assert "Системный порт SG-Gateway" not in template
+    assert "<output>{{ profile.port }}</output>" not in template

@@ -169,21 +169,21 @@
               {% set tls_locked = profile.tls_required and not xray_profiles.tls_ready %}
               {% set encryption_locked = profile.encryption_required and not profile.encryption_ready %}
               {% set locked = tls_locked or encryption_locked %}
+              {% if profile.id == 'xhttp_reality' %}
+              <input type="hidden" name="{{ profile.id }}_mode" value="stream-one">
+              {% endif %}
+              {% if profile.path %}
+              <input type="hidden" name="{{ profile.id }}_path" value="{{ profile.path }}">
+              {% endif %}
+              {% if profile.id in ['xhttp_tls', 'hysteria2'] %}
               <article class="xps2-parameter-row {{ 'is-visible' if profile.enabled and not locked else '' }}"
                        data-profile-panel="{{ profile.id }}">
                 <div class="xps2-parameter-title">
                   <strong>{{ profile.title }}</strong>
                   <span>{{ profile.transport }} · {{ profile.security }}</span>
                 </div>
-                <div class="xps2-field-port xps2-system-port">
-                  <span>{{ 'UDP-порт' if profile.id == 'hysteria2' else 'TCP-порт' }}</span>
-                  <output>{{ profile.port }}</output>
-                  <small>Системный порт SG-Gateway</small>
-                </div>
-                {% if profile.mode %}
-                {% if profile.id == 'xhttp_reality' %}
-                <input type="hidden" name="{{ profile.id }}_mode" value="stream-one">
-                {% else %}
+
+                {% if profile.id == 'xhttp_tls' %}
                 <label class="xps2-field-mode">
                   <span>XHTTP mode клиента</span>
                   <select name="{{ profile.id }}_mode" {% if locked %}disabled{% endif %}>
@@ -193,35 +193,30 @@
                   </select>
                   <small>Сервер остаётся в auto. Выбор меняет клиентские ссылки, QR и SG Client subscription.</small>
                 </label>
-                {% endif %}
-
-                <section class="xps2-xmux">
-                  <div class="xps2-xmux-main">
-                    <div class="xps2-xmux-copy">
-                      <span>Клиентский XMUX</span>
-                      <strong>XMUX для РФ</strong>
-                      <small>Постоянный клиентский профиль для XHTTP-ссылок, QR и SG Client subscription.</small>
-                    </div>
-                  </div>
-                  <details class="xps2-xmux-details">
-                    <summary>
-                      <span class="xps2-xmux-show">Показать параметры</span>
-                      <span class="xps2-xmux-hide">Скрыть параметры</span>
-                    </summary>
-                    <div class="xps2-xmux-grid">
-                      <div><span>Максимальная параллельность</span><small>maxConcurrency</small><strong>{{ profile.xmux.maxConcurrency }}</strong></div>
-                      <div><span>Максимум соединений</span><small>maxConnections</small><strong>{{ profile.xmux.maxConnections }}</strong></div>
-                      <div><span>Повторное использование соединения</span><small>cMaxReuseTimes</small><strong>{{ profile.xmux.cMaxReuseTimes }}</strong></div>
-                      <div><span>Запросов на HTTP-соединение</span><small>hMaxRequestTimes</small><strong>{{ profile.xmux.hMaxRequestTimes }}</strong></div>
-                      <div><span>Время повторного использования, сек.</span><small>hMaxReusableSecs</small><strong>{{ profile.xmux.hMaxReusableSecs }}</strong></div>
-                      <div><span>Интервал Keep-Alive</span><small>hKeepAlivePeriod</small><strong>{{ profile.xmux.hKeepAlivePeriod }}</strong></div>
-                    </div>
-                    <p>Рекомендуемый профиль для российских сетей. Серверный inbound не меняется.</p>
-                  </details>
-                </section>
-                {% endif %}
-                {% if profile.path %}
-                <input type="hidden" name="{{ profile.id }}_path" value="{{ profile.path }}">
+      <section class="xps2-xmux">
+        <div class="xps2-xmux-main">
+          <div class="xps2-xmux-copy">
+            <span>Клиентский XMUX</span>
+            <strong>XMUX для РФ</strong>
+            <small>Постоянный клиентский профиль для XHTTP-ссылок, QR и SG Client subscription.</small>
+          </div>
+        </div>
+        <details class="xps2-xmux-details">
+          <summary>
+            <span class="xps2-xmux-show">Показать параметры</span>
+            <span class="xps2-xmux-hide">Скрыть параметры</span>
+          </summary>
+          <div class="xps2-xmux-grid">
+            <div><span>Максимальная параллельность</span><small>maxConcurrency</small><strong>{{ profile.xmux.maxConcurrency }}</strong></div>
+            <div><span>Максимум соединений</span><small>maxConnections</small><strong>{{ profile.xmux.maxConnections }}</strong></div>
+            <div><span>Повторное использование соединения</span><small>cMaxReuseTimes</small><strong>{{ profile.xmux.cMaxReuseTimes }}</strong></div>
+            <div><span>Запросов на HTTP-соединение</span><small>hMaxRequestTimes</small><strong>{{ profile.xmux.hMaxRequestTimes }}</strong></div>
+            <div><span>Время повторного использования, сек.</span><small>hMaxReusableSecs</small><strong>{{ profile.xmux.hMaxReusableSecs }}</strong></div>
+            <div><span>Интервал Keep-Alive</span><small>hKeepAlivePeriod</small><strong>{{ profile.xmux.hKeepAlivePeriod }}</strong></div>
+          </div>
+          <p>Рекомендуемый профиль для российских сетей. Серверный inbound не меняется.</p>
+        </details>
+      </section>
                 {% endif %}
 
                 {% if profile.id == 'hysteria2' %}
@@ -275,6 +270,7 @@
                 </section>
                 {% endif %}
               </article>
+              {% endif %}
               {% endfor %}
             </div>
             <p class="xps2-empty-note" data-xps2-empty>Выберите хотя бы одну карточку Xray.</p>

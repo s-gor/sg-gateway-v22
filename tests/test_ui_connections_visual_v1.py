@@ -111,11 +111,11 @@ def test_connections_protocol_cards_show_only_real_controls_as_fields():
     assert "VLESS Encryption ·" not in template
     assert "xps2-field-path" not in template
     assert '<input type="hidden" name="{{ profile.id }}_path" value="{{ profile.path }}">' in template
-    assert "xps2-field-port" in template
+    assert "xps2-field-port" not in template
+    assert "xps2-system-port" not in template
     assert "xps2-field-mode" in template
-    assert ".xps2-field-port" in polish
+    assert ".xps2-field-port" not in polish
     assert ".xps2-field-mode" in polish
-
 
 def test_reality_xhttp_fixed_mode_is_native_hidden_form_value_not_fake_control():
     template = (ROOT / "app/web/templates/connections.html").read_text(encoding="utf-8")
@@ -130,8 +130,8 @@ def test_reality_xhttp_fixed_mode_is_native_hidden_form_value_not_fake_control()
 def test_connections_protocol_cards_keep_mutable_non_port_form_contracts():
     template = (ROOT / "app/web/templates/connections.html").read_text(encoding="utf-8")
     assert 'name="{{ profile.id }}_port"' not in template
-    assert "<output>{{ profile.port }}</output>" in template
-    assert "Системный порт SG-Gateway" in template
+    assert "<output>{{ profile.port }}</output>" not in template
+    assert "Системный порт SG-Gateway" not in template
     for field in (
         'name="{{ profile.id }}_mode"',
         'name="{{ profile.id }}_path"',
@@ -145,27 +145,28 @@ def test_connections_protocol_cards_keep_mutable_non_port_form_contracts():
     assert "Проверить конфигурацию" in template
     assert "Сохранить и применить" in template
 
-
 def test_connections_protocol_cards_have_minimal_profile_specific_grids():
     css = (ROOT / "app/web/static/sg-xmux-settings-v1.css").read_text(encoding="utf-8")
     polish = css.split("SG-Gateway 022.04 · Connections controls-only polish", 1)[1]
-    for profile_id in ("reality_tcp", "xhttp_reality", "xhttp_tls", "hysteria2"):
+    for profile_id in ("xhttp_tls", "hysteria2"):
         assert f'data-profile-panel="{profile_id}"' in polish
-    assert polish.count('grid-template-areas: "title port";') >= 2
-    assert 'grid-template-areas: "title mode port";' in polish
-    assert '"obfs obfs"' in polish
-    assert "path port" not in polish
-    assert ".xps2-field-path" not in polish
+    for profile_id in ("reality_tcp", "xhttp_reality"):
+        assert f'data-profile-panel="{profile_id}"' not in polish
+    assert 'grid-template-areas: "title mode";' in polish
+    assert '"title"\n    "obfs";' in polish
+    assert "title port" not in polish
+    assert ".xps2-field-port" not in polish
     assert "box-shadow: none" in polish
 
-
-def test_first_three_xray_cards_keep_ports_aligned_and_tls_mode_only():
+def test_only_mutable_xray_rows_reserve_layout_space():
+    template = (ROOT / "app/web/templates/connections.html").read_text(encoding="utf-8")
     css = (ROOT / "app/web/static/sg-xmux-settings-v1.css").read_text(encoding="utf-8")
     polish = css.split("SG-Gateway 022.04 · Connections controls-only polish", 1)[1]
-    assert polish.count("minmax(150px, 210px)") >= 3
-    assert polish.count("minmax(135px, 180px)") >= 3
-    assert 'grid-template-areas: "title mode port";' in polish
-
+    assert "{% if profile.id in ['xhttp_tls', 'hysteria2'] %}" in template
+    assert 'grid-template-areas: "title mode";' in polish
+    assert "minmax(280px, .58fr)" in polish
+    assert "minmax(150px, 210px)" not in polish
+    assert "minmax(135px, 180px)" not in polish
 
 def test_connections_protocol_cards_cover_low_resolution_and_mobile():
     css = (ROOT / "app/web/static/sg-xmux-settings-v1.css").read_text(encoding="utf-8")
@@ -174,32 +175,30 @@ def test_connections_protocol_cards_cover_low_resolution_and_mobile():
     assert "(min-width: 981px) and (max-height: 820px)" in polish
     assert "@media (max-width: 1050px)" in polish
     assert "@media (max-width: 760px)" in polish
-    assert 'grid-template-areas: "title" "port" "mode";' in polish
+    assert 'grid-template-areas: "title" "mode";' in polish
+    assert 'grid-template-areas: "title" "obfs";' in polish
+    assert '"port"' not in polish
 
-
-def test_first_three_xray_parameter_cards_use_compact_natural_height_and_centered_level():
+def test_xhttp_tls_and_hysteria_use_compact_natural_height():
     css = (ROOT / "app/web/static/sg-xmux-settings-v1.css").read_text(encoding="utf-8")
     polish = css.split("SG-Gateway 022.04 · Connections controls-only polish", 1)[1]
-    selector = '.xps2-parameter-row[data-profile-panel="reality_tcp"],\n  .xps2-parameter-row[data-profile-panel="xhttp_reality"],\n  .xps2-parameter-row[data-profile-panel="xhttp_tls"] {'
-    assert selector in polish
-    assert "@media (min-width: 1051px) {" in polish
+    assert '.xps2-parameter-row[data-profile-panel="xhttp_tls"] {' in polish
+    assert '.xps2-parameter-row[data-profile-panel="hysteria2"] {' in polish
     assert "height: 120px;" not in polish
     assert "height: 112px;" not in polish
     assert "align-items: center;" in polish
     assert 'data-profile-panel="hysteria2"] {\n    height:' not in polish
-
 
 def test_xhttp_tls_mode_helper_is_hidden_without_affecting_responsive_layout():
     css = (ROOT / "app/web/static/sg-xmux-settings-v1.css").read_text(encoding="utf-8")
     polish = css.split("SG-Gateway 022.04 · Connections controls-only polish", 1)[1]
     assert '.xps2-parameter-row[data-profile-panel="xhttp_tls"] .xps2-field-mode > small {' in polish
     assert "display: none;" in polish
-    stacked = polish.split("@media (max-width: 1050px)", 1)[1]
-    assert '"title port"\n      "mode mode";' in stacked
-    assert 'grid-template-areas: "title" "port" "mode";' in stacked
+    stacked = polish.split("@media (max-width: 760px)", 1)[1]
+    assert 'grid-template-areas: "title" "mode";' in stacked
+    assert 'grid-template-areas: "title" "obfs";' in stacked
     assert "height: 120px;" not in stacked
     assert "height: 112px;" not in stacked
-
 
 def test_connections_dark_classic_theme_is_scoped_and_loaded_last():
     base = (ROOT / "app/web/templates/base.html").read_text(encoding="utf-8")

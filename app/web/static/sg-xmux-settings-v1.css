@@ -134,7 +134,7 @@
 }
 
 /* SG-Gateway 022.04 · Connections controls-only polish.
-   Only actual user controls occupy the form grid. Fixed protocol contracts are metadata. */
+   Only actual user controls occupy the form grid. Fixed protocol contracts are hidden. */
 .xps2-parameters {
   padding: 16px;
 }
@@ -153,6 +153,7 @@
 }
 
 .xps2-parameter-title {
+  grid-area: title;
   display: grid;
   align-content: center;
   gap: 3px;
@@ -228,44 +229,24 @@
   min-height: 42px;
 }
 
-.xps2-field-port { grid-area: port; }
 .xps2-field-mode { grid-area: mode; }
-.xps2-parameter-title { grid-area: title; }
 .xps2-salamander { grid-area: obfs; }
 
-/* Keep the three VLESS parameter strips compact and aligned on one-row layouts. */
-@media (min-width: 1051px) {
-  .xps2-parameter-row[data-profile-panel="reality_tcp"],
-  .xps2-parameter-row[data-profile-panel="xhttp_reality"],
-  .xps2-parameter-row[data-profile-panel="xhttp_tls"] {
-    align-items: center;
-  }
+.xps2-parameter-row[data-profile-panel="xhttp_tls"] {
+  grid-template-columns: minmax(260px, 1fr) minmax(280px, .58fr);
+  grid-template-areas: "title mode";
+  align-items: center;
 }
 
 .xps2-parameter-row[data-profile-panel="xhttp_tls"] .xps2-field-mode > small {
   display: none;
 }
 
-.xps2-parameter-row[data-profile-panel="reality_tcp"] {
-  grid-template-columns: minmax(300px, 1fr) minmax(150px, 210px);
-  grid-template-areas: "title port";
-}
-
-.xps2-parameter-row[data-profile-panel="xhttp_reality"] {
-  grid-template-columns: minmax(300px, 1fr) minmax(150px, 210px);
-  grid-template-areas: "title port";
-}
-
-.xps2-parameter-row[data-profile-panel="xhttp_tls"] {
-  grid-template-columns: minmax(250px, 1fr) minmax(150px, 210px) minmax(150px, 210px);
-  grid-template-areas: "title mode port";
-}
-
 .xps2-parameter-row[data-profile-panel="hysteria2"] {
-  grid-template-columns: minmax(300px, 1fr) minmax(150px, 210px);
+  grid-template-columns: minmax(0, 1fr);
   grid-template-areas:
-    "title port"
-    "obfs obfs";
+    "title"
+    "obfs";
 }
 
 .xps2-salamander {
@@ -275,7 +256,7 @@
   border: 0 !important;
   border-radius: 0 !important;
   background: transparent !important;
-  padding: 11px 0 0;
+  padding: 8px 0 0;
   box-shadow: none !important;
 }
 
@@ -355,20 +336,8 @@ html[data-theme="light"] .xps2-salamander {
     padding: 11px 12px;
   }
 
-  .xps2-parameter-row[data-profile-panel="reality_tcp"] {
-    grid-template-columns: minmax(230px, 1fr) minmax(135px, 180px);
-  }
-
-  .xps2-parameter-row[data-profile-panel="xhttp_reality"] {
-    grid-template-columns: minmax(230px, 1fr) minmax(135px, 180px);
-  }
-
   .xps2-parameter-row[data-profile-panel="xhttp_tls"] {
-    grid-template-columns: minmax(210px, 1fr) minmax(135px, 180px) minmax(135px, 180px);
-  }
-
-  .xps2-parameter-row[data-profile-panel="hysteria2"] {
-    grid-template-columns: minmax(230px, 1fr) minmax(135px, 180px);
+    grid-template-columns: minmax(210px, 1fr) minmax(240px, .62fr);
   }
 
   .xps2-parameter-row > label input,
@@ -384,63 +353,29 @@ html[data-theme="light"] .xps2-salamander {
 
   .xps2-salamander {
     gap: 7px;
-    padding-top: 9px;
+    padding-top: 7px;
   }
 }
 
 @media (max-width: 1050px) {
-  .xps2-parameter-row[data-profile-panel="reality_tcp"],
-  .xps2-parameter-row[data-profile-panel="xhttp_reality"],
-  .xps2-parameter-row[data-profile-panel="xhttp_tls"],
-  .xps2-parameter-row[data-profile-panel="hysteria2"] {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  }
-
-  .xps2-parameter-row[data-profile-panel="reality_tcp"] {
-    grid-template-areas:
-      "title port";
-  }
-
-  .xps2-parameter-row[data-profile-panel="xhttp_reality"] {
-    grid-template-areas:
-      "title port";
-  }
-
   .xps2-parameter-row[data-profile-panel="xhttp_tls"] {
-    grid-template-areas:
-      "title port"
-      "mode mode";
-  }
-
-  .xps2-parameter-row[data-profile-panel="hysteria2"] {
-    grid-template-areas:
-      "title port"
-      "obfs obfs";
+    grid-template-columns: minmax(0, 1fr) minmax(220px, .65fr);
+    grid-template-areas: "title mode";
   }
 }
 
 @media (max-width: 760px) {
-  .xps2-parameter-row[data-profile-panel="reality_tcp"],
-  .xps2-parameter-row[data-profile-panel="xhttp_reality"],
   .xps2-parameter-row[data-profile-panel="xhttp_tls"],
   .xps2-parameter-row[data-profile-panel="hysteria2"] {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .xps2-parameter-row[data-profile-panel="reality_tcp"] {
-    grid-template-areas: "title" "port";
-  }
-
-  .xps2-parameter-row[data-profile-panel="xhttp_reality"] {
-    grid-template-areas: "title" "port";
-  }
-
   .xps2-parameter-row[data-profile-panel="xhttp_tls"] {
-    grid-template-areas: "title" "port" "mode";
+    grid-template-areas: "title" "mode";
   }
 
   .xps2-parameter-row[data-profile-panel="hysteria2"] {
-    grid-template-areas: "title" "port" "obfs";
+    grid-template-areas: "title" "obfs";
   }
 
   .xps2-salamander > header {
