@@ -6,12 +6,11 @@ INSTALL_WRAPPER = ROOT / "deploy" / "install-from-github.sh"
 UPDATE_WRAPPER = ROOT / "deploy" / "update-from-github.sh"
 UNINSTALL_WRAPPER = ROOT / "deploy" / "uninstall-from-github.sh"
 COMMANDS = ROOT / "deploy" / "GITHUB-COMMANDS.md"
+INSTALL_SOURCE_COMMIT = "e7cd63deab9c3a34b6aee910c61017ff8a8b9c6e"
 
-INSTALL_COMMAND = (
-    "curl -4 -fsSL "
-    "https://raw.githubusercontent.com/s-gor/sg-gateway-v22/stable-02206/"
-    "deploy/install-from-github.sh | sudo env "
-    "SG_GATEWAY_GITHUB_BRANCH=stable-02206 bash"
+INSTALL_URL = (
+    "https://raw.githubusercontent.com/s-gor/sg-gateway-v22/"
+    f"{INSTALL_SOURCE_COMMIT}/deploy/install-from-github.sh"
 )
 UPDATE_COMMAND = (
     "curl -4 -fsSL "
@@ -29,7 +28,9 @@ UNINSTALL_COMMAND = (
 
 def test_public_github_commands_are_published():
     body = COMMANDS.read_text(encoding="utf-8")
-    assert INSTALL_COMMAND in body
+    assert INSTALL_URL in body
+    assert "SG_GATEWAY_GITHUB_BRANCH=stable-02206" in body
+    assert f"SG_GATEWAY_SOURCE_COMMIT={INSTALL_SOURCE_COMMIT}" in body
     assert UPDATE_COMMAND in body
     assert UNINSTALL_COMMAND in body
 
