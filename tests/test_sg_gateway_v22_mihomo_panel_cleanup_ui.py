@@ -12,15 +12,25 @@ def _css_block(source: str, selector: str) -> str:
     return source[start : end + 1]
 
 
-def test_mihomo_panel_keeps_compact_endpoint_and_approved_controls() -> None:
+def test_mihomo_panel_removes_only_fixed_metadata_and_keeps_approved_controls() -> None:
     source = TEMPLATE.read_text(encoding="utf-8")
 
-    assert "mhv2-compact-endpoint" in source
-    assert "mihomo.listener_active" in source
-    assert "mihomo.listener_total" in source
+    assert "mhv2-compact-endpoint" not in source
+    assert "mihomo.listener_active" not in source
+    assert "mihomo.listener_total" not in source
+    assert "mhv2-system-port" not in source
+    assert "Системный порт SG-Gateway" not in source
     assert 'name="tuic_alpn"' not in source
 
+    for port_value in (
+        "{{ mihomo.settings.mieru_port }}",
+        "{{ mihomo.settings.anytls_port }}",
+        "{{ mihomo.settings.tuic_port }}",
+    ):
+        assert port_value not in source
+
     for control in (
+        'name="mieru_transport"',
         'name="mieru_multiplexing"',
         'name="mieru_handshake"',
         'name="mieru_user_hint_mandatory"',

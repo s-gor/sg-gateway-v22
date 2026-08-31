@@ -24,15 +24,15 @@ def test_mihomo_restart_is_visible_in_primary_action_row() -> None:
     assert '<span class="mhv2-restart-note">Только для уже применённой конфигурации.</span>' in actions
 
 
-def test_mihomo_listener_runtime_statuses_are_preserved() -> None:
+def test_mihomo_listener_runtime_statuses_are_preserved_without_aggregate_counter() -> None:
     source = TEMPLATE.read_text(encoding="utf-8")
 
     assert source.count("data-runtime-switch") >= 3
     assert "mieru_state.state_label" in source
     assert "anytls_state.state_label" in source
     assert "tuic_state.state_label" in source
-    assert "mihomo.listener_active" in source
-    assert "mihomo.listener_total" in source
+    assert "mihomo.listener_active" not in source
+    assert "mihomo.listener_total" not in source
 
 
 def test_mihomo_compact_spacing_contract() -> None:
