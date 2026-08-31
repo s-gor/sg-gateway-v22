@@ -1,0 +1,69 @@
+name: Verify exact AWG primary label fix
+
+on:
+  push:
+    branches:
+      - scratch/verify-02206-hide-primary-awg-label
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: 68b0db79221cb38e739d95d4de32ca53e8419fca
+          fetch-depth: 0
+
+      - name: Verify candidate identity and scope
+        run: |
+          test "$(git rev-parse HEAD)" = "68b0db79221cb38e739d95d4de32ca53e8419fca"
+          test "$(git rev-parse HEAD^)" = "a8dd38d080b97c9d196e7a43de24a3773e33c3d8"
+          test "$(git rev-parse HEAD^{tree})" = "c1f072c69324049a47356ac849383c3d26ee6510"
+          git diff --name-only HEAD^ HEAD > /tmp/changed.txt
+          cat > /tmp/expected.txt <<'EOF'
+          SOURCE-SHA256SUMS
+          app/clients/sg_subscription.py
+          tests/test_sg_gateway_v22_sg_subscription_compat_text.py
+          EOF
+          diff -u /tmp/expected.txt /tmp/changed.txt
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+
+      - name: Verify focused subscription contracts
+        run: |
+          python -m pytest -q \
+            tests/test_sg_gateway_v22_sg_subscription_compat_text.py \
+            tests/test_sg_gateway_v22_subscription_device_name.py \
+            tests/test_sg_gateway_v22_sg_subscription_schema.py \
+            tests/test_sg_gateway_v22_sg_subscription_base64_body.py
+
+      - name: Verify complete suite
+        run: python -m pytest tests
+
+      - name: Restore and verify exact source tree
+        run: |
+          git reset --hard HEAD
+          git clean -fdx
+          sha256sum --check SOURCE-SHA256SUMS
+          test -z "$(git status --porcelain)"
+
+      - name: Build and verify FULL package
+        run: |
+          VERSION="$(tr -d '[:space:]' < VERSION)"
+          OUT="/tmp/SG-Gateway-${VERSION}-FULL.run"
+          bash build-run.sh "$OUT"
+          bash "$OUT" --verify-only
+          test "$(git rev-parse HEAD)" = "68b0db79221cb38e739d95d4de32ca53e8419fca"
