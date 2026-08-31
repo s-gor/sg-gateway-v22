@@ -3,7 +3,9 @@ set -Eeuo pipefail
 
 REPOSITORY="s-gor/sg-gateway-v22"
 BRANCH="${SG_GATEWAY_GITHUB_BRANCH:-${SG_GATEWAY_UPDATE_BRANCH:-stable-02206}}"
-ARCHIVE_URL="https://github.com/${REPOSITORY}/archive/refs/heads/${BRANCH}.tar.gz"
+SOURCE_COMMIT="${SG_GATEWAY_SOURCE_COMMIT:-}"
+ARCHIVE_REF="${SOURCE_COMMIT:-$BRANCH}"
+ARCHIVE_URL="https://github.com/${REPOSITORY}/archive/${ARCHIVE_REF}.tar.gz"
 TEMP_DIR=""
 MIN_FREE_MIB="${SG_GATEWAY_INSTALL_MIN_FREE_MIB:-1024}"
 
@@ -13,6 +15,7 @@ fail() {
 }
 
 [[ "$BRANCH" == "stable-02206" ]] || fail "stable installer is pinned to stable-02206; requested branch: $BRANCH"
+[[ -z "$SOURCE_COMMIT" || "$SOURCE_COMMIT" =~ ^[0-9a-f]{40}$ ]] || fail "SG_GATEWAY_SOURCE_COMMIT must be a lowercase 40-character commit SHA"
 
 cleanup() {
   if [[ -n "$TEMP_DIR" && -d "$TEMP_DIR" ]]; then
@@ -123,7 +126,11 @@ ARCHIVE="$TEMP_DIR/sg-gateway-stable-02206.tar.gz"
 SOURCE_DIR="$TEMP_DIR/source"
 mkdir -p "$SOURCE_DIR"
 
-printf '[SG-Gateway] Downloading GitHub branch %s...\n' "$BRANCH"
+if [[ -n "$SOURCE_COMMIT" ]]; then
+  printf '[SG-Gateway] Downloading exact GitHub source %s...\n' "$SOURCE_COMMIT"
+else
+  printf '[SG-Gateway] Downloading GitHub branch %s...\n' "$BRANCH"
+fi
 curl -fL --retry 6 --retry-all-errors --retry-delay 3 --connect-timeout 20 \
   "$ARCHIVE_URL" -o "$ARCHIVE"
 
@@ -138,7 +145,9 @@ tar -xzf "$ARCHIVE" -C "$SOURCE_DIR" --strip-components=1
 printf '[SG-Gateway] GitHub source version: %s\n' "$(tr -d '\r\n' < "$SOURCE_DIR/VERSION")"
 printf '[SG-Gateway] STABLE channel: stable-02206\n'
 printf '[SG-Gateway] Starting the native Ubuntu CLEAN installer...\n'
-SG_GATEWAY_SOURCE_DIR="$SOURCE_DIR" bash "$SOURCE_DIR/install.sh"
+SG_GATEWAY_SOURCE_DIR="$SOURCE_DIR" \
+SG_GATEWAY_SOURCE_COMMIT="$SOURCE_COMMIT" \
+bash "$SOURCE_DIR/install.sh"
 
 # SG_GATEWAY_FIX30_IPV6_BOOTSTRAP_V1
 # Keep the proven native installer untouched while Fix30 is developed.  The

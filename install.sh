@@ -136,6 +136,57 @@ MANAGED_PATHS=(
   etc/sysctl.d/99-sg-gateway.conf
 )
 
+
+verify_installed_connections_ui_contract() {
+  local root="${1:-$PREFIX}"
+  local connections="$root/app/web/templates/connections.html"
+  local mihomo="$root/app/web/templates/_mihomo_panel.html"
+  local xray_css="$root/app/web/static/sg-xray-profiles-v2.css"
+  local required=""
+
+  for required in "$connections" "$mihomo" "$xray_css"; do
+    if [[ ! -f "$required" ]]; then
+      printf '[SG-Gateway] Clean-install UI contract failed: missing %s\n' "$required" >&2
+      return 1
+    fi
+  done
+
+  if ! grep -Fq 'data-salamander-generate>Новый пароль</button>' "$connections"; then
+    printf '[SG-Gateway] Clean-install UI contract failed: compact Hysteria2 action is missing.\n' >&2
+    return 1
+  fi
+  if grep -Fq 'data-salamander-generate>Сгенерировать новый</button>' "$connections"; then
+    printf '[SG-Gateway] Clean-install UI contract failed: old Hysteria2 action returned.\n' >&2
+    return 1
+  fi
+  if grep -Fq 'Системный порт SG-Gateway' "$connections"; then
+    printf '[SG-Gateway] Clean-install UI contract failed: Xray fixed listener metadata is visible.\n' >&2
+    return 1
+  fi
+  if grep -Fq 'mhv2-compact-endpoint' "$mihomo"; then
+    printf '[SG-Gateway] Clean-install UI contract failed: old Mihomo endpoint block is visible.\n' >&2
+    return 1
+  fi
+  if grep -Fq 'Системный порт SG-Gateway' "$mihomo"; then
+    printf '[SG-Gateway] Clean-install UI contract failed: Mihomo fixed listener metadata is visible.\n' >&2
+    return 1
+  fi
+  if grep -Fq 'mihomo.listener_active' "$mihomo"; then
+    printf '[SG-Gateway] Clean-install UI contract failed: old Mihomo listener summary is visible.\n' >&2
+    return 1
+  fi
+  if grep -Fq 'mihomo.listener_total' "$mihomo"; then
+    printf '[SG-Gateway] Clean-install UI contract failed: old Mihomo listener summary is visible.\n' >&2
+    return 1
+  fi
+  if ! grep -Fq 'grid-template-columns: auto minmax(0, 1fr);' "$xray_css"; then
+    printf '[SG-Gateway] Clean-install UI contract failed: compact Hysteria2 layout is missing.\n' >&2
+    return 1
+  fi
+
+  printf '[SG-Gateway] Clean-install Connections UI contract: OK.\n'
+}
+
 require_root() {
   if [[ "$(id -u)" -ne 0 ]]; then
     echo "Запустите установщик через sudo." >&2
@@ -1135,6 +1186,7 @@ stage_backup_and_prepare() {
   rm -rf "$PREFIX.new/vendor/cores"
   rm -f "$PREFIX.new/install.sh"
   mv "$PREFIX.new" "$PREFIX"
+  verify_installed_connections_ui_contract "$PREFIX"
   chown -R root:root "$PREFIX"
   # Normalize the packaged application tree before any unprivileged checks.
   # The payload is code, templates and static assets only; runtime secrets are
