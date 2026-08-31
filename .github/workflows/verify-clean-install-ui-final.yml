@@ -1,0 +1,87 @@
+name: Verify exact clean-install UI candidate
+
+on:
+  push:
+    branches:
+      - verify/02206-clean-install-ui-contract-final
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact candidate SHA
+        uses: actions/checkout@v4
+        with:
+          ref: a8dd38d080b97c9d196e7a43de24a3773e33c3d8
+          fetch-depth: 2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+      - name: Verify ancestry and exact change set
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "a8dd38d080b97c9d196e7a43de24a3773e33c3d8"
+          test "$(git rev-parse HEAD^)" = "f8849827bb4fbdabb0c67d0e5749b2710724c0a7"
+          git diff --name-only HEAD^ HEAD | sort | tee /tmp/changed-files.txt
+          test "$(wc -l < /tmp/changed-files.txt)" -eq 4
+          grep -Fxq SOURCE-SHA256SUMS /tmp/changed-files.txt
+          grep -Fxq deploy/install-from-github.sh /tmp/changed-files.txt
+          grep -Fxq install.sh /tmp/changed-files.txt
+          grep -Fxq tests/test_sg_gateway_v22_clean_install_connections_ui.py /tmp/changed-files.txt
+      - name: Verify tracked source integrity
+        run: |
+          set -euo pipefail
+          test "$(wc -l < SOURCE-SHA256SUMS)" -eq 645
+          sha256sum -c SOURCE-SHA256SUMS
+      - name: Verify exact GitHub source archive
+        run: |
+          set -euo pipefail
+          archive=/tmp/sg-gateway-a8dd38d.tar.gz
+          source=/tmp/sg-gateway-a8dd38d-source
+          curl -fL --retry 4 --retry-all-errors \
+            https://github.com/s-gor/sg-gateway-v22/archive/a8dd38d080b97c9d196e7a43de24a3773e33c3d8.tar.gz \
+            -o "$archive"
+          gzip -t "$archive"
+          mkdir -p "$source"
+          tar -xzf "$archive" -C "$source" --strip-components=1
+          cmp deploy/install-from-github.sh "$source/deploy/install-from-github.sh"
+          cmp install.sh "$source/install.sh"
+          cmp app/web/templates/connections.html "$source/app/web/templates/connections.html"
+          cmp app/web/templates/_mihomo_panel.html "$source/app/web/templates/_mihomo_panel.html"
+          cmp app/web/static/sg-xray-profiles-v2.css "$source/app/web/static/sg-xray-profiles-v2.css"
+      - name: Verify installer syntax
+        run: |
+          bash -n install.sh
+          bash -n deploy/install-from-github.sh
+      - name: Run focused clean-install contracts
+        run: |
+          python -m pytest -q \
+            tests/test_sg_gateway_v22_clean_install_connections_ui.py \
+            tests/test_sg_gateway_02110_installer_safety_regression.py \
+            tests/test_sg_gateway_v22_02206_installer_readiness.py \
+            tests/test_sg_gateway_v22_02206_stable_release.py \
+            tests/test_sg_gateway_v22_clean_install_production_wsgi.py \
+            tests/test_sg_gateway_v22_reinstall_after_full_uninstall.py \
+            tests/test_sg_gateway_v22_public_github_commands.py \
+            tests/test_sg_gateway_v22_server_managed_ports.py \
+            tests/test_sg_gateway_v22_hysteria2_compact_controls_ui.py \
+            tests/test_sg_gateway_v22_mihomo_panel_cleanup_ui.py
+      - name: Run full repository suite
+        run: python -m pytest -q
+      - name: Restore runtime samples
+        run: git restore --worktree data/sg-gateway.sqlite data/system-activity.json
+      - name: Build and verify FULL package
+        run: |
+          set -euo pipefail
+          VERSION="$(tr -d '[:space:]' < VERSION)"
+          OUT="/tmp/SG-Gateway-${VERSION}-FULL.run"
+          bash build-run.sh "$OUT"
+          bash "$OUT" --verify-only
+          test -z "$(git status --porcelain)"
