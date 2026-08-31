@@ -165,6 +165,45 @@ jobs:
           PY
           '
 
+      - name: Verify clean-install subscription labels
+        run: |
+          sudo bash -c '
+            set -a
+            source /etc/sg-gateway/runtime.env
+            source /etc/sg-gateway/sg-gateway.env
+            set +a
+            runuser -u sg-gateway -- env \
+              PYTHONPATH=/opt/sg-gateway:/opt/sg-gateway/hostd \
+              /opt/sg-gateway/.venv/bin/python - <<"PY"
+          import json
+
+          from app.clients.repository import list_clients
+          from app.clients.sg_subscription import build_sg_subscription_text
+
+          client = next((item for item in list_clients() if item.name == "sg-admin"), None)
+          assert client is not None, "seeded sg-admin client is missing"
+
+          text = build_sg_subscription_text(client)
+          lines = text.splitlines()
+          profiles = {"amneziawg", "amneziawg3", "amneziawg31"}
+          markers = [
+              json.loads(line.removeprefix("# SG-CONFIG "))
+              for line in lines
+              if line.startswith("# SG-CONFIG ")
+          ]
+          awg_markers = [marker for marker in markers if marker.get("profile") in profiles]
+
+          assert [marker.get("profile") for marker in awg_markers] == [
+              "amneziawg", "amneziawg3", "amneziawg31"
+          ]
+          labels = [str(marker.get("device") or "") for marker in awg_markers]
+          assert labels == ["sg-admin"] * 3
+          assert "sg-admin · Устройство" not in labels
+          assert "# client=sg-admin" not in lines
+          assert "# client-name=sg-admin" in lines
+          PY
+          '
+
       - name: Create and apply additional AWG3 client
         run: |
           sudo bash -c '
