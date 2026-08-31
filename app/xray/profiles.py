@@ -290,9 +290,9 @@ def _prepare(form: Any) -> PreparedXraySettings:
     values: dict[str, Any] = {
         "fingerprint": requested_fingerprint,
         "reality_tcp_enabled": bool(form.get("reality_tcp_enabled")),
-        "reality_tcp_port": _port(form.get("reality_tcp_port"), int(settings.port or 443)),
+        "reality_tcp_port": int(current["reality_tcp_port"]),
         "xhttp_reality_enabled": bool(form.get("xhttp_reality_enabled")),
-        "xhttp_reality_port": _port(form.get("xhttp_reality_port"), 8444),
+        "xhttp_reality_port": int(current["xhttp_reality_port"]),
         "xhttp_reality_path": _path(form.get("xhttp_reality_path"), "/sg-xhttp-reality"),
         "xhttp_reality_mode": _mode(
             form.get("xhttp_reality_mode"), str(current["xhttp_reality_mode"])
@@ -302,9 +302,7 @@ def _prepare(form: Any) -> PreparedXraySettings:
             bool(form.get("xhttp_tls_enabled"))
             if tls_ready else bool(current["xhttp_tls_enabled"])
         ),
-        "xhttp_tls_port": _port(
-            form.get("xhttp_tls_port"), int(current["xhttp_tls_port"])
-        ),
+        "xhttp_tls_port": int(current["xhttp_tls_port"]),
         "xhttp_tls_path": _path(
             form.get("xhttp_tls_path"), str(current["xhttp_tls_path"])
         ),
@@ -316,9 +314,7 @@ def _prepare(form: Any) -> PreparedXraySettings:
             bool(form.get("hysteria2_enabled"))
             if tls_ready else bool(current["hysteria2_enabled"])
         ),
-        "hysteria2_port": _port(
-            form.get("hysteria2_port"), int(current["hysteria2_port"])
-        ),
+        "hysteria2_port": int(current["hysteria2_port"]),
     }
 
     if not any(

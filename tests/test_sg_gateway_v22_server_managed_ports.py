@@ -152,7 +152,8 @@ def test_real_user_controls_remain_available() -> None:
 
     assert 'name="fingerprint"' in template
     assert 'name="server_name"' in template
-    assert 'name="xhttp_tls_mode"' in template
+    assert 'name="{{ profile.id }}_mode"' in template
+    assert "XHTTP mode клиента" in template
     assert 'name="hysteria2_obfs_mode"' in template
     assert 'name="mieru_transport"' in mihomo
     assert 'name="tuic_congestion_controller"' in mihomo

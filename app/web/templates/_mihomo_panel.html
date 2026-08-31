@@ -63,11 +63,11 @@
           </label>
         </header>
         <div class="mhv2-basic-fields">
-          <label>
+          <div class="mhv2-system-port">
             <span>Порт</span>
-            <input type="number" min="1" max="65535"
-                   name="mieru_port" value="{{ mihomo.settings.mieru_port }}">
-          </label>
+            <output>{{ mihomo.settings.mieru_port }}</output>
+            <small>Системный порт SG-Gateway</small>
+          </div>
           <label>
             <span>Transport</span>
             <select name="mieru_transport">
@@ -126,11 +126,11 @@
           </label>
         </header>
         <div class="mhv2-basic-fields one">
-          <label>
+          <div class="mhv2-system-port">
             <span>TCP-порт</span>
-            <input type="number" min="1" max="65535"
-                   name="anytls_port" value="{{ mihomo.settings.anytls_port }}">
-          </label>
+            <output>{{ mihomo.settings.anytls_port }}</output>
+            <small>Системный порт SG-Gateway</small>
+          </div>
         </div>
         <details class="mhv2-advanced">
           <summary>Дополнительно</summary>
@@ -167,11 +167,11 @@
           </label>
         </header>
         <div class="mhv2-basic-fields one">
-          <label>
+          <div class="mhv2-system-port">
             <span>UDP-порт</span>
-            <input type="number" min="1" max="65535"
-                   name="tuic_port" value="{{ mihomo.settings.tuic_port }}">
-          </label>
+            <output>{{ mihomo.settings.tuic_port }}</output>
+            <small>Системный порт SG-Gateway</small>
+          </div>
         </div>
         <details class="mhv2-advanced">
           <summary>Дополнительно</summary>
@@ -240,6 +240,30 @@
   color: var(--sg-muted);
   font-size: 10px;
   white-space: nowrap;
+}
+#mihomo .mhv2-system-port {
+  display: grid;
+  gap: 6px;
+}
+#mihomo .mhv2-system-port > span {
+  color: var(--sg-muted);
+  font-size: 10px;
+  font-weight: 750;
+}
+#mihomo .mhv2-system-port > output {
+  display: flex;
+  align-items: center;
+  min-height: 42px;
+  border: 1px solid var(--sg-line);
+  border-radius: 10px;
+  background: var(--sg-panel-deep);
+  color: var(--sg-text);
+  padding: 0 12px;
+  font: inherit;
+}
+#mihomo .mhv2-system-port > small {
+  color: var(--sg-muted);
+  font-size: 10px;
 }
 </style>
 

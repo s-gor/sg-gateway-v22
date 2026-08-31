@@ -42,11 +42,20 @@ def test_mihomo_is_compact_and_keeps_three_protocols():
     for protocol in ("Mieru", "AnyTLS", "TUIC v5"):
         assert protocol in panel
     for field in (
-        'name="mieru_enabled"', 'name="mieru_port"', 'name="mieru_transport"',
-        'name="anytls_enabled"', 'name="anytls_port"',
-        'name="tuic_enabled"', 'name="tuic_port"',
+        'name="mieru_enabled"', 'name="mieru_transport"',
+        'name="anytls_enabled"',
+        'name="tuic_enabled"',
     ):
         assert field in panel
+    for field in ("mieru_port", "anytls_port", "tuic_port"):
+        assert f'name="{field}"' not in panel
+    for value in (
+        "{{ mihomo.settings.mieru_port }}",
+        "{{ mihomo.settings.anytls_port }}",
+        "{{ mihomo.settings.tuic_port }}",
+    ):
+        assert value in panel
+    assert "Системный порт SG-Gateway" in panel
     assert "mhv2-summary" not in panel
     assert "mhv2-sgclient" not in panel
 
