@@ -20,24 +20,11 @@ jobs:
 
       - name: Apply native quiet-stage change and refresh checksums
         run: |
+          python3 -c 'from pathlib import Path; p=Path("install.sh"); b=p.read_text(encoding="utf-8"); old="  if [[ \"$number\" == \"1\" ]]; then\n    run_live \"$CURRENT_LABEL\" \"$function_name\"\n  else\n    run_quiet \"$CURRENT_LABEL\" \"$function_name\"\n  fi\n"; new="  run_quiet \"$CURRENT_LABEL\" \"$function_name\"\n"; assert b.count(old)==1, b.count(old); p.write_text(b.replace(old,new),encoding="utf-8")'
           python3 - <<'PY'
           import hashlib
           import subprocess
           from pathlib import Path
-
-          installer = Path("install.sh")
-          body = installer.read_text(encoding="utf-8")
-          old = '''  if [[ "$number" == "1" ]]; then
-    run_live "$CURRENT_LABEL" "$function_name"
-  else
-    run_quiet "$CURRENT_LABEL" "$function_name"
-  fi
-'''
-          new = '''  run_quiet "$CURRENT_LABEL" "$function_name"
-'''
-          if body.count(old) != 1:
-              raise SystemExit(f"expected exactly one native live-stage block, found {body.count(old)}")
-          installer.write_text(body.replace(old, new), encoding="utf-8")
 
           paths = sorted(subprocess.check_output(["git", "ls-files"], text=True).splitlines())
           paths.remove("SOURCE-SHA256SUMS")
