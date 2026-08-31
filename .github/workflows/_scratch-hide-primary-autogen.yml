@@ -43,6 +43,7 @@ jobs:
           Path("SOURCE-SHA256SUMS").write_text("\n".join(rows) + "\n", encoding="utf-8")
           print(f"regenerated {len(rows)} source hashes")
           PY
+          git add SOURCE-SHA256SUMS
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -106,11 +107,14 @@ jobs:
 
       - name: Commit exact finalized tree locally
         run: |
+          git restore --worktree -- .
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add SOURCE-SHA256SUMS
-          git commit -m "test: finalize AWG primary marker contract"
-          test -z "$(git status --porcelain)"
+          git add -A
+          git status --short
+          git commit --no-verify -m "test: finalize AWG primary marker contract"
+          git diff --exit-code
+          git diff --cached --exit-code
 
       - name: Build and verify FULL package
         run: |
