@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 REPOSITORY="s-gor/sg-gateway-v22"
-BRANCH="${SG_GATEWAY_GITHUB_BRANCH:-${SG_GATEWAY_UPDATE_BRANCH:-stable-02206}}"
+BRANCH="${SG_GATEWAY_GITHUB_BRANCH:-${SG_GATEWAY_UPDATE_BRANCH:-dev-02206}}"
 ARCHIVE_URL="https://github.com/${REPOSITORY}/archive/refs/heads/${BRANCH}.tar.gz"
 TEMP_DIR=""
 
@@ -11,7 +11,8 @@ fail() {
   exit 1
 }
 
-[[ "$BRANCH" == "stable-02206" ]] || fail "stable uninstaller is pinned to stable-02206; requested branch: $BRANCH"
+[[ "${SG_GATEWAY_ALLOW_DEVELOPMENT:-0}" == "1" ]] || fail "development build blocked; set SG_GATEWAY_ALLOW_DEVELOPMENT=1 explicitly"
+[[ "$BRANCH" == "dev-02206" ]] || fail "development uninstaller is pinned to dev-02206; requested branch: $BRANCH"
 [[ "$(id -u)" -eq 0 ]] || fail "run this uninstaller through sudo"
 
 cleanup() {
@@ -26,7 +27,7 @@ for command in curl tar gzip; do
 done
 
 TEMP_DIR="$(mktemp -d /tmp/sg-gateway-github-uninstall.XXXXXX)"
-ARCHIVE="$TEMP_DIR/sg-gateway-stable-02206.tar.gz"
+ARCHIVE="$TEMP_DIR/sg-gateway-dev-02206.tar.gz"
 SOURCE_DIR="$TEMP_DIR/source"
 mkdir -p "$SOURCE_DIR"
 
