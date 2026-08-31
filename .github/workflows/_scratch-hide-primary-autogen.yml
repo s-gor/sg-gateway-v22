@@ -104,6 +104,14 @@ jobs:
           print(f"source integrity OK: {len(tracked)} files")
           PY
 
+      - name: Commit exact finalized tree locally
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add SOURCE-SHA256SUMS
+          git commit -m "test: finalize AWG primary marker contract"
+          test -z "$(git status --porcelain)"
+
       - name: Build and verify FULL package
         run: |
           VERSION="$(tr -d '[:space:]' < VERSION)"
@@ -111,10 +119,5 @@ jobs:
           bash build-run.sh "$OUT"
           bash "$OUT" --verify-only
 
-      - name: Commit finalized candidate
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add SOURCE-SHA256SUMS
-          git commit -m "test: finalize AWG primary marker contract"
-          git push origin HEAD:scratch/02206-hide-primary-awg-autogen
+      - name: Publish finalized candidate
+        run: git push origin HEAD:scratch/02206-hide-primary-awg-autogen
