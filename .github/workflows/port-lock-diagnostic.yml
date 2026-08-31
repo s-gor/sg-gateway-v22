@@ -1,4 +1,4 @@
-name: Port lock diagnostic
+name: Port lock contract
 
 on:
   push:
@@ -9,8 +9,8 @@ permissions:
   contents: read
 
 jobs:
-  inspect:
-    runs-on: ubuntu-latest
+  verify:
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
         with:
@@ -20,32 +20,7 @@ jobs:
           python-version: '3.12'
       - name: Install test dependencies
         run: python -m pip install -r requirements-dev.txt
-      - name: Trace current and historical port controls
-        run: |
-          echo '=== CURRENT: editable number inputs in Connections ==='
-          grep -n -B4 -A5 'type="number"' app/web/templates/connections.html || true
-          grep -n -B3 -A5 'name=".*_port"' app/web/templates/_mihomo_panel.html || true
-
-          echo '=== CURRENT: server-port parsing definitions ==='
-          grep -RIn 'def save_xray_profiles\|def save_mihomo_settings\|def _prepare' app | head -n 100 || true
-          for file in $(grep -RIl 'def save_xray_profiles\|def save_mihomo_settings' app); do
-            echo "--- $file ---"
-            grep -n -B10 -A180 'def save_xray_profiles\|def save_mihomo_settings' "$file" || true
-          done
-
-          echo '=== HISTORY: commits that changed Xray profile port fields ==='
-          git log --oneline -S 'name="{{ profile.id }}_port"' -- app/web/templates/connections.html || true
-          echo '=== HISTORY: commits that changed Mihomo port fields ==='
-          git log --oneline -S 'name="mieru_port"' -- app/web/templates/_mihomo_panel.html || true
-          echo '=== KNOWN GOOD PARTS ==='
-          git show --stat --oneline 6d164e89649181135e95d81cb8d3cab86142451a
-          git show --stat --oneline dde723f065d850a898df703ca250d9e8c67af893
-          git show 6d164e89649181135e95d81cb8d3cab86142451a:app/web/templates/connections.html | grep -n -B4 -A6 'Reality TCP-порт\|profile.id }}_port' || true
-
-      - name: Run existing focused contracts
-        run: |
-          pytest -q \
-            tests/test_sg_gateway_v22_awg30_clean_install_and_port_ui.py \
-            tests/test_connection_settings.py \
-            tests/test_sg_gateway_v22_xray_fingerprint.py \
-            tests/test_connections_layout_v24.py
+      - name: Run server-managed port contract
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q tests/test_sg_gateway_v22_server_managed_ports.py
