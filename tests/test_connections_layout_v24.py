@@ -54,8 +54,9 @@ def test_mihomo_is_compact_and_keeps_three_protocols():
         "{{ mihomo.settings.anytls_port }}",
         "{{ mihomo.settings.tuic_port }}",
     ):
-        assert value in panel
-    assert "Системный порт SG-Gateway" in panel
+        assert value not in panel
+    assert "Системный порт SG-Gateway" not in panel
+    assert "mhv2-compact-endpoint" not in panel
     assert "mhv2-summary" not in panel
     assert "mhv2-sgclient" not in panel
 
