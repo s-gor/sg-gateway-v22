@@ -1,0 +1,41 @@
+name: Verify clean-install AWG label contract
+
+on:
+  push:
+    branches:
+      - fix/02206-clean-install-awg-label-contract
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run focused contract tests
+        run: |
+          python3 -B - <<'PY'
+          import runpy
+
+          namespace = runpy.run_path(
+              "tests/test_sg_gateway_v22_clean_install_awg_label_contract.py"
+          )
+          names = [
+              "test_public_clean_install_commands_pin_verified_source_commit",
+              "test_clean_install_smoke_verifies_seeded_awg_subscription_labels",
+          ]
+          failures = []
+          for name in names:
+              try:
+                  namespace[name]()
+              except AssertionError as error:
+                  failures.append((name, str(error)))
+                  print(f"FAILED {name}: {error}")
+              else:
+                  print(f"PASSED {name}")
+          if failures:
+              raise SystemExit(f"focused contract failed: {len(failures)} failure(s)")
+          PY
