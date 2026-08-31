@@ -272,6 +272,19 @@
     align-items: stretch;
     flex-direction: column;
   }
+
+  .xps2-salamander {
+    grid-template-columns: 1fr;
+  }
+
+  .xps2-salamander-secret {
+    grid-template-columns: 1fr;
+  }
+
+  .xps2-salamander-buttons {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 650px) {
@@ -299,24 +312,28 @@
 .xps2-salamander {
   grid-column: 1 / -1;
   display: grid;
-  gap: 14px;
-  margin-top: 2px;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px 14px;
+  margin-top: 0;
   border: 1px solid var(--sg-line-soft);
   border-radius: 12px;
   background: var(--sg-panel-soft);
-  padding: 16px;
+  padding: 12px 14px;
 }
 
 .xps2-salamander > header {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 18px;
+  align-items: center;
+  align-self: center;
+  justify-content: flex-start;
+  gap: 8px;
 }
 
 .xps2-salamander > header > div {
-  display: grid;
-  gap: 5px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  white-space: nowrap;
 }
 
 .xps2-salamander-kicker {
@@ -332,12 +349,20 @@
 }
 
 .xps2-salamander > header p,
-.xps2-salamander-warning,
-.xps2-salamander-status {
+.xps2-salamander-warning {
   margin: 0;
   color: var(--sg-muted);
   font-size: 11px;
-  line-height: 1.55;
+  line-height: 1.4;
+}
+
+.xps2-salamander-status {
+  grid-column: 1 / -1;
+  margin: 0;
+  margin-top: -4px;
+  color: var(--sg-muted);
+  font-size: 11px;
+  line-height: 1.4;
 }
 
 .xps2-salamander-version {
@@ -357,15 +382,16 @@
 
 .xps2-salamander-modes {
   display: flex;
+  align-items: center;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
 }
 
 .xps2-salamander-modes label {
   position: relative;
   display: inline-flex;
   align-items: center;
-  min-height: 38px;
+  min-height: 34px;
   cursor: pointer;
 }
 
@@ -381,12 +407,12 @@
 .xps2-salamander-modes span {
   display: inline-flex;
   align-items: center;
-  min-height: 38px;
+  min-height: 34px;
   border: 1px solid var(--sg-line);
   border-radius: 10px;
   background: var(--sg-panel);
   color: var(--sg-muted);
-  padding: 0 14px;
+  padding: 0 12px;
   font-size: 11px;
   font-weight: 800;
 }
@@ -403,10 +429,11 @@
 }
 
 .xps2-salamander-secret {
+  grid-column: 1 / -1;
   display: grid;
   grid-template-columns: minmax(280px, 1fr) auto;
   align-items: end;
-  gap: 12px;
+  gap: 10px;
 }
 
 .xps2-salamander-secret > label {
@@ -423,18 +450,18 @@
 .xps2-salamander-secret input[type="password"],
 .xps2-salamander-secret input[type="text"] {
   width: 100%;
-  min-height: 42px;
+  min-height: 40px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 .xps2-salamander-buttons {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
 }
 
 .xps2-salamander-buttons .button {
-  min-height: 42px;
+  min-height: 40px;
   justify-content: center;
 }
 
@@ -460,16 +487,6 @@ html[data-theme="light"] .xps2-salamander {
 html[data-theme="light"] .xps2-salamander-modes span,
 html[data-theme="light"] .xps2-salamander-warning {
   background: #ffffff;
-}
-
-@media (max-width: 900px) {
-  .xps2-salamander-secret {
-    grid-template-columns: 1fr;
-  }
-  .xps2-salamander-buttons {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
 }
 
 @media (max-width: 650px) {

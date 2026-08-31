@@ -292,7 +292,7 @@ def test_ui_has_off_salamander_gecko_and_internal_confirmation():
     assert 'name="hysteria2_obfs_mode" value="salamander"' in section
     assert 'name="hysteria2_obfs_mode" value="gecko"' in section
     assert "Gecko · рекомендуется" in section
-    assert "Сгенерировать новый" in section
+    assert "Новый пароль" in section
     assert "dataset.sgConfirm" in section
     assert "window.alert" not in section
     assert "window.confirm" not in section
@@ -438,4 +438,4 @@ def test_hysteria2_compact_ui_hides_display_only_metadata():
     assert "xps2-salamander-warning" not in template
     assert "Смена Off / Salamander / Gecko или замена пароля" not in template
     assert "Gecko · рекомендуется" in template
-    assert "Сгенерировать новый" in template
+    assert "Новый пароль" in template
