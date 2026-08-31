@@ -16,12 +16,12 @@ jobs:
       - name: Checkout exact final candidate
         uses: actions/checkout@v4
         with:
-          ref: ce2f9f56ffb11e03f2b6dfd7c2d90dcf589328dc
+          ref: afa5901896fdf6eaea56ec8a9c090a34eb645852
           fetch-depth: 0
 
       - name: Verify exact ancestry and file set
         run: |
-          test "$(git rev-parse HEAD)" = "ce2f9f56ffb11e03f2b6dfd7c2d90dcf589328dc"
+          test "$(git rev-parse HEAD)" = "afa5901896fdf6eaea56ec8a9c090a34eb645852"
           test "$(git rev-parse HEAD^)" = "4607c25b52a25206643ddd43fb5402791992e848"
           python -B - <<'PY'
           import subprocess
@@ -39,7 +39,7 @@ jobs:
                       "diff",
                       "--name-only",
                       "4607c25b52a25206643ddd43fb5402791992e848",
-                      "ce2f9f56ffb11e03f2b6dfd7c2d90dcf589328dc",
+                      "afa5901896fdf6eaea56ec8a9c090a34eb645852",
                   ],
                   text=True,
               ).splitlines()
