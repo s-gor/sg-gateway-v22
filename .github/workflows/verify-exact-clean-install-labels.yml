@@ -1,0 +1,189 @@
+name: Verify exact clean-install label candidate
+
+on:
+  push:
+    branches:
+      - verify/02206-clean-install-labels-4c92cce3
+
+permissions:
+  contents: read
+
+jobs:
+  exact-ci:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: 4c92cce362aa8a3c208357554d87d6ac03987cb6
+          fetch-depth: 1
+
+      - name: Confirm exact commit and tree
+        run: |
+          test "$(git rev-parse HEAD)" = "4c92cce362aa8a3c208357554d87d6ac03987cb6"
+          test "$(git rev-parse HEAD^{tree})" = "ac6737ea859a4d6204b1666e8630d492db2e2e99"
+          echo "HEAD=$(git rev-parse HEAD)"
+          echo "TREE=$(git rev-parse HEAD^{tree})"
+
+      - name: Verify source integrity
+        run: |
+          python3 -B - <<'PY'
+          import hashlib
+          import re
+          import subprocess
+          from pathlib import Path
+
+          rows = Path("SOURCE-SHA256SUMS").read_text(encoding="utf-8").splitlines()
+          expected = {}
+          for line_no, raw in enumerate(rows, 1):
+              if not raw.strip():
+                  continue
+              match = re.fullmatch(r"([0-9a-f]{64})  (.+)", raw)
+              if match is None:
+                  raise SystemExit(f"invalid SOURCE-SHA256SUMS line {line_no}: {raw!r}")
+              digest, path = match.groups()
+              if path in expected:
+                  raise SystemExit(f"duplicate checksum path: {path}")
+              expected[path] = digest
+
+          tracked = set(subprocess.check_output(["git", "ls-files"], text=True).splitlines())
+          tracked.discard("SOURCE-SHA256SUMS")
+          assert set(expected) == tracked, (sorted(tracked - set(expected)), sorted(set(expected) - tracked))
+          for path in sorted(tracked):
+              data = subprocess.check_output(["git", "show", f"HEAD:{path}"])
+              actual = hashlib.sha256(data).hexdigest()
+              assert actual == expected[path], path
+          print(f"Git-blob source integrity ok: {len(tracked)} tracked files verified")
+          PY
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+
+      - name: Check Python syntax
+        run: |
+          python -B -c "from pathlib import Path; files=list(Path('app').rglob('*.py'))+list(Path('engines').rglob('*.py'))+list(Path('tests').rglob('*.py')); [compile(p.read_text(encoding='utf-8'), str(p), 'exec') for p in files]; print(f'syntax ok: {len(files)} files')"
+
+      - name: Run focused clean-install contracts
+        run: |
+          python -m pytest -q \
+            tests/test_sg_gateway_v22_clean_install_awg_label_contract.py \
+            tests/test_sg_gateway_v22_public_github_commands.py \
+            tests/test_sg_gateway_v22_sg_subscription_compat_text.py
+
+      - name: Run full test suite
+        run: python -m pytest tests
+
+      - name: Build and verify FULL package
+        run: |
+          VERSION="$(tr -d '[:space:]' < VERSION)"
+          OUT="/tmp/SG-Gateway-${VERSION}-FULL.run"
+          bash build-run.sh "$OUT"
+          bash "$OUT" --verify-only
+
+  exact-clean-install:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: 4c92cce362aa8a3c208357554d87d6ac03987cb6
+          fetch-depth: 1
+
+      - name: Confirm exact commit and virgin state
+        run: |
+          test "$(git rev-parse HEAD)" = "4c92cce362aa8a3c208357554d87d6ac03987cb6"
+          test "$(git rev-parse HEAD^{tree})" = "ac6737ea859a4d6204b1666e8630d492db2e2e99"
+          sudo test ! -e /opt/sg-gateway
+          sudo test ! -e /etc/sg-gateway
+          sudo test ! -e /var/lib/sg-gateway
+
+      - name: Seed unattended clean-install parameters
+        run: |
+          PUBLIC_IP="$(curl -4 -fsS --max-time 15 https://api.ipify.org)"
+          python3 - "$PUBLIC_IP" <<'PY'
+          import ipaddress
+          import sys
+          ip = ipaddress.ip_address(sys.argv[1])
+          assert ip.version == 4 and ip.is_global, ip
+          PY
+          sudo install -m 0600 /dev/null /root/sg-gateway-02206-installer-resume.env
+          sudo tee /root/sg-gateway-02206-installer-resume.env >/dev/null <<EOF
+          PANEL_PORT=63443
+          XRAY_PORT=443
+          AWG_PORT=585
+          REALITY_TARGET=www.bing.com:443
+          REALITY_SNI=www.bing.com
+          ADMIN_PASSWORD=CleanInstallTest2026
+          ADMIN_PASSWORD_HASH=
+          PUBLIC_ADDRESS=$PUBLIC_IP
+          SERVER_NAME=sg-gateway-exact-ci
+          COUNTRY_CODE=us
+          CREATE_SG_ADMIN=1
+          SECRET_KEY=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+          EOF
+
+      - name: Run native clean installer from exact source
+        env:
+          SG_GATEWAY_SOURCE_DIR: ${{ github.workspace }}
+          SG_GATEWAY_SOURCE_COMMIT: 4c92cce362aa8a3c208357554d87d6ac03987cb6
+          SG_GATEWAY_APT_WAIT_SECONDS: "900"
+        run: sudo -E bash install.sh
+
+      - name: Verify services and AWG subscription labels
+        run: |
+          sudo systemctl is-active --quiet sg-hostd.service
+          sudo systemctl is-active --quiet sg-gateway.service
+          sudo systemctl is-active --quiet sg-gateway-awg3.service
+          sudo systemctl is-active --quiet sg-gateway-awg31.service
+          sudo test -S /run/amneziawg/awg3.sock
+          sudo test -S /run/amneziawg/awg31.sock
+          test "$(sudo /opt/sg-gateway/awg3/bin/awg show awg3 listen-port)" = "586"
+          test "$(sudo /opt/sg-gateway/awg31/bin/awg show awg31 listen-port)" = "587"
+          sudo bash -c '
+            set -a
+            source /etc/sg-gateway/runtime.env
+            source /etc/sg-gateway/sg-gateway.env
+            set +a
+            runuser -u sg-gateway -- env \
+              PYTHONPATH=/opt/sg-gateway:/opt/sg-gateway/hostd \
+              /opt/sg-gateway/.venv/bin/python - <<"PY"
+          import json
+          from app.clients.repository import list_clients
+          from app.clients.sg_subscription import build_sg_subscription_text
+
+          client = next((item for item in list_clients() if item.name == "sg-admin"), None)
+          assert client is not None
+          lines = build_sg_subscription_text(client).splitlines()
+          profiles = {"amneziawg", "amneziawg3", "amneziawg31"}
+          markers = [
+              json.loads(line.removeprefix("# SG-CONFIG "))
+              for line in lines
+              if line.startswith("# SG-CONFIG ")
+          ]
+          awg = [marker for marker in markers if marker.get("profile") in profiles]
+          assert [marker.get("profile") for marker in awg] == [
+              "amneziawg", "amneziawg3", "amneziawg31"
+          ]
+          labels = [str(marker.get("device") or "") for marker in awg]
+          assert labels == ["sg-admin"] * 3
+          assert "sg-admin · Устройство" not in labels
+          assert "# client-name=sg-admin" in lines
+          assert "# client=sg-admin" not in lines
+          print("Exact clean-install AWG labels:", labels)
+          PY
+          '
+
+      - name: Print diagnostics on failure
+        if: failure()
+        run: |
+          sudo systemctl status sg-gateway.service sg-hostd.service sg-gateway-awg3.service sg-gateway-awg31.service --no-pager || true
+          sudo journalctl -b -u sg-gateway.service -u sg-hostd.service -u sg-gateway-awg3.service -u sg-gateway-awg31.service -n 200 --no-pager || true
+          sudo tail -n 200 /var/log/sg-gateway-installer-02206.log || true
