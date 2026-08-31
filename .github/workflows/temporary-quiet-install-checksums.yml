@@ -18,8 +18,9 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Refresh source checksums
+      - name: Finalize candidate and refresh source checksums
         run: |
+          git rm .github/workflows/temporary-quiet-install-checksums.yml
           python3 - <<'PY'
           import hashlib
           import subprocess
@@ -32,11 +33,8 @@ jobs:
               rows.append(f"{hashlib.sha256(Path(name).read_bytes()).hexdigest()}  {name}")
           Path("SOURCE-SHA256SUMS").write_text("\n".join(rows) + "\n", encoding="utf-8")
           PY
-          if git diff --quiet -- SOURCE-SHA256SUMS; then
-            exit 0
-          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add SOURCE-SHA256SUMS
-          git commit -m "chore: refresh source checksums"
+          git commit -m "chore: finalize quiet install candidate"
           git push
