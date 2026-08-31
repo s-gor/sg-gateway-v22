@@ -16,12 +16,12 @@ jobs:
       - name: Checkout exact final candidate
         uses: actions/checkout@v4
         with:
-          ref: afa5901896fdf6eaea56ec8a9c090a34eb645852
+          ref: cc2d65e4ddd3d6824b6c46517201be245c4c877e
           fetch-depth: 0
 
       - name: Verify exact ancestry and file set
         run: |
-          test "$(git rev-parse HEAD)" = "afa5901896fdf6eaea56ec8a9c090a34eb645852"
+          test "$(git rev-parse HEAD)" = "cc2d65e4ddd3d6824b6c46517201be245c4c877e"
           test "$(git rev-parse HEAD^)" = "4607c25b52a25206643ddd43fb5402791992e848"
           python -B - <<'PY'
           import subprocess
@@ -30,6 +30,7 @@ jobs:
               "SOURCE-SHA256SUMS",
               "app/web/templates/_mihomo_panel.html",
               "tests/test_sg_gateway_v22_mihomo_panel_cleanup_ui.py",
+              "tests/test_sg_gateway_v22_mihomo_service_tools_ui.py",
               "tests/test_sg_gateway_v22_server_managed_ports.py",
           }
           actual = set(
@@ -39,7 +40,7 @@ jobs:
                       "diff",
                       "--name-only",
                       "4607c25b52a25206643ddd43fb5402791992e848",
-                      "afa5901896fdf6eaea56ec8a9c090a34eb645852",
+                      "cc2d65e4ddd3d6824b6c46517201be245c4c877e",
                   ],
                   text=True,
               ).splitlines()
