@@ -1,0 +1,125 @@
+name: Verify final Mihomo metadata SHA
+
+on:
+  push:
+    branches:
+      - verify/02206-remove-mihomo-fixed-metadata-final
+
+permissions:
+  contents: read
+
+jobs:
+  verify-final-sha:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout exact final candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ce2f9f56ffb11e03f2b6dfd7c2d90dcf589328dc
+          fetch-depth: 0
+
+      - name: Verify exact ancestry and file set
+        run: |
+          test "$(git rev-parse HEAD)" = "ce2f9f56ffb11e03f2b6dfd7c2d90dcf589328dc"
+          test "$(git rev-parse HEAD^)" = "4607c25b52a25206643ddd43fb5402791992e848"
+          python -B - <<'PY'
+          import subprocess
+
+          expected = {
+              "SOURCE-SHA256SUMS",
+              "app/web/templates/_mihomo_panel.html",
+              "tests/test_sg_gateway_v22_mihomo_panel_cleanup_ui.py",
+              "tests/test_sg_gateway_v22_server_managed_ports.py",
+          }
+          actual = set(
+              subprocess.check_output(
+                  [
+                      "git",
+                      "diff",
+                      "--name-only",
+                      "4607c25b52a25206643ddd43fb5402791992e848",
+                      "ce2f9f56ffb11e03f2b6dfd7c2d90dcf589328dc",
+                  ],
+                  text=True,
+              ).splitlines()
+          )
+          if actual != expected:
+              raise SystemExit(
+                  f"unexpected diff: missing={sorted(expected-actual)} extra={sorted(actual-expected)}"
+              )
+          print("ancestry and exact file set verified")
+          PY
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+
+      - name: Verify source integrity
+        run: |
+          python -B - <<'PY'
+          import hashlib
+          import re
+          import subprocess
+          from pathlib import Path
+
+          rows = Path("SOURCE-SHA256SUMS").read_text(encoding="utf-8").splitlines()
+          expected = {}
+          for line_no, raw in enumerate(rows, 1):
+              match = re.fullmatch(r"([0-9a-f]{64})  (.+)", raw)
+              if match is None:
+                  raise SystemExit(f"invalid SOURCE-SHA256SUMS line {line_no}: {raw!r}")
+              digest, path = match.groups()
+              if path in expected:
+                  raise SystemExit(f"duplicate checksum path: {path}")
+              expected[path] = digest
+
+          tracked = set(
+              subprocess.check_output(["git", "ls-files"], text=True).splitlines()
+          )
+          tracked.discard("SOURCE-SHA256SUMS")
+          if set(expected) != tracked:
+              raise SystemExit(
+                  f"checksum inventory mismatch: missing={sorted(tracked-set(expected))} "
+                  f"extra={sorted(set(expected)-tracked)}"
+              )
+
+          for path in sorted(tracked):
+              blob = subprocess.check_output(["git", "show", f"HEAD:{path}"])
+              actual = hashlib.sha256(blob).hexdigest()
+              if actual != expected[path]:
+                  raise SystemExit(f"source hash mismatch: {path}")
+          print(f"Git-blob source integrity ok: {len(tracked)} tracked files verified")
+          PY
+
+      - name: Run focused Mihomo contracts
+        run: |
+          python -m pytest -q \
+            tests/test_sg_gateway_v22_server_managed_ports.py \
+            tests/test_sg_gateway_v22_mihomo_panel_cleanup_ui.py \
+            tests/test_sg_gateway_v22_mihomo_service_tools_ui.py \
+            tests/test_sg_gateway_v22_mihomo_restart_services.py \
+            tests/test_sg_gateway_v22_awg_cards_unified_ui.py \
+            tests/test_ui_connections_visual_v1.py
+
+      - name: Run full repository suite
+        run: python -m pytest -q
+
+      - name: Restore tracked runtime samples
+        run: |
+          git checkout -- data/sg-gateway.sqlite data/system-activity.json
+          test -z "$(git status --porcelain)"
+
+      - name: Build and verify FULL package from final SHA
+        run: |
+          VERSION="$(tr -d '[:space:]' < VERSION)"
+          OUT="/tmp/SG-Gateway-${VERSION}-FULL.run"
+          bash build-run.sh "$OUT"
+          bash "$OUT" --verify-only
+          test -z "$(git status --porcelain)"
