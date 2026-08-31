@@ -1,0 +1,49 @@
+name: Regenerate AWG label source checksums
+
+on:
+  push:
+    branches:
+      - fix/02206-awg-primary-subscription-label
+
+permissions:
+  contents: write
+
+jobs:
+  regenerate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact branch commit
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Regenerate source inventory and remove temporary workflow
+        run: |
+          git rm .github/workflows/regen-awg-label-source.yml
+          python3 -B - <<'PY'
+          import hashlib
+          import subprocess
+          from pathlib import Path
+
+          paths = subprocess.check_output(
+              ["git", "ls-files"],
+              text=True,
+              encoding="utf-8",
+          ).splitlines()
+          paths.remove("SOURCE-SHA256SUMS")
+
+          rows = []
+          for path in sorted(paths):
+              content = subprocess.check_output(["git", "show", f":{path}"])
+              rows.append(f"{hashlib.sha256(content).hexdigest()}  {path}")
+
+          Path("SOURCE-SHA256SUMS").write_text("\n".join(rows) + "\n", encoding="utf-8")
+          PY
+          git add SOURCE-SHA256SUMS
+
+      - name: Commit regenerated checksums
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore: refresh source checksums for AWG label fix"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
