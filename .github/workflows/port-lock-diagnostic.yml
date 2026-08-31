@@ -1,0 +1,25 @@
+name: Port lock diagnostic
+
+on:
+  push:
+    branches:
+      - fix/02206-lock-server-ports
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Show editable port controls
+        run: |
+          echo '=== connections.html number inputs ==='
+          grep -n -B4 -A5 'type="number"' app/web/templates/connections.html || true
+          echo '=== profile port fields ==='
+          grep -RIn -B5 -A12 '_port' app/main.py app/connections tests | head -n 600 || true
+          echo '=== update routes ==='
+          grep -n -B8 -A120 'def update_xray_profiles\|def update_xray' app/main.py || true
+      - name: Run current port contract
+        run: pytest -q tests/test_sg_gateway_v22_awg30_clean_install_and_port_ui.py
