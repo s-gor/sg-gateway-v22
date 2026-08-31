@@ -7,10 +7,29 @@ SOURCE_COMMIT="${SG_GATEWAY_SOURCE_COMMIT:-}"
 ARCHIVE_REF="${SOURCE_COMMIT:-$BRANCH}"
 ARCHIVE_URL="https://github.com/${REPOSITORY}/archive/${ARCHIVE_REF}.tar.gz"
 TEMP_DIR=""
+ARCHIVE=""
+SOURCE_DIR=""
 MIN_FREE_MIB="${SG_GATEWAY_INSTALL_MIN_FREE_MIB:-1024}"
+BOOTSTRAP_LOG="/var/log/sg-gateway-bootstrap-02206.log"
+CURRENT_BOOTSTRAP_LABEL="Подготовка"
+
+if [[ -t 1 ]]; then
+  GREEN=$'\033[1;32m'
+  RED=$'\033[1;31m'
+  YELLOW=$'\033[1;33m'
+  RESET=$'\033[0m'
+else
+  GREEN=""
+  RED=""
+  YELLOW=""
+  RESET=""
+fi
 
 fail() {
-  printf '[SG-Gateway] ERROR: %s\n' "$*" >&2
+  printf '%s[SG-Gateway] [ОШИБКА]%s %s\n' "$RED" "$RESET" "$*" >&2
+  if [[ -f "$BOOTSTRAP_LOG" ]]; then
+    printf '[SG-Gateway] Полный технический журнал: %s\n' "$BOOTSTRAP_LOG" >&2
+  fi
   exit 1
 }
 
@@ -18,6 +37,7 @@ fail() {
 [[ -z "$SOURCE_COMMIT" || "$SOURCE_COMMIT" =~ ^[0-9a-f]{40}$ ]] || fail "SG_GATEWAY_SOURCE_COMMIT must be a lowercase 40-character commit SHA"
 
 cleanup() {
+  rm -f /tmp/sg-gateway-bootstrap-output.* 2>/dev/null || true
   if [[ -n "$TEMP_DIR" && -d "$TEMP_DIR" ]]; then
     rm -rf "$TEMP_DIR"
   fi
@@ -36,6 +56,75 @@ if [[ -f /opt/sg-gateway/VERSION && -f /etc/sg-gateway/runtime.env && -f /etc/sg
   printf 'curl -fsSL https://raw.githubusercontent.com/%s/%s/deploy/update-from-github.sh | sudo env SG_GATEWAY_GITHUB_BRANCH=%s bash\n' "$REPOSITORY" "$BRANCH" "$BRANCH"
   exit 2
 fi
+
+prepare_bootstrap_log() {
+  install -d -m 0755 "$(dirname "$BOOTSTRAP_LOG")"
+  : > "$BOOTSTRAP_LOG"
+  chmod 0600 "$BOOTSTRAP_LOG"
+}
+
+run_quiet() {
+  local label="$1"
+  shift
+  local started=$SECONDS rc=0 pid=0 frame=0 raw_output="" elapsed=0
+  local frames=('|' '/' '-' "\\")
+
+  CURRENT_BOOTSTRAP_LABEL="$label"
+  raw_output="$(mktemp /tmp/sg-gateway-bootstrap-output.XXXXXX)"
+  chmod 0600 "$raw_output"
+
+  if [[ -t 1 ]]; then
+    printf "\r\033[K%s[SG-Gateway] [-]%s %s" "$GREEN" "$RESET" "$label"
+  else
+    printf '%s[SG-Gateway] [..]%s %s\n' "$GREEN" "$RESET" "$label"
+  fi
+
+  set +e
+  (
+    trap - ERR INT TERM
+    set -Eeuo pipefail
+    "$@"
+  ) >"$raw_output" 2>&1 &
+  pid=$!
+
+  if [[ -t 1 ]]; then
+    while kill -0 "$pid" 2>/dev/null; do
+      frame=$(( (frame + 1) % 4 ))
+      printf "\r\033[K%s[SG-Gateway] [%s]%s %s" "$GREEN" "${frames[$frame]}" "$RESET" "$label"
+      sleep 0.18
+    done
+  fi
+
+  wait "$pid"
+  rc=$?
+  set -e
+
+  cat "$raw_output" >> "$BOOTSTRAP_LOG"
+  elapsed=$((SECONDS - started))
+
+  if (( rc != 0 )); then
+    if [[ -t 1 ]]; then
+      printf "\r\033[K%s[SG-Gateway] [ОШИБКА]%s %s (%s сек.)\n" "$RED" "$RESET" "$label" "$elapsed"
+    else
+      printf '%s[SG-Gateway] [ОШИБКА]%s %s (%s сек.)\n' "$RED" "$RESET" "$label" "$elapsed"
+    fi
+    printf 'FAILED COMMAND (rc=%s): %s\n' "$rc" "$label" >> "$BOOTSTRAP_LOG"
+    if [[ -s "$raw_output" ]]; then
+      printf '%s[SG-Gateway] Причина:%s\n' "$YELLOW" "$RESET" >&2
+      tail -n 12 "$raw_output" | sed 's/^/[SG-Gateway] /' >&2
+    fi
+    printf '[SG-Gateway] Полный технический журнал: %s\n' "$BOOTSTRAP_LOG" >&2
+    rm -f "$raw_output"
+    return "$rc"
+  fi
+
+  rm -f "$raw_output"
+  if [[ -t 1 ]]; then
+    printf "\r\033[K%s[SG-Gateway] [OK]%s %s (%s сек.)\n" "$GREEN" "$RESET" "$label" "$elapsed"
+  else
+    printf '%s[SG-Gateway] [OK]%s %s (%s сек.)\n' "$GREEN" "$RESET" "$label" "$elapsed"
+  fi
+}
 
 require_supported_ubuntu() {
   [[ -r /etc/os-release ]] || fail "cannot detect the operating system; Ubuntu 24.04 is required"
@@ -72,6 +161,11 @@ require_free_space() {
   printf '[SG-Gateway] Disk preflight %s: %s MiB free (minimum %s MiB).\n' "$label" "$available_mib" "$MIN_FREE_MIB"
 }
 
+preflight_disk_space() {
+  require_free_space /tmp "temporary storage"
+  require_free_space /opt "installation storage"
+}
+
 prepare_clean_ubuntu() {
   command -v apt-get >/dev/null 2>&1 || fail "apt-get is required to prepare Ubuntu"
 
@@ -89,58 +183,68 @@ prepare_clean_ubuntu() {
     exit 10
   fi
 
+  require_free_space /tmp "temporary storage after Ubuntu update"
+  require_free_space /opt "installation storage after Ubuntu update"
   printf '[SG-Gateway] Ubuntu update: complete; reboot not required.\n'
 }
+
+prepare_bootstrap_tools() {
+  local -a missing_packages=()
+  local command_name=""
+
+  command -v curl >/dev/null 2>&1 || missing_packages+=(curl)
+  command -v tar >/dev/null 2>&1 || missing_packages+=(tar)
+  command -v gzip >/dev/null 2>&1 || missing_packages+=(gzip)
+  [[ -s /etc/ssl/certs/ca-certificates.crt ]] || missing_packages+=(ca-certificates)
+
+  if (( ${#missing_packages[@]} > 0 )); then
+    command -v apt-get >/dev/null 2>&1 || fail "apt-get is required to install bootstrap dependencies"
+    printf '[SG-Gateway] Preparing required Ubuntu tools...\n'
+    apt-get -o Dpkg::Use-Pty=0 update -qq
+    env DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a \
+      apt-get -o Dpkg::Use-Pty=0 install -y -qq --no-install-recommends "${missing_packages[@]}"
+  fi
+
+  for command_name in curl tar gzip; do
+    command -v "$command_name" >/dev/null 2>&1 || fail "missing command after bootstrap: $command_name"
+  done
+}
+
+download_gateway_source() {
+  if [[ -n "$SOURCE_COMMIT" ]]; then
+    printf '[SG-Gateway] Downloading exact GitHub source %s...\n' "$SOURCE_COMMIT"
+  else
+    printf '[SG-Gateway] Downloading GitHub branch %s...\n' "$BRANCH"
+  fi
+
+  curl -fsSL --retry 6 --retry-all-errors --retry-delay 3 --connect-timeout 20 \
+    "$ARCHIVE_URL" -o "$ARCHIVE"
+
+  gzip -t "$ARCHIVE"
+  tar -xzf "$ARCHIVE" -C "$SOURCE_DIR" --strip-components=1
+
+  [[ -f "$SOURCE_DIR/install.sh" ]] || fail "install.sh is missing from the GitHub archive"
+  [[ -f "$SOURCE_DIR/VERSION" ]] || fail "VERSION is missing from the GitHub archive"
+  [[ -f "$SOURCE_DIR/requirements.txt" ]] || fail "requirements.txt is missing from the GitHub archive"
+  [[ -d "$SOURCE_DIR/app" ]] || fail "application source is missing from the GitHub archive"
+}
+
+prepare_bootstrap_log
 
 # A fresh cloud image can still be expanding its disk or applying first-boot
 # package changes when SSH becomes available. Wait for that work first, then
 # fully update Ubuntu before downloading or mutating any SG-Gateway state.
-require_supported_ubuntu
-wait_for_cloud_init
-require_free_space /tmp "temporary storage"
-require_free_space /opt "installation storage"
-prepare_clean_ubuntu
-require_free_space /tmp "temporary storage after Ubuntu update"
-require_free_space /opt "installation storage after Ubuntu update"
-
-missing_packages=()
-command -v curl >/dev/null 2>&1 || missing_packages+=(curl)
-command -v tar >/dev/null 2>&1 || missing_packages+=(tar)
-command -v gzip >/dev/null 2>&1 || missing_packages+=(gzip)
-[[ -s /etc/ssl/certs/ca-certificates.crt ]] || missing_packages+=(ca-certificates)
-
-if (( ${#missing_packages[@]} > 0 )); then
-  command -v apt-get >/dev/null 2>&1 || fail "apt-get is required to install bootstrap dependencies"
-  printf '[SG-Gateway] Preparing required Ubuntu tools...\n'
-  apt-get -o Dpkg::Use-Pty=0 update -qq
-  env DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a \
-    apt-get -o Dpkg::Use-Pty=0 install -y -qq --no-install-recommends "${missing_packages[@]}"
-fi
-
-for command in curl tar gzip; do
-  command -v "$command" >/dev/null 2>&1 || fail "missing command after bootstrap: $command"
-done
+run_quiet "Подготовка 1/6 · Проверка Ubuntu" require_supported_ubuntu
+run_quiet "Подготовка 2/6 · Ожидание cloud-init" wait_for_cloud_init
+run_quiet "Подготовка 3/6 · Проверка диска" preflight_disk_space
+run_quiet "Подготовка 4/6 · Обновление Ubuntu" prepare_clean_ubuntu
+run_quiet "Подготовка 5/6 · Подготовка инструментов" prepare_bootstrap_tools
 
 TEMP_DIR="$(mktemp -d /tmp/sg-gateway-github-install.XXXXXX)"
 ARCHIVE="$TEMP_DIR/sg-gateway-stable-02206.tar.gz"
 SOURCE_DIR="$TEMP_DIR/source"
 mkdir -p "$SOURCE_DIR"
-
-if [[ -n "$SOURCE_COMMIT" ]]; then
-  printf '[SG-Gateway] Downloading exact GitHub source %s...\n' "$SOURCE_COMMIT"
-else
-  printf '[SG-Gateway] Downloading GitHub branch %s...\n' "$BRANCH"
-fi
-curl -fL --retry 6 --retry-all-errors --retry-delay 3 --connect-timeout 20 \
-  "$ARCHIVE_URL" -o "$ARCHIVE"
-
-gzip -t "$ARCHIVE"
-tar -xzf "$ARCHIVE" -C "$SOURCE_DIR" --strip-components=1
-
-[[ -f "$SOURCE_DIR/install.sh" ]] || fail "install.sh is missing from the GitHub archive"
-[[ -f "$SOURCE_DIR/VERSION" ]] || fail "VERSION is missing from the GitHub archive"
-[[ -f "$SOURCE_DIR/requirements.txt" ]] || fail "requirements.txt is missing from the GitHub archive"
-[[ -d "$SOURCE_DIR/app" ]] || fail "application source is missing from the GitHub archive"
+run_quiet "Подготовка 6/6 · Загрузка SG-Gateway" download_gateway_source
 
 printf '[SG-Gateway] GitHub source version: %s\n' "$(tr -d '\r\n' < "$SOURCE_DIR/VERSION")"
 printf '[SG-Gateway] STABLE channel: stable-02206\n'
