@@ -540,11 +540,7 @@ run_stage() {
   local function_name="$3"
   CURRENT_STAGE="$number"
   CURRENT_LABEL="Этап ${number}/${TOTAL_STAGES} · ${label}"
-  if [[ "$number" == "1" ]]; then
-    run_live "$CURRENT_LABEL" "$function_name"
-  else
-    run_quiet "$CURRENT_LABEL" "$function_name"
-  fi
+  run_quiet "$CURRENT_LABEL" "$function_name"
 }
 
 wait_for_apt() {
