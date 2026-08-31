@@ -16,12 +16,12 @@ jobs:
       - name: Checkout exact final candidate
         uses: actions/checkout@v4
         with:
-          ref: cc2d65e4ddd3d6824b6c46517201be245c4c877e
+          ref: 6d8b22ffeb9005fd2d847a0802afafbb0f4fe4da
           fetch-depth: 0
 
       - name: Verify exact ancestry and file set
         run: |
-          test "$(git rev-parse HEAD)" = "cc2d65e4ddd3d6824b6c46517201be245c4c877e"
+          test "$(git rev-parse HEAD)" = "6d8b22ffeb9005fd2d847a0802afafbb0f4fe4da"
           test "$(git rev-parse HEAD^)" = "4607c25b52a25206643ddd43fb5402791992e848"
           python -B - <<'PY'
           import subprocess
@@ -29,6 +29,8 @@ jobs:
           expected = {
               "SOURCE-SHA256SUMS",
               "app/web/templates/_mihomo_panel.html",
+              "tests/test_connections_layout_v24.py",
+              "tests/test_sg_gateway_02112_all_connections_domain_fix3.py",
               "tests/test_sg_gateway_v22_mihomo_panel_cleanup_ui.py",
               "tests/test_sg_gateway_v22_mihomo_service_tools_ui.py",
               "tests/test_sg_gateway_v22_server_managed_ports.py",
@@ -40,7 +42,7 @@ jobs:
                       "diff",
                       "--name-only",
                       "4607c25b52a25206643ddd43fb5402791992e848",
-                      "cc2d65e4ddd3d6824b6c46517201be245c4c877e",
+                      "6d8b22ffeb9005fd2d847a0802afafbb0f4fe4da",
                   ],
                   text=True,
               ).splitlines()
@@ -105,6 +107,8 @@ jobs:
             tests/test_sg_gateway_v22_server_managed_ports.py \
             tests/test_sg_gateway_v22_mihomo_panel_cleanup_ui.py \
             tests/test_sg_gateway_v22_mihomo_service_tools_ui.py \
+            tests/test_connections_layout_v24.py \
+            tests/test_sg_gateway_02112_all_connections_domain_fix3.py \
             tests/test_sg_gateway_v22_mihomo_restart_services.py \
             tests/test_sg_gateway_v22_awg_cards_unified_ui.py \
             tests/test_ui_connections_visual_v1.py
