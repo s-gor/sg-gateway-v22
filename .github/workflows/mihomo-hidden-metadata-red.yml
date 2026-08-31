@@ -1,0 +1,21 @@
+name: Mihomo hidden metadata red phase
+
+on:
+  push:
+    branches:
+      - fix/02206-remove-mihomo-fixed-metadata
+  workflow_dispatch:
+
+jobs:
+  focused:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install pytest
+      - run: >-
+          python -m pytest -q
+          tests/test_sg_gateway_v22_server_managed_ports.py
+          tests/test_sg_gateway_v22_mihomo_panel_cleanup_ui.py
