@@ -315,12 +315,21 @@ def register_sg_infosec_management(
     *,
     client: SGInfoSecManagementClient | None = None,
 ) -> None:
-    if "sg_infosec_management" in app.extensions:
+    extensions = getattr(app, "extensions", None)
+    if (
+        not isinstance(extensions, dict)
+        or not callable(getattr(app, "context_processor", None))
+        or not callable(getattr(app, "post", None))
+    ):
+        return
+    if "sg_infosec_management" in extensions:
         return
     management = client or SGInfoSecManagementClient.from_environment()
 
     @app.context_processor
     def _sg_infosec_management_context():
+        if request.path != "/security":
+            return {}
         if not is_authenticated():
             return {
                 "sg_infosec": _empty_overview(),
@@ -402,4 +411,4 @@ def register_sg_infosec_management(
             flash(str(exc), "error")
         return redirect(target)
 
-    app.extensions["sg_infosec_management"] = {"client": management}
+    extensions["sg_infosec_management"] = {"client": management}
