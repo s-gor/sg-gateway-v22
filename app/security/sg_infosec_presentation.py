@@ -157,7 +157,11 @@ def _is_local_address(address: ipaddress.IPv4Address | ipaddress.IPv6Address) ->
     if address.is_loopback or address.is_link_local or address.is_multicast or address.is_unspecified:
         return True
     if isinstance(address, ipaddress.IPv4Address):
-        return address in ipaddress.ip_network("10.0.0.0/8") or address in ipaddress.ip_network("172.16.0.0/12") or address in ipaddress.ip_network("192.168.0.0/16")
+        return (
+            address in ipaddress.ip_network("10.0.0.0/8")
+            or address in ipaddress.ip_network("172.16.0.0/12")
+            or address in ipaddress.ip_network("192.168.0.0/16")
+        )
     return address in ipaddress.ip_network("fc00::/7")
 
 
@@ -199,6 +203,7 @@ class IPIntelligenceResolver:
         now: Callable[[], datetime] | None = None,
         timeout: float = 0.8,
         ttl: timedelta = timedelta(days=7),
+        negative_ttl: timedelta = timedelta(hours=1),
         enabled: bool | None = None,
         reputation_path: str | os.PathLike[str] = DEFAULT_REPUTATION_PATH,
     ) -> None:
@@ -207,7 +212,8 @@ class IPIntelligenceResolver:
         self.fetcher = fetcher
         self.now = now or (lambda: datetime.now(timezone.utc))
         self.timeout = min(max(float(timeout), 0.1), 1.0)
-        self.ttl = ttl
+        self.ttl = max(ttl, timedelta(minutes=1))
+        self.negative_ttl = max(negative_ttl, timedelta(minutes=1))
         self.enabled = _enabled_from_environment() if enabled is None else bool(enabled)
         self.reputation_path = Path(reputation_path)
         self._lock = threading.RLock()
@@ -238,11 +244,17 @@ class IPIntelligenceResolver:
         with self._lock:
             entries = self._load_cache()
             if len(entries) > _MAX_CACHE_ENTRIES:
-                ordered = sorted(entries.items(), key=lambda item: str(item[1].get("cached_at", "")))
+                ordered = sorted(
+                    entries.items(),
+                    key=lambda item: str(item[1].get("cached_at", "")),
+                )
                 entries = dict(ordered[-_MAX_CACHE_ENTRIES:])
                 self._cache = entries
             try:
-                _atomic_json(self.cache_path, {"version": _CACHE_VERSION, "entries": entries})
+                _atomic_json(
+                    self.cache_path,
+                    {"version": _CACHE_VERSION, "entries": entries},
+                )
             except OSError:
                 return
 
@@ -251,31 +263,45 @@ class IPIntelligenceResolver:
         if not isinstance(item, dict):
             return None
         try:
-            cached_at = datetime.fromisoformat(str(item["cached_at"]).replace("Z", "+00:00"))
+            cached_at = datetime.fromisoformat(
+                str(item["cached_at"]).replace("Z", "+00:00")
+            )
             if cached_at.tzinfo is None:
                 cached_at = cached_at.replace(tzinfo=timezone.utc)
         except (KeyError, TypeError, ValueError):
             return None
-        if self.now().astimezone(timezone.utc) - cached_at.astimezone(timezone.utc) > self.ttl:
-            return None
         data = item.get("data")
-        return dict(data) if isinstance(data, dict) else None
+        if not isinstance(data, dict):
+            return None
+        lifetime = self.ttl if data.get("available") else self.negative_ttl
+        age = self.now().astimezone(timezone.utc) - cached_at.astimezone(timezone.utc)
+        if age > lifetime:
+            return None
+        return dict(data)
 
     def _lookup_reputation(self, ip: str) -> dict[str, Any]:
-        try:
-            mtime = self.reputation_path.stat().st_mtime_ns
-        except OSError:
-            return {}
-        try:
-            if self._reputation is None or self._reputation_mtime != mtime:
-                from app.security.sg_infosec_guard import ReputationIndex
+        with self._lock:
+            try:
+                mtime = self.reputation_path.stat().st_mtime_ns
+            except OSError:
+                return {}
+            try:
+                if self._reputation is None or self._reputation_mtime != mtime:
+                    from app.security.sg_infosec_guard import ReputationIndex
 
-                self._reputation = ReputationIndex.load(self.reputation_path)
-                self._reputation_mtime = mtime
-            entry = self._reputation.lookup(ip)
-            return entry.view() if entry is not None else {}
-        except (OSError, TypeError, ValueError, json.JSONDecodeError):
-            return {}
+                    self._reputation = ReputationIndex.load(self.reputation_path)
+                    self._reputation_mtime = mtime
+                entry = self._reputation.lookup(ip)
+                return entry.view() if entry is not None else {}
+            except (OSError, TypeError, ValueError, json.JSONDecodeError):
+                return {}
+
+    def _country_code(self, ip: str) -> str:
+        try:
+            value = str(self.country_lookup(ip) or "").strip().lower()
+        except (OSError, RuntimeError, ValueError):
+            return ""
+        return value if re.fullmatch(r"[a-z]{2}", value) else ""
 
     def _base(self, ip: str, country_code: str) -> dict[str, Any]:
         name = _country_name(country_code)
@@ -287,15 +313,27 @@ class IPIntelligenceResolver:
             "asn": None,
             "organization": "",
             "prefix": "",
-            "source": "",
+            "source": "GeoIP" if country_code else "",
             "available": False,
         }
 
-    def _render(self, data: Mapping[str, Any], reputation: Mapping[str, Any] | None) -> dict[str, Any]:
+    def _render(
+        self,
+        data: Mapping[str, Any],
+        reputation: Mapping[str, Any] | None,
+    ) -> dict[str, Any]:
         result = dict(data)
         network_type = _network_type(reputation)
         result["network_type_label"] = network_type
-        country = " ".join(filter(None, [str(result.get("country_flag", "")), str(result.get("country_name", ""))])).strip()
+        country = " ".join(
+            filter(
+                None,
+                [
+                    str(result.get("country_flag", "")),
+                    str(result.get("country_name", "")),
+                ],
+            )
+        ).strip()
         routing = []
         if result.get("asn"):
             routing.append(f"AS{result['asn']}")
@@ -314,39 +352,67 @@ class IPIntelligenceResolver:
         result["details"] = " · ".join(details)
         return result
 
+    def _unavailable(
+        self,
+        ip: str,
+        reputation: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        return self._render(self._base(ip, self._country_code(ip)), reputation)
+
     def resolve(self, ip: object, reputation: object = None) -> dict[str, Any]:
         try:
             address = ipaddress.ip_address(str(ip or "").strip())
         except ValueError:
             return {
-                "ip": str(ip or ""), "summary": "Некорректный IP-адрес", "details": "",
-                "country_code": "", "country_name": "", "country_flag": "", "asn": None,
-                "organization": "", "prefix": "", "network_type_label": "Не определена",
-                "source": "", "available": False,
+                "ip": str(ip or ""),
+                "summary": "Некорректный IP-адрес",
+                "details": "",
+                "country_code": "",
+                "country_name": "",
+                "country_flag": "",
+                "asn": None,
+                "organization": "",
+                "prefix": "",
+                "network_type_label": "Не определена",
+                "source": "",
+                "available": False,
             }
         if isinstance(address, ipaddress.IPv6Address) and address.ipv4_mapped is not None:
             address = address.ipv4_mapped
         canonical = address.compressed
         if _is_local_address(address):
             return {
-                "ip": canonical, "summary": "Локальный адрес", "details": "Внутренняя сеть сервера",
-                "country_code": "", "country_name": "", "country_flag": "", "asn": None,
-                "organization": "", "prefix": "", "network_type_label": "Локальная сеть",
-                "source": "local", "available": True,
+                "ip": canonical,
+                "summary": "Локальный адрес",
+                "details": "Внутренняя сеть сервера",
+                "country_code": "",
+                "country_name": "",
+                "country_flag": "",
+                "asn": None,
+                "organization": "",
+                "prefix": "",
+                "network_type_label": "Локальная сеть",
+                "source": "local",
+                "available": True,
             }
-        rep = dict(reputation) if isinstance(reputation, Mapping) else self._lookup_reputation(canonical)
+
+        rep = (
+            dict(reputation)
+            if isinstance(reputation, Mapping)
+            else self._lookup_reputation(canonical)
+        )
         cached = self._cached(canonical)
         if cached is not None:
             return self._render(cached, rep)
-        try:
-            country_code = str(self.country_lookup(canonical) or "").strip().lower()
-        except (OSError, RuntimeError, ValueError):
-            country_code = ""
-        data = self._base(canonical, country_code)
+
+        data = self._base(canonical, self._country_code(canonical))
         if self.enabled:
             try:
                 query = urllib.parse.urlencode({"resource": canonical})
-                payload = self.fetcher(f"{RIPESTAT_PREFIX_OVERVIEW}?{query}", self.timeout)
+                payload = self.fetcher(
+                    f"{RIPESTAT_PREFIX_OVERVIEW}?{query}",
+                    self.timeout,
+                )
                 body = payload.get("data") if isinstance(payload, dict) else None
                 if not isinstance(body, dict):
                     raise ValueError("missing RIPEstat data")
@@ -355,23 +421,39 @@ class IPIntelligenceResolver:
                 if isinstance(raw_asns, list) and raw_asns:
                     first = raw_asns[0]
                     if isinstance(first, dict):
-                        data["asn"] = int(first.get("asn")) if first.get("asn") else None
-                        data["organization"] = " ".join(str(first.get("holder") or "").split())[:160]
+                        raw_asn = first.get("asn")
+                        data["asn"] = int(raw_asn) if raw_asn else None
+                        data["organization"] = " ".join(
+                            str(first.get("holder") or "").split()
+                        )[:160]
                     elif str(first).isdigit():
                         data["asn"] = int(first)
-                data["source"] = "RIPEstat"
+                data["source"] = "RIPEstat + GeoIP" if data["country_code"] else "RIPEstat"
                 data["available"] = bool(data.get("asn") or data.get("prefix"))
-            except (OSError, RuntimeError, TypeError, ValueError, json.JSONDecodeError):
+            except (
+                OSError,
+                RuntimeError,
+                TypeError,
+                ValueError,
+                json.JSONDecodeError,
+            ):
                 pass
+
         with self._lock:
             self._load_cache()[canonical] = {
-                "cached_at": self.now().astimezone(timezone.utc).isoformat().replace("+00:00", "Z"),
+                "cached_at": self.now()
+                .astimezone(timezone.utc)
+                .isoformat()
+                .replace("+00:00", "Z"),
                 "data": data,
             }
             self._save_cache()
         return self._render(data, rep)
 
-    def resolve_many(self, values: Iterable[tuple[object, object]]) -> dict[str, dict[str, Any]]:
+    def resolve_many(
+        self,
+        values: Iterable[tuple[object, object]],
+    ) -> dict[str, dict[str, Any]]:
         unique: dict[str, object] = {}
         for raw_ip, reputation in values:
             text = str(raw_ip or "").strip()
@@ -380,21 +462,27 @@ class IPIntelligenceResolver:
         items = list(unique.items())
         results: dict[str, dict[str, Any]] = {}
         immediate = items[:_MAX_PAGE_LOOKUPS]
-        with ThreadPoolExecutor(max_workers=min(4, max(1, len(immediate)))) as executor:
-            futures = {executor.submit(self.resolve, ip, rep): ip for ip, rep in immediate}
-            for future in as_completed(futures):
-                ip = futures[future]
-                try:
-                    results[ip] = future.result()
-                except Exception:
-                    results[ip] = self.resolve(ip, {}) if not self.enabled else {
-                        "ip": ip, "summary": "Сведения о сети недоступны", "details": "Публичная сеть",
-                        "country_code": "", "country_name": "", "country_flag": "", "asn": None,
-                        "organization": "", "prefix": "", "network_type_label": "Публичная сеть",
-                        "source": "", "available": False,
-                    }
+        if immediate:
+            with ThreadPoolExecutor(max_workers=min(4, len(immediate))) as executor:
+                futures = {
+                    executor.submit(self.resolve, ip, rep): ip
+                    for ip, rep in immediate
+                }
+                for future in as_completed(futures):
+                    ip = futures[future]
+                    try:
+                        results[ip] = future.result()
+                    except Exception:
+                        rep = unique.get(ip)
+                        results[ip] = self._unavailable(
+                            ip,
+                            rep if isinstance(rep, Mapping) else {},
+                        )
         for ip, rep in items[_MAX_PAGE_LOOKUPS:]:
-            results[ip] = self._render(self._base(ip, ""), rep if isinstance(rep, Mapping) else {})
+            results[ip] = self._unavailable(
+                ip,
+                rep if isinstance(rep, Mapping) else {},
+            )
         return results
 
 
@@ -407,8 +495,14 @@ def get_ip_intelligence_resolver() -> IPIntelligenceResolver:
     with _shared_lock:
         if _shared_resolver is None:
             _shared_resolver = IPIntelligenceResolver(
-                cache_path=os.environ.get("SG_INFOSEC_IP_INTEL_CACHE", str(DEFAULT_IP_INTELLIGENCE_CACHE)),
-                reputation_path=os.environ.get("SG_INFOSEC_REPUTATION_FILE", str(DEFAULT_REPUTATION_PATH)),
+                cache_path=os.environ.get(
+                    "SG_INFOSEC_IP_INTEL_CACHE",
+                    str(DEFAULT_IP_INTELLIGENCE_CACHE),
+                ),
+                reputation_path=os.environ.get(
+                    "SG_INFOSEC_REPUTATION_FILE",
+                    str(DEFAULT_REPUTATION_PATH),
+                ),
             )
         return _shared_resolver
 
@@ -444,29 +538,72 @@ def _scope_label(value: object) -> str:
     return _SCOPE_LABELS.get(text, text or "Не указана")
 
 
-def _decision(item: Mapping[str, Any], intel: Mapping[str, Any], local_timezone: tzinfo) -> dict[str, Any]:
+def _decision(
+    item: Mapping[str, Any],
+    intel: Mapping[str, Any],
+    local_timezone: tzinfo,
+) -> dict[str, Any]:
     raw = dict(item)
     scope = str(raw.get("scope") or "")
     reason = str(raw.get("reason_code") or raw.get("reason") or "manual")
     state = str(raw.get("state") or "")
     result = dict(raw)
-    result.update({
-        "scope_label": _scope_label(scope),
-        "scope_effect": _SCOPE_EFFECTS.get(scope, "Ограничение действует только в указанной области."),
-        "reason_label": _REASON_LABELS.get(reason, reason.replace("_", " ") or "Ручная блокировка"),
-        "state_label": _STATE_LABELS.get(state, state or "Не указано"),
-        "created_at_label": _format_time(raw.get("created_at"), local_timezone),
-        "expires_at_label": _format_time(raw.get("expires_at"), local_timezone),
-        "updated_at_label": _format_time(raw.get("updated_at"), local_timezone),
-        "ip_intel": dict(intel),
-        "technical": {
-            key: raw.get(key) for key in (
-                "id", "source_id", "policy_id", "scope", "reason_code", "state", "backend",
-                "strike", "created_at", "starts_at", "expires_at", "updated_at",
-            ) if raw.get(key) not in {None, ""}
-        },
-    })
+    result.update(
+        {
+            "scope_label": _scope_label(scope),
+            "scope_effect": _SCOPE_EFFECTS.get(
+                scope,
+                "Ограничение действует только в указанной области.",
+            ),
+            "reason_label": _REASON_LABELS.get(
+                reason,
+                reason.replace("_", " ") or "Ручная блокировка",
+            ),
+            "state_label": _STATE_LABELS.get(state, state or "Не указано"),
+            "created_at_label": _format_time(
+                raw.get("created_at"), local_timezone
+            ),
+            "expires_at_label": _format_time(
+                raw.get("expires_at"), local_timezone
+            ),
+            "updated_at_label": _format_time(
+                raw.get("updated_at"), local_timezone
+            ),
+            "ip_intel": dict(intel),
+            "technical": {
+                key: raw.get(key)
+                for key in (
+                    "id",
+                    "source_id",
+                    "policy_id",
+                    "scope",
+                    "reason_code",
+                    "state",
+                    "backend",
+                    "strike",
+                    "created_at",
+                    "starts_at",
+                    "expires_at",
+                    "updated_at",
+                )
+                if raw.get(key) not in {None, ""}
+            },
+        }
+    )
     return result
+
+
+def _intelligence_for(
+    source: Any,
+    intelligence: Mapping[str, Mapping[str, Any]],
+    ip: object,
+    reputation: object = None,
+) -> Mapping[str, Any]:
+    key = str(ip or "")
+    known = intelligence.get(key)
+    if known is not None:
+        return known
+    return source.resolve(ip, reputation)
 
 
 def present_management_overview(
@@ -478,40 +615,111 @@ def present_management_overview(
     result = dict(overview)
     source = resolver or get_ip_intelligence_resolver()
     zone = _timezone(local_timezone)
-    active_raw = [item for item in overview.get("active_decisions", []) if isinstance(item, Mapping)]
-    history_raw = [item for item in overview.get("history", []) if isinstance(item, Mapping)]
-    allowlist_raw = [item for item in overview.get("allowlist", []) if isinstance(item, Mapping)]
-    audit_raw = [item for item in overview.get("audit", []) if isinstance(item, Mapping)]
-    pairs = [(item.get("ip"), {}) for item in (*active_raw, *history_raw) if item.get("ip")]
+    active_raw = [
+        item
+        for item in overview.get("active_decisions", [])
+        if isinstance(item, Mapping)
+    ]
+    history_raw = [
+        item
+        for item in overview.get("history", [])
+        if isinstance(item, Mapping)
+    ]
+    allowlist_raw = [
+        item
+        for item in overview.get("allowlist", [])
+        if isinstance(item, Mapping)
+    ]
+    audit_raw = [
+        item
+        for item in overview.get("audit", [])
+        if isinstance(item, Mapping)
+    ]
+    pairs = [
+        (item.get("ip"), {})
+        for item in (*active_raw, *history_raw)
+        if item.get("ip")
+    ]
     if hasattr(source, "resolve_many"):
         intelligence = source.resolve_many(pairs)
     else:
-        intelligence = {str(ip): source.resolve(ip, rep) for ip, rep in pairs}
+        intelligence = {}
+        for ip, reputation in pairs:
+            key = str(ip)
+            if key not in intelligence:
+                intelligence[key] = source.resolve(ip, reputation)
+
     result["active_decisions"] = [
-        _decision(item, intelligence.get(str(item.get("ip")), source.resolve(item.get("ip"))), zone)
+        _decision(
+            item,
+            _intelligence_for(source, intelligence, item.get("ip")),
+            zone,
+        )
         for item in active_raw
     ]
     result["history"] = [
-        _decision(item, intelligence.get(str(item.get("ip")), source.resolve(item.get("ip"))), zone)
+        _decision(
+            item,
+            _intelligence_for(source, intelligence, item.get("ip")),
+            zone,
+        )
         for item in history_raw
     ]
     result["allowlist"] = [
         {
             **dict(item),
-            "scope_label": _scope_label(item.get("scope")) if item.get("scope") else "Все области",
-            "expires_at_label": _format_time(item.get("expires_at"), zone) if item.get("expires_at") else "Без срока",
-            "technical": {key: item.get(key) for key in ("id", "scope", "created_at", "expires_at") if item.get(key) not in {None, ""}},
+            "scope_label": (
+                _scope_label(item.get("scope"))
+                if item.get("scope")
+                else "Все области"
+            ),
+            "expires_at_label": (
+                _format_time(item.get("expires_at"), zone)
+                if item.get("expires_at")
+                else "Без срока"
+            ),
+            "technical": {
+                key: item.get(key)
+                for key in ("id", "scope", "created_at", "expires_at")
+                if item.get(key) not in {None, ""}
+            },
         }
         for item in allowlist_raw
     ]
     result["audit"] = [
         {
             **dict(item),
-            "action_label": _AUDIT_ACTION_LABELS.get(str(item.get("action") or ""), str(item.get("action") or "Действие")),
-            "target_label": "Блокировка" if item.get("target_type") == "decision" else ("Исключение" if item.get("target_type") == "allowlist" else str(item.get("target_type") or "Объект")),
-            "result_label": _RESULT_LABELS.get(str(item.get("result") or ""), str(item.get("result") or "Не указано")),
+            "action_label": _AUDIT_ACTION_LABELS.get(
+                str(item.get("action") or ""),
+                str(item.get("action") or "Действие"),
+            ),
+            "target_label": (
+                "Блокировка"
+                if item.get("target_type") == "decision"
+                else (
+                    "Исключение"
+                    if item.get("target_type") == "allowlist"
+                    else str(item.get("target_type") or "Объект")
+                )
+            ),
+            "result_label": _RESULT_LABELS.get(
+                str(item.get("result") or ""),
+                str(item.get("result") or "Не указано"),
+            ),
             "occurred_at_label": _format_time(item.get("occurred_at"), zone),
-            "technical": {key: item.get(key) for key in ("actor", "action", "target_type", "target_id", "request_id", "result", "occurred_at") if item.get(key) not in {None, ""}},
+            "technical": {
+                key: item.get(key)
+                for key in (
+                    "actor",
+                    "action",
+                    "target_type",
+                    "target_id",
+                    "request_id",
+                    "result",
+                    "occurred_at",
+                )
+                if item.get(key) not in {None, ""}
+            },
         }
         for item in audit_raw
     ]
@@ -527,28 +735,58 @@ def present_guard_overview(
     result = dict(overview)
     source = resolver or get_ip_intelligence_resolver()
     zone = _timezone(local_timezone)
-    alerts = [item for item in overview.get("alerts", []) if isinstance(item, Mapping)]
-    pairs = [(item.get("ip"), item.get("reputation") or {}) for item in alerts if item.get("ip")]
+    alerts = [
+        item
+        for item in overview.get("alerts", [])
+        if isinstance(item, Mapping)
+    ]
+    pairs = [
+        (item.get("ip"), item.get("reputation") or {})
+        for item in alerts
+        if item.get("ip")
+    ]
     if hasattr(source, "resolve_many"):
         intelligence = source.resolve_many(pairs)
     else:
-        intelligence = {str(ip): source.resolve(ip, rep) for ip, rep in pairs}
+        intelligence = {}
+        for ip, reputation in pairs:
+            key = str(ip)
+            if key not in intelligence:
+                intelligence[key] = source.resolve(ip, reputation)
+
     presented = []
     for item in alerts:
         raw = dict(item)
         ip = str(raw.get("ip") or "")
         rule_ids = [str(value) for value in raw.get("rule_ids", [])]
-        presented.append({
-            **raw,
-            "action_label": _GUARD_ACTION_LABELS.get(str(raw.get("action") or ""), str(raw.get("action") or "Действие")),
-            "scope_label": _scope_label(raw.get("scope")),
-            "rule_labels": [_RULE_LABELS.get(value, value) for value in rule_ids],
-            "occurred_at_label": _format_time(raw.get("occurred_at"), zone),
-            "ip_intel": intelligence.get(ip, source.resolve(ip, raw.get("reputation") or {})),
-            "technical": {
-                "id": raw.get("id"), "action": raw.get("action"), "scope": raw.get("scope"),
-                "rule_ids": rule_ids, "occurred_at": raw.get("occurred_at"),
-            },
-        })
+        presented.append(
+            {
+                **raw,
+                "action_label": _GUARD_ACTION_LABELS.get(
+                    str(raw.get("action") or ""),
+                    str(raw.get("action") or "Действие"),
+                ),
+                "scope_label": _scope_label(raw.get("scope")),
+                "rule_labels": [
+                    _RULE_LABELS.get(value, value) for value in rule_ids
+                ],
+                "occurred_at_label": _format_time(
+                    raw.get("occurred_at"), zone
+                ),
+                "ip_intel": _intelligence_for(
+                    source,
+                    intelligence,
+                    ip,
+                    raw.get("reputation") or {},
+                ),
+                "technical": {
+                    "id": raw.get("id"),
+                    "action": raw.get("action"),
+                    "scope": raw.get("scope"),
+                    "rule_ids": rule_ids,
+                    "occurred_at": raw.get("occurred_at"),
+                },
+            }
+        )
     result["alerts"] = presented
     return result
