@@ -131,7 +131,8 @@ environment="$(systemctl show -p Environment --value "$PANEL_SERVICE")"
 for expected in \
     SG_INFOSEC_GUARD_SETTINGS=/var/lib/sg-gateway/infosec/guard.json \
     SG_INFOSEC_REPUTATION_FILE=/var/lib/sg-gateway/infosec/reputation.json \
-    SG_INFOSEC_ALERTS_FILE=/var/lib/sg-gateway/infosec/alerts.jsonl; do
+    SG_INFOSEC_ALERTS_FILE=/var/lib/sg-gateway/infosec/alerts.jsonl \
+    SG_INFOSEC_IP_INTEL_CACHE=/var/lib/sg-gateway/infosec/ip-intelligence.json; do
     [[ " $environment " == *" $expected "* ]] || \
         fail "panel did not load $expected"
 done
