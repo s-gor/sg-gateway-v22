@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 RUNTIME_VERSION="v2.11.2-naive"
-RUNTIME_SHA256="19eccb7321dd877a5fb4a3dba6ef1b745185188b616c96cc6201f1a1fc0380a8"
+RUNTIME_ARCHIVE_SHA256="19eccb7321dd877a5fb4a3dba6ef1b745185188b616c96cc6201f1a1fc0380a8"
 RUNTIME_URL="https://github.com/klzgrad/forwardproxy/releases/download/${RUNTIME_VERSION}/caddy-forwardproxy-naive.tar.xz"
 PREFIX="/opt/sg-gateway/naiveproxy"
 CONFIG_DIR="/etc/sg-gateway/naiveproxy"
@@ -129,7 +129,7 @@ work="$TX_DIR/download"
 mkdir -p "$work"
 archive="$work/caddy-forwardproxy-naive.tar.xz"
 curl -fL --retry 3 --connect-timeout 15 -o "$archive" "$RUNTIME_URL"
-printf '%s  %s\n' "$RUNTIME_SHA256" "$archive" | sha256sum -c - >/dev/null
+printf '%s  %s\n' "$RUNTIME_ARCHIVE_SHA256" "$archive" | sha256sum -c - >/dev/null
 tar -xJf "$archive" -C "$work"
 candidate="$work/caddy-forwardproxy-naive/caddy"
 [[ -x "$candidate" ]] || die "Pinned archive does not contain executable caddy"
@@ -140,10 +140,13 @@ fi
 
 install -m 0755 "$candidate" "$PREFIX/bin/caddy.new"
 mv -f "$PREFIX/bin/caddy.new" "$PREFIX/bin/caddy"
-sha256sum "$PREFIX/bin/caddy" > "$PREFIX/CADDY-SHA256"
+binary_sha256="$(sha256sum "$PREFIX/bin/caddy" | awk '{print $1}')"
+[[ "$binary_sha256" =~ ^[0-9a-f]{64}$ ]] || die "Cannot calculate installed Caddy SHA-256"
+printf '%s  %s\n' "$binary_sha256" "$PREFIX/bin/caddy" > "$PREFIX/CADDY-SHA256"
 cat > "$PREFIX/VERSIONS.env" <<EOF
 RUNTIME_VERSION=$RUNTIME_VERSION
-RUNTIME_SHA256=$RUNTIME_SHA256
+RUNTIME_ARCHIVE_SHA256=$RUNTIME_ARCHIVE_SHA256
+RUNTIME_BINARY_SHA256=$binary_sha256
 RUNTIME_URL=$RUNTIME_URL
 EOF
 

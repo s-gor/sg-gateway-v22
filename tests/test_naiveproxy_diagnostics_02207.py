@@ -23,24 +23,32 @@ SPEC.loader.exec_module(diagnostics_patch)
 def _runtime(
     tmp_path: Path,
     *,
-    expected_sha: str | None = None,
+    expected_binary_sha: str | None = None,
     listener_pid: int = 7,
     service_pid: int = 7,
+    include_binary_metadata: bool = True,
 ):
     prefix = tmp_path / "naiveproxy"
     binary = prefix / "bin" / "caddy"
     binary.parent.mkdir(parents=True)
     binary.write_bytes(b"pinned-caddy-binary")
     actual_sha = hashlib.sha256(binary.read_bytes()).hexdigest()
-    (prefix / "VERSIONS.env").write_text(
-        "\n".join(
-            (
-                "RUNTIME_VERSION=v2.11.2-naive",
-                f"RUNTIME_SHA256={expected_sha or actual_sha}",
-                "RUNTIME_URL=https://example.invalid/caddy.tar.xz",
-            )
+    archive_sha = "1" * 64
+    metadata = [
+        "RUNTIME_VERSION=v2.11.2-naive",
+        f"RUNTIME_ARCHIVE_SHA256={archive_sha}",
+        "RUNTIME_URL=https://example.invalid/caddy.tar.xz",
+    ]
+    if include_binary_metadata:
+        metadata.append(
+            f"RUNTIME_BINARY_SHA256={expected_binary_sha or actual_sha}"
         )
-        + "\n",
+    (prefix / "VERSIONS.env").write_text(
+        "\n".join(metadata) + "\n",
+        encoding="utf-8",
+    )
+    (prefix / "CADDY-SHA256").write_text(
+        f"{expected_binary_sha or actual_sha}  {binary}\n",
         encoding="utf-8",
     )
     config = tmp_path / "Caddyfile"
@@ -106,6 +114,8 @@ def test_status_verifies_binary_config_listener_and_firewall(tmp_path):
     assert result["installed"] is True
     assert result["runtime_release"] == "v2.11.2-naive"
     assert result["runtime_version"] == "v2.11.2 h1:test"
+    assert result["archive_sha256"] == "1" * 64
+    assert result["runtime_sha256"] != result["archive_sha256"]
     assert result["checksum_ok"] is True
     assert result["config_valid"] is True
     assert result["listener"] == {
@@ -122,14 +132,25 @@ def test_status_verifies_binary_config_listener_and_firewall(tmp_path):
     }
 
 
-def test_status_fails_closed_on_checksum_mismatch(tmp_path):
-    runtime = _runtime(tmp_path, expected_sha="0" * 64)
+def test_status_fails_closed_on_binary_checksum_mismatch(tmp_path):
+    runtime = _runtime(tmp_path, expected_binary_sha="0" * 64)
     diagnostics_patch.install(runtime)
 
     result = runtime.status()
 
+    assert result["archive_sha256"] == "1" * 64
     assert result["checksum_ok"] is False
     assert result["ok"] is False
+
+
+def test_status_uses_binary_checksum_file_for_previous_metadata(tmp_path):
+    runtime = _runtime(tmp_path, include_binary_metadata=False)
+    diagnostics_patch.install(runtime)
+
+    result = runtime.status()
+
+    assert result["checksum_ok"] is True
+    assert result["expected_sha256"] == result["runtime_sha256"]
 
 
 def test_status_rejects_unrelated_caddy_listener(tmp_path):

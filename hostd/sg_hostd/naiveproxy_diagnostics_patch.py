@@ -27,6 +27,14 @@ def _read_env(path: Path) -> dict[str, str]:
     return result
 
 
+def _read_checksum(path: Path) -> str:
+    try:
+        value = path.read_text(encoding="utf-8").split()[0].strip().lower()
+    except (OSError, IndexError):
+        return ""
+    return value if re.fullmatch(r"[0-9a-f]{64}", value) else ""
+
+
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as stream:
@@ -105,9 +113,13 @@ def install(runtime) -> None:
         settings = state.get("settings")
         settings = settings if isinstance(settings, dict) else {}
         port = int(settings.get("port") or result.get("port") or runtime.DEFAULT_PORT)
-        versions_path = runtime.BINARY.parent.parent / "VERSIONS.env"
+        runtime_root = runtime.BINARY.parent.parent
+        versions_path = runtime_root / "VERSIONS.env"
         metadata = _read_env(versions_path)
-        expected_sha = str(metadata.get("RUNTIME_SHA256") or "").lower()
+        expected_sha = str(metadata.get("RUNTIME_BINARY_SHA256") or "").lower()
+        if not re.fullmatch(r"[0-9a-f]{64}", expected_sha):
+            expected_sha = _read_checksum(runtime_root / "CADDY-SHA256")
+        archive_sha = str(metadata.get("RUNTIME_ARCHIVE_SHA256") or "").lower()
 
         installed = runtime.BINARY.is_file()
         actual_sha = ""
@@ -153,6 +165,7 @@ def install(runtime) -> None:
                 "runtime_release": str(metadata.get("RUNTIME_VERSION") or ""),
                 "runtime_sha256": actual_sha,
                 "expected_sha256": expected_sha,
+                "archive_sha256": archive_sha,
                 "checksum_ok": checksum_ok,
                 "config_valid": config_valid,
                 "listener": listener,

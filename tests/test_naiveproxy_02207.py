@@ -80,12 +80,15 @@ def test_service_is_unprivileged_and_restricted():
     assert "AmbientCapabilities=CAP_NET_BIND_SERVICE" in unit
 
 
-def test_installer_pins_all_build_inputs():
+def test_installer_pins_archive_and_records_binary_digest_separately():
     installer = (Path(__file__).parents[1] / "deploy" / "install-naiveproxy.sh").read_text()
     assert 'RUNTIME_VERSION="v2.11.2-naive"' in installer
-    assert 'RUNTIME_SHA256="19eccb7321dd877a5fb4a3dba6ef1b745185188b616c96cc6201f1a1fc0380a8"' in installer
+    assert 'RUNTIME_ARCHIVE_SHA256="19eccb7321dd877a5fb4a3dba6ef1b745185188b616c96cc6201f1a1fc0380a8"' in installer
+    assert 'printf \'%s  %s\\n\' "$RUNTIME_ARCHIVE_SHA256" "$archive" | sha256sum -c -' in installer
+    assert 'binary_sha256="$(sha256sum "$PREFIX/bin/caddy"' in installer
+    assert "RUNTIME_BINARY_SHA256=$binary_sha256" in installer
+    assert "RUNTIME_ARCHIVE_SHA256=$RUNTIME_ARCHIVE_SHA256" in installer
     assert "releases/latest" not in installer
-    assert "sha256sum -c" in installer
     assert "http.handlers.forward_proxy" in installer
 
 
