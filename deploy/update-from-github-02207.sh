@@ -32,10 +32,19 @@ capture_naive_prestate() {
     cp -a -- "$NAIVE_UNIT" "$TX_DIR/naive-unit"
     NAIVE_UNIT_EXISTED=1
   fi
-  id -u sg-naiveproxy >/dev/null 2>&1 && NAIVE_USER_EXISTED=1
-  getent group sg-naiveproxy >/dev/null 2>&1 && NAIVE_GROUP_EXISTED=1
-  systemctl is-active --quiet "$NAIVE_SERVICE" 2>/dev/null && NAIVE_WAS_ACTIVE=1
-  systemctl is-enabled --quiet "$NAIVE_SERVICE" 2>/dev/null && NAIVE_WAS_ENABLED=1
+  if id -u sg-naiveproxy >/dev/null 2>&1; then
+    NAIVE_USER_EXISTED=1
+  fi
+  if getent group sg-naiveproxy >/dev/null 2>&1; then
+    NAIVE_GROUP_EXISTED=1
+  fi
+  if systemctl is-active --quiet "$NAIVE_SERVICE" 2>/dev/null; then
+    NAIVE_WAS_ACTIVE=1
+  fi
+  if systemctl is-enabled --quiet "$NAIVE_SERVICE" 2>/dev/null; then
+    NAIVE_WAS_ENABLED=1
+  fi
+  return 0
 }
 
 resolve_safety_backup() {
