@@ -21,7 +21,20 @@ DEFAULT_CONNECTION = {
 }
 
 
+def _restore_connection_settings(previous) -> bool:
+    from app.connections.settings import update_connection_settings
+
+    return update_connection_settings(
+        "naiveproxy",
+        previous.host,
+        previous.port,
+        dict(previous.config),
+    )
+
+
 def _request_sync() -> None:
+    bootstrap_previous = None
+    bootstrap_changed = False
     try:
         from app.db import connect
         with connect() as connection:
@@ -37,7 +50,10 @@ def _request_sync() -> None:
             return
         if not configured_host:
             from app.security.tls import overview as tls_overview
-            from app.connections.settings import update_connection_settings
+            from app.connections.settings import (
+                get_connection_settings,
+                update_connection_settings,
+            )
 
             tls = tls_overview()
             domain = str(tls.get("domain") or "").strip()
@@ -50,6 +66,7 @@ def _request_sync() -> None:
                     status="warning",
                 )
                 return
+            bootstrap_previous = get_connection_settings("naiveproxy")
             updated = update_connection_settings(
                 "naiveproxy",
                 domain,
@@ -62,25 +79,45 @@ def _request_sync() -> None:
             )
             if not updated:
                 raise RuntimeError("Не удалось сохранить настройки NaiveProxy")
+            bootstrap_changed = True
 
         from app.hostd.client import run_hostd_command
         from app.maintenance.operations import log_operation
 
         result = run_hostd_command("naiveproxy.sync", timeout=60)
         if result.status != "ok":
+            rollback_note = ""
+            if bootstrap_changed and bootstrap_previous is not None:
+                restored = _restore_connection_settings(bootstrap_previous)
+                rollback_note = (
+                    "; bootstrap-настройки восстановлены"
+                    if restored
+                    else "; восстановить bootstrap-настройки не удалось"
+                )
             log_operation(
                 "naiveproxy.sync",
                 "runtime:naiveproxy",
-                result.message or "NaiveProxy sync failed",
+                (result.message or "NaiveProxy sync failed") + rollback_note,
                 status="error",
             )
     except Exception as exc:
+        rollback_note = ""
+        if bootstrap_changed and bootstrap_previous is not None:
+            try:
+                restored = _restore_connection_settings(bootstrap_previous)
+            except Exception:
+                restored = False
+            rollback_note = (
+                "; bootstrap-настройки восстановлены"
+                if restored
+                else "; восстановить bootstrap-настройки не удалось"
+            )
         try:
             from app.maintenance.operations import log_operation
             log_operation(
                 "naiveproxy.sync",
                 "runtime:naiveproxy",
-                str(exc),
+                str(exc) + rollback_note,
                 status="error",
             )
         except Exception:
