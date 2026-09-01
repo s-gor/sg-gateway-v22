@@ -14,6 +14,7 @@ on:
       - app/security/sg_infosec_guard_runtime.py
       - app/security/sg_infosec_guard_management.py
       - app/security/sg_infosec_presentation.py
+      - app/security/sg_infosec_presentation_runtime.py
       - app/security/sg_infosec_unit_migration.py
       - app/production.py
       - app/web/templates/security.html
@@ -23,7 +24,9 @@ on:
       - app/web/templates/sg_infosec_help.html
       - app/web/static/sg-infosec-management-v1.css
       - app/web/static/sg-infosec-guard-v1.css
+      - app/web/static/sg-infosec-readable-v2.css
       - docs/SG-INFOSEC-GUIDE-RU.md
+      - docs/SG-INFOSEC-IP-INTELLIGENCE.md
       - deploy/install-sg-infosec-management-bridge.sh
       - deploy/update-from-github-core.sh
       - deploy/update-infosec-complete-from-github.sh
@@ -41,6 +44,7 @@ on:
       - app/security/sg_infosec_guard_runtime.py
       - app/security/sg_infosec_guard_management.py
       - app/security/sg_infosec_presentation.py
+      - app/security/sg_infosec_presentation_runtime.py
       - app/security/sg_infosec_unit_migration.py
       - app/production.py
       - app/web/templates/security.html
@@ -50,7 +54,9 @@ on:
       - app/web/templates/sg_infosec_help.html
       - app/web/static/sg-infosec-management-v1.css
       - app/web/static/sg-infosec-guard-v1.css
+      - app/web/static/sg-infosec-readable-v2.css
       - docs/SG-INFOSEC-GUIDE-RU.md
+      - docs/SG-INFOSEC-IP-INTELLIGENCE.md
       - deploy/install-sg-infosec-management-bridge.sh
       - deploy/update-from-github-core.sh
       - deploy/update-infosec-complete-from-github.sh
@@ -94,6 +100,7 @@ jobs:
             tests/test_sg_infosec_guard_management.py \
             tests/test_sg_infosec_management_bridge.py \
             tests/test_sg_infosec_presentation.py \
+            tests/test_sg_infosec_readable_ui.py \
             tests/test_sg_infosec_security_ui.py \
             tests/test_sg_infosec_management_install_contract.py \
             tests/test_sg_infosec_management_update_contract.py \
@@ -109,6 +116,7 @@ jobs:
             app/security/sg_infosec_guard_runtime.py \
             app/security/sg_infosec_guard_management.py \
             app/security/sg_infosec_presentation.py \
+            app/security/sg_infosec_presentation_runtime.py \
             app/security/sg_infosec_unit_migration.py \
             app/production.py
           bash -n deploy/install-sg-infosec-management-bridge.sh
@@ -130,9 +138,11 @@ jobs:
             deploy/systemd/sg-gateway.service
           grep -Fq 'RestrictAddressFamilies=AF_UNIX' deploy/systemd/sg-infosec-management-bridge.service
           grep -Fq 'SG_INFOSEC_GUARD_SETTINGS=/var/lib/sg-gateway/infosec/guard.json' deploy/systemd/sg-gateway.service
+          grep -Fq 'SG_INFOSEC_IP_INTEL_CACHE=/var/lib/sg-gateway/infosec/ip-intelligence.json' deploy/systemd/sg-gateway.service
           grep -Fq 'systemctl restart "$INFOSEC_SERVICE"' deploy/update-from-github-core.sh
           grep -Fq 'SG InfoSec control socket is unavailable' deploy/update-infosec-complete-from-github.sh
           grep -Fq '# SG InfoSec: полное руководство' docs/SG-INFOSEC-GUIDE-RU.md
+          grep -Fq '# Сведения об IP в SG InfoSec' docs/SG-INFOSEC-IP-INTELLIGENCE.md
           ! grep -ERn '(^|[^0-9])(585|586|587)([^0-9]|$)' \
             app/security/sg_infosec_bridge.py \
             app/security/sg_infosec_management.py \
