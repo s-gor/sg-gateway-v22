@@ -13,6 +13,7 @@ on:
       - app/security/sg_infosec_guard.py
       - app/security/sg_infosec_guard_runtime.py
       - app/security/sg_infosec_guard_management.py
+      - app/security/sg_infosec_presentation.py
       - app/security/sg_infosec_unit_migration.py
       - app/production.py
       - app/web/templates/security.html
@@ -39,6 +40,7 @@ on:
       - app/security/sg_infosec_guard.py
       - app/security/sg_infosec_guard_runtime.py
       - app/security/sg_infosec_guard_management.py
+      - app/security/sg_infosec_presentation.py
       - app/security/sg_infosec_unit_migration.py
       - app/production.py
       - app/web/templates/security.html
@@ -91,6 +93,7 @@ jobs:
             tests/test_sg_infosec_guard_hardening.py \
             tests/test_sg_infosec_guard_management.py \
             tests/test_sg_infosec_management_bridge.py \
+            tests/test_sg_infosec_presentation.py \
             tests/test_sg_infosec_security_ui.py \
             tests/test_sg_infosec_management_install_contract.py \
             tests/test_sg_infosec_management_update_contract.py \
@@ -105,6 +108,7 @@ jobs:
             app/security/sg_infosec_guard.py \
             app/security/sg_infosec_guard_runtime.py \
             app/security/sg_infosec_guard_management.py \
+            app/security/sg_infosec_presentation.py \
             app/security/sg_infosec_unit_migration.py \
             app/production.py
           bash -n deploy/install-sg-infosec-management-bridge.sh
@@ -134,6 +138,7 @@ jobs:
             app/security/sg_infosec_management.py \
             app/security/sg_infosec_guard.py \
             app/security/sg_infosec_guard_runtime.py \
+            app/security/sg_infosec_presentation.py \
             deploy/install-sg-infosec-management-bridge.sh \
             deploy/systemd/sg-infosec-management-bridge.service
 
