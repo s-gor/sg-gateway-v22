@@ -14,6 +14,8 @@ def test_bridge_unit_is_unprivileged_and_unix_socket_only():
     assert "Group=sg-infosec-bridge" in unit
     assert "SupplementaryGroups=sg-infosec sg-gateway" in unit
     assert "PartOf=sg-gateway.service" in unit
+    assert "ConditionPathExists=/run/sg-infosec/control.sock" in unit
+    assert "ConditionPathIsSocket" not in unit
     assert "AF_INET" not in unit
     assert "ListenStream=" not in unit
     assert "585" not in unit and "586" not in unit and "587" not in unit
