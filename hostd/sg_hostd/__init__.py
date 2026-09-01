@@ -59,6 +59,11 @@ del _install_naiveproxy_listener
 from sg_hostd.naiveproxy_firewall_patch import install as _install_naiveproxy_firewall
 _install_naiveproxy_firewall(_import_module("sg_hostd.naiveproxy_runtime"))
 del _install_naiveproxy_firewall
+
+# SG_GATEWAY_02207_NAIVEPROXY_DIAGNOSTICS
+from sg_hostd.naiveproxy_diagnostics_patch import install as _install_naiveproxy_diagnostics
+_install_naiveproxy_diagnostics(_import_module("sg_hostd.naiveproxy_runtime"))
+del _install_naiveproxy_diagnostics
 del _import_module
 
 # SG_GATEWAY_02207_NAIVEPROXY_BACKUP_TLS

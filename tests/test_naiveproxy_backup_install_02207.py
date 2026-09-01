@@ -25,7 +25,8 @@ def test_02207_wrappers_refuse_stable_02206_and_install_runtime():
         assert '"dev-02207"' in source
         assert "stable-02206" not in source
         assert "install-naiveproxy.sh" in source
-        assert "ufw allow 8447/tcp" in source
+        assert "ufw allow 8447/tcp" not in source
+        assert "selected TCP port is managed" in source or "runtime transaction completed" in source
 
 
 def test_hostd_import_installs_backup_tls_patch():
