@@ -44,3 +44,33 @@ def test_first_failed_start_does_not_require_a_previous_snapshot():
     source = (Path(__file__).parents[1] / "hostd" / "sg_hostd" / "naiveproxy_runtime.py").read_text()
     assert "if previous_config.is_file() and previous_state.is_file():" in source
     assert "CONFIG_PATH.unlink(missing_ok=True)" in source
+
+
+def test_ui_injects_naiveproxy_checkbox_into_existing_protocol_forms():
+    source = (Path(__file__).parents[1] / "app/naiveproxy/http.py").read_text()
+    assert '<input type="checkbox" name="protocols" value="naiveproxy"' in source
+    assert "SG_PROTOCOL_ORDER_END" in source
+    assert "TCP 8447" in source
+    assert "app.after_request(_inject_protocol_option)" in source
+
+
+def test_first_assignment_bootstraps_8447_from_security_tls():
+    source = (Path(__file__).parents[1] / "app/naiveproxy/integration.py").read_text()
+    assert "assigned_total" in source
+    assert "tls_overview()" in source
+    assert 'update_connection_settings(' in source
+    assert 'DEFAULT_PORT' in source
+
+
+def test_hostd_checks_real_tcp_listener_before_apply():
+    source = (Path(__file__).parents[1] / "hostd/sg_hostd/naiveproxy_listener_patch.py").read_text()
+    assert '["ss", "-H", "-ltnp"]' in source
+    assert '"caddy" not in line.lower()' in source
+    init_source = (Path(__file__).parents[1] / "hostd/sg_hostd/__init__.py").read_text()
+    assert "naiveproxy_listener_patch" in init_source
+
+
+def test_successful_none_return_still_resyncs_runtime():
+    source = (Path(__file__).parents[1] / "app/naiveproxy/integration.py").read_text()
+    assert "if result is not False:" in source
+    assert "result not in (None, False)" not in source
