@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import pytest
+
+from app.clients import runtime as client_runtime
 from app.naiveproxy import integration
 
 
@@ -41,15 +44,12 @@ def _previous():
     )
 
 
-def _prepare(monkeypatch, *, hostd_status: str):
+def _prepare_bootstrap(monkeypatch):
     import app.connections.settings as connection_settings
     import app.db as db
-    import app.hostd.client as hostd_client
-    import app.maintenance.operations as operations
     import app.security.tls as tls
 
     writes: list[tuple[str, int, dict]] = []
-    logs: list[dict] = []
     previous = _previous()
     monkeypatch.setattr(db, "connect", lambda: _Connection())
     monkeypatch.setattr(
@@ -69,48 +69,74 @@ def _prepare(monkeypatch, *, hostd_status: str):
     monkeypatch.setattr(
         connection_settings,
         "update_connection_settings",
-        lambda engine, host, port, config: writes.append((host, port, config)) or True,
+        lambda engine, host, port, config: writes.append((host, int(port), dict(config))) or True,
     )
-    monkeypatch.setattr(
-        hostd_client,
-        "run_hostd_command",
-        lambda *args, **kwargs: SimpleNamespace(
-            status=hostd_status,
-            message="runtime failed" if hostd_status != "ok" else "runtime applied",
-            payload={},
-        ),
-    )
-    monkeypatch.setattr(
-        operations,
-        "log_operation",
-        lambda action, target, message, status="ok": logs.append(
+    return previous, writes
+
+
+def test_first_assignment_prepares_https_settings_without_running_hostd(monkeypatch):
+    previous, writes = _prepare_bootstrap(monkeypatch)
+
+    result = integration._prepare_runtime_settings()
+
+    assert result is previous
+    assert writes == [
+        (
+            "vpn.example.com",
+            8447,
             {
-                "action": action,
-                "target": target,
-                "message": message,
-                "status": status,
-            }
-        ),
+                "domain": "vpn.example.com",
+                "certificate_path": "/etc/letsencrypt/live/vpn.example.com/fullchain.pem",
+                "private_key_path": "/etc/letsencrypt/live/vpn.example.com/privkey.pem",
+            },
+        )
+    ]
+
+
+def test_failed_common_client_apply_restores_bootstrap_settings(monkeypatch):
+    previous = _previous()
+    restored: list[object] = []
+
+    def failed_apply():
+        raise client_runtime.ClientWorkflowError("NaiveProxy apply failed")
+
+    monkeypatch.setattr(client_runtime, "apply_clients_runtime", failed_apply)
+    monkeypatch.setattr(integration, "_prepare_runtime_settings", lambda: previous)
+    monkeypatch.setattr(
+        integration,
+        "_restore_connection_settings",
+        lambda value: restored.append(value) or True,
     )
-    return previous, writes, logs
+
+    integration._patch_client_runtime()
+
+    with pytest.raises(
+        client_runtime.ClientWorkflowError,
+        match="bootstrap-настройки восстановлены",
+    ):
+        client_runtime.apply_clients_runtime()
+
+    assert restored == [previous]
 
 
-def test_failed_first_bootstrap_restores_blank_connection_settings(monkeypatch):
-    previous, writes, logs = _prepare(monkeypatch, hostd_status="error")
+def test_successful_common_client_apply_keeps_bootstrap_settings(monkeypatch):
+    previous = _previous()
+    restored: list[object] = []
 
-    integration._request_sync()
+    monkeypatch.setattr(
+        client_runtime,
+        "apply_clients_runtime",
+        lambda: {"ok": True, "message": "all runtimes applied"},
+    )
+    monkeypatch.setattr(integration, "_prepare_runtime_settings", lambda: previous)
+    monkeypatch.setattr(
+        integration,
+        "_restore_connection_settings",
+        lambda value: restored.append(value) or True,
+    )
 
-    assert writes[0][0:2] == ("vpn.example.com", 8447)
-    assert writes[1] == (previous.host, previous.port, previous.config)
-    assert logs[-1]["status"] == "error"
-    assert "bootstrap-настройки восстановлены" in logs[-1]["message"]
+    integration._patch_client_runtime()
+    result = client_runtime.apply_clients_runtime()
 
-
-def test_successful_first_bootstrap_keeps_applied_connection_settings(monkeypatch):
-    _previous_settings, writes, logs = _prepare(monkeypatch, hostd_status="ok")
-
-    integration._request_sync()
-
-    assert len(writes) == 1
-    assert writes[0][0:2] == ("vpn.example.com", 8447)
-    assert logs == []
+    assert result["ok"] is True
+    assert restored == []

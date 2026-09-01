@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from functools import wraps
 
 from app.naiveproxy.runtime import DEFAULT_PORT, NaiveProxySettings, NaiveProxyUser, build_client_uri, generate_user
 
@@ -32,96 +31,79 @@ def _restore_connection_settings(previous) -> bool:
     )
 
 
-def _request_sync() -> None:
-    bootstrap_previous = None
-    bootstrap_changed = False
-    try:
-        from app.db import connect
-        with connect() as connection:
-            setting = connection.execute(
-                "SELECT host FROM connection_settings WHERE engine = 'naiveproxy'"
-            ).fetchone()
-            assigned = connection.execute(
-                "SELECT COUNT(*) AS total FROM device_credentials WHERE engine = 'naiveproxy'"
-            ).fetchone()
-        assigned_total = int(assigned["total"] or 0)
-        configured_host = str(setting["host"] or "").strip() if setting else ""
-        if not configured_host and assigned_total == 0:
-            return
-        if not configured_host:
-            from app.security.tls import overview as tls_overview
-            from app.connections.settings import (
-                get_connection_settings,
-                update_connection_settings,
-            )
+def _prepare_runtime_settings():
+    from app.db import connect
 
-            tls = tls_overview()
-            domain = str(tls.get("domain") or "").strip()
-            if not tls.get("https_ready") or not domain:
-                from app.maintenance.operations import log_operation
-                log_operation(
-                    "naiveproxy.sync",
-                    "runtime:naiveproxy",
-                    "NaiveProxy ожидает настроенный HTTPS в Security",
-                    status="warning",
-                )
-                return
-            bootstrap_previous = get_connection_settings("naiveproxy")
-            updated = update_connection_settings(
-                "naiveproxy",
-                domain,
-                DEFAULT_PORT,
-                {
-                    "domain": domain,
-                    "certificate_path": str(tls.get("certificate_path") or ""),
-                    "private_key_path": f"/etc/letsencrypt/live/{domain}/privkey.pem",
-                },
-            )
-            if not updated:
-                raise RuntimeError("Не удалось сохранить настройки NaiveProxy")
-            bootstrap_changed = True
+    with connect() as connection:
+        setting = connection.execute(
+            "SELECT host FROM connection_settings WHERE engine = 'naiveproxy'"
+        ).fetchone()
+        assigned = connection.execute(
+            "SELECT COUNT(*) AS total FROM device_credentials WHERE engine = 'naiveproxy'"
+        ).fetchone()
+    assigned_total = int(assigned["total"] or 0)
+    configured_host = str(setting["host"] or "").strip() if setting else ""
+    if configured_host or assigned_total == 0:
+        return None
 
-        from app.hostd.client import run_hostd_command
-        from app.maintenance.operations import log_operation
+    from app.security.tls import overview as tls_overview
+    from app.connections.settings import (
+        get_connection_settings,
+        update_connection_settings,
+    )
 
-        result = run_hostd_command("naiveproxy.sync", timeout=60)
-        if result.status != "ok":
+    tls = tls_overview()
+    domain = str(tls.get("domain") or "").strip()
+    if not tls.get("https_ready") or not domain:
+        raise RuntimeError("NaiveProxy требует настроенный HTTPS в Security")
+
+    previous = get_connection_settings("naiveproxy")
+    updated = update_connection_settings(
+        "naiveproxy",
+        domain,
+        DEFAULT_PORT,
+        {
+            "domain": domain,
+            "certificate_path": str(tls.get("certificate_path") or ""),
+            "private_key_path": f"/etc/letsencrypt/live/{domain}/privkey.pem",
+        },
+    )
+    if not updated:
+        raise RuntimeError("Не удалось сохранить настройки NaiveProxy")
+    return previous
+
+
+def _patch_client_runtime() -> None:
+    from app.clients import runtime as client_runtime
+
+    original = client_runtime.apply_clients_runtime
+    if getattr(original, "_naiveproxy_transaction_wrapper", False):
+        return
+
+    def apply_clients_runtime() -> dict:
+        previous = None
+        try:
+            previous = _prepare_runtime_settings()
+            return original()
+        except Exception as exc:
             rollback_note = ""
-            if bootstrap_changed and bootstrap_previous is not None:
-                restored = _restore_connection_settings(bootstrap_previous)
+            if previous is not None:
+                try:
+                    restored = _restore_connection_settings(previous)
+                except Exception:
+                    restored = False
                 rollback_note = (
                     "; bootstrap-настройки восстановлены"
                     if restored
                     else "; восстановить bootstrap-настройки не удалось"
                 )
-            log_operation(
-                "naiveproxy.sync",
-                "runtime:naiveproxy",
-                (result.message or "NaiveProxy sync failed") + rollback_note,
-                status="error",
-            )
-    except Exception as exc:
-        rollback_note = ""
-        if bootstrap_changed and bootstrap_previous is not None:
-            try:
-                restored = _restore_connection_settings(bootstrap_previous)
-            except Exception:
-                restored = False
-            rollback_note = (
-                "; bootstrap-настройки восстановлены"
-                if restored
-                else "; восстановить bootstrap-настройки не удалось"
-            )
-        try:
-            from app.maintenance.operations import log_operation
-            log_operation(
-                "naiveproxy.sync",
-                "runtime:naiveproxy",
-                str(exc) + rollback_note,
-                status="error",
-            )
-        except Exception:
-            pass
+            message = str(exc) + rollback_note
+            if isinstance(exc, client_runtime.ClientWorkflowError) and not rollback_note:
+                raise
+            raise client_runtime.ClientWorkflowError(message) from exc
+
+    apply_clients_runtime._naiveproxy_transaction_wrapper = True
+    client_runtime.apply_clients_runtime = apply_clients_runtime
 
 
 def reserved_ports() -> dict[int, str]:
@@ -155,34 +137,6 @@ def reserved_ports() -> dict[int, str]:
                 if 1 <= candidate <= 65535:
                     result[candidate] = f"{engine}.{key}"
     return result
-
-
-def _patch_mutations(repository) -> None:
-    names = (
-        "create_client",
-        "create_device",
-        "update_client",
-        "update_device",
-        "set_client_enabled",
-        "set_device_enabled",
-        "delete_client",
-        "delete_device",
-        "restore_client_snapshot",
-    )
-    for name in names:
-        original = getattr(repository, name, None)
-        if original is None or getattr(original, "_naiveproxy_sync_wrapper", False):
-            continue
-
-        @wraps(original)
-        def wrapped(*args, __original=original, **kwargs):
-            result = __original(*args, **kwargs)
-            if result is not False:
-                _request_sync()
-            return result
-
-        wrapped._naiveproxy_sync_wrapper = True
-        setattr(repository, name, wrapped)
 
 
 def install() -> None:
@@ -222,7 +176,7 @@ def install() -> None:
     if "naiveproxy" not in repository.RUNTIME_ENGINES:
         repository.RUNTIME_ENGINES += ("naiveproxy",)
     repository.TLS_PROTOCOL_TOKENS.add("naiveproxy")
-    _patch_mutations(repository)
+    _patch_client_runtime()
 
     from app.clients import exports
 

@@ -7,12 +7,15 @@ def test_production_installs_naiveproxy_before_app_import():
     assert "register_naiveproxy_http(app)" in source
 
 
-def test_integration_registers_engine_and_subscription():
+def test_integration_registers_engine_subscription_and_common_transaction():
     source = (Path(__file__).parents[1] / "app" / "naiveproxy" / "integration.py").read_text()
     assert 'SUPPORTED_ENGINES += ("naiveproxy",)' in source
     assert 'RUNTIME_ENGINES += ("naiveproxy",)' in source
     assert '("naiveproxy", "naiveproxy", "naiveproxy", "NaiveProxy", "naiveproxy", "uri")' in source
-    assert 'run_hostd_command("naiveproxy.sync"' in source
+    assert "_patch_client_runtime()" in source
+    assert "_naiveproxy_transaction_wrapper" in source
+    assert "_patch_mutations" not in source
+    assert 'run_hostd_command("naiveproxy.sync"' not in source
 
 
 def test_hostd_sync_is_database_driven_and_secret_safe():
@@ -64,12 +67,22 @@ def test_ui_injects_protocol_and_real_connections_port_control():
     assert "JSON.stringify({port: Number(port.value)})" in source
 
 
-def test_first_assignment_bootstraps_8447_from_security_tls():
+def test_first_assignment_prepares_8447_from_security_tls():
     source = (Path(__file__).parents[1] / "app/naiveproxy/integration.py").read_text()
     assert "assigned_total" in source
     assert "tls_overview()" in source
     assert 'update_connection_settings(' in source
     assert 'DEFAULT_PORT' in source
+    assert "NaiveProxy требует настроенный HTTPS" in source
+
+
+def test_common_clients_apply_includes_naiveproxy():
+    source = (Path(__file__).parents[1] / "hostd/sg_hostd/naiveproxy_commands.py").read_text()
+    assert 'commands._COMMANDS.get("clients.apply")' in source
+    assert 'commands._COMMANDS["clients.apply"] = clients_apply' in source
+    assert "naiveproxy_runtime.sync()" in source
+    assert 'status="error"' in source
+    assert 'combined["naiveproxy"]' in source
 
 
 def test_hostd_checks_exact_service_pid_before_apply():
@@ -81,9 +94,3 @@ def test_hostd_checks_exact_service_pid_before_apply():
     assert "service_pid not in listener_pids" in source
     init_source = (Path(__file__).parents[1] / "hostd/sg_hostd/__init__.py").read_text()
     assert "naiveproxy_listener_patch" in init_source
-
-
-def test_successful_none_return_still_resyncs_runtime():
-    source = (Path(__file__).parents[1] / "app/naiveproxy/integration.py").read_text()
-    assert "if result is not False:" in source
-    assert "result not in (None, False)" not in source
