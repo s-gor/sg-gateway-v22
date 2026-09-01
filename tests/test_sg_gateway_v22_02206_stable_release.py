@@ -46,3 +46,4 @@ def test_02206_readme_exposes_verified_stable_commands():
     assert "sg-gateway-v22/main/deploy/install-from-github.sh" not in readme
     assert "sg-gateway-v22/main/deploy/update-from-github.sh" not in readme
     assert "sg-gateway-v22/main/deploy/full-uninstall-ubuntu.sh" not in readme
+    assert f"curl -4 -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/{PINNED_INSTALL_SHA}/deploy/install-from-github.sh | sudo env SG_GATEWAY_GITHUB_BRANCH=stable-02206 SG_GATEWAY_SOURCE_COMMIT={PINNED_INSTALL_SHA} bash" in readme
