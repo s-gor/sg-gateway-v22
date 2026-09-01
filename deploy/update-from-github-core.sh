@@ -33,6 +33,7 @@ PANEL_PRODUCTION_WSGI="app.production:app"
 HOSTD_SERVICE="sg-hostd.service"
 AWG3_SERVICE="sg-gateway-awg3.service"
 AWG31_SERVICE="sg-gateway-awg31.service"
+INFOSEC_SERVICE="sg-infosec.service"
 INFOSEC_BRIDGE_SERVICE="sg-infosec-management-bridge.service"
 INFOSEC_BRIDGE_SOURCE="$(system_path /etc/sg-infosec/sources.d/sg-gateway-management.yaml)"
 INFOSEC_BRIDGE_UNIT="$(system_path /etc/systemd/system/sg-infosec-management-bridge.service)"
@@ -897,6 +898,9 @@ rollback_update() {
 
   tar -C "$SYSTEM_ROOT" -xpf "$BACKUP_DIR/state.tar"
   systemctl daemon-reload >/dev/null 2>&1 || true
+  if systemctl is-active --quiet "$INFOSEC_SERVICE"; then
+    systemctl restart "$INFOSEC_SERVICE" >/dev/null 2>&1 || true
+  fi
 
   if command -v nginx >/dev/null 2>&1 && nginx -t >/dev/null 2>&1; then
     systemctl is-active --quiet nginx.service && systemctl reload nginx.service >/dev/null 2>&1 || true
