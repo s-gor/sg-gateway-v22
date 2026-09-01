@@ -17,9 +17,9 @@ def _shell_function(name: str) -> str:
 
 def test_light_source_fetches_naiveproxy_hostd_unit() -> None:
     function = _shell_function("prepare_source_light")
-    assert "'/hostd/systemd/sg-hostd.service'" in function
+    assert "/hostd/systemd/sg-hostd.service" in function
 
 
 def test_source_preflight_requires_naiveproxy_hostd_unit() -> None:
-    function = _shell_function("prepare_source_common")
-    assert '[[ -f "$source_root/hostd/systemd/sg-hostd.service" ]]' in function
+    function = _shell_function("prepare_source")
+    assert '[[ -f "$SOURCE_DIR/hostd/systemd/sg-hostd.service" ]]' in function
