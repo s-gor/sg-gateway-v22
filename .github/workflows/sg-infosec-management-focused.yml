@@ -13,12 +13,14 @@ on:
       - app/web/templates/_sg_infosec_management.html
       - app/web/static/sg-infosec-management-v1.css
       - deploy/install-sg-infosec-management-bridge.sh
+      - deploy/update-from-github-core.sh
       - deploy/systemd/sg-infosec-management-bridge.service
       - deploy/systemd/sg-gateway.service
       - deploy/tmpfiles/sg-infosec-management-bridge.conf
       - tests/test_sg_infosec_management_bridge.py
       - tests/test_sg_infosec_security_ui.py
       - tests/test_sg_infosec_management_install_contract.py
+      - tests/test_sg_infosec_management_update_contract.py
       - .github/workflows/sg-infosec-management-focused.yml
   pull_request:
     paths:
@@ -29,12 +31,14 @@ on:
       - app/web/templates/_sg_infosec_management.html
       - app/web/static/sg-infosec-management-v1.css
       - deploy/install-sg-infosec-management-bridge.sh
+      - deploy/update-from-github-core.sh
       - deploy/systemd/sg-infosec-management-bridge.service
       - deploy/systemd/sg-gateway.service
       - deploy/tmpfiles/sg-infosec-management-bridge.conf
       - tests/test_sg_infosec_management_bridge.py
       - tests/test_sg_infosec_security_ui.py
       - tests/test_sg_infosec_management_install_contract.py
+      - tests/test_sg_infosec_management_update_contract.py
       - .github/workflows/sg-infosec-management-focused.yml
 
 permissions:
@@ -64,7 +68,8 @@ jobs:
           python -m pytest -q \
             tests/test_sg_infosec_management_bridge.py \
             tests/test_sg_infosec_security_ui.py \
-            tests/test_sg_infosec_management_install_contract.py
+            tests/test_sg_infosec_management_install_contract.py \
+            tests/test_sg_infosec_management_update_contract.py
 
       - name: Verify Python and shell syntax
         run: |
@@ -73,6 +78,7 @@ jobs:
             app/security/sg_infosec_management.py \
             app/production.py
           bash -n deploy/install-sg-infosec-management-bridge.sh
+          bash -n deploy/update-from-github-core.sh
 
       - name: Prepare unit verification paths
         run: |
