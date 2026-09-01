@@ -1,10 +1,17 @@
+import json
+import os
 import socket
+import socketserver
+import threading
+from contextlib import contextmanager
+from http.server import BaseHTTPRequestHandler
 
 import pytest
 
 from app.security.sg_infosec_bridge import (
     BridgePolicy,
     BridgeRequestError,
+    ManagementRequestHandler,
     ManagementUnixServer,
     authorize_peer,
     build_forward_request,
@@ -84,3 +91,95 @@ def test_allowlist_requires_valid_ip_or_cidr():
 
 def test_bridge_server_is_unix_socket_only():
     assert ManagementUnixServer.address_family == socket.AF_UNIX
+
+
+class _UpstreamHandler(BaseHTTPRequestHandler):
+    protocol_version = "HTTP/1.1"
+
+    def log_message(self, format, *args):
+        return
+
+    def do_GET(self):
+        self.server.request_paths.append(self.path)
+        payload = json.dumps({"items": []}).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(payload)))
+        self.send_header("Connection", "close")
+        self.end_headers()
+        self.wfile.write(payload)
+
+
+@contextmanager
+def _running(server):
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield server
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+def _unix_http(socket_path, request_bytes):
+    client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    try:
+        client.settimeout(2)
+        client.connect(str(socket_path))
+        client.sendall(request_bytes)
+        chunks = []
+        while True:
+            chunk = client.recv(4096)
+            if not chunk:
+                break
+            chunks.append(chunk)
+    finally:
+        client.close()
+    raw = b"".join(chunks)
+    header, body = raw.split(b"\r\n\r\n", 1)
+    status = int(header.splitlines()[0].split()[1])
+    return status, json.loads(body.decode("utf-8"))
+
+
+def test_bridge_health_uses_real_unix_sockets(tmp_path):
+    upstream_path = tmp_path / "upstream.sock"
+    bridge_path = tmp_path / "bridge.sock"
+    upstream = socketserver.ThreadingUnixStreamServer(str(upstream_path), _UpstreamHandler)
+    upstream.daemon_threads = True
+    upstream.request_paths = []
+    bridge = ManagementUnixServer(
+        bridge_path,
+        ManagementRequestHandler,
+        policy=BridgePolicy(allowed_uid=os.getuid()),
+        upstream_socket=upstream_path,
+    )
+
+    with _running(upstream), _running(bridge):
+        status, payload = _unix_http(
+            bridge_path,
+            b"GET /v1/health HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+        )
+
+    assert status == 200
+    assert payload["ok"] is True
+    assert upstream.request_paths == ["/v1/decisions?state=active&limit=1"]
+
+
+def test_bridge_rejects_real_unix_peer_with_wrong_uid(tmp_path):
+    bridge_path = tmp_path / "bridge-denied.sock"
+    bridge = ManagementUnixServer(
+        bridge_path,
+        ManagementRequestHandler,
+        policy=BridgePolicy(allowed_uid=os.getuid() + 1),
+        upstream_socket=tmp_path / "missing-upstream.sock",
+    )
+
+    with _running(bridge):
+        status, payload = _unix_http(
+            bridge_path,
+            b"GET /v1/health HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+        )
+
+    assert status == 403
+    assert payload["code"] == "peer_not_allowed"
