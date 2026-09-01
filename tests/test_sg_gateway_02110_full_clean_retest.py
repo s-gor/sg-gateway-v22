@@ -67,10 +67,10 @@ def test_builder_uses_binary_payload_and_transfer_recheck() -> None:
     assert 'bash "$(basename "$OUT")" --verify-only' in script
 
 
-def test_stage_one_is_live() -> None:
+def test_stage_one_uses_quiet_progress() -> None:
     script = (ROOT / "install.sh").read_text(encoding="utf-8")
-    assert 'if [[ "$number" == "1" ]]; then' in script
-    assert 'run_live "$CURRENT_LABEL" "$function_name"' in script
+    assert 'if [[ "$number" == "1" ]]; then' not in script
+    assert 'run_quiet "$CURRENT_LABEL" "$function_name"' in script
     assert "APT/dpkg всё ещё занят; ожидание:" in script
 
 

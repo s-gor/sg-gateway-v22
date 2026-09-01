@@ -130,6 +130,8 @@ def test_installer_uses_sg_panel_progress_contract_and_one_error_path():
     assert "assert update_connection_settings(\"xray\", xray.host" not in INSTALLER
     assert "spinner_loop" not in INSTALLER
     assert "tee -a" not in INSTALLER
+    assert 'if [[ "$number" == "1" ]]' not in INSTALLER
+    assert 'run_quiet "$CURRENT_LABEL" "$function_name"' in INSTALLER
     assert "etc/hostname" in INSTALLER and "etc/hosts" in INSTALLER
 
 
