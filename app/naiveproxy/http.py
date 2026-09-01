@@ -50,11 +50,34 @@ def register_naiveproxy_http(app) -> None:
                 "certificate_path": str(tls.get("certificate_path") or ""),
                 "private_key_path": f"/etc/letsencrypt/live/{domain}/privkey.pem",
             }
+            previous = get_connection_settings("naiveproxy")
             if not update_connection_settings("naiveproxy", domain, port, config):
                 return jsonify({"ok": False, "message": "Настройки NaiveProxy отклонены"}), 400
             result = run_hostd_command("naiveproxy.sync", timeout=60)
-            code = 200 if result.status == "ok" else 503
-            return jsonify({"ok": result.status == "ok", "message": result.message, "runtime": result.payload}), code
+            if result.status != "ok":
+                restored = update_connection_settings(
+                    "naiveproxy",
+                    previous.host,
+                    previous.port,
+                    dict(previous.config),
+                )
+                if not restored:
+                    return jsonify({
+                        "ok": False,
+                        "message": (
+                            f"{result.message}. Runtime откатился, но восстановить "
+                            "предыдущие настройки в БД не удалось"
+                        ),
+                        "runtime": result.payload,
+                        "settings_rollback": False,
+                    }), 500
+                return jsonify({
+                    "ok": False,
+                    "message": f"{result.message}. Предыдущие настройки восстановлены",
+                    "runtime": result.payload,
+                    "settings_rollback": True,
+                }), 503
+            return jsonify({"ok": True, "message": result.message, "runtime": result.payload}), 200
 
         app.add_url_rule(
             "/api/naiveproxy/settings",
