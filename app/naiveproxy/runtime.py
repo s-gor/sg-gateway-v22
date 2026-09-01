@@ -22,6 +22,7 @@ DOMAIN_RE = re.compile(
     r"^(?=.{4,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$"
 )
 USERNAME_RE = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
+PASSWORD_RE = re.compile(r"^[A-Za-z0-9._~-]{16,256}$")
 
 
 class NaiveProxyError(RuntimeError):
@@ -94,8 +95,10 @@ def _validate_user(user: NaiveProxyUser) -> NaiveProxyUser:
     password = str(user.password or "")
     if not USERNAME_RE.fullmatch(username):
         raise NaiveProxyError("Логин NaiveProxy содержит недопустимые символы")
-    if not 16 <= len(password) <= 256 or any(ch in password for ch in "\r\n\t"):
-        raise NaiveProxyError("Пароль NaiveProxy должен содержать 16–256 печатных символов")
+    if not PASSWORD_RE.fullmatch(password):
+        raise NaiveProxyError(
+            "Пароль NaiveProxy должен содержать 16–256 безопасных символов"
+        )
     return NaiveProxyUser(
         username=username,
         password=password,

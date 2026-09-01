@@ -37,15 +37,26 @@ def test_caddyfile_uses_existing_certificate_and_probe_resistance():
     assert "exclude http.log.error" in config
 
 
+def test_caddyfile_rejects_credential_directive_injection():
+    user = runtime.NaiveProxyUser(
+        "alice",
+        "safe-password-1234 } forward_proxy {",
+    )
+    with pytest.raises(runtime.NaiveProxyError, match="безопасных символов"):
+        runtime.render_caddyfile(settings(), [user])
+
+
 def test_port_validation_rejects_sg_gateway_conflict():
     with pytest.raises(runtime.NaiveProxyError, match="Reality"):
         runtime.validate_port(443, {443: "VLESS Reality"})
 
 
-def test_client_uri_contains_explicit_8447_and_escaped_credentials():
-    user = runtime.NaiveProxyUser("alice.one", "p@ssword-with-very-long-value")
+def test_client_uri_contains_explicit_8447_and_safe_credentials():
+    user = runtime.NaiveProxyUser("alice.one", "safe-password-with-very-long-value")
     uri = runtime.build_client_uri(settings(), user, "Телефон")
-    assert uri.startswith("naive+https://alice.one:p%40ssword-with-very-long-value@vpn.example.com:8447")
+    assert uri.startswith(
+        "naive+https://alice.one:safe-password-with-very-long-value@vpn.example.com:8447"
+    )
     assert uri.endswith("#%D0%A2%D0%B5%D0%BB%D0%B5%D1%84%D0%BE%D0%BD")
 
 
