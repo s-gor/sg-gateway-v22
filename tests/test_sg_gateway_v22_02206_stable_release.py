@@ -40,3 +40,9 @@ def test_02206_readme_exposes_verified_stable_commands():
     assert f"SG_GATEWAY_SOURCE_COMMIT={PINNED_INSTALL_SHA}" in readme
     assert "stable-02206/deploy/update-from-github.sh" in readme
     assert "stable-02206/deploy/uninstall-from-github.sh" in readme
+    assert readme.count(f"{PINNED_INSTALL_SHA}/deploy/install-from-github.sh") == 1
+    assert readme.count("stable-02206/deploy/update-from-github.sh") == 1
+    assert readme.count("stable-02206/deploy/uninstall-from-github.sh") == 1
+    assert "sg-gateway-v22/main/deploy/install-from-github.sh" not in readme
+    assert "sg-gateway-v22/main/deploy/update-from-github.sh" not in readme
+    assert "sg-gateway-v22/main/deploy/full-uninstall-ubuntu.sh" not in readme
