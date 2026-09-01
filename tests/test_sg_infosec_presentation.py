@@ -23,7 +23,7 @@ class StaticResolver:
             "network_type_label": "Сеть хостинг-провайдера",
             "summary": "🇺🇸 США · AS7488 · CNServer LLC",
             "details": "Сеть 144.225.6.0/23 · Сеть хостинг-провайдера",
-            "source": "RIPEstat",
+            "source": "RIPEstat + GeoIP",
             "available": True,
         }
 
@@ -72,7 +72,7 @@ def test_ip_intelligence_combines_country_routing_data_reputation_and_cache(tmp_
     assert first["prefix"] == "144.225.6.0/23"
     assert first["organization"] == "CNServer LLC"
     assert first["network_type_label"] == "Сеть хостинг-провайдера"
-    assert first["source"] == "RIPEstat"
+    assert first["source"] == "RIPEstat + GeoIP"
     assert len(calls) == 1
     assert cache.exists()
 
