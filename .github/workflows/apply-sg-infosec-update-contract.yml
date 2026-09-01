@@ -21,11 +21,19 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install test dependency
+        run: python -m pip install pytest
+
       - name: Apply exact updater transformation
-        run: python3 tools/apply_sg_infosec_update_contract.py
+        run: python tools/apply_sg_infosec_update_contract.py
 
       - name: Verify rollback contract
-        run: python3 -m pytest -q tests/test_sg_infosec_management_update_contract.py
+        run: python -m pytest -q tests/test_sg_infosec_management_update_contract.py
 
       - name: Commit transformed updater
         run: |
