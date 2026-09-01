@@ -1,0 +1,70 @@
+name: Make README install command one line
+
+on:
+  push:
+    branches: [fix/readme-install-one-line]
+    paths:
+      - .github/workflows/fix-readme-install-one-line.yml
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/readme-install-one-line
+          fetch-depth: 0
+
+      - name: Replace multiline Clean Install command
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          readme_path = Path("README.md")
+          readme = readme_path.read_text(encoding="utf-8")
+          sha = "2e96ea97992509f8ff2fdce8b8d23aa0dc5a1dff"
+          old = "\n".join([
+              "curl -4 -fsSL \\",
+              f"  https://raw.githubusercontent.com/s-gor/sg-gateway-v22/{sha}/deploy/install-from-github.sh \\",
+              "| sudo env \\",
+              "  SG_GATEWAY_GITHUB_BRANCH=stable-02206 \\",
+              f"  SG_GATEWAY_SOURCE_COMMIT={sha} \\",
+              "  bash",
+          ])
+          new = f"curl -4 -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/{sha}/deploy/install-from-github.sh | sudo env SG_GATEWAY_GITHUB_BRANCH=stable-02206 SG_GATEWAY_SOURCE_COMMIT={sha} bash"
+          assert readme.count(old) == 1, readme.count(old)
+          readme = readme.replace(old, new)
+          readme_path.write_text(readme, encoding="utf-8")
+
+          test_path = Path("tests/test_sg_gateway_v22_02206_stable_release.py")
+          test_text = test_path.read_text(encoding="utf-8")
+          needle = '    assert "sg-gateway-v22/main/deploy/full-uninstall-ubuntu.sh" not in readme\n'
+          assertion = needle + '    assert f"curl -4 -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/{PINNED_INSTALL_SHA}/deploy/install-from-github.sh | sudo env SG_GATEWAY_GITHUB_BRANCH=stable-02206 SG_GATEWAY_SOURCE_COMMIT={PINNED_INSTALL_SHA} bash" in readme\n'
+          assert test_text.count(needle) == 1
+          test_path.write_text(test_text.replace(needle, assertion), encoding="utf-8")
+          PY
+
+      - name: Remove helper and refresh checksums
+        run: |
+          git rm .github/workflows/fix-readme-install-one-line.yml
+          python3 - <<'PY'
+          import hashlib
+          import subprocess
+          from pathlib import Path
+
+          files = subprocess.check_output(["git", "ls-files"], text=True, encoding="utf-8").splitlines()
+          files = [path for path in files if path != "SOURCE-SHA256SUMS"]
+          rows = [f"{hashlib.sha256(Path(path).read_bytes()).hexdigest()}  {path}" for path in sorted(files)]
+          Path("SOURCE-SHA256SUMS").write_text("\n".join(rows) + "\n", encoding="utf-8")
+          PY
+
+      - name: Commit correction
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add README.md tests/test_sg_gateway_v22_02206_stable_release.py SOURCE-SHA256SUMS
+          git commit -m "docs: make Clean Install command copyable"
+          git push origin HEAD:fix/readme-install-one-line
