@@ -20,6 +20,8 @@ TLS_PRIVATE_KEY = TLS_DIR / "privkey.pem"
 BINARY = Path("/opt/sg-gateway/naiveproxy/bin/caddy")
 SERVICE = "sg-gateway-naiveproxy.service"
 DEFAULT_PORT = 8447
+USERNAME_RE = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
+PASSWORD_RE = re.compile(r"^[A-Za-z0-9._~-]{16,256}$")
 
 
 def _atomic_write(path: Path, content: str, mode: int) -> None:
@@ -38,7 +40,16 @@ def _atomic_write(path: Path, content: str, mode: int) -> None:
 
 
 def _redact(text: str) -> str:
-    return re.sub(r"(basic_auth\s+\S+\s+)\S+", r"\1***", str(text))
+    value = re.sub(r"(basic_auth\s+\S+\s+)\S+", r"\1***", str(text))
+    return re.sub(r"(naive\+https://[^:]+:)[^@]+", r"\1***", value)
+
+
+def _validated_account(credential_id: int, payload: dict) -> dict:
+    username = str(payload.get("username") or "").strip()
+    password = str(payload.get("password") or "")
+    if not USERNAME_RE.fullmatch(username) or not PASSWORD_RE.fullmatch(password):
+        raise RuntimeError(f"NaiveProxy credential {credential_id} is invalid")
+    return {"username": username, "password": password}
 
 
 def _load() -> tuple[dict, list[dict], list[int]]:
@@ -50,7 +61,12 @@ def _load() -> tuple[dict, list[dict], list[int]]:
         ).fetchone()
         if setting is None:
             raise RuntimeError("NaiveProxy connection settings are missing")
-        config = json.loads(setting["config_json"] or "{}")
+        try:
+            config = json.loads(setting["config_json"] or "{}")
+        except (TypeError, ValueError, json.JSONDecodeError) as exc:
+            raise RuntimeError("NaiveProxy connection settings are invalid") from exc
+        if not isinstance(config, dict):
+            raise RuntimeError("NaiveProxy connection settings are invalid")
         settings = {
             "domain": str(setting["host"] or config.get("domain") or "").strip(),
             "port": int(setting["port"] or DEFAULT_PORT),
@@ -71,14 +87,19 @@ def _load() -> tuple[dict, list[dict], list[int]]:
         users: list[dict] = []
         credential_ids: list[int] = []
         for row in rows:
-            credential_ids.append(int(row["id"]))
-            payload = json.loads(row["config_json"] or "{}")
+            credential_id = int(row["id"])
+            credential_ids.append(credential_id)
             if not bool(row["client_enabled"]) or not bool(row["device_enabled"]):
                 continue
-            username = str(payload.get("username") or "").strip()
-            password = str(payload.get("password") or "")
-            if username and len(password) >= 16:
-                users.append({"username": username, "password": password})
+            try:
+                payload = json.loads(row["config_json"] or "{}")
+            except (TypeError, ValueError, json.JSONDecodeError) as exc:
+                raise RuntimeError(
+                    f"NaiveProxy credential {credential_id} is invalid"
+                ) from exc
+            if not isinstance(payload, dict):
+                raise RuntimeError(f"NaiveProxy credential {credential_id} is invalid")
+            users.append(_validated_account(credential_id, payload))
         return settings, users, credential_ids
     finally:
         connection.close()
@@ -122,8 +143,14 @@ def _validate(settings: dict) -> None:
     conflict = _reserved_ports().get(port)
     if conflict:
         raise RuntimeError(f"TCP port {port} conflicts with {conflict}")
-    certificate = Path(settings["certificate_path"] or f"/etc/letsencrypt/live/{domain}/fullchain.pem")
-    private_key = Path(settings["private_key_path"] or f"/etc/letsencrypt/live/{domain}/privkey.pem")
+    certificate = Path(
+        settings["certificate_path"]
+        or f"/etc/letsencrypt/live/{domain}/fullchain.pem"
+    )
+    private_key = Path(
+        settings["private_key_path"]
+        or f"/etc/letsencrypt/live/{domain}/privkey.pem"
+    )
     if not certificate.is_file() or not private_key.is_file():
         raise RuntimeError("NaiveProxy TLS certificate is not ready")
     settings["source_certificate_path"] = str(certificate)
@@ -140,9 +167,11 @@ def _render(settings: dict, users: list[dict]) -> str:
     )
     order = "    order forward_proxy before file_server\n" if users else ""
     proxy = (
-        "    forward_proxy {\n" + auth
+        "    forward_proxy {\n"
+        + auth
         + "\n        hide_ip\n        hide_via\n        probe_resistance\n    }\n"
-        if users else ""
+        if users
+        else ""
     )
     return f"""{{
     admin off
@@ -163,53 +192,206 @@ def _render(settings: dict, users: list[dict]) -> str:
 
 
 def _run(command: list[str], timeout: int = 30) -> subprocess.CompletedProcess:
-    return subprocess.run(command, capture_output=True, text=True, timeout=timeout, check=False)
+    return subprocess.run(
+        command,
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+        check=False,
+    )
+
+
+def _copy_private(source: Path, destination: Path, mode: int) -> None:
+    shutil.copy2(source, destination)
+    os.chmod(destination, mode)
+    try:
+        shutil.chown(destination, user="root", group="sg-naiveproxy")
+    except LookupError:
+        pass
+
+
+def _snapshot(source: Path, destination: Path) -> bool:
+    if not source.is_file():
+        destination.unlink(missing_ok=True)
+        return False
+    shutil.copy2(source, destination)
+    return True
+
+
+def _restore_file(active: Path, previous: Path, existed: bool) -> None:
+    if existed:
+        if not previous.is_file():
+            raise RuntimeError(
+                f"Incomplete NaiveProxy rollback snapshot: {previous.name}"
+            )
+        shutil.copy2(previous, active)
+    else:
+        active.unlink(missing_ok=True)
+
+
+def _restore_snapshot(snapshot: dict[str, bool], restart: bool) -> None:
+    _restore_file(
+        CONFIG_PATH,
+        CONFIG_DIR / "Caddyfile.previous",
+        snapshot["config"],
+    )
+    _restore_file(
+        STATE_PATH,
+        STATE_DIR / "state.json.previous",
+        snapshot["state"],
+    )
+    _restore_file(
+        TLS_CERTIFICATE,
+        TLS_DIR / "fullchain.pem.previous",
+        snapshot["certificate"],
+    )
+    _restore_file(
+        TLS_PRIVATE_KEY,
+        TLS_DIR / "privkey.pem.previous",
+        snapshot["private_key"],
+    )
+    if restart:
+        result = _run(["systemctl", "restart", SERVICE], timeout=60)
+        if result.returncode != 0:
+            raise RuntimeError(
+                _redact(
+                    result.stderr
+                    or result.stdout
+                    or "NaiveProxy rollback restart failed"
+                )
+            )
 
 
 def sync() -> dict:
     settings, users, credential_ids = _load()
     _validate(settings)
-    candidate = _render(settings, users)
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     TLS_DIR.mkdir(parents=True, exist_ok=True)
     STATE_DIR.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(settings["source_certificate_path"], TLS_CERTIFICATE)
-    shutil.copy2(settings["source_private_key_path"], TLS_PRIVATE_KEY)
-    os.chmod(TLS_CERTIFICATE, 0o644)
-    os.chmod(TLS_PRIVATE_KEY, 0o640)
+
+    candidate_certificate = TLS_DIR / "fullchain.pem.candidate"
+    candidate_private_key = TLS_DIR / "privkey.pem.candidate"
+    candidate_config = CONFIG_DIR / "Caddyfile.candidate"
+    for path in (candidate_certificate, candidate_private_key, candidate_config):
+        path.unlink(missing_ok=True)
+
+    _copy_private(
+        Path(settings["source_certificate_path"]),
+        candidate_certificate,
+        0o644,
+    )
+    _copy_private(
+        Path(settings["source_private_key_path"]),
+        candidate_private_key,
+        0o640,
+    )
+    validation_settings = dict(settings)
+    validation_settings["certificate_path"] = str(candidate_certificate)
+    validation_settings["private_key_path"] = str(candidate_private_key)
+    _atomic_write(candidate_config, _render(validation_settings, users), 0o640)
+    validation = _run(
+        [
+            str(BINARY),
+            "validate",
+            "--config",
+            str(candidate_config),
+            "--adapter",
+            "caddyfile",
+        ]
+    )
+    if validation.returncode != 0:
+        for path in (candidate_certificate, candidate_private_key, candidate_config):
+            path.unlink(missing_ok=True)
+        raise RuntimeError(
+            _redact(
+                validation.stderr
+                or validation.stdout
+                or "Caddy validation failed"
+            )
+        )
+
+    service_was_active = (
+        _run(
+            ["systemctl", "is-active", "--quiet", SERVICE],
+            timeout=10,
+        ).returncode
+        == 0
+    )
+    snapshot = {
+        "config": _snapshot(CONFIG_PATH, CONFIG_DIR / "Caddyfile.previous"),
+        "state": _snapshot(STATE_PATH, STATE_DIR / "state.json.previous"),
+        "certificate": _snapshot(
+            TLS_CERTIFICATE,
+            TLS_DIR / "fullchain.pem.previous",
+        ),
+        "private_key": _snapshot(
+            TLS_PRIVATE_KEY,
+            TLS_DIR / "privkey.pem.previous",
+        ),
+    }
+
     try:
-        shutil.chown(TLS_CERTIFICATE, user="root", group="sg-naiveproxy")
-        shutil.chown(TLS_PRIVATE_KEY, user="root", group="sg-naiveproxy")
-    except LookupError:
-        pass
-    candidate_path = CONFIG_DIR / "Caddyfile.candidate"
-    _atomic_write(candidate_path, candidate, 0o640)
-    result = _run([str(BINARY), "validate", "--config", str(candidate_path), "--adapter", "caddyfile"])
-    if result.returncode != 0:
-        candidate_path.unlink(missing_ok=True)
-        raise RuntimeError(_redact(result.stderr or result.stdout or "Caddy validation failed"))
-    if CONFIG_PATH.is_file():
-        shutil.copy2(CONFIG_PATH, CONFIG_DIR / "Caddyfile.previous")
-    if STATE_PATH.is_file():
-        shutil.copy2(STATE_PATH, STATE_DIR / "state.json.previous")
-    os.replace(candidate_path, CONFIG_PATH)
-    os.chmod(CONFIG_PATH, 0o640)
-    try:
-        shutil.chown(CONFIG_PATH, user="root", group="sg-naiveproxy")
-    except LookupError:
-        pass
-    safe_state = {"version": 1, "settings": settings, "users": len(users)}
-    _atomic_write(STATE_PATH, json.dumps(safe_state, ensure_ascii=False, indent=2, sort_keys=True) + "\n", 0o600)
-    service = _run(["systemctl", "enable", "--now", SERVICE], timeout=60)
-    if service.returncode != 0:
-        previous_config = CONFIG_DIR / "Caddyfile.previous"
-        previous_state = STATE_DIR / "state.json.previous"
-        if previous_config.is_file() and previous_state.is_file():
-            rollback(restart=False)
-        else:
-            CONFIG_PATH.unlink(missing_ok=True)
-            STATE_PATH.unlink(missing_ok=True)
-        raise RuntimeError(_redact(service.stderr or service.stdout or "NaiveProxy restart failed"))
+        os.replace(candidate_certificate, TLS_CERTIFICATE)
+        os.replace(candidate_private_key, TLS_PRIVATE_KEY)
+        _atomic_write(candidate_config, _render(settings, users), 0o640)
+        final_validation = _run(
+            [
+                str(BINARY),
+                "validate",
+                "--config",
+                str(candidate_config),
+                "--adapter",
+                "caddyfile",
+            ]
+        )
+        if final_validation.returncode != 0:
+            raise RuntimeError(
+                _redact(
+                    final_validation.stderr
+                    or final_validation.stdout
+                    or "Caddy final validation failed"
+                )
+            )
+        os.replace(candidate_config, CONFIG_PATH)
+        os.chmod(CONFIG_PATH, 0o640)
+        try:
+            shutil.chown(CONFIG_PATH, user="root", group="sg-naiveproxy")
+        except LookupError:
+            pass
+        safe_state = {
+            "version": 1,
+            "settings": settings,
+            "users": len(users),
+        }
+        _atomic_write(
+            STATE_PATH,
+            json.dumps(
+                safe_state,
+                ensure_ascii=False,
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n",
+            0o600,
+        )
+        service = _run(
+            ["systemctl", "enable", "--now", SERVICE],
+            timeout=60,
+        )
+        if service.returncode != 0:
+            raise RuntimeError(
+                _redact(
+                    service.stderr
+                    or service.stdout
+                    or "NaiveProxy restart failed"
+                )
+            )
+    except Exception:
+        for path in (candidate_certificate, candidate_private_key, candidate_config):
+            path.unlink(missing_ok=True)
+        _restore_snapshot(snapshot, restart=service_was_active)
+        raise
+
     if credential_ids:
         connection = sqlite3.connect(DB_PATH)
         try:
@@ -220,20 +402,41 @@ def sync() -> dict:
             connection.commit()
         finally:
             connection.close()
-    return {"ok": True, "service": SERVICE, "port": settings["port"], "users": len(users)}
+    return {
+        "ok": True,
+        "service": SERVICE,
+        "port": settings["port"],
+        "users": len(users),
+    }
 
 
 def rollback(restart: bool = True) -> dict:
     previous_config = CONFIG_DIR / "Caddyfile.previous"
     previous_state = STATE_DIR / "state.json.previous"
-    if not previous_config.is_file() or not previous_state.is_file():
+    previous_certificate = TLS_DIR / "fullchain.pem.previous"
+    previous_private_key = TLS_DIR / "privkey.pem.previous"
+    required = (
+        previous_config,
+        previous_state,
+        previous_certificate,
+        previous_private_key,
+    )
+    if not all(path.is_file() for path in required):
         raise RuntimeError("No complete NaiveProxy rollback snapshot")
     shutil.copy2(previous_config, CONFIG_PATH)
     shutil.copy2(previous_state, STATE_PATH)
+    shutil.copy2(previous_certificate, TLS_CERTIFICATE)
+    shutil.copy2(previous_private_key, TLS_PRIVATE_KEY)
     if restart:
         result = _run(["systemctl", "restart", SERVICE], timeout=60)
         if result.returncode != 0:
-            raise RuntimeError(_redact(result.stderr or result.stdout or "NaiveProxy rollback restart failed"))
+            raise RuntimeError(
+                _redact(
+                    result.stderr
+                    or result.stdout
+                    or "NaiveProxy rollback restart failed"
+                )
+            )
     return {"ok": True, "service": SERVICE, "rolled_back": True}
 
 
