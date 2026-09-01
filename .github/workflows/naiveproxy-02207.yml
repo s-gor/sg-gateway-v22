@@ -1,0 +1,68 @@
+name: NaiveProxy 22.07
+
+on:
+  push:
+    branches:
+      - feature/02207-naiveproxy
+  pull_request:
+    branches:
+      - dev-02207
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+
+      - name: Compile Python sources
+        run: |
+          python -B - <<'PY'
+          import compileall
+          roots = ("app", "engines", "hostd/sg_hostd", "tests")
+          ok = all(compileall.compile_dir(root, quiet=1) for root in roots)
+          raise SystemExit(0 if ok else 1)
+          PY
+
+      - name: Validate shell entrypoints
+        run: |
+          bash -n deploy/install-from-github-02207.sh
+          bash -n deploy/update-from-github-02207.sh
+          bash -n deploy/install-naiveproxy.sh
+          bash -n deploy/uninstall-naiveproxy.sh
+
+      - name: Guard frozen 22.06 artifacts
+        run: |
+          git fetch --no-tags origin dev-02207
+          changed="$(git diff --name-only origin/dev-02207...HEAD)"
+          if grep -Eq '^(PUBLICATION-02206\.md|\.github/workflows/release-02206-stable\.yml)$' <<<"$changed"; then
+            printf '%s\n' "$changed"
+            echo 'Frozen 22.06 artifact was modified' >&2
+            exit 1
+          fi
+
+      - name: Guard Reality 443 isolation
+        run: |
+          if grep -RIn --include='*.py' --include='*.service' --include='*.sh' ':443' \
+            app/naiveproxy engines/naiveproxy hostd/sg_hostd/naiveproxy* \
+            deploy/*naiveproxy*; then
+            echo 'NaiveProxy source must not claim listener :443' >&2
+            exit 1
+          fi
+
+      - name: Run full test suite
+        run: python -m pytest -q tests
