@@ -3,6 +3,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+PINNED_INSTALL_SHA = "2e96ea97992509f8ff2fdce8b8d23aa0dc5a1dff"
 
 
 def test_02206_stable_identity_and_channel():
@@ -16,9 +17,8 @@ def test_02206_stable_identity_and_channel():
     assert manifest["maintenance_updates"]["panel"]["channel"] == "stable-02206"
 
 
-def test_02206_publication_and_release_workflow_are_complete():
+def test_02206_publication_contract_is_complete_without_github_release():
     publication = (ROOT / "PUBLICATION-02206.md").read_text(encoding="utf-8")
-    workflow = (ROOT / ".github" / "workflows" / "release-02206-stable.yml").read_text(encoding="utf-8")
     for marker in (
         "AWG 2.0",
         "AWG 3.0",
@@ -27,21 +27,16 @@ def test_02206_publication_and_release_workflow_are_complete():
         "Clean Install",
         "Full Uninstall",
         "stable-02206",
-        "v0.1.0-022.06-final",
     ):
         assert marker in publication
-    assert "TAG: v0.1.0-022.06-final" in workflow
-    assert "TITLE: SG-Gateway 0.1.0-022.06 Final" in workflow
-    assert "SG-Gateway-0.1.0-022.06-FULL.run" in workflow
-    assert "PUBLICATION-02206.md" in workflow
-    assert "python -m pytest tests" in workflow
-    assert "--verify-only" in workflow
-    assert "--latest" in workflow
+    assert "v0.1.0-022.06-final" not in publication
+    assert not (ROOT / ".github" / "workflows" / "release-02206-stable.yml").exists()
 
 
-def test_02206_readme_exposes_stable_commands():
+def test_02206_readme_exposes_verified_stable_commands():
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     assert "0.1.0-022.06 STABLE" in readme
-    assert "stable-02206/deploy/install-from-github.sh" in readme
+    assert f"{PINNED_INSTALL_SHA}/deploy/install-from-github.sh" in readme
+    assert f"SG_GATEWAY_SOURCE_COMMIT={PINNED_INSTALL_SHA}" in readme
     assert "stable-02206/deploy/update-from-github.sh" in readme
     assert "stable-02206/deploy/uninstall-from-github.sh" in readme
