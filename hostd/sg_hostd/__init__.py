@@ -50,3 +50,14 @@ from sg_hostd.naiveproxy_commands import install as _install_naiveproxy_commands
 _install_naiveproxy_commands(_import_module("sg_hostd.commands"))
 del _install_naiveproxy_commands
 del _import_module
+
+# SG_GATEWAY_02207_NAIVEPROXY_BACKUP_TLS
+from importlib import import_module as _naive_import_module
+from sg_hostd.naiveproxy_backup_patch import install as _install_naiveproxy_backup
+_install_naiveproxy_backup(
+    _naive_import_module("sg_hostd.full_backup_runtime"),
+    _naive_import_module("sg_hostd.data_backup_runtime"),
+    _naive_import_module("sg_hostd.operation_jobs"),
+)
+del _install_naiveproxy_backup
+del _naive_import_module
