@@ -6,7 +6,7 @@ INSTALL_WRAPPER = ROOT / "deploy" / "install-from-github.sh"
 UPDATE_WRAPPER = ROOT / "deploy" / "update-from-github.sh"
 UNINSTALL_WRAPPER = ROOT / "deploy" / "uninstall-from-github.sh"
 COMMANDS = ROOT / "deploy" / "GITHUB-COMMANDS.md"
-INSTALL_SOURCE_COMMIT = "e7cd63deab9c3a34b6aee910c61017ff8a8b9c6e"
+INSTALL_SOURCE_COMMIT = "2e96ea97992509f8ff2fdce8b8d23aa0dc5a1dff"
 
 INSTALL_URL = (
     "https://raw.githubusercontent.com/s-gor/sg-gateway-v22/"

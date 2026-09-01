@@ -4,7 +4,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-INSTALL_SOURCE_COMMIT = "e7cd63deab9c3a34b6aee910c61017ff8a8b9c6e"
+INSTALL_SOURCE_COMMIT = "2e96ea97992509f8ff2fdce8b8d23aa0dc5a1dff"
 
 
 def _read(path: str) -> str:
