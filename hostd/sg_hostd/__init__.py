@@ -49,6 +49,11 @@ del _install_awg31_commands
 from sg_hostd.naiveproxy_commands import install as _install_naiveproxy_commands
 _install_naiveproxy_commands(_import_module("sg_hostd.commands"))
 del _install_naiveproxy_commands
+
+# SG_GATEWAY_02207_NAIVEPROXY_LISTENER_GUARD
+from sg_hostd.naiveproxy_listener_patch import install as _install_naiveproxy_listener
+_install_naiveproxy_listener(_import_module("sg_hostd.naiveproxy_runtime"))
+del _install_naiveproxy_listener
 del _import_module
 
 # SG_GATEWAY_02207_NAIVEPROXY_BACKUP_TLS
