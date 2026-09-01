@@ -22,9 +22,11 @@ on:
       - app/web/templates/_sg_infosec_management_base.html
       - app/web/templates/_sg_infosec_guard.html
       - app/web/templates/sg_infosec_help.html
+      - app/web/templates/sg_infosec_help_v2.html
       - app/web/static/sg-infosec-management-v1.css
       - app/web/static/sg-infosec-guard-v1.css
       - app/web/static/sg-infosec-readable-v2.css
+      - app/web/static/sg-infosec-help-v2.css
       - docs/SG-INFOSEC-GUIDE-RU.md
       - docs/SG-INFOSEC-IP-INTELLIGENCE.md
       - deploy/install-sg-infosec-management-bridge.sh
@@ -52,9 +54,11 @@ on:
       - app/web/templates/_sg_infosec_management_base.html
       - app/web/templates/_sg_infosec_guard.html
       - app/web/templates/sg_infosec_help.html
+      - app/web/templates/sg_infosec_help_v2.html
       - app/web/static/sg-infosec-management-v1.css
       - app/web/static/sg-infosec-guard-v1.css
       - app/web/static/sg-infosec-readable-v2.css
+      - app/web/static/sg-infosec-help-v2.css
       - docs/SG-INFOSEC-GUIDE-RU.md
       - docs/SG-INFOSEC-IP-INTELLIGENCE.md
       - deploy/install-sg-infosec-management-bridge.sh
