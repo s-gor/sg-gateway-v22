@@ -195,4 +195,5 @@ def test_fragment_replacement_and_awg_profile_order() -> None:
     assert subscription.canonical_profile_ids() == (
         "xray_reality_tcp", "xray_xhttp_reality", "xray_xhttp_tls", "xray_hysteria2",
         "amneziawg", "amneziawg3", "amneziawg31", "mieru", "anytls", "tuic",
+        "naiveproxy",
     )

@@ -35,15 +35,20 @@ def test_hostd_unit_allows_only_naiveproxy_write_paths():
 def test_hostd_copies_certbot_key_for_unprivileged_caddy():
     source = (Path(__file__).parents[1] / "hostd" / "sg_hostd" / "naiveproxy_runtime.py").read_text()
     assert 'TLS_PRIVATE_KEY = TLS_DIR / "privkey.pem"' in source
-    assert 'shutil.copy2(settings["source_private_key_path"], TLS_PRIVATE_KEY)' in source
-    assert "os.chmod(TLS_PRIVATE_KEY, 0o640)" in source
+    assert "candidate_private_key" in source
+    assert 'Path(settings["source_private_key_path"])' in source
+    assert "_copy_private(" in source
+    assert "0o640" in source
     assert 'group="sg-naiveproxy"' in source
 
 
-def test_first_failed_start_does_not_require_a_previous_snapshot():
+def test_first_failed_start_restores_absent_first_install_without_previous_files():
     source = (Path(__file__).parents[1] / "hostd" / "sg_hostd" / "naiveproxy_runtime.py").read_text()
-    assert "if previous_config.is_file() and previous_state.is_file():" in source
-    assert "CONFIG_PATH.unlink(missing_ok=True)" in source
+    assert "snapshot = {" in source
+    assert '"config": _snapshot(' in source
+    assert '"state": _snapshot(' in source
+    assert "_restore_snapshot(snapshot, restart=service_was_active)" in source
+    assert "active.unlink(missing_ok=True)" in source
 
 
 def test_ui_injects_naiveproxy_checkbox_into_existing_protocol_forms():
