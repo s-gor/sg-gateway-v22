@@ -19,7 +19,7 @@
     <div>
       <div class="secv2-kicker">SG-INFOSEC</div>
       <h2>Защита входа и SSH</h2>
-      <p>Активные блокировки, ручные действия, allowlist и аудит локального модуля безопасности.</p>
+      <p>Понятная сводка атак, блокировок, исключений и действий администратора.</p>
     </div>
     <div class="infosec-card-actions">
       <a class="button compact infosec-guide-link" href="/security/infosec/help">Полная инструкция</a>
@@ -27,121 +27,161 @@
     </div>
   </header>
 
-  <section class="infosec-summary sg-ljd-nested-group" aria-label="Сводка SG-InfoSec">
+  <section class="infosec-summary sg-ljd-nested-group" aria-label="Сводка SG InfoSec">
     <div><span>Состояние</span><strong class="{{ 'ok' if sg.available else 'warning' }}">{{ sg.status }}</strong></div>
     <div><span>Активных блокировок</span><strong>{{ sg.active_count }}</strong></div>
-    <div><span>Allowlist</span><strong>{{ sg.allowlist_count }}</strong></div>
-    <div><span>Последняя синхронизация</span><strong>{{ sg.last_sync }}</strong></div>
+    <div><span>Исключений</span><strong>{{ sg.allowlist_count }}</strong></div>
+    <div><span>Последнее обновление</span><strong>{{ sg.last_sync }}</strong></div>
   </section>
 
   {% if not sg.available %}
   <div class="secv2-result error sg-ljd-nested infosec-unavailable">
     <strong>Управление временно недоступно</strong>
     <span>{{ sg.error }}</span>
-    <small>Вход в панель продолжает работать по текущей fail-open политике. VPN-сервисы не затрагиваются.</small>
+    <small>Панель продолжает работать по fail-open политике. VPN-сервисы не затрагиваются.</small>
   </div>
-  {% else %}
-  <div class="infosec-grid">
-    <section class="infosec-section sg-ljd-nested">
-      <header>
-        <div><span class="secv2-kicker">АКТИВНЫЕ РЕШЕНИЯ</span><h3>Блокировки</h3></div>
-        <span class="infosec-count">{{ sg.active_count }}</span>
-      </header>
-      {% if sg.active_decisions %}
-      <div class="infosec-table-wrap">
-        <table class="infosec-table">
-          <thead><tr><th>IP</th><th>Область</th><th>Причина</th><th>Окончание</th><th></th></tr></thead>
-          <tbody>
-          {% for item in sg.active_decisions %}
-            <tr>
-              <td><code>{{ item.ip }}</code></td>
-              <td>{{ item.scope }}</td>
-              <td>{{ item.reason_code or 'manual' }}</td>
-              <td>{{ item.expires_at }}</td>
-              <td class="infosec-action-cell">
-                <form method="post" action="/security/infosec/decisions/{{ item.id }}/revoke" onsubmit="return confirm('Снять эту блокировку?')">
-                  <input type="hidden" name="csrf_token" value="{{ sg_csrf }}">
-                  <button class="button danger compact" type="submit">Разблокировать</button>
-                </form>
-              </td>
-            </tr>
-          {% endfor %}
-          </tbody>
-        </table>
-      </div>
-      {% else %}
-      <div class="secv2-compact-empty"><strong>Активных блокировок нет</strong><span>Новые решения появятся здесь после срабатывания правил или ручной блокировки.</span></div>
-      {% endif %}
-    </section>
+  {% endif %}
 
-    <section class="infosec-section sg-ljd-nested">
-      <header><div><span class="secv2-kicker">РУЧНОЕ ДЕЙСТВИЕ</span><h3>Заблокировать IP</h3></div></header>
-      <form class="infosec-form" method="post" action="/security/infosec/block">
-        <input type="hidden" name="csrf_token" value="{{ sg_csrf }}">
-        <label><span>IP-адрес</span><input type="text" name="ip" placeholder="192.0.2.10" autocomplete="off" required></label>
-        <div class="infosec-form-row">
-          <label><span>Область</span><select name="scope" required><option value="admin-login">Вход в панель</option><option value="admin-api">API панели</option><option value="ssh">SSH</option></select></label>
-          <label><span>Срок, часов</span><input type="number" name="hours" min="1" max="168" value="1" required></label>
-        </div>
-        <label><span>Причина</span><input type="text" name="reason" minlength="3" maxlength="240" placeholder="Причина ручной блокировки" required></label>
-        <button class="button primary" type="submit">Заблокировать</button>
-      </form>
-    </section>
-  </div>
-
-  <section class="infosec-section sg-ljd-nested infosec-allowlist">
+  <section class="infosec-section infosec-primary-section sg-ljd-nested">
     <header>
-      <div><span class="secv2-kicker">ALLOWLIST</span><h3>Исключения</h3></div>
-      <span class="infosec-count">{{ sg.allowlist_count }}</span>
+      <div>
+        <div class="secv2-kicker">АКТИВНЫЕ РЕШЕНИЯ</div>
+        <h3>Кто сейчас заблокирован</h3>
+      </div>
+      <span class="infosec-count">{{ sg.active_count }}</span>
     </header>
-    <form class="infosec-form infosec-allowlist-form" method="post" action="/security/infosec/allowlist">
-      <input type="hidden" name="csrf_token" value="{{ sg_csrf }}">
-      <label><span>IP или CIDR</span><input type="text" name="prefix" placeholder="198.51.100.0/24" autocomplete="off" required></label>
-      <label><span>Область</span><select name="scope"><option value="">Все области</option><option value="admin-login">Вход в панель</option><option value="admin-api">API панели</option><option value="ssh">SSH</option></select></label>
-      <label><span>Описание</span><input type="text" name="description" minlength="3" maxlength="240" placeholder="Например: офисная сеть" required></label>
-      <label><span>До даты, необязательно</span><input type="datetime-local" name="expires_at"></label>
-      <button class="button primary" type="submit">Добавить</button>
-    </form>
 
-    {% if sg.allowlist %}
-    <div class="infosec-table-wrap">
-      <table class="infosec-table">
-        <thead><tr><th>Адрес</th><th>Область</th><th>Описание</th><th>Срок</th><th></th></tr></thead>
-        <tbody>
-        {% for item in sg.allowlist %}
-          <tr>
-            <td><code>{{ item.prefix }}</code></td>
-            <td>{{ item.scope or 'Все' }}</td>
-            <td>{{ item.description }}</td>
-            <td>{{ item.expires_at or 'Без срока' }}</td>
-            <td class="infosec-action-cell">
-              <form method="post" action="/security/infosec/allowlist/{{ item.id }}/delete" onsubmit="return confirm('Удалить эту запись из allowlist?')">
-                <input type="hidden" name="csrf_token" value="{{ sg_csrf }}">
-                <button class="button danger compact" type="submit">Удалить</button>
-              </form>
-            </td>
-          </tr>
-        {% endfor %}
-        </tbody>
-      </table>
+    {% if sg.active_decisions %}
+    <div class="infosec-decision-list">
+      {% for item in sg.active_decisions %}
+      <article class="infosec-decision-card">
+        <div class="infosec-decision-main">
+          <div class="infosec-address-block">
+            <strong class="infosec-ip">{{ item.ip }}</strong>
+            <span class="infosec-network-summary">{{ item.ip_intel.summary }}</span>
+            <small>{{ item.ip_intel.details }}</small>
+          </div>
+          <span class="secv2-pill ok">{{ item.state_label }}</span>
+        </div>
+
+        <dl class="infosec-decision-meta">
+          <div><dt>Что ограничено</dt><dd>{{ item.scope_label }}</dd></div>
+          <div><dt>Почему</dt><dd>{{ item.reason_label }}</dd></div>
+          <div><dt>До какого времени</dt><dd>{{ item.expires_at_label }}</dd></div>
+        </dl>
+
+        <p class="infosec-effect">{{ item.scope_effect }}</p>
+
+        <div class="infosec-row-actions">
+          <form method="post" action="/security/infosec/decisions/{{ item.id }}/revoke">
+            <input type="hidden" name="csrf_token" value="{{ sg_csrf }}">
+            <button class="button danger compact" type="submit" {% if not sg.available %}disabled{% endif %}>Разблокировать</button>
+          </form>
+          <details class="infosec-technical">
+            <summary>Технические данные</summary>
+            <dl>
+              {% for key, value in item.technical.items() %}
+              <div><dt>{{ key }}</dt><dd><code>{{ value }}</code></dd></div>
+              {% endfor %}
+              <div><dt>Источник сведений об IP</dt><dd><code>{{ item.ip_intel.source or 'нет' }}</code></dd></div>
+            </dl>
+          </details>
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="secv2-compact-empty sg-ljd-nested">
+      <strong>Активных блокировок нет</strong>
+      <span>Новые решения появятся здесь после срабатывания правил или ручного действия.</span>
     </div>
     {% endif %}
   </section>
 
-  <div class="infosec-grid infosec-history-grid">
+  <details class="infosec-disclosure sg-ljd-nested">
+    <summary>
+      <span><strong>Заблокировать IP</strong><small>Ручное действие для входа, API или SSH</small></span>
+      <b>Открыть</b>
+    </summary>
+    <form class="infosec-form infosec-form--compact" method="post" action="/security/infosec/block">
+      <input type="hidden" name="csrf_token" value="{{ sg_csrf }}">
+      <label><span>IP-адрес</span><input type="text" name="ip" placeholder="192.0.2.10" required {% if not sg.available %}disabled{% endif %}></label>
+      <div class="infosec-form-row">
+        <label><span>Область</span><select name="scope" {% if not sg.available %}disabled{% endif %}><option value="admin-login">Вход в панель</option><option value="admin-api">API панели</option><option value="ssh">Вход на сервер (SSH, порт 22)</option></select></label>
+        <label><span>Срок, часов</span><input type="number" name="hours" min="1" max="168" value="1" required {% if not sg.available %}disabled{% endif %}></label>
+      </div>
+      <label><span>Причина</span><input type="text" name="reason" minlength="3" maxlength="240" placeholder="Причина ручной блокировки" required {% if not sg.available %}disabled{% endif %}></label>
+      <button class="button primary" type="submit" {% if not sg.available %}disabled{% endif %}>Заблокировать</button>
+    </form>
+  </details>
+
+  <section class="infosec-section sg-ljd-nested">
+    <header>
+      <div><div class="secv2-kicker">ИСКЛЮЧЕНИЯ</div><h3>Доверенные IP и сети</h3></div>
+      <span class="infosec-count">{{ sg.allowlist_count }}</span>
+    </header>
+
+    {% if sg.allowlist %}
+    <div class="infosec-allowlist-list">
+      {% for item in sg.allowlist %}
+      <article class="infosec-allowlist-card">
+        <div><strong>{{ item.prefix }}</strong><span>{{ item.description }}</span></div>
+        <dl><div><dt>Область</dt><dd>{{ item.scope_label }}</dd></div><div><dt>Срок</dt><dd>{{ item.expires_at_label }}</dd></div></dl>
+        <form method="post" action="/security/infosec/allowlist/{{ item.id }}/delete">
+          <input type="hidden" name="csrf_token" value="{{ sg_csrf }}">
+          <button class="button danger compact" type="submit" {% if not sg.available %}disabled{% endif %}>Удалить</button>
+        </form>
+      </article>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="secv2-compact-empty sg-ljd-nested"><strong>Исключений нет</strong><span>Защита применяется ко всем внешним адресам.</span></div>
+    {% endif %}
+
+    <details class="infosec-disclosure infosec-disclosure--inside">
+      <summary><span><strong>Добавить исключение</strong><small>IP или CIDR доверенной сети</small></span><b>Открыть</b></summary>
+      <form class="infosec-form infosec-allowlist-form" method="post" action="/security/infosec/allowlist">
+        <input type="hidden" name="csrf_token" value="{{ sg_csrf }}">
+        <label><span>IP или CIDR</span><input type="text" name="prefix" placeholder="198.51.100.0/24" required {% if not sg.available %}disabled{% endif %}></label>
+        <label><span>Область</span><select name="scope" {% if not sg.available %}disabled{% endif %}><option value="">Все области</option><option value="admin-login">Вход в панель</option><option value="admin-api">API панели</option><option value="ssh">Вход на сервер (SSH)</option></select></label>
+        <label><span>Описание</span><input type="text" name="description" minlength="3" maxlength="240" placeholder="Например: офисная сеть" required {% if not sg.available %}disabled{% endif %}></label>
+        <label><span>До даты, необязательно</span><input type="datetime-local" name="expires_at" {% if not sg.available %}disabled{% endif %}></label>
+        <button class="button primary" type="submit" {% if not sg.available %}disabled{% endif %}>Добавить</button>
+      </form>
+    </details>
+  </section>
+
+  <div class="infosec-history-stack">
     <section class="infosec-section sg-ljd-nested">
-      <header><div><span class="secv2-kicker">ИСТОРИЯ</span><h3>Последние решения</h3></div></header>
+      <header><div><div class="secv2-kicker">ИСТОРИЯ</div><h3>Последние решения</h3></div></header>
       {% if sg.history %}
-      <div class="infosec-table-wrap"><table class="infosec-table"><thead><tr><th>IP</th><th>Область</th><th>Состояние</th><th>Создано</th></tr></thead><tbody>{% for item in sg.history %}<tr><td><code>{{ item.ip }}</code></td><td>{{ item.scope }}</td><td>{{ item.state }}</td><td>{{ item.created_at }}</td></tr>{% endfor %}</tbody></table></div>
-      {% else %}<div class="secv2-compact-empty"><strong>История пуста</strong><span>Решения SG-InfoSec появятся после первых событий.</span></div>{% endif %}
+      <div class="infosec-history-list">
+        {% for item in sg.history %}
+        <article class="infosec-history-card">
+          <div class="infosec-history-head"><strong>{{ item.ip }}</strong><span class="secv2-pill">{{ item.state_label }}</span></div>
+          <span>{{ item.ip_intel.summary }}</span>
+          <dl><div><dt>Область</dt><dd>{{ item.scope_label }}</dd></div><div><dt>Причина</dt><dd>{{ item.reason_label }}</dd></div><div><dt>Создано</dt><dd>{{ item.created_at_label }}</dd></div></dl>
+          <details class="infosec-technical"><summary>Технические данные</summary><dl>{% for key, value in item.technical.items() %}<div><dt>{{ key }}</dt><dd><code>{{ value }}</code></dd></div>{% endfor %}</dl></details>
+        </article>
+        {% endfor %}
+      </div>
+      {% else %}<div class="secv2-compact-empty sg-ljd-nested"><strong>История пуста</strong><span>Решения появятся после первого срабатывания.</span></div>{% endif %}
     </section>
 
     <section class="infosec-section sg-ljd-nested">
-      <header><div><span class="secv2-kicker">АУДИТ</span><h3>Административные действия</h3></div></header>
+      <header><div><div class="secv2-kicker">АУДИТ</div><h3>Административные действия</h3></div></header>
       {% if sg.audit %}
-      <div class="infosec-table-wrap"><table class="infosec-table"><thead><tr><th>Действие</th><th>Объект</th><th>Результат</th><th>Время</th></tr></thead><tbody>{% for item in sg.audit %}<tr><td>{{ item.action }}</td><td>{{ item.target_type }} · {{ item.target_id }}</td><td>{{ item.result }}</td><td>{{ item.occurred_at }}</td></tr>{% endfor %}</tbody></table></div>
-      {% else %}<div class="secv2-compact-empty"><strong>Действий пока нет</strong><span>Ручные блокировки и изменения allowlist будут зафиксированы здесь.</span></div>{% endif %}
+      <div class="infosec-audit-list">
+        {% for item in sg.audit %}
+        <article class="infosec-audit-card">
+          <div><strong>{{ item.action_label }}</strong><span class="{{ 'ok' if item.result in ['success', 'ok'] else 'warning' }}">{{ item.result_label }}</span></div>
+          <p>{{ item.target_label }}{% if item.target_id %} · {{ item.target_id }}{% endif %}</p>
+          <time>{{ item.occurred_at_label }}</time>
+          <details class="infosec-technical"><summary>Технические данные</summary><dl>{% for key, value in item.technical.items() %}<div><dt>{{ key }}</dt><dd><code>{{ value }}</code></dd></div>{% endfor %}</dl></details>
+        </article>
+        {% endfor %}
+      </div>
+      {% else %}<div class="secv2-compact-empty sg-ljd-nested"><strong>Аудит пуст</strong><span>Действия администратора появятся после первой операции.</span></div>{% endif %}
     </section>
   </div>
-  {% endif %}
 </article>
