@@ -1,0 +1,90 @@
+name: SG InfoSec management focused
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feature/sg-infosec-security-ui-v2
+    paths:
+      - app/security/sg_infosec_bridge.py
+      - app/security/sg_infosec_management.py
+      - app/production.py
+      - app/web/templates/security.html
+      - app/web/templates/_sg_infosec_management.html
+      - app/web/static/sg-infosec-management-v1.css
+      - deploy/install-sg-infosec-management-bridge.sh
+      - deploy/systemd/sg-infosec-management-bridge.service
+      - deploy/systemd/sg-gateway.service
+      - deploy/tmpfiles/sg-infosec-management-bridge.conf
+      - tests/test_sg_infosec_management_bridge.py
+      - tests/test_sg_infosec_security_ui.py
+      - tests/test_sg_infosec_management_install_contract.py
+      - .github/workflows/sg-infosec-management-focused.yml
+  pull_request:
+    paths:
+      - app/security/sg_infosec_bridge.py
+      - app/security/sg_infosec_management.py
+      - app/production.py
+      - app/web/templates/security.html
+      - app/web/templates/_sg_infosec_management.html
+      - app/web/static/sg-infosec-management-v1.css
+      - deploy/install-sg-infosec-management-bridge.sh
+      - deploy/systemd/sg-infosec-management-bridge.service
+      - deploy/systemd/sg-gateway.service
+      - deploy/tmpfiles/sg-infosec-management-bridge.conf
+      - tests/test_sg_infosec_management_bridge.py
+      - tests/test_sg_infosec_security_ui.py
+      - tests/test_sg_infosec_management_install_contract.py
+      - .github/workflows/sg-infosec-management-focused.yml
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pytest
+
+      - name: Run focused tests
+        run: |
+          python -m pytest -q \
+            tests/test_sg_infosec_management_bridge.py \
+            tests/test_sg_infosec_security_ui.py \
+            tests/test_sg_infosec_management_install_contract.py
+
+      - name: Verify Python and shell syntax
+        run: |
+          python -m compileall -q \
+            app/security/sg_infosec_bridge.py \
+            app/security/sg_infosec_management.py \
+            app/production.py
+          bash -n deploy/install-sg-infosec-management-bridge.sh
+
+      - name: Verify systemd and Unix-only contracts
+        run: |
+          systemd-analyze verify \
+            deploy/systemd/sg-infosec-management-bridge.service \
+            deploy/systemd/sg-gateway.service
+          grep -Fq 'RestrictAddressFamilies=AF_UNIX' deploy/systemd/sg-infosec-management-bridge.service
+          ! grep -ERn '(^|[^0-9])(585|586|587)([^0-9]|$)' \
+            app/security/sg_infosec_bridge.py \
+            app/security/sg_infosec_management.py \
+            deploy/install-sg-infosec-management-bridge.sh \
+            deploy/systemd/sg-infosec-management-bridge.service
+
+      - name: Run complete pytest suite
+        run: python -m pytest -q
