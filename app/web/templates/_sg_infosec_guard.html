@@ -1,11 +1,27 @@
 {% set guard = sg_infosec_guard|default(none, true) %}
-{% if guard %}
-{% set guard_csrf = sg_infosec_guard_csrf_token|default('', true) %}
+{% if not guard %}
+  {% set guard = {
+    'mode': 'off',
+    'settings': {
+      'max_body_bytes': 65536,
+      'login_requests_per_minute': 20,
+      'api_requests_per_minute': 120,
+      'block_score': 80,
+      'notification_min_score': 70,
+      'notification_webhook': ''
+    },
+    'counters': {'inspected': 0, 'blocked': 0, 'rate_limited': 0},
+    'alerts': [],
+    'unread_count': 0,
+    'reputation_count': 0
+  } %}
+{% endif %}
+{% set guard_csrf = sg_infosec_guard_csrf_token|default(sg_infosec_csrf_token|default('', true), true) %}
 <article class="secv2-workflow sg-ljd-card-large infosec-card infosec-card--compact infosec-guard-card" id="sg-infosec-web-shield">
   <header class="secv2-card-head">
     <div>
       <div class="secv2-kicker">WEB SHIELD</div>
-      <h2>Защита панели и API</h2>
+      <h2>Веб-защита панели и API</h2>
       <p>Веб-атаки, частота запросов, локальная репутация и уведомления.</p>
     </div>
     <span class="secv2-pill {{ 'ok' if guard.mode == 'enforce' else 'warning' }}">
@@ -17,7 +33,7 @@
     <div><span>Режим</span><strong>{% if guard.mode == 'enforce' %}Блокировать{% elif guard.mode == 'monitor' %}Только наблюдать{% else %}Выключено{% endif %}</strong></div>
     <div><span>Непросмотренных событий</span><strong>{{ guard.unread_count }}</strong></div>
     <div><span>Записей репутации</span><strong>{{ guard.reputation_count }}</strong></div>
-    <div><span>Заблокировано</span><strong>{{ guard.counters.block|default(0) + guard.counters.rate_limit|default(0) }}</strong></div>
+    <div><span>Заблокировано</span><strong>{{ guard.counters.blocked|default(0) + guard.counters.rate_limited|default(0) }}</strong></div>
   </section>
 
   <div class="infosec-control-disclosures">
@@ -106,4 +122,3 @@
     {% endif %}
   </section>
 </article>
-{% endif %}
