@@ -1,0 +1,38 @@
+name: Temporary final release checksum cleanup
+
+on:
+  push:
+    branches:
+      - release/02206-final-publication
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout release branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Remove helper and refresh source checksums
+        run: |
+          git rm .github/workflows/temporary-final-release-checksums.yml
+          python3 - <<'PY'
+          import hashlib
+          import subprocess
+          from pathlib import Path
+
+          paths = sorted(subprocess.check_output(["git", "ls-files"], text=True).splitlines())
+          paths.remove("SOURCE-SHA256SUMS")
+          rows = [f"{hashlib.sha256(Path(name).read_bytes()).hexdigest()}  {name}" for name in paths]
+          Path("SOURCE-SHA256SUMS").write_text("\n".join(rows) + "\n", encoding="utf-8")
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add SOURCE-SHA256SUMS
+          git commit -m "chore: refresh final release checksums"
+          git push
