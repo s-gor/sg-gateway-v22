@@ -55,12 +55,7 @@ SG-Gateway устанавливается на **один самостоятел
 Для чистой Ubuntu:
 
 ```bash
-curl -4 -fsSL \
-  https://raw.githubusercontent.com/s-gor/sg-gateway-v22/2e96ea97992509f8ff2fdce8b8d23aa0dc5a1dff/deploy/install-from-github.sh \
-| sudo env \
-  SG_GATEWAY_GITHUB_BRANCH=stable-02206 \
-  SG_GATEWAY_SOURCE_COMMIT=2e96ea97992509f8ff2fdce8b8d23aa0dc5a1dff \
-  bash
+curl -4 -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/2e96ea97992509f8ff2fdce8b8d23aa0dc5a1dff/deploy/install-from-github.sh | sudo env SG_GATEWAY_GITHUB_BRANCH=stable-02206 SG_GATEWAY_SOURCE_COMMIT=2e96ea97992509f8ff2fdce8b8d23aa0dc5a1dff bash
 ```
 
 Если SG-Gateway уже установлен, Clean Install останавливается до изменений и предлагает отдельную команду Update.
