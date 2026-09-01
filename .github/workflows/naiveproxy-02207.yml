@@ -44,6 +44,7 @@ jobs:
           bash -n deploy/update-from-github-02207.sh
           bash -n deploy/install-naiveproxy.sh
           bash -n deploy/uninstall-naiveproxy.sh
+          bash -n deploy/full-uninstall-02207.sh
 
       - name: Guard frozen 22.06 artifacts
         run: |
