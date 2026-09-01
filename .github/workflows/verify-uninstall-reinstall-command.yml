@@ -32,6 +32,9 @@ jobs:
           path.write_text(body.replace(old, new), encoding="utf-8")
           PY
 
+      - name: Install focused test dependency
+        run: python3 -m pip install pytest
+
       - name: Verify focused contract
         run: python3 -m pytest -q tests/test_sg_gateway_v22_reinstall_after_full_uninstall.py
 
