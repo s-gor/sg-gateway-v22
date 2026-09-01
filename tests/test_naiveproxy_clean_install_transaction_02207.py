@@ -25,8 +25,9 @@ def test_naiveproxy_runtime_installer_restores_identity_and_service_state():
     assert "WAS_ENABLED" in source
     assert "userdel sg-naiveproxy" in source
     assert "groupdel sg-naiveproxy" in source
-    assert 'systemctl start "$SERVICE"' in source
-    assert 'systemctl disable "$SERVICE"' in source
+    assert 'restore_service_state "$SERVICE" "$WAS_ENABLED" "$WAS_ACTIVE"' in source
+    assert 'systemctl restart "$service"' in source
+    assert 'systemctl disable "$service"' in source
 
 
 def test_clean_install_injects_naiveproxy_before_installer_success_boundary():
