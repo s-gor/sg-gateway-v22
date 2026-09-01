@@ -28,6 +28,23 @@ class StaticResolver:
         }
 
 
+class CountingResolver(StaticResolver):
+    def __init__(self):
+        self.calls: list[str] = []
+
+    def resolve(self, ip: object, reputation: object = None):
+        self.calls.append(str(ip))
+        return super().resolve(ip, reputation)
+
+    def resolve_many(self, values):
+        result = {}
+        for ip, reputation in values:
+            key = str(ip)
+            if key not in result:
+                result[key] = self.resolve(key, reputation)
+        return result
+
+
 def test_ip_intelligence_combines_country_routing_data_reputation_and_cache(tmp_path: Path):
     calls: list[str] = []
 
@@ -95,6 +112,33 @@ def test_ip_intelligence_is_fail_open_and_skips_non_global_addresses(tmp_path: P
     assert len(calls) == 1
 
 
+def test_failed_lookup_uses_short_negative_cache(tmp_path: Path):
+    current = [datetime(2026, 9, 1, 10, 0, tzinfo=timezone.utc)]
+    calls: list[str] = []
+
+    def failed(url: str, timeout: float):
+        calls.append(url)
+        raise OSError("offline")
+
+    resolver = IPIntelligenceResolver(
+        cache_path=tmp_path / "cache.json",
+        country_lookup=lambda _ip: "de",
+        fetcher=failed,
+        now=lambda: current[0],
+        ttl=timedelta(days=7),
+        negative_ttl=timedelta(hours=1),
+    )
+
+    resolver.resolve("198.51.100.10")
+    current[0] += timedelta(minutes=30)
+    resolver.resolve("198.51.100.10")
+    assert len(calls) == 1
+
+    current[0] += timedelta(hours=2)
+    resolver.resolve("198.51.100.10")
+    assert len(calls) == 2
+
+
 def test_management_overview_humanizes_decisions_audit_and_time():
     raw = {
         "available": True,
@@ -154,6 +198,23 @@ def test_management_overview_humanizes_decisions_audit_and_time():
     assert result["audit"][0]["action_label"] == "Автоматически создана блокировка"
     assert result["audit"][0]["result_label"] == "Успешно"
     assert result["audit"][0]["occurred_at_label"] == "01.09.2026, 22:21"
+
+
+def test_presentation_does_not_repeat_lookup_for_same_ip():
+    resolver = CountingResolver()
+    raw = {
+        "available": True,
+        "active_decisions": [{"id": "one", "ip": "144.225.6.182", "scope": "ssh"}],
+        "history": [{"id": "one", "ip": "144.225.6.182", "scope": "ssh"}],
+        "allowlist": [],
+        "audit": [],
+    }
+
+    result = present_management_overview(raw, resolver=resolver)
+
+    assert result["active_decisions"][0]["ip_intel"]["asn"] == 7488
+    assert result["history"][0]["ip_intel"]["asn"] == 7488
+    assert resolver.calls == ["144.225.6.182"]
 
 
 def test_guard_overview_humanizes_actions_rules_and_network():
