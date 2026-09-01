@@ -713,13 +713,7 @@ SG-Gateway не является уменьшенной копией всей SG
 
 ## Установка
 
-Используйте чистую Ubuntu EC2/VPS:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/main/deploy/install-from-github.sh | sudo env SG_GATEWAY_GITHUB_BRANCH=main bash
-```
-
-После установки панель доступна по адресу, показанному установщиком. Начальная настройка может выполняться по HTTP и IP; домен и HTTPS добавляются позднее из раздела `Security`.
+Используйте единственную актуальную команду **Clean Install** в разделе [«Быстрые команды»](#быстрые-команды) выше.
 
 ## Первые шаги
 
@@ -731,33 +725,9 @@ curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/main/deploy/in
 6. При необходимости настройте `WARP`, `Routing` и `GeoFiles`.
 7. Подключите домен и HTTPS.
 
-## Обновление
+## Обновление и полное удаление
 
-Для уже установленного SG-Gateway используется **отдельная команда Update**:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/main/deploy/update-from-github.sh | sudo env SG_GATEWAY_GITHUB_BRANCH=main bash
-```
-
-Clean Install для обновления существующего сервера больше не используется.
-
-Update не запускает полный `install.sh`, не выполняет повторную установку системных пакетов и не переустанавливает Nginx, Certbot, Xray, AmneziaWG, Mihomo, sing-box или WARP helper.
-
-Перед изменениями создаётся safety backup, включая полный `/etc/letsencrypt`. После переключения кода SG-Gateway проверяет Clients/credentials, HTTPS, Nginx и состояние runtime-служб. Если финальная проверка не проходит, выполняется автоматический rollback.
-
-## Полное удаление
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/main/deploy/full-uninstall-ubuntu.sh | sudo env SG_GATEWAY_GITHUB_BRANCH=main bash
-```
-
-Подтверждение:
-
-```text
-DELETE SG-GATEWAY
-```
-
-Удаляются приложение, данные и управляемые SG-Gateway службы и конфигурации. Общие пакеты Ubuntu намеренно сохраняются.
+Актуальные команды **Update** и **Full Uninstall** находятся в разделе [«Быстрые команды»](#быстрые-команды) выше. Не используйте Clean Install для обновления уже установленного сервера.
 
 ## Документация
 
