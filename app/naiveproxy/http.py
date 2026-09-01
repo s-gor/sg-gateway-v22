@@ -152,7 +152,12 @@ def register_naiveproxy_http(app) -> None:
 
     if "naiveproxy_settings" not in app.view_functions:
         def settings_update():
-            payload = request.get_json(silent=True) or request.form
+            payload = request.get_json(silent=True)
+            if not isinstance(payload, dict):
+                return jsonify({
+                    "ok": False,
+                    "message": "NaiveProxy settings require an application/json request",
+                }), 415
             tls = tls_overview()
             domain = str(tls.get("domain") or "").strip()
             if not tls.get("https_ready") or not domain:
