@@ -107,6 +107,25 @@ def test_readable_layout_removes_mandatory_horizontal_tables():
     assert "overflow-x:auto" not in compact
 
 
+def test_built_in_manual_explains_ip_ownership_privacy_and_effect():
+    template = Path("app/web/templates/sg_infosec_help_v2.html").read_text(
+        encoding="utf-8"
+    )
+    runtime = Path(
+        "app/security/sg_infosec_presentation_runtime.py"
+    ).read_text(encoding="utf-8")
+    for contract in (
+        "Кому принадлежит адрес",
+        "Это сведения о сети, а не установление личности",
+        "RIPEstat",
+        "не создают блокировку",
+        "SG_INFOSEC_IP_INTEL_ENABLED=0",
+    ):
+        assert contract in template
+    assert "sg_infosec_help_v2.html" in runtime
+    assert "security_infosec_help" in runtime
+
+
 def test_ip_intelligence_cache_is_persistent_in_service_and_update_contracts():
     unit = Path("deploy/systemd/sg-gateway.service").read_text(encoding="utf-8")
     migration = Path("app/security/sg_infosec_unit_migration.py").read_text(
