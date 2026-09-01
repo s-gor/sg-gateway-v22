@@ -1,0 +1,62 @@
+name: Verify pinned reinstall command fix
+
+on:
+  push:
+    branches: [verify/uninstall-reinstall-command-pinned]
+
+jobs:
+  panel:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ff21373cf8b625ba8972c3d05f67a545e95a46f0
+
+      - name: Verify source integrity
+        run: |
+          python3 -B - <<'PY'
+          import hashlib
+          import re
+          import subprocess
+          from pathlib import Path
+          rows = Path("SOURCE-SHA256SUMS").read_text(encoding="utf-8").splitlines()
+          expected = {}
+          for line_no, raw in enumerate(rows, 1):
+              if not raw.strip():
+                  continue
+              match = re.fullmatch(r"([0-9a-f]{64})  (.+)", raw)
+              if match is None:
+                  raise SystemExit(f"invalid SOURCE-SHA256SUMS line {line_no}: {raw!r}")
+              digest, path = match.groups()
+              expected[path] = digest
+          tracked = set(subprocess.check_output(["git", "ls-files"], text=True, encoding="utf-8").splitlines())
+          tracked.discard("SOURCE-SHA256SUMS")
+          assert tracked == set(expected), (sorted(tracked-set(expected)), sorted(set(expected)-tracked))
+          for path in sorted(tracked):
+              actual = hashlib.sha256(Path(path).read_bytes()).hexdigest()
+              assert actual == expected[path], f"source hash mismatch: {path}"
+          print(f"source integrity ok: {len(tracked)} files")
+          PY
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+
+      - name: Check syntax
+        run: python -B -c "from pathlib import Path; files=list(Path('app').rglob('*.py'))+list(Path('engines').rglob('*.py'))+list(Path('tests').rglob('*.py')); [compile(p.read_text(encoding='utf-8'), str(p), 'exec') for p in files]; print(f'syntax ok: {len(files)} files')"
+
+      - name: Run all tests
+        run: python -m pytest tests
+
+      - name: Build and verify FULL package
+        run: |
+          VERSION="$(tr -d '[:space:]' < VERSION)"
+          OUT="/tmp/SG-Gateway-${VERSION}-FULL.run"
+          bash build-run.sh "$OUT"
+          bash "$OUT" --verify-only
