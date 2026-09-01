@@ -1,0 +1,71 @@
+name: Fix README 022.06 forum page
+
+on:
+  push:
+    branches: [fix/readme-02206-forum]
+    paths:
+      - .github/workflows/fix-readme-02206-forum.yml
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/readme-02206-forum
+          fetch-depth: 0
+
+      - name: Correct public README and publication text
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          readme = Path("README.md")
+          text = readme.read_text(encoding="utf-8")
+          old = "curl -4 -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/stable-02206/deploy/install-from-github.sh | sudo env SG_GATEWAY_GITHUB_BRANCH=stable-02206 bash"
+          new = """curl -4 -fsSL \\
+            https://raw.githubusercontent.com/s-gor/sg-gateway-v22/2e96ea97992509f8ff2fdce8b8d23aa0dc5a1dff/deploy/install-from-github.sh \\
+          | sudo env \\
+            SG_GATEWAY_GITHUB_BRANCH=stable-02206 \\
+            SG_GATEWAY_SOURCE_COMMIT=2e96ea97992509f8ff2fdce8b8d23aa0dc5a1dff \\
+            bash"""
+          if text.count(old) != 1:
+              raise SystemExit(f"unexpected README clean-install command count: {text.count(old)}")
+          readme.write_text(text.replace(old, new), encoding="utf-8")
+
+          publication = Path("PUBLICATION-02206.md")
+          text = publication.read_text(encoding="utf-8")
+          old = "Статус: **FINAL / STABLE**. Основная ветка: `main`. Ветка выпуска: `stable-02206`. Финальный тег: `v0.1.0-022.06-final`."
+          new = "Статус: **FINAL / STABLE**. Основная ветка: `main`. Стабильный канал: `stable-02206`."
+          if text.count(old) != 1:
+              raise SystemExit(f"unexpected publication status count: {text.count(old)}")
+          publication.write_text(text.replace(old, new), encoding="utf-8")
+          PY
+
+      - name: Remove helper and refresh source checksums
+        run: |
+          git rm .github/workflows/fix-readme-02206-forum.yml
+          python3 - <<'PY'
+          import hashlib
+          import subprocess
+          from pathlib import Path
+
+          files = subprocess.check_output(["git", "ls-files"], text=True, encoding="utf-8").splitlines()
+          files = [p for p in files if p != "SOURCE-SHA256SUMS"]
+          lines = []
+          for path in sorted(files):
+              digest = hashlib.sha256(Path(path).read_bytes()).hexdigest()
+              lines.append(f"{digest}  {path}")
+          Path("SOURCE-SHA256SUMS").write_text("\n".join(lines) + "\n", encoding="utf-8")
+          PY
+
+      - name: Commit correction
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add README.md PUBLICATION-02206.md SOURCE-SHA256SUMS
+          git commit -m "docs: correct 022.06 forum page"
+          git push origin HEAD:fix/readme-02206-forum
