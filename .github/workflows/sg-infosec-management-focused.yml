@@ -94,6 +94,7 @@ jobs:
             deploy/systemd/sg-infosec-management-bridge.service \
             deploy/systemd/sg-gateway.service
           grep -Fq 'RestrictAddressFamilies=AF_UNIX' deploy/systemd/sg-infosec-management-bridge.service
+          grep -Fq 'systemctl restart "$INFOSEC_SERVICE"' deploy/update-from-github-core.sh
           ! grep -ERn '(^|[^0-9])(585|586|587)([^0-9]|$)' \
             app/security/sg_infosec_bridge.py \
             app/security/sg_infosec_management.py \
