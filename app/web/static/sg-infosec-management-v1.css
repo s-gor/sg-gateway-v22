@@ -1,0 +1,554 @@
+@import url("sg-infosec-guard-v1.css");
+
+.infosec-card {
+  display: grid;
+  gap: 18px;
+}
+
+.infosec-card-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.infosec-guide-link {
+  text-decoration: none;
+}
+
+.infosec-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.infosec-summary > div {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+}
+
+.infosec-summary span {
+  color: var(--muted);
+  font-size: .74rem;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.infosec-summary strong {
+  font-size: 1rem;
+}
+
+.infosec-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(280px, .85fr);
+  align-items: start;
+  gap: 14px;
+}
+
+.infosec-section {
+  min-width: 0;
+  padding: 16px;
+}
+
+.infosec-section > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.infosec-section h3 {
+  margin: 3px 0 0;
+  font-size: 1.05rem;
+}
+
+.infosec-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid rgba(75, 219, 166, .28);
+  border-radius: 999px;
+  background: rgba(75, 219, 166, .08);
+  font-weight: 700;
+}
+
+.infosec-table-wrap {
+  max-width: 100%;
+  overflow: auto;
+}
+
+.infosec-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: .82rem;
+}
+
+.infosec-table th,
+.infosec-table td {
+  padding: 10px 9px;
+  border-bottom: 1px solid rgba(148, 163, 184, .13);
+  text-align: left;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.infosec-table th {
+  color: var(--muted);
+  font-size: .7rem;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+.infosec-table code {
+  font-size: .79rem;
+}
+
+.infosec-action-cell {
+  text-align: right !important;
+}
+
+.button.compact {
+  min-height: 30px;
+  padding: 5px 10px;
+  font-size: .75rem;
+}
+
+.infosec-form {
+  display: grid;
+  gap: 12px;
+}
+
+.infosec-form label {
+  display: grid;
+  gap: 6px;
+}
+
+.infosec-form label > span {
+  color: var(--muted);
+  font-size: .76rem;
+}
+
+.infosec-form input,
+.infosec-form select {
+  width: 100%;
+  min-height: 40px;
+}
+
+.infosec-form-row {
+  display: grid;
+  grid-template-columns: 1fr 120px;
+  gap: 10px;
+}
+
+.infosec-allowlist {
+  display: grid;
+  gap: 14px;
+}
+
+.infosec-allowlist-form {
+  grid-template-columns:
+    minmax(180px, 1fr)
+    minmax(150px, .75fr)
+    minmax(220px, 1.2fr)
+    minmax(185px, .9fr)
+    auto;
+  align-items: end;
+}
+
+.infosec-allowlist-form button {
+  min-height: 40px;
+}
+
+.infosec-history-grid {
+  grid-template-columns: 1fr 1fr;
+}
+
+.infosec-unavailable {
+  display: grid;
+  gap: 5px;
+}
+
+.infosec-unavailable small {
+  color: var(--muted);
+}
+
+/* Compact desktop layout for both SG InfoSec cards. */
+.infosec-card--compact {
+  --infosec-section-gap:12px;
+  --infosec-control-height:38px;
+  gap: var(--infosec-section-gap);
+  padding: 16px 18px;
+}
+
+.infosec-card--compact > .secv2-card-head {
+  align-items: center;
+  gap: 12px;
+}
+
+.infosec-card--compact > .secv2-card-head h2 {
+  margin-top: 3px;
+  font-size: 18px;
+}
+
+.infosec-card--compact > .secv2-card-head p {
+  margin-top: 3px;
+  line-height: 1.35;
+}
+
+.infosec-card--compact .infosec-summary,
+.infosec-card--compact .infosec-guard-summary {
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--sg-line-soft);
+  border-radius: 10px;
+  background: var(--sg-line-soft);
+}
+
+.infosec-card--compact .infosec-summary > div,
+.infosec-card--compact .infosec-guard-summary > div {
+  min-height: 54px;
+  gap: 3px;
+  align-content: center;
+  background: var(--sg-panel-deep);
+  padding: 8px 12px;
+}
+
+.infosec-card--compact .infosec-summary span,
+.infosec-card--compact .infosec-guard-summary span {
+  font-size: .67rem;
+}
+
+.infosec-card--compact .infosec-summary strong,
+.infosec-card--compact .infosec-guard-summary strong {
+  font-size: .94rem;
+}
+
+.infosec-card--compact .infosec-grid,
+.infosec-card--compact .infosec-guard-grid {
+  gap: var(--infosec-section-gap);
+}
+
+.infosec-card--compact .infosec-section {
+  padding: 12px 14px;
+}
+
+.infosec-card--compact .infosec-section > header {
+  gap: 10px;
+  margin-bottom: 9px;
+}
+
+.infosec-card--compact .infosec-section h3 {
+  margin-top: 2px;
+  font-size: 1rem;
+}
+
+.infosec-card--compact .infosec-count {
+  min-width: 31px;
+  height: 26px;
+  padding: 0 8px;
+  font-size: .82rem;
+}
+
+.infosec-card--compact .secv2-compact-empty {
+  min-height:0;
+  gap: 4px;
+  padding: 16px 14px;
+}
+
+.infosec-card--compact .secv2-compact-empty strong {
+  font-size: 11px;
+}
+
+.infosec-card--compact .secv2-compact-empty span {
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.infosec-card--compact .infosec-form {
+  gap: 9px;
+}
+
+.infosec-card--compact .infosec-form label {
+  gap: 4px;
+}
+
+.infosec-card--compact .infosec-form input,
+.infosec-card--compact .infosec-form select,
+.infosec-card--compact .infosec-allowlist-form button {
+  min-height: var(--infosec-control-height);
+}
+
+.infosec-card--compact .infosec-form-row,
+.infosec-card--compact .infosec-guard-fields {
+  gap: 8px;
+}
+
+.infosec-card--compact .infosec-table th,
+.infosec-card--compact .infosec-table td {
+  padding: 8px 7px;
+}
+
+.infosec-card--compact .infosec-allowlist {
+  gap: 10px;
+}
+
+.infosec-card--compact .infosec-guard-note {
+  margin-bottom: 8px;
+  font-size: .75rem;
+  line-height: 1.4;
+}
+
+.infosec-card--compact .infosec-form textarea {
+  min-height: 132px;
+}
+
+/* Built-in instruction page. */
+.infosec-help-page {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.infosec-help-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.infosec-help-heading h1 {
+  margin: 5px 0 0;
+}
+
+.infosec-help-heading p {
+  max-width: 860px;
+  margin: 6px 0 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.infosec-help-layout {
+  display: grid;
+  grid-template-columns: minmax(210px, 260px) minmax(0, 1fr);
+  align-items: start;
+  gap: 14px;
+}
+
+.infosec-help-nav {
+  position: sticky;
+  top: 14px;
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--sg-line);
+  border-radius: 13px;
+  background: var(--sg-panel);
+  padding: 12px;
+}
+
+.infosec-help-nav strong {
+  margin-bottom: 5px;
+  color: var(--sg-text);
+  font-size: .78rem;
+}
+
+.infosec-help-nav a {
+  border-radius: 8px;
+  color: var(--muted);
+  padding: 7px 9px;
+  font-size: .76rem;
+  line-height: 1.25;
+  text-decoration: none;
+}
+
+.infosec-help-nav a:hover,
+.infosec-help-nav a:focus-visible {
+  background: var(--sg-panel-deep);
+  color: var(--sg-text);
+}
+
+.infosec-help-content {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.infosec-help-section {
+  scroll-margin-top: 14px;
+  border: 1px solid var(--sg-line);
+  border-radius: 13px;
+  background: var(--sg-panel);
+  padding: 16px 18px;
+}
+
+.infosec-help-section h2 {
+  margin: 0 0 9px;
+  font-size: 1.06rem;
+}
+
+.infosec-help-section h3 {
+  margin: 15px 0 6px;
+  font-size: .92rem;
+}
+
+.infosec-help-section p,
+.infosec-help-section li {
+  color: var(--muted);
+  font-size: .82rem;
+  line-height: 1.55;
+}
+
+.infosec-help-section p {
+  margin: 0 0 9px;
+}
+
+.infosec-help-section ul,
+.infosec-help-section ol {
+  display: grid;
+  gap: 5px;
+  margin: 8px 0 10px;
+  padding-left: 20px;
+}
+
+.infosec-help-section code {
+  color: var(--sg-text);
+}
+
+.infosec-help-section pre {
+  overflow: auto;
+  margin: 9px 0;
+  border: 1px solid var(--sg-line-soft);
+  border-radius: 9px;
+  background: var(--sg-panel-deep);
+  padding: 11px 12px;
+  color: var(--sg-text);
+  font: 500 .75rem/1.5 ui-monospace, SFMono-Regular, Consolas, monospace;
+  white-space: pre-wrap;
+}
+
+.infosec-help-callout {
+  display: grid;
+  gap: 4px;
+  margin: 10px 0;
+  border-left: 3px solid var(--sg-blue);
+  border-radius: 7px;
+  background: var(--sg-panel-deep);
+  padding: 9px 11px;
+}
+
+.infosec-help-callout.warning {
+  border-left-color: var(--sg-yellow);
+}
+
+.infosec-help-callout.danger {
+  border-left-color: #f0848d;
+}
+
+.infosec-help-callout strong {
+  color: var(--sg-text);
+  font-size: .8rem;
+}
+
+.infosec-help-callout span {
+  color: var(--muted);
+  font-size: .76rem;
+  line-height: 1.45;
+}
+
+.infosec-help-table {
+  width: 100%;
+  margin: 9px 0;
+  border-collapse: collapse;
+  font-size: .77rem;
+}
+
+.infosec-help-table th,
+.infosec-help-table td {
+  border-bottom: 1px solid var(--sg-line-soft);
+  padding: 8px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.infosec-help-table th {
+  color: var(--sg-text);
+}
+
+.infosec-help-table td {
+  color: var(--muted);
+}
+
+@media (max-width: 1100px) {
+  .infosec-summary,
+  .infosec-guard-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .infosec-grid,
+  .infosec-history-grid,
+  .infosec-guard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .infosec-allowlist-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .infosec-allowlist-form button {
+    width: max-content;
+  }
+}
+
+@media (max-width: 860px) {
+  .infosec-help-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .infosec-help-nav {
+    position: static;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .infosec-help-nav strong {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 680px) {
+  .infosec-summary,
+  .infosec-guard-summary,
+  .infosec-allowlist-form,
+  .infosec-form-row,
+  .infosec-guard-fields,
+  .infosec-help-nav {
+    grid-template-columns: 1fr;
+  }
+
+  .infosec-card--compact {
+    padding: 14px;
+  }
+
+  .infosec-card--compact > .secv2-card-head,
+  .infosec-help-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .infosec-card-actions {
+    justify-content: flex-start;
+  }
+
+  .infosec-table th,
+  .infosec-table td {
+    padding: 8px 6px;
+  }
+
+  .infosec-help-section {
+    padding: 14px;
+  }
+}

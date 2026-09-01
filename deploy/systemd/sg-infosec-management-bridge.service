@@ -1,0 +1,38 @@
+[Unit]
+Description=SG-InfoSec management bridge for SG-Gateway
+Documentation=https://github.com/s-gor/sg-gateway-v22
+After=sg-infosec.service
+Wants=sg-infosec.service
+Before=sg-gateway.service
+PartOf=sg-gateway.service
+ConditionPathExists=/run/sg-infosec/control.sock
+
+[Service]
+Type=simple
+User=sg-infosec-bridge
+Group=sg-infosec-bridge
+SupplementaryGroups=sg-infosec sg-gateway
+WorkingDirectory=/opt/sg-gateway
+ExecStart=/opt/sg-gateway/.venv/bin/python -B -m app.security.sg_infosec_bridge --socket /run/sg-infosec-bridge/management.sock --upstream-socket /run/sg-infosec/control.sock --allowed-user sg-gateway --socket-group sg-gateway --max-duration-hours 168
+Restart=on-failure
+RestartSec=2
+TimeoutStartSec=10
+TimeoutStopSec=10
+UMask=0007
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectHome=true
+ProtectSystem=strict
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_UNIX
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+ReadOnlyPaths=/opt/sg-gateway /etc/sg-infosec
+ReadWritePaths=/run/sg-infosec-bridge
+
+[Install]
+WantedBy=multi-user.target

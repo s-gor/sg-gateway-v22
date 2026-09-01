@@ -1,0 +1,141 @@
+name: SG InfoSec complete security gate
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feature/sg-infosec-security-ui-v2
+      - feature/sg-infosec-complete-ui
+    paths:
+      - app/security/sg_infosec.py
+      - app/security/sg_infosec_bridge.py
+      - app/security/sg_infosec_management.py
+      - app/security/sg_infosec_guard.py
+      - app/security/sg_infosec_guard_runtime.py
+      - app/security/sg_infosec_guard_management.py
+      - app/security/sg_infosec_unit_migration.py
+      - app/production.py
+      - app/web/templates/security.html
+      - app/web/templates/_sg_infosec_management.html
+      - app/web/templates/_sg_infosec_management_base.html
+      - app/web/templates/_sg_infosec_guard.html
+      - app/web/templates/sg_infosec_help.html
+      - app/web/static/sg-infosec-management-v1.css
+      - app/web/static/sg-infosec-guard-v1.css
+      - docs/SG-INFOSEC-GUIDE-RU.md
+      - deploy/install-sg-infosec-management-bridge.sh
+      - deploy/update-from-github-core.sh
+      - deploy/update-infosec-complete-from-github.sh
+      - deploy/systemd/sg-infosec-management-bridge.service
+      - deploy/systemd/sg-gateway.service
+      - deploy/tmpfiles/sg-infosec-management-bridge.conf
+      - tests/test_sg_infosec_*.py
+      - .github/workflows/sg-infosec-management-focused.yml
+  pull_request:
+    paths:
+      - app/security/sg_infosec.py
+      - app/security/sg_infosec_bridge.py
+      - app/security/sg_infosec_management.py
+      - app/security/sg_infosec_guard.py
+      - app/security/sg_infosec_guard_runtime.py
+      - app/security/sg_infosec_guard_management.py
+      - app/security/sg_infosec_unit_migration.py
+      - app/production.py
+      - app/web/templates/security.html
+      - app/web/templates/_sg_infosec_management.html
+      - app/web/templates/_sg_infosec_management_base.html
+      - app/web/templates/_sg_infosec_guard.html
+      - app/web/templates/sg_infosec_help.html
+      - app/web/static/sg-infosec-management-v1.css
+      - app/web/static/sg-infosec-guard-v1.css
+      - docs/SG-INFOSEC-GUIDE-RU.md
+      - deploy/install-sg-infosec-management-bridge.sh
+      - deploy/update-from-github-core.sh
+      - deploy/update-infosec-complete-from-github.sh
+      - deploy/systemd/sg-infosec-management-bridge.service
+      - deploy/systemd/sg-gateway.service
+      - deploy/tmpfiles/sg-infosec-management-bridge.conf
+      - tests/test_sg_infosec_*.py
+      - .github/workflows/sg-infosec-management-focused.yml
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pytest
+
+      - name: Run focused SG InfoSec tests
+        run: |
+          python -m pytest -q \
+            tests/test_sg_infosec_adapter.py \
+            tests/test_sg_infosec_security_event.py \
+            tests/test_sg_infosec_guard.py \
+            tests/test_sg_infosec_guard_integration.py \
+            tests/test_sg_infosec_guard_flask.py \
+            tests/test_sg_infosec_guard_hardening.py \
+            tests/test_sg_infosec_guard_management.py \
+            tests/test_sg_infosec_management_bridge.py \
+            tests/test_sg_infosec_security_ui.py \
+            tests/test_sg_infosec_management_install_contract.py \
+            tests/test_sg_infosec_management_update_contract.py \
+            tests/test_sg_infosec_unit_migration.py
+
+      - name: Verify Python and shell syntax
+        run: |
+          python -m compileall -q \
+            app/security/sg_infosec.py \
+            app/security/sg_infosec_bridge.py \
+            app/security/sg_infosec_management.py \
+            app/security/sg_infosec_guard.py \
+            app/security/sg_infosec_guard_runtime.py \
+            app/security/sg_infosec_guard_management.py \
+            app/security/sg_infosec_unit_migration.py \
+            app/production.py
+          bash -n deploy/install-sg-infosec-management-bridge.sh
+          bash -n deploy/update-from-github-core.sh
+          bash -n deploy/update-infosec-complete-from-github.sh
+
+      - name: Prepare unit verification paths
+        run: |
+          sudo install -d -m 0755 /opt/sg-gateway/.venv/bin /opt/sg-gateway/deploy /etc/sg-gateway
+          sudo ln -s "$(command -v python)" /opt/sg-gateway/.venv/bin/python
+          sudo ln -s /bin/true /opt/sg-gateway/.venv/bin/waitress-serve
+          sudo install -m 0755 deploy/install-sg-infosec-management-bridge.sh /opt/sg-gateway/deploy/install-sg-infosec-management-bridge.sh
+          sudo install -m 0644 /dev/null /etc/sg-gateway/sg-gateway.env
+
+      - name: Verify systemd and isolation contracts
+        run: |
+          systemd-analyze verify \
+            deploy/systemd/sg-infosec-management-bridge.service \
+            deploy/systemd/sg-gateway.service
+          grep -Fq 'RestrictAddressFamilies=AF_UNIX' deploy/systemd/sg-infosec-management-bridge.service
+          grep -Fq 'SG_INFOSEC_GUARD_SETTINGS=/var/lib/sg-gateway/infosec/guard.json' deploy/systemd/sg-gateway.service
+          grep -Fq 'systemctl restart "$INFOSEC_SERVICE"' deploy/update-from-github-core.sh
+          grep -Fq 'SG InfoSec control socket is unavailable' deploy/update-infosec-complete-from-github.sh
+          grep -Fq '# SG InfoSec: полное руководство' docs/SG-INFOSEC-GUIDE-RU.md
+          ! grep -ERn '(^|[^0-9])(585|586|587)([^0-9]|$)' \
+            app/security/sg_infosec_bridge.py \
+            app/security/sg_infosec_management.py \
+            app/security/sg_infosec_guard.py \
+            app/security/sg_infosec_guard_runtime.py \
+            deploy/install-sg-infosec-management-bridge.sh \
+            deploy/systemd/sg-infosec-management-bridge.service
+
+      - name: Run complete pytest suite
+        run: python -m pytest -q

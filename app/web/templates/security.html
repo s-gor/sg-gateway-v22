@@ -3,6 +3,7 @@
 {% block head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='sg-security-v2.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='sg-security-password-fix1.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='sg-infosec-management-v1.css') }}">
 {% endblock %}
 
 {% block content %}
@@ -67,6 +68,8 @@
       </small>
     </article>
   </section>
+
+  {% include "_sg_infosec_management.html" %}
 
   <article class="secv2-workflow sg-ljd-card-large">
     <header class="secv2-card-head">

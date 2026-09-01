@@ -1,0 +1,4 @@
+{% set sg_infosec = sg_infosec|default(none, true) %}
+{# The management base owns action="/security/infosec/block" and the other mutation forms. #}
+{% include "_sg_infosec_management_base.html" %}
+{% include "_sg_infosec_guard.html" %}

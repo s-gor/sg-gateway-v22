@@ -1,0 +1,264 @@
+{% extends "base.html" %}
+{% block title %}SG-Gateway · SG InfoSec{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='sg-security-v2.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='sg-infosec-management-v1.css') }}">
+{% endblock %}
+
+{% block content %}
+<section class="infosec-help-page">
+  <header class="infosec-help-heading">
+    <div>
+      <div class="secv2-kicker">SG-INFOSEC / РУКОВОДСТВО</div>
+      <h1>Полная инструкция</h1>
+      <p>Назначение защиты, автоматические сценарии, ручные действия, веб-фильтр, репутация, уведомления, диагностика и безопасное восстановление.</p>
+    </div>
+    <a class="button" href="/security#sg-infosec">Вернуться к защите</a>
+  </header>
+
+  <div class="infosec-help-layout">
+    <nav class="infosec-help-nav" aria-label="Разделы инструкции">
+      <strong>Содержание</strong>
+      <a href="#purpose">Что защищает</a>
+      <a href="#automatic">Автоматическая защита</a>
+      <a href="#status">Статусы и счётчики</a>
+      <a href="#manual">Ручная блокировка</a>
+      <a href="#allowlist">Allowlist</a>
+      <a href="#web-shield">Веб-защита</a>
+      <a href="#reputation">Репутация IP</a>
+      <a href="#notifications">Уведомления</a>
+      <a href="#history">История и аудит</a>
+      <a href="#backup">Копии и откат</a>
+      <a href="#diagnostics">Диагностика</a>
+      <a href="#limits">Ограничения</a>
+    </nav>
+
+    <main class="infosec-help-content">
+      <section class="infosec-help-section" id="purpose">
+        <h2>Что защищает SG InfoSec</h2>
+        <p>SG InfoSec — локальный модуль защиты административной части сервера. Он не имеет публичного сетевого API и взаимодействует с SG-Gateway через Unix-сокеты.</p>
+        <ul>
+          <li><strong>SSH:</strong> обнаруживает перебор паролей, медленный brute force и перебор имён пользователей; подтверждённые адреса блокируются через nftables только на TCP/22.</li>
+          <li><strong>Вход в панель:</strong> учитывает ошибки авторизации и применяет решения к области <code>admin-login</code>.</li>
+          <li><strong>API панели:</strong> учитывает ошибки авторизации, сканирование служебных маршрутов и решения области <code>admin-api</code>.</li>
+          <li><strong>HTTP-запросы:</strong> фильтрует высокоуверенные признаки SQL injection, XSS, path traversal, command injection, опасные методы и известные пути сканеров.</li>
+          <li><strong>Корреляция:</strong> объединяет события одного IP из SSH, Nginx и SG-Gateway.</li>
+        </ul>
+        <div class="infosec-help-callout">
+          <strong>Изоляция VPN</strong>
+          <span>Правила SG InfoSec не должны затрагивать AWG, подписки и VPN-порты 585–587. SSH-решения ограничены TCP/22, а вход и API блокируются приложением.</span>
+        </div>
+      </section>
+
+      <section class="infosec-help-section" id="automatic">
+        <h2>Автоматическая защита</h2>
+        <p>Сервис читает только новые записи журналов <code>ssh.service</code>, <code>sshd.service</code>, <code>nginx.service</code> и <code>sg-gateway.service</code>. Старые события после перезапуска не воспроизводятся.</p>
+        <table class="infosec-help-table">
+          <thead><tr><th>Сценарий</th><th>Порог по умолчанию</th><th>Реакция</th></tr></thead>
+          <tbody>
+            <tr><td>Быстрый SSH brute force</td><td>5 ошибок за 10 минут</td><td>Блокировка SSH</td></tr>
+            <tr><td>Медленный SSH brute force</td><td>12 ошибок за 60 минут</td><td>Блокировка SSH</td></tr>
+            <tr><td>Перебор пользователей SSH</td><td>6 разных имён за 15 минут</td><td>Блокировка SSH</td></tr>
+            <tr><td>Сканирование административных путей</td><td>6 запросов за 5 минут</td><td>Решение для API панели</td></tr>
+            <tr><td>Ошибки входа в панель</td><td>5 ошибок за 10 минут</td><td>Решение для входа</td></tr>
+            <tr><td>Ошибки авторизации API</td><td>10 ошибок за 10 минут</td><td>Решение для API</td></tr>
+            <tr><td>Атака на несколько сервисов</td><td>Взвешенный риск от двух сервисов</td><td>Только подтверждённые области</td></tr>
+          </tbody>
+        </table>
+        <p>Повторные нарушения увеличивают длительность решения в четыре раза, но не более 24 часов. Долгая спокойная работа сбрасывает эскалацию.</p>
+        <p>Для счёта уникальных пользователей хранятся хеши, а не реальные имена. Пароли, токены, cookies, тела запросов и query-параметры в решения не записываются.</p>
+      </section>
+
+      <section class="infosec-help-section" id="status">
+        <h2>Статусы и счётчики</h2>
+        <h3>Защита входа и SSH</h3>
+        <ul>
+          <li><strong>Состояние:</strong> доступен ли локальный management bridge и отвечает ли SG InfoSec.</li>
+          <li><strong>Активных блокировок:</strong> решения, срок которых ещё не истёк и которые не были отозваны.</li>
+          <li><strong>Allowlist:</strong> число действующих исключений.</li>
+          <li><strong>Последняя синхронизация:</strong> время последнего успешного чтения данных панелью, а не время последней атаки.</li>
+        </ul>
+        <h3>Web Shield</h3>
+        <ul>
+          <li><strong>Проверено запросов:</strong> запросы, прошедшие через guard текущего процесса панели.</li>
+          <li><strong>Заблокировано:</strong> сумма WAF-блокировок и ограничений частоты.</li>
+          <li><strong>Новых событий:</strong> записи журнала, ещё не отмеченные как просмотренные.</li>
+          <li><strong>Репутационных сетей:</strong> действующие CIDR-записи локального файла репутации.</li>
+        </ul>
+      </section>
+
+      <section class="infosec-help-section" id="manual">
+        <h2>Ручная блокировка</h2>
+        <ol>
+          <li>Введите один IPv4- или IPv6-адрес. CIDR в этом поле не принимается.</li>
+          <li>Выберите область: вход в панель, API панели или SSH.</li>
+          <li>Задайте срок от 1 до 168 часов.</li>
+          <li>Укажите понятную причину длиной от 3 до 240 символов.</li>
+          <li>Нажмите «Заблокировать» и убедитесь, что решение появилось в активном списке.</li>
+        </ol>
+        <p>Область определяет действие: <code>ssh</code> применяется через nftables на TCP/22, а <code>admin-login</code> и <code>admin-api</code> проверяются middleware панели.</p>
+        <div class="infosec-help-callout warning">
+          <strong>Не блокируйте собственный адрес без резервного доступа</strong>
+          <span>Перед экспериментом добавьте доверенный адрес администратора в allowlist или убедитесь, что у вас есть консольный доступ к серверу.</span>
+        </div>
+        <p>Для снятия решения найдите его в таблице «Блокировки» и нажмите «Разблокировать». Операция фиксируется в аудите.</p>
+      </section>
+
+      <section class="infosec-help-section" id="allowlist">
+        <h2>Allowlist</h2>
+        <p>Allowlist запрещает автоматическое создание решения для указанного IP или CIDR. Используйте его только для действительно доверенных административных сетей.</p>
+        <ul>
+          <li><strong>IP или CIDR:</strong> например <code>198.51.100.24</code> или <code>198.51.100.0/24</code>.</li>
+          <li><strong>Область:</strong> одна конкретная область либо все области.</li>
+          <li><strong>Описание:</strong> кто владеет сетью и зачем сделано исключение.</li>
+          <li><strong>До даты:</strong> необязательный срок. Временные исключения безопаснее бессрочных.</li>
+        </ul>
+        <div class="infosec-help-callout danger">
+          <strong>Не добавляйте широкие публичные сети</strong>
+          <span>Запись <code>0.0.0.0/0</code>, <code>::/0</code> или большая сеть провайдера фактически отключит соответствующую защиту.</span>
+        </div>
+      </section>
+
+      <section class="infosec-help-section" id="web-shield">
+        <h2>Веб-защита</h2>
+        <h3>Режимы работы</h3>
+        <table class="infosec-help-table">
+          <thead><tr><th>Режим</th><th>Поведение</th><th>Когда применять</th></tr></thead>
+          <tbody>
+            <tr><td><code>Блокировать</code></td><td>Записывает событие и отклоняет подтверждённый вредоносный или слишком частый запрос.</td><td>Обычная постоянная работа.</td></tr>
+            <tr><td><code>Только наблюдать</code></td><td>Оценивает и журналирует запросы, но не блокирует их.</td><td>Первичная настройка и проверка порогов.</td></tr>
+            <tr><td><code>Выключить</code></td><td>Не выполняет WAF-оценку и rate limit.</td><td>Краткая диагностика только при подтверждённой проблеме.</td></tr>
+          </tbody>
+        </table>
+        <h3>Что проверяется</h3>
+        <ul>
+          <li>опасные методы <code>TRACE</code>, <code>TRACK</code> и <code>CONNECT</code>;</li>
+          <li>сканирование <code>.env</code>, <code>.git</code>, WordPress, phpMyAdmin, Actuator, CGI и PHPUnit;</li>
+          <li>path traversal и его распространённые URL-кодированные варианты;</li>
+          <li>высокоуверенные признаки SQL injection, XSS и command injection;</li>
+          <li>превышение разрешённого размера тела запроса;</li>
+          <li>частота запросов к входу и API.</li>
+        </ul>
+        <h3>Параметры</h3>
+        <ul>
+          <li><strong>Тело запроса:</strong> максимальное число байт, которое разрешено и инспектируется.</li>
+          <li><strong>Входов в минуту:</strong> лимит запросов к маршрутам входа для одного IP.</li>
+          <li><strong>API-запросов в минуту:</strong> лимит защищённых API-запросов для одного IP.</li>
+          <li><strong>Порог блокировки:</strong> итоговый риск 1–100, после которого режим «Блокировать» отклоняет запрос.</li>
+          <li><strong>Порог уведомления:</strong> минимальный риск события для отправки webhook.</li>
+        </ul>
+        <p>После изменения параметров нажмите «Сохранить политику». Новые значения применяются процессом панели без ручного редактирования файлов.</p>
+      </section>
+
+      <section class="infosec-help-section" id="reputation">
+        <h2>Репутация IP</h2>
+        <p>Локальная репутация — это JSON со списком IP-сетей и оценкой риска. При совпадении используется наиболее специфичная CIDR-запись.</p>
+        <pre>{
+  "entries": [
+    {
+      "cidr": "203.0.113.0/24",
+      "score": 90,
+      "country": "ZZ",
+      "asn": 64500,
+      "tags": ["scanner", "hosting"],
+      "expires_at": "2026-12-31T23:59:59Z"
+    }
+  ]
+}</pre>
+        <ul>
+          <li><code>cidr</code> — обязательная IPv4- или IPv6-сеть;</li>
+          <li><code>score</code> — обязательное число 1–100;</li>
+          <li><code>country</code> — необязательный двухбуквенный код;</li>
+          <li><code>asn</code> — необязательный номер автономной системы;</li>
+          <li><code>tags</code> — до 16 коротких тегов;</li>
+          <li><code>expires_at</code> — необязательная дата UTC; просроченные записи игнорируются.</li>
+        </ul>
+        <p>Загрузка полностью заменяет текущий список после проверки JSON. Максимальный размер — 2 МБ, максимальное число записей — 20 000.</p>
+      </section>
+
+      <section class="infosec-help-section" id="notifications">
+        <h2>Уведомления</h2>
+        <p>Webhook необязателен. Допускается только адрес с <code>https://</code>. Событие отправляется асинхронно, когда его риск не ниже настроенного порога уведомления.</p>
+        <p>В webhook передаются безопасные поля события: время, IP, действие, риск, идентификаторы правил, область и нормализованная репутация. Пароли, токены, cookies, тела и полные запросы не отправляются.</p>
+        <p>Одинаковые срабатывания одного IP подавляются в течение короткого окна, чтобы атака не создала поток одинаковых уведомлений.</p>
+        <div class="infosec-help-callout warning">
+          <strong>Webhook не является гарантированной доставкой</strong>
+          <span>Основное доказательство события — локальный журнал панели и решения SG InfoSec. Ошибка внешнего получателя не должна останавливать панель.</span>
+        </div>
+      </section>
+
+      <section class="infosec-help-section" id="history">
+        <h2>История решений и аудит</h2>
+        <ul>
+          <li><strong>Активные решения:</strong> что блокируется сейчас, область, причина и срок.</li>
+          <li><strong>Последние решения:</strong> активные, истёкшие и отозванные записи.</li>
+          <li><strong>Аудит:</strong> создание и отзыв решений, изменения allowlist и другие административные операции.</li>
+          <li><strong>Последние срабатывания:</strong> WAF, rate limit и репутационные совпадения. «Просмотрено» меняет только отметку, а не удаляет событие.</li>
+        </ul>
+        <p>История полезна для ответа на четыре вопроса: кто обращался, какая область была атакована, какое правило сработало и что система сделала.</p>
+      </section>
+
+      <section class="infosec-help-section" id="backup">
+        <h2>Резервное копирование и откат</h2>
+        <p>Обновление SG-Gateway создаёт Safety Backup до замены приложения. Отдельный этап интеграции сохраняет systemd-unit панели, source-конфигурацию bridge, unit bridge и tmpfiles-контракт. При ошибке этапа эти файлы возвращаются автоматически.</p>
+        <p>Установщик SG InfoSec сохраняет существующие конфигурацию и SQLite-состояние при повторном запуске. Обычное удаление бинарников также может сохранить данные; purge предназначен для явного удаления состояния.</p>
+        <h3>Перед ручными изменениями</h3>
+        <ol>
+          <li>Сохраните резервную копию SG-Gateway через Maintenance.</li>
+          <li>Не редактируйте SQLite SG InfoSec вручную.</li>
+          <li>Не создавайте собственные объекты внутри таблицы <code>inet sg_infosec</code>.</li>
+          <li>Запишите текущие значения режима, порогов, allowlist и репутации.</li>
+        </ol>
+      </section>
+
+      <section class="infosec-help-section" id="diagnostics">
+        <h2>Диагностика</h2>
+        <h3>Быстрая проверка</h3>
+        <pre>sudo sg-infosecctl health
+sudo sg-infosecctl status
+sudo sg-infosecctl decisions list
+sudo sg-infosecctl allowlist list
+sudo sg-infosecctl nft status
+sudo sg-infosecctl nft list</pre>
+        <h3>Службы и журналы</h3>
+        <pre>sudo systemctl status \
+  sg-infosec-enforcer.service \
+  sg-infosec.service \
+  sg-infosec-management-bridge.service \
+  sg-gateway.service
+
+sudo journalctl \
+  -u sg-infosec-enforcer.service \
+  -u sg-infosec.service \
+  -u sg-infosec-management-bridge.service \
+  -u sg-gateway.service \
+  --since '-15 minutes' --no-pager</pre>
+        <h3>Типичные состояния</h3>
+        <ul>
+          <li><strong>«Недоступен» в карточке:</strong> проверьте core service, management bridge и сокеты в <code>/run/sg-infosec</code>.</li>
+          <li><strong>SSH-решение есть, но nftables пуст:</strong> проверьте enforcer и выполните <code>sudo sg-infosecctl nft reconcile</code>.</li>
+          <li><strong>Панель работает, но настройки не сохраняются:</strong> проверьте bridge, права на <code>/var/lib/sg-gateway/infosec</code> и журнал панели.</li>
+          <li><strong>Ложное WAF-срабатывание:</strong> временно включите «Только наблюдать», найдите правило в событиях и скорректируйте пороги. Не отключайте всю систему без необходимости.</li>
+        </ul>
+      </section>
+
+      <section class="infosec-help-section" id="limits">
+        <h2>Ограничения</h2>
+        <ul>
+          <li>Это не антивирус, не сетевой IDS/IPS и не анализатор всего VPN-трафика.</li>
+          <li>Веб-фильтр — компактный набор правил для SG-Gateway, а не полный OWASP Core Rule Set.</li>
+          <li>Репутация локальная: система сама не загружает глобальные списки и не обменивается ими с другими серверами.</li>
+          <li>GeoIP и ASN учитываются только тогда, когда администратор передал их в локальном файле репутации.</li>
+          <li>Webhook зависит от внешнего получателя и сети.</li>
+          <li>При недоступности SG InfoSec интеграция панели работает по модели <code>fail-open</code>: административная панель не должна стать недоступной только из-за сбоя защитного демона.</li>
+          <li>Повреждение или неизвестные объекты внутри принадлежащей SG InfoSec таблицы nftables приводят к отказу от опасной перезаписи, а не к удалению чужих правил.</li>
+        </ul>
+        <div class="infosec-help-callout">
+          <strong>Практический режим</strong>
+          <span>Для постоянной работы используйте режим «Блокировать», разумные лимиты, узкий allowlist и резервный консольный доступ. После крупных изменений сначала просмотрите события в режиме наблюдения.</span>
+        </div>
+      </section>
+    </main>
+  </div>
+</section>
+{% endblock %}

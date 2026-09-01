@@ -33,6 +33,11 @@ PANEL_PRODUCTION_WSGI="app.production:app"
 HOSTD_SERVICE="sg-hostd.service"
 AWG3_SERVICE="sg-gateway-awg3.service"
 AWG31_SERVICE="sg-gateway-awg31.service"
+INFOSEC_SERVICE="sg-infosec.service"
+INFOSEC_BRIDGE_SERVICE="sg-infosec-management-bridge.service"
+INFOSEC_BRIDGE_SOURCE="$(system_path /etc/sg-infosec/sources.d/sg-gateway-management.yaml)"
+INFOSEC_BRIDGE_UNIT="$(system_path /etc/systemd/system/sg-infosec-management-bridge.service)"
+INFOSEC_BRIDGE_TMPFILES="$(system_path /usr/lib/tmpfiles.d/sg-infosec-management-bridge.conf)"
 AWG2_CONFIG="$(system_path /etc/amnezia/amneziawg/awg0.conf)"
 AWG2_UNIT="$(system_path /etc/systemd/system/sg-gateway-awg.service)"
 AWG3_CONFIG="$(system_path /etc/amnezia/amneziawg/awg3.conf)"
@@ -610,7 +615,7 @@ capture_service_states() {
   : > "$output"
   for service in \
     nginx.service xray.service mihomo.service sg-gateway-awg.service "$AWG3_SERVICE" "$AWG31_SERVICE" \
-    sg-gateway-singbox.service "$HOSTD_SERVICE" "$PANEL_SERVICE"; do
+    sg-gateway-singbox.service "$HOSTD_SERVICE" "$PANEL_SERVICE" "$INFOSEC_BRIDGE_SERVICE"; do
     active=0
     enabled=0
     failed=0
@@ -626,7 +631,7 @@ verify_runtime_states_unchanged() {
   while IFS=$'\t' read -r service active enabled failed; do
     [[ -n "$service" ]] || continue
     case "$service" in
-      "$PANEL_SERVICE"|"$HOSTD_SERVICE"|"$AWG31_SERVICE") continue ;;
+      "$PANEL_SERVICE"|"$HOSTD_SERVICE"|"$AWG31_SERVICE"|"$INFOSEC_BRIDGE_SERVICE") continue ;;
     esac
     now=0
     now_enabled=0
@@ -810,7 +815,10 @@ create_safety_backup() {
     etc/systemd/system/sg-hostd.service \
     etc/systemd/system/sg-gateway-awg.service \
     etc/systemd/system/sg-gateway-awg3.service \
-    etc/systemd/system/sg-gateway-awg31.service; do
+    etc/systemd/system/sg-gateway-awg31.service \
+    etc/sg-infosec/sources.d/sg-gateway-management.yaml \
+    etc/systemd/system/sg-infosec-management-bridge.service \
+    usr/lib/tmpfiles.d/sg-infosec-management-bridge.conf; do
     if [[ -e "$SYSTEM_ROOT/$relative" || -L "$SYSTEM_ROOT/$relative" ]]; then
       existing+=("$relative")
     fi
@@ -856,7 +864,7 @@ create_safety_backup() {
 rollback_update() {
   (( BACKUP_READY == 1 )) || return 0
   printf '\n%s[SG-Gateway Update] ROLLBACK:%s restoring the pre-update server state...\n' "$YELLOW" "$RESET"
-  systemctl stop "$PANEL_SERVICE" "$HOSTD_SERVICE" "$AWG3_SERVICE" "$AWG31_SERVICE" >/dev/null 2>&1 || true
+  systemctl stop "$PANEL_SERVICE" "$HOSTD_SERVICE" "$INFOSEC_BRIDGE_SERVICE" "$AWG3_SERVICE" "$AWG31_SERVICE" >/dev/null 2>&1 || true
 
   local path
   for path in \
@@ -874,7 +882,10 @@ rollback_update() {
     "$HOSTD_UNIT" \
     "$AWG2_UNIT" \
     "$AWG3_UNIT" \
-    "$AWG31_UNIT"; do
+    "$AWG31_UNIT" \
+    "$INFOSEC_BRIDGE_SOURCE" \
+    "$INFOSEC_BRIDGE_UNIT" \
+    "$INFOSEC_BRIDGE_TMPFILES"; do
     rm -rf -- "$path"
   done
 
@@ -887,6 +898,9 @@ rollback_update() {
 
   tar -C "$SYSTEM_ROOT" -xpf "$BACKUP_DIR/state.tar"
   systemctl daemon-reload >/dev/null 2>&1 || true
+  if systemctl is-active --quiet "$INFOSEC_SERVICE"; then
+    systemctl restart "$INFOSEC_SERVICE" >/dev/null 2>&1 || true
+  fi
 
   if command -v nginx >/dev/null 2>&1 && nginx -t >/dev/null 2>&1; then
     systemctl is-active --quiet nginx.service && systemctl reload nginx.service >/dev/null 2>&1 || true

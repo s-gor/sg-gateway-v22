@@ -1,0 +1,116 @@
+{% set guard = sg_infosec_guard|default(none, true) %}
+{% if not guard %}
+  {% set guard = {
+    'mode': 'unavailable',
+    'settings': {},
+    'counters': {},
+    'alerts': [],
+    'unread_count': 0,
+    'reputation_count': 0
+  } %}
+{% endif %}
+{% set guard_settings = guard.settings|default({}, true) %}
+{% set guard_counters = guard.counters|default({}, true) %}
+{% set sg_csrf = sg_infosec_csrf_token|default('', true) %}
+<article class="secv2-workflow sg-ljd-card-large infosec-guard-card infosec-card--compact" id="sg-infosec-guard">
+  <header class="secv2-card-head">
+    <div>
+      <div class="secv2-kicker">SG-INFOSEC / WEB SHIELD</div>
+      <h2>Веб-защита, репутация и уведомления</h2>
+      <p>Фильтрация вредоносных запросов, ограничения частоты, локальная репутация IP и журнал срабатываний.</p>
+    </div>
+    <span class="secv2-pill {{ 'ok' if guard.mode == 'enforce' else ('warning' if guard.mode == 'monitor' else '') }}">
+      {% if guard.mode == 'enforce' %}Блокирует
+      {% elif guard.mode == 'monitor' %}Наблюдает
+      {% elif guard.mode == 'off' %}Выключена
+      {% else %}Недоступна
+      {% endif %}
+    </span>
+  </header>
+
+  <section class="infosec-guard-summary sg-ljd-nested-group" aria-label="Сводка веб-защиты">
+    <div><span>Проверено запросов</span><strong>{{ guard_counters.inspected|default(0) }}</strong></div>
+    <div><span>Заблокировано</span><strong>{{ guard_counters.blocked|default(0) + guard_counters.rate_limited|default(0) }}</strong></div>
+    <div><span>Новых событий</span><strong>{{ guard.unread_count|default(0) }}</strong></div>
+    <div><span>Репутационных сетей</span><strong>{{ guard.reputation_count|default(0) }}</strong></div>
+  </section>
+
+  <div class="infosec-guard-grid">
+    <section class="infosec-section sg-ljd-nested">
+      <header>
+        <div><span class="secv2-kicker">ПОЛИТИКА</span><h3>Режим и пороги</h3></div>
+      </header>
+      <form class="infosec-form infosec-guard-settings" method="post" action="/security/infosec/guard/settings">
+        <input type="hidden" name="csrf_token" value="{{ sg_csrf }}">
+        <label><span>Режим</span><select name="mode" required>
+          <option value="enforce" {{ 'selected' if guard.mode == 'enforce' else '' }}>Блокировать</option>
+          <option value="monitor" {{ 'selected' if guard.mode == 'monitor' else '' }}>Только наблюдать</option>
+          <option value="off" {{ 'selected' if guard.mode == 'off' else '' }}>Выключить</option>
+        </select></label>
+        <div class="infosec-guard-fields">
+          <label><span>Тело запроса, байт</span><input type="number" name="max_body_bytes" min="1024" max="1048576" value="{{ guard_settings.max_body_bytes|default(65536) }}" required></label>
+          <label><span>Входов в минуту</span><input type="number" name="login_requests_per_minute" min="1" max="10000" value="{{ guard_settings.login_requests_per_minute|default(20) }}" required></label>
+          <label><span>API-запросов в минуту</span><input type="number" name="api_requests_per_minute" min="1" max="100000" value="{{ guard_settings.api_requests_per_minute|default(120) }}" required></label>
+          <label><span>Порог блокировки</span><input type="number" name="block_score" min="1" max="100" value="{{ guard_settings.block_score|default(80) }}" required></label>
+          <label><span>Порог уведомления</span><input type="number" name="notification_min_score" min="1" max="100" value="{{ guard_settings.notification_min_score|default(70) }}" required></label>
+        </div>
+        <label><span>HTTPS webhook, необязательно</span><input type="url" name="notification_webhook" maxlength="2048" value="{{ guard_settings.notification_webhook|default('') }}" placeholder="https://example.net/security-hook" autocomplete="off"></label>
+        <button class="button primary" type="submit">Сохранить политику</button>
+      </form>
+    </section>
+
+    <section class="infosec-section sg-ljd-nested">
+      <header>
+        <div><span class="secv2-kicker">РЕПУТАЦИЯ</span><h3>Локальный список IP и сетей</h3></div>
+        <span class="infosec-count">{{ guard.reputation_count|default(0) }}</span>
+      </header>
+      <p class="infosec-guard-note">JSON хранится локально. Для каждой сети можно задать score 1–100, country, ASN, tags и expires_at.</p>
+      <form class="infosec-form" method="post" action="/security/infosec/guard/reputation">
+        <input type="hidden" name="csrf_token" value="{{ sg_csrf }}">
+        <label><span>JSON репутации</span><textarea name="reputation_json" rows="10" maxlength="2097152" spellcheck="false" placeholder='{"entries":[{"cidr":"203.0.113.0/24","score":90,"country":"ZZ","asn":64500,"tags":["scanner"]}]}' required></textarea></label>
+        <button class="button primary" type="submit">Проверить и заменить</button>
+      </form>
+    </section>
+  </div>
+
+  <section class="infosec-section sg-ljd-nested infosec-guard-alerts">
+    <header>
+      <div><span class="secv2-kicker">СОБЫТИЯ</span><h3>Последние срабатывания</h3></div>
+      {% if guard.unread_count|default(0) > 0 %}
+      <form method="post" action="/security/infosec/guard/alerts/ack-all">
+        <input type="hidden" name="csrf_token" value="{{ sg_csrf }}">
+        <button class="button compact" type="submit">Просмотреть все</button>
+      </form>
+      {% endif %}
+    </header>
+    {% if guard.alerts %}
+    <div class="infosec-table-wrap">
+      <table class="infosec-table">
+        <thead><tr><th>Время</th><th>IP</th><th>Риск</th><th>Реакция</th><th>Правила</th><th>Репутация</th><th></th></tr></thead>
+        <tbody>
+        {% for item in guard.alerts %}
+          <tr class="{{ '' if item.acknowledged else 'infosec-guard-unread' }}">
+            <td>{{ item.occurred_at }}</td>
+            <td><code>{{ item.ip }}</code></td>
+            <td><strong>{{ item.score }}</strong></td>
+            <td>{{ item.action }}</td>
+            <td>{{ item.rule_ids|join(', ') }}</td>
+            <td>{% if item.reputation %}{{ item.reputation.country|default('') }} {{ item.reputation.asn|default('') }} · {{ item.reputation.score|default('') }}{% else %}—{% endif %}</td>
+            <td class="infosec-action-cell">
+              {% if not item.acknowledged %}
+              <form method="post" action="/security/infosec/guard/alerts/{{ item.id }}/ack">
+                <input type="hidden" name="csrf_token" value="{{ sg_csrf }}">
+                <button class="button compact" type="submit">Просмотрено</button>
+              </form>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="secv2-compact-empty"><strong>Срабатываний пока нет</strong><span>Здесь появятся блокировки WAF, ограничения частоты и совпадения с репутацией.</span></div>
+    {% endif %}
+  </section>
+</article>

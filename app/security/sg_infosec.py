@@ -14,6 +14,18 @@ DEFAULT_CONTROL_SOCKET = Path("/run/sg-infosec/control.sock")
 DEFAULT_EVENTS_SOCKET = Path("/run/sg-infosec/events.sock")
 DEFAULT_TIMEOUT_SECONDS = 0.2
 MAX_RESPONSE_BYTES = 64 * 1024
+_FORBIDDEN_METADATA_KEYS = frozenset(
+    {
+        "password",
+        "passwd",
+        "token",
+        "authorization",
+        "cookie",
+        "private_key",
+        "subscription_url",
+        "config",
+    }
+)
 
 
 class _UnixHTTPConnection(http.client.HTTPConnection):
@@ -116,11 +128,36 @@ def _safe_route(route: object) -> str:
     return cleaned[:128] or "unknown"
 
 
-def build_auth_failure_event(
+def _safe_metadata(value: Any, *, depth: int = 0) -> Any:
+    if depth > 6:
+        raise ValueError("metadata nesting is too deep")
+    if value is None or isinstance(value, (str, bool, float, int)):
+        if isinstance(value, str):
+            return value[:512]
+        return value
+    if isinstance(value, list):
+        if len(value) > 32:
+            raise ValueError("metadata list is too large")
+        return [_safe_metadata(item, depth=depth + 1) for item in value]
+    if isinstance(value, dict):
+        if len(value) > 32:
+            raise ValueError("metadata object is too large")
+        result: dict[str, Any] = {}
+        for raw_key, child in value.items():
+            key = str(raw_key)[:64]
+            if key.lower() in _FORBIDDEN_METADATA_KEYS:
+                raise ValueError("sensitive metadata key is forbidden")
+            result[key] = _safe_metadata(child, depth=depth + 1)
+        return result
+    raise ValueError("unsupported metadata value")
+
+
+def build_security_event(
     *,
     scope: str,
     ip: str,
     route: str,
+    metadata: dict[str, Any],
     subject: str | None = None,
 ) -> dict[str, Any]:
     canonical_ip = _canonical_ip(ip)
@@ -128,7 +165,10 @@ def build_auth_failure_event(
         raise ValueError("invalid client IP")
     if scope not in {"admin-login", "admin-api"}:
         raise ValueError("unsupported SG InfoSec scope")
-
+    safe_metadata = _safe_metadata(metadata)
+    if not isinstance(safe_metadata, dict):
+        raise ValueError("metadata must be an object")
+    safe_metadata["route"] = _safe_route(route)
     event: dict[str, Any] = {
         "event_id": f"sg-gateway-{uuid.uuid4().hex}",
         "event_type": "auth.failed" if scope == "admin-login" else "api.auth_failed",
@@ -137,14 +177,27 @@ def build_auth_failure_event(
         "occurred_at": datetime.now(timezone.utc)
         .isoformat(timespec="milliseconds")
         .replace("+00:00", "Z"),
-        "metadata": {
-            "reason": "invalid_credentials",
-            "route": _safe_route(route),
-        },
+        "metadata": safe_metadata,
     }
     if subject:
         event["subject"] = _safe_route(subject)
     return event
+
+
+def build_auth_failure_event(
+    *,
+    scope: str,
+    ip: str,
+    route: str,
+    subject: str | None = None,
+) -> dict[str, Any]:
+    return build_security_event(
+        scope=scope,
+        ip=ip,
+        route=route,
+        subject=subject,
+        metadata={"reason": "invalid_credentials"},
+    )
 
 
 class SGInfoSecClient:
@@ -237,19 +290,21 @@ class SGInfoSecClient:
         status, payload = result
         return status == 200 and payload.get("blocked") is True
 
-    def emit_auth_failure(
+    def emit_security_event(
         self,
         *,
         scope: str,
         ip: str,
         route: str,
+        metadata: dict[str, Any],
         subject: str | None = None,
     ) -> bool:
         try:
-            event = build_auth_failure_event(
+            event = build_security_event(
                 scope=scope,
                 ip=ip,
                 route=route,
+                metadata=metadata,
                 subject=subject,
             )
         except ValueError:
@@ -259,6 +314,22 @@ class SGInfoSecClient:
             return False
         status, payload = result
         return status in {200, 202} and payload.get("accepted") is True
+
+    def emit_auth_failure(
+        self,
+        *,
+        scope: str,
+        ip: str,
+        route: str,
+        subject: str | None = None,
+    ) -> bool:
+        return self.emit_security_event(
+            scope=scope,
+            ip=ip,
+            route=route,
+            subject=subject,
+            metadata={"reason": "invalid_credentials"},
+        )
 
 
 def register_sg_infosec(
@@ -319,8 +390,6 @@ def register_sg_infosec(
                 return response
         return None
 
-    # Flask appends before_request handlers. SG InfoSec must run before the
-    # existing protect_panel hook so a blocked login is rejected before auth.
     before_handlers = app.before_request_funcs.get(None, [])
     if before_handlers and before_handlers[-1] is _sg_infosec_before_request:
         before_handlers.insert(0, before_handlers.pop())

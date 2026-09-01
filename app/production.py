@@ -7,6 +7,13 @@ from app.clients.sg_subscription_http_v4 import register_sg_subscription
 from app.main import app
 from app.runtime_ui import runtime_engine_state
 from app.security.sg_infosec import register_sg_infosec
+from app.security.sg_infosec_guard_management import (
+    register_sg_infosec_guard_management,
+)
+from app.security.sg_infosec_guard_runtime import (
+    register_hardened_sg_infosec_guard,
+)
+from app.security.sg_infosec_management import register_sg_infosec_management
 from app.system_disk_cleanup_http import register_system_disk_cleanup
 from app.xray.xmux_http import register_xmux_http
 
@@ -22,3 +29,6 @@ register_mieru_router_http(app)
 register_xmux_http(app)
 register_system_disk_cleanup(app)
 register_sg_infosec(app)
+register_hardened_sg_infosec_guard(app)
+register_sg_infosec_management(app)
+register_sg_infosec_guard_management(app)
