@@ -14,6 +14,9 @@ CONFIG_DIR = Path("/etc/sg-gateway/naiveproxy")
 CONFIG_PATH = CONFIG_DIR / "Caddyfile"
 STATE_DIR = Path("/var/lib/sg-gateway/naiveproxy")
 STATE_PATH = STATE_DIR / "state.json"
+TLS_DIR = CONFIG_DIR / "tls"
+TLS_CERTIFICATE = TLS_DIR / "fullchain.pem"
+TLS_PRIVATE_KEY = TLS_DIR / "privkey.pem"
 BINARY = Path("/opt/sg-gateway/naiveproxy/bin/caddy")
 SERVICE = "sg-gateway-naiveproxy.service"
 DEFAULT_PORT = 8447
@@ -123,8 +126,10 @@ def _validate(settings: dict) -> None:
     private_key = Path(settings["private_key_path"] or f"/etc/letsencrypt/live/{domain}/privkey.pem")
     if not certificate.is_file() or not private_key.is_file():
         raise RuntimeError("NaiveProxy TLS certificate is not ready")
-    settings["certificate_path"] = str(certificate)
-    settings["private_key_path"] = str(private_key)
+    settings["source_certificate_path"] = str(certificate)
+    settings["source_private_key_path"] = str(private_key)
+    settings["certificate_path"] = str(TLS_CERTIFICATE)
+    settings["private_key_path"] = str(TLS_PRIVATE_KEY)
     if not BINARY.is_file() or not os.access(BINARY, os.X_OK):
         raise RuntimeError("NaiveProxy runtime is not installed")
 
@@ -166,7 +171,17 @@ def sync() -> dict:
     _validate(settings)
     candidate = _render(settings, users)
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    TLS_DIR.mkdir(parents=True, exist_ok=True)
     STATE_DIR.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(settings["source_certificate_path"], TLS_CERTIFICATE)
+    shutil.copy2(settings["source_private_key_path"], TLS_PRIVATE_KEY)
+    os.chmod(TLS_CERTIFICATE, 0o644)
+    os.chmod(TLS_PRIVATE_KEY, 0o640)
+    try:
+        shutil.chown(TLS_CERTIFICATE, user="root", group="sg-naiveproxy")
+        shutil.chown(TLS_PRIVATE_KEY, user="root", group="sg-naiveproxy")
+    except LookupError:
+        pass
     candidate_path = CONFIG_DIR / "Caddyfile.candidate"
     _atomic_write(candidate_path, candidate, 0o640)
     result = _run([str(BINARY), "validate", "--config", str(candidate_path), "--adapter", "caddyfile"])
@@ -187,7 +202,13 @@ def sync() -> dict:
     _atomic_write(STATE_PATH, json.dumps(safe_state, ensure_ascii=False, indent=2, sort_keys=True) + "\n", 0o600)
     service = _run(["systemctl", "enable", "--now", SERVICE], timeout=60)
     if service.returncode != 0:
-        rollback(restart=False)
+        previous_config = CONFIG_DIR / "Caddyfile.previous"
+        previous_state = STATE_DIR / "state.json.previous"
+        if previous_config.is_file() and previous_state.is_file():
+            rollback(restart=False)
+        else:
+            CONFIG_PATH.unlink(missing_ok=True)
+            STATE_PATH.unlink(missing_ok=True)
         raise RuntimeError(_redact(service.stderr or service.stdout or "NaiveProxy restart failed"))
     if credential_ids:
         connection = sqlite3.connect(DB_PATH)

@@ -35,7 +35,7 @@ def register_naiveproxy_http(app) -> None:
         def settings_update():
             payload = request.get_json(silent=True) or request.form
             tls = tls_overview()
-            domain = str(payload.get("domain") or tls.get("domain") or "").strip()
+            domain = str(tls.get("domain") or "").strip()
             if not tls.get("https_ready") or not domain:
                 return jsonify({"ok": False, "message": "Сначала настройте HTTPS в Security"}), 409
             try:

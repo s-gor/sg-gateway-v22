@@ -29,4 +29,18 @@ def test_hostd_sync_is_database_driven_and_secret_safe():
 def test_hostd_unit_allows_only_naiveproxy_write_paths():
     source = (Path(__file__).parents[1] / "hostd" / "systemd" / "sg-hostd.service").read_text()
     assert "/etc/sg-gateway/naiveproxy" in source
-    assert "/var/lib/sg-gateway/naiveproxy" in source
+    assert "-/var/lib/sg-gateway" in source
+
+
+def test_hostd_copies_certbot_key_for_unprivileged_caddy():
+    source = (Path(__file__).parents[1] / "hostd" / "sg_hostd" / "naiveproxy_runtime.py").read_text()
+    assert 'TLS_PRIVATE_KEY = TLS_DIR / "privkey.pem"' in source
+    assert 'shutil.copy2(settings["source_private_key_path"], TLS_PRIVATE_KEY)' in source
+    assert "os.chmod(TLS_PRIVATE_KEY, 0o640)" in source
+    assert 'group="sg-naiveproxy"' in source
+
+
+def test_first_failed_start_does_not_require_a_previous_snapshot():
+    source = (Path(__file__).parents[1] / "hostd" / "sg_hostd" / "naiveproxy_runtime.py").read_text()
+    assert "if previous_config.is_file() and previous_state.is_file():" in source
+    assert "CONFIG_PATH.unlink(missing_ok=True)" in source

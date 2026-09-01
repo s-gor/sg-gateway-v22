@@ -23,6 +23,17 @@ DEFAULT_CONNECTION = {
 
 def _request_sync() -> None:
     try:
+        from app.db import connect
+        with connect() as connection:
+            setting = connection.execute(
+                "SELECT host FROM connection_settings WHERE engine = 'naiveproxy'"
+            ).fetchone()
+            assigned = connection.execute(
+                "SELECT COUNT(*) AS total FROM device_credentials WHERE engine = 'naiveproxy'"
+            ).fetchone()
+        if not (setting and str(setting["host"] or "").strip()) and int(assigned["total"] or 0) == 0:
+            return
+
         from app.hostd.client import run_hostd_command
         from app.maintenance.operations import log_operation
 
