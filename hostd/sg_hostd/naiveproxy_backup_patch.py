@@ -1,15 +1,45 @@
 from __future__ import annotations
 
+import sqlite3
 from functools import wraps
+
+
+def _profile_present() -> bool:
+    from sg_hostd import naiveproxy_runtime
+
+    database = sqlite3.connect(naiveproxy_runtime.DB_PATH)
+    try:
+        tables = {
+            str(row[0])
+            for row in database.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table'"
+            ).fetchall()
+        }
+        settings = 0
+        credentials = 0
+        if "connection_settings" in tables:
+            settings = int(
+                database.execute(
+                    "SELECT COUNT(*) FROM connection_settings WHERE engine = 'naiveproxy'"
+                ).fetchone()[0]
+            )
+        if "device_credentials" in tables:
+            credentials = int(
+                database.execute(
+                    "SELECT COUNT(*) FROM device_credentials WHERE engine = 'naiveproxy'"
+                ).fetchone()[0]
+            )
+        return bool(settings or credentials)
+    finally:
+        database.close()
 
 
 def _sync_if_configured() -> None:
     from sg_hostd import naiveproxy_runtime
 
-    try:
-        settings, users, _ = naiveproxy_runtime._load()
-    except Exception:
+    if not _profile_present():
         return
+    settings, users, _ = naiveproxy_runtime._load()
     if not str(settings.get("domain") or "").strip() and not users:
         return
     naiveproxy_runtime.sync()
