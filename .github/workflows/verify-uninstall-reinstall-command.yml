@@ -1,0 +1,16 @@
+name: Verify uninstall reinstall command
+
+on:
+  push:
+    branches: [fix/uninstall-reinstall-command-pinned]
+
+jobs:
+  contract:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install pytest
+      - run: python -m pytest -q tests/test_sg_gateway_v22_reinstall_after_full_uninstall.py::test_full_uninstall_prints_the_canonical_reinstall_command
