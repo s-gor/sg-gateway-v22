@@ -67,10 +67,13 @@ def test_first_assignment_bootstraps_8447_from_security_tls():
     assert 'DEFAULT_PORT' in source
 
 
-def test_hostd_checks_real_tcp_listener_before_apply():
+def test_hostd_checks_exact_service_pid_before_apply():
     source = (Path(__file__).parents[1] / "hostd/sg_hostd/naiveproxy_listener_patch.py").read_text()
     assert '["ss", "-H", "-ltnp"]' in source
-    assert '"caddy" not in line.lower()' in source
+    assert '"systemctl",' in source
+    assert '"MainPID"' in source
+    assert 're.findall(r"\\bpid=(\\d+)\\b"' in source
+    assert "service_pid not in listener_pids" in source
     init_source = (Path(__file__).parents[1] / "hostd/sg_hostd/__init__.py").read_text()
     assert "naiveproxy_listener_patch" in init_source
 

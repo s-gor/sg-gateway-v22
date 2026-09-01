@@ -35,19 +35,61 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _service_main_pid(runtime) -> int:
+    try:
+        result = runtime._run(
+            [
+                "systemctl",
+                "show",
+                runtime.SERVICE,
+                "--property",
+                "MainPID",
+                "--value",
+            ],
+            timeout=10,
+        )
+    except (OSError, RuntimeError):
+        return 0
+    if result.returncode != 0:
+        return 0
+    try:
+        pid = int((result.stdout or "").strip())
+    except (TypeError, ValueError):
+        return 0
+    return pid if pid > 0 else 0
+
+
 def _listener(runtime, port: int) -> dict:
     try:
         result = runtime._run(["ss", "-H", "-ltnp"], timeout=15)
     except (OSError, RuntimeError):
-        return {"listening": False, "owned_by_caddy": False}
+        return {
+            "listening": False,
+            "owned_by_caddy": False,
+            "owned_by_service": False,
+            "service_main_pid": 0,
+            "listener_pids": [],
+        }
     lines = [
         line
         for line in (result.stdout or "").splitlines()
         if re.search(rf":{int(port)}\b", line)
     ]
+    listener_pids = sorted(
+        {
+            int(value)
+            for line in lines
+            for value in re.findall(r"\bpid=(\d+)\b", line)
+            if int(value) > 0
+        }
+    )
+    service_pid = _service_main_pid(runtime)
     return {
         "listening": bool(lines),
         "owned_by_caddy": any("caddy" in line.lower() for line in lines),
+        "owned_by_service": bool(service_pid and service_pid in listener_pids),
+        "service_main_pid": service_pid,
+        "listener_pids": listener_pids,
     }
 
 
@@ -123,7 +165,7 @@ def install(runtime) -> None:
             and checksum_ok
             and config_valid
             and listener["listening"]
-            and listener["owned_by_caddy"]
+            and listener["owned_by_service"]
         )
         return result
 

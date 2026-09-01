@@ -20,7 +20,13 @@ assert SPEC.loader is not None
 SPEC.loader.exec_module(diagnostics_patch)
 
 
-def _runtime(tmp_path: Path, *, expected_sha: str | None = None):
+def _runtime(
+    tmp_path: Path,
+    *,
+    expected_sha: str | None = None,
+    listener_pid: int = 7,
+    service_pid: int = 7,
+):
     prefix = tmp_path / "naiveproxy"
     binary = prefix / "bin" / "caddy"
     binary.parent.mkdir(parents=True)
@@ -58,7 +64,16 @@ def _runtime(tmp_path: Path, *, expected_sha: str | None = None):
         if command[:3] == ["ss", "-H", "-ltnp"]:
             return SimpleNamespace(
                 returncode=0,
-                stdout='LISTEN 0 4096 0.0.0.0:8447 0.0.0.0:* users:(("caddy",pid=7,fd=3))\n',
+                stdout=(
+                    "LISTEN 0 4096 0.0.0.0:8447 0.0.0.0:* "
+                    f'users:(("caddy",pid={listener_pid},fd=3))\n'
+                ),
+                stderr="",
+            )
+        if command[:2] == ["systemctl", "show"]:
+            return SimpleNamespace(
+                returncode=0,
+                stdout=f"{service_pid}\n",
                 stderr="",
             )
         raise AssertionError(command)
@@ -68,6 +83,7 @@ def _runtime(tmp_path: Path, *, expected_sha: str | None = None):
         CONFIG_PATH=config,
         STATE_PATH=state,
         DEFAULT_PORT=8447,
+        SERVICE="sg-gateway-naiveproxy.service",
         _run=run,
         _redact=lambda value: str(value),
         status=lambda: {
@@ -95,6 +111,9 @@ def test_status_verifies_binary_config_listener_and_firewall(tmp_path):
     assert result["listener"] == {
         "listening": True,
         "owned_by_caddy": True,
+        "owned_by_service": True,
+        "service_main_pid": 7,
+        "listener_pids": [7],
     }
     assert result["firewall"] == {
         "active": True,
@@ -110,6 +129,17 @@ def test_status_fails_closed_on_checksum_mismatch(tmp_path):
     result = runtime.status()
 
     assert result["checksum_ok"] is False
+    assert result["ok"] is False
+
+
+def test_status_rejects_unrelated_caddy_listener(tmp_path):
+    runtime = _runtime(tmp_path, listener_pid=99, service_pid=7)
+    diagnostics_patch.install(runtime)
+
+    result = runtime.status()
+
+    assert result["listener"]["owned_by_caddy"] is True
+    assert result["listener"]["owned_by_service"] is False
     assert result["ok"] is False
 
 
