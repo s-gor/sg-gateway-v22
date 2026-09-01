@@ -115,7 +115,9 @@ SG_GATEWAY_GITHUB_BRANCH="$BRANCH" bash "$PREFIX/deploy/update-from-github.sh"
 resolve_safety_backup
 
 set +e
-SG_GATEWAY_SOURCE_ROOT="$PREFIX" bash "$PREFIX/deploy/install-naiveproxy.sh"
+SG_GATEWAY_SOURCE_ROOT="$PREFIX" \
+SG_GATEWAY_UPDATE_BRANCH="$BRANCH" \
+  bash "$PREFIX/deploy/install-naiveproxy.sh"
 naive_rc=$?
 set -e
 if (( naive_rc != 0 )); then

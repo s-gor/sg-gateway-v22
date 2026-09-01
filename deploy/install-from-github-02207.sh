@@ -44,7 +44,9 @@ path.write_text(source.replace(marker, hook + marker), encoding="utf-8")
 PY
 bash -n "$patched_installer"
 
-SG_GATEWAY_SOURCE_DIR="$TMP/source" SG_GATEWAY_SOURCE_COMMIT="$SOURCE_COMMIT" \
+SG_GATEWAY_SOURCE_DIR="$TMP/source" \
+SG_GATEWAY_SOURCE_COMMIT="$SOURCE_COMMIT" \
+SG_GATEWAY_UPDATE_BRANCH="$BRANCH" \
   bash "$patched_installer"
 
 printf '[SG-Gateway 22.07] Installed. NaiveProxy remains disabled until HTTPS/settings are ready; its selected TCP port is managed when settings are applied.\n'

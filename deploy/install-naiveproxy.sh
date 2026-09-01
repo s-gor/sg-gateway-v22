@@ -11,6 +11,9 @@ SERVICE="sg-gateway-naiveproxy.service"
 SERVICE_PATH="/etc/systemd/system/$SERVICE"
 HOSTD_SERVICE="sg-hostd.service"
 HOSTD_SERVICE_PATH="/etc/systemd/system/$HOSTD_SERVICE"
+PANEL_SERVICE="sg-gateway.service"
+PANEL_ENV="/etc/sg-gateway/sg-gateway.env"
+UPDATE_BRANCH="${SG_GATEWAY_UPDATE_BRANCH:-}"
 SOURCE_ROOT="${SG_GATEWAY_SOURCE_ROOT:-/opt/sg-gateway}"
 TX_DIR=""
 INSTALL_OK=0
@@ -25,6 +28,8 @@ WAS_ACTIVE=0
 WAS_ENABLED=0
 HOSTD_WAS_ACTIVE=0
 HOSTD_WAS_ENABLED=0
+PANEL_WAS_ACTIVE=0
+PANEL_WAS_ENABLED=0
 
 log() { printf '[SG-Gateway] %s\n' "$*"; }
 die() { log "ERROR: $*" >&2; return 1; }
@@ -60,6 +65,50 @@ restore_service_state() {
   fi
 }
 
+persist_update_channel() {
+  [[ -n "$UPDATE_BRANCH" ]] || return 0
+  [[ "$UPDATE_BRANCH" == "dev-02207" || "$UPDATE_BRANCH" == feature/02207-* ]] || \
+    die "Refusing invalid 22.07 update channel: $UPDATE_BRANCH"
+  [[ -f "$PANEL_ENV" ]] || die "Panel environment is missing: $PANEL_ENV"
+  python3 - "$PANEL_ENV" "$UPDATE_BRANCH" <<'PY'
+import os
+import sys
+import tempfile
+from pathlib import Path
+
+path = Path(sys.argv[1])
+branch = sys.argv[2]
+lines = path.read_text(encoding="utf-8").splitlines()
+key = "SG_GATEWAY_UPDATE_BRANCH"
+replacement = f"{key}={branch}"
+updated = []
+found = False
+for line in lines:
+    raw_key, separator, _value = line.partition("=")
+    if separator and raw_key.strip() == key:
+        if not found:
+            updated.append(replacement)
+            found = True
+        continue
+    updated.append(line)
+if not found:
+    updated.append(replacement)
+stat = path.stat()
+fd, raw = tempfile.mkstemp(prefix=path.name + ".", dir=str(path.parent))
+temporary = Path(raw)
+try:
+    with os.fdopen(fd, "w", encoding="utf-8") as stream:
+        stream.write("\n".join(updated) + "\n")
+        stream.flush()
+        os.fsync(stream.fileno())
+    os.chmod(temporary, stat.st_mode & 0o777)
+    os.chown(temporary, stat.st_uid, stat.st_gid)
+    os.replace(temporary, path)
+finally:
+    temporary.unlink(missing_ok=True)
+PY
+}
+
 cleanup() {
   [[ -z "$TX_DIR" ]] || rm -rf -- "$TX_DIR"
 }
@@ -77,6 +126,7 @@ rollback_install() {
     restore_path "$HOSTD_SERVICE_PATH" hostd-unit "$HAD_HOSTD_UNIT"
     systemctl daemon-reload >/dev/null 2>&1 || true
     restore_service_state "$HOSTD_SERVICE" "$HOSTD_WAS_ENABLED" "$HOSTD_WAS_ACTIVE"
+    restore_service_state "$PANEL_SERVICE" "$PANEL_WAS_ENABLED" "$PANEL_WAS_ACTIVE"
     restore_service_state "$SERVICE" "$WAS_ENABLED" "$WAS_ACTIVE"
     if (( HAD_USER == 0 )); then
       userdel sg-naiveproxy >/dev/null 2>&1 || true
@@ -93,7 +143,7 @@ trap cleanup EXIT
 
 [[ ${EUID:-$(id -u)} -eq 0 ]] || die "install-naiveproxy.sh requires root"
 [[ "$(uname -m)" == "x86_64" ]] || die "Pinned NaiveProxy runtime currently supports x86_64 only"
-for tool in curl tar sha256sum systemctl; do
+for tool in curl tar sha256sum systemctl python3; do
   command -v "$tool" >/dev/null 2>&1 || die "$tool is required"
 done
 [[ -f "$SOURCE_ROOT/deploy/$SERVICE" ]] || die "NaiveProxy systemd unit is missing"
@@ -111,6 +161,8 @@ systemctl is-active --quiet "$SERVICE" 2>/dev/null && WAS_ACTIVE=1
 systemctl is-enabled --quiet "$SERVICE" 2>/dev/null && WAS_ENABLED=1
 systemctl is-active --quiet "$HOSTD_SERVICE" 2>/dev/null && HOSTD_WAS_ACTIVE=1
 systemctl is-enabled --quiet "$HOSTD_SERVICE" 2>/dev/null && HOSTD_WAS_ENABLED=1
+systemctl is-active --quiet "$PANEL_SERVICE" 2>/dev/null && PANEL_WAS_ACTIVE=1
+systemctl is-enabled --quiet "$PANEL_SERVICE" 2>/dev/null && PANEL_WAS_ENABLED=1
 
 install -d -m 0755 "$PREFIX/bin"
 if ! getent group sg-naiveproxy >/dev/null; then groupadd --system sg-naiveproxy; fi
@@ -152,10 +204,15 @@ EOF
 
 install -m 0644 "$SOURCE_ROOT/deploy/$SERVICE" "$SERVICE_PATH"
 install -m 0644 "$SOURCE_ROOT/hostd/systemd/$HOSTD_SERVICE" "$HOSTD_SERVICE_PATH"
+persist_update_channel
 systemctl daemon-reload
 if (( HOSTD_WAS_ACTIVE == 1 )); then
   systemctl restart "$HOSTD_SERVICE"
   systemctl is-active --quiet "$HOSTD_SERVICE" || die "sg-hostd failed after NaiveProxy sandbox update"
+fi
+if (( PANEL_WAS_ACTIVE == 1 )); then
+  systemctl restart "$PANEL_SERVICE"
+  systemctl is-active --quiet "$PANEL_SERVICE" || die "SG-Gateway panel failed after update-channel migration"
 fi
 if (( WAS_ACTIVE == 1 )); then
   systemctl restart "$SERVICE"
