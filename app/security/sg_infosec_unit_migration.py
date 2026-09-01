@@ -12,6 +12,7 @@ GUARD_ENVIRONMENT = (
     "Environment=SG_INFOSEC_GUARD_SETTINGS=/var/lib/sg-gateway/infosec/guard.json",
     "Environment=SG_INFOSEC_REPUTATION_FILE=/var/lib/sg-gateway/infosec/reputation.json",
     "Environment=SG_INFOSEC_ALERTS_FILE=/var/lib/sg-gateway/infosec/alerts.jsonl",
+    "Environment=SG_INFOSEC_IP_INTEL_CACHE=/var/lib/sg-gateway/infosec/ip-intelligence.json",
 )
 BRIDGE_PRESTART = (
     "ExecStartPre=-+/opt/sg-gateway/deploy/"
