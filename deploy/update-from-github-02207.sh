@@ -125,7 +125,4 @@ if (( naive_rc != 0 )); then
   fail "NaiveProxy runtime installation failed and rollback was incomplete"
 fi
 
-if command -v ufw >/dev/null 2>&1 && ufw status | grep -q '^Status: active'; then
-  ufw allow 8447/tcp
-fi
-log "Update and NaiveProxy runtime transaction completed."
+log "Update and NaiveProxy runtime transaction completed. The selected TCP port will be managed when settings are applied."

@@ -38,8 +38,9 @@ def test_clean_install_injects_naiveproxy_before_installer_success_boundary():
     assert 'bash "$TMP/source/install.sh"' not in source
 
 
-def test_clean_install_does_not_run_naiveproxy_after_successful_main_install():
+def test_clean_install_leaves_firewall_to_selected_runtime_port():
     source = (ROOT / "deploy/install-from-github-02207.sh").read_text()
     post_install = source.split('bash "$patched_installer"', 1)[1]
     assert "install-naiveproxy.sh" not in post_install
-    assert "ufw allow 8447/tcp ||" in post_install
+    assert "ufw allow 8447/tcp" not in source
+    assert "selected TCP port is managed when settings are applied" in source

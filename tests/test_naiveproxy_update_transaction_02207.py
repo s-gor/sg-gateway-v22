@@ -34,9 +34,7 @@ def test_02207_update_restores_preexisting_service_identity_and_unit():
     assert "groupdel sg-naiveproxy" in source
 
 
-def test_firewall_is_changed_only_after_runtime_transaction_succeeds():
+def test_update_wrapper_does_not_open_a_hardcoded_firewall_port():
     source = (ROOT / "deploy/update-from-github-02207.sh").read_text()
-    assert source.index('bash "$PREFIX/deploy/install-naiveproxy.sh"') < source.index(
-        "ufw allow 8447/tcp"
-    )
-    assert source.index("rollback_panel_update") < source.index("ufw allow 8447/tcp")
+    assert "ufw allow 8447/tcp" not in source
+    assert "selected TCP port will be managed when settings are applied" in source

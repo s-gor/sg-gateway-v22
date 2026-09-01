@@ -47,7 +47,4 @@ bash -n "$patched_installer"
 SG_GATEWAY_SOURCE_DIR="$TMP/source" SG_GATEWAY_SOURCE_COMMIT="$SOURCE_COMMIT" \
   bash "$patched_installer"
 
-if command -v ufw >/dev/null 2>&1 && ufw status | grep -q '^Status: active'; then
-  ufw allow 8447/tcp || printf '[SG-Gateway 22.07] WARNING: open TCP 8447 manually.\n' >&2
-fi
-printf '[SG-Gateway 22.07] Installed. NaiveProxy is isolated on TCP 8447 and remains disabled until HTTPS/settings are ready.\n'
+printf '[SG-Gateway 22.07] Installed. NaiveProxy remains disabled until HTTPS/settings are ready; its selected TCP port is managed when settings are applied.\n'
