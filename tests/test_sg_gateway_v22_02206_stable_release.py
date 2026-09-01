@@ -27,13 +27,16 @@ def test_02206_publication_and_release_workflow_are_complete():
         "Clean Install",
         "Full Uninstall",
         "stable-02206",
+        "v0.1.0-022.06-final",
     ):
         assert marker in publication
-    assert "v0.1.0-022.06" in workflow
+    assert "TAG: v0.1.0-022.06-final" in workflow
+    assert "TITLE: SG-Gateway 0.1.0-022.06 Final" in workflow
     assert "SG-Gateway-0.1.0-022.06-FULL.run" in workflow
     assert "PUBLICATION-02206.md" in workflow
     assert "python -m pytest tests" in workflow
     assert "--verify-only" in workflow
+    assert "--latest" in workflow
 
 
 def test_02206_readme_exposes_stable_commands():

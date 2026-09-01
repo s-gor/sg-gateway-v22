@@ -1,4 +1,4 @@
-name: Release 0.1.0-022.06 Stable
+name: Release 0.1.0-022.06 Final
 
 on:
   push:
@@ -19,8 +19,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
-      TAG: v0.1.0-022.06
-      TITLE: SG-Gateway 0.1.0-022.06
+      TAG: v0.1.0-022.06-final
+      TITLE: SG-Gateway 0.1.0-022.06 Final
       RUN_NAME: SG-Gateway-0.1.0-022.06-FULL.run
 
     steps:
