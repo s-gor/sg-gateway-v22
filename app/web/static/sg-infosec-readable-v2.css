@@ -1,0 +1,433 @@
+/* Readable SG InfoSec layout: cards, disclosures and wrapped technical data. */
+.infosec-primary-section,
+.infosec-history-stack,
+.infosec-control-disclosures {
+  min-width: 0;
+}
+
+.infosec-primary-section {
+  width: 100%;
+}
+
+.infosec-decision-list,
+.infosec-alert-list,
+.infosec-history-list,
+.infosec-audit-list,
+.infosec-allowlist-list {
+  display: grid;
+  gap: 9px;
+  min-width: 0;
+}
+
+.infosec-decision-card,
+.infosec-alert-card,
+.infosec-history-card,
+.infosec-audit-card,
+.infosec-allowlist-card {
+  min-width: 0;
+  border: 1px solid var(--sg-line-soft);
+  border-radius: 11px;
+  background: var(--sg-panel-deep);
+  padding: 12px 14px;
+}
+
+.infosec-decision-card,
+.infosec-alert-card,
+.infosec-history-card,
+.infosec-audit-card {
+  display: grid;
+  gap: 9px;
+}
+
+.infosec-decision-main,
+.infosec-alert-head,
+.infosec-history-head,
+.infosec-audit-card > div:first-child {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.infosec-address-block {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.infosec-ip {
+  color: var(--sg-text);
+  font: 700 .92rem/1.25 ui-monospace, SFMono-Regular, Consolas, monospace;
+  overflow-wrap: anywhere;
+}
+
+.infosec-network-summary {
+  color: var(--sg-text);
+  font-size: .82rem;
+  font-weight: 700;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.infosec-address-block small {
+  color: var(--muted);
+  font-size: .72rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.infosec-decision-meta,
+.infosec-alert-meta,
+.infosec-history-card dl,
+.infosec-allowlist-card dl {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.infosec-decision-meta > div,
+.infosec-alert-meta > div,
+.infosec-history-card dl > div,
+.infosec-allowlist-card dl > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.infosec-decision-meta dt,
+.infosec-alert-meta dt,
+.infosec-history-card dt,
+.infosec-allowlist-card dt {
+  color: var(--muted);
+  font-size: .65rem;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+.infosec-decision-meta dd,
+.infosec-alert-meta dd,
+.infosec-history-card dd,
+.infosec-allowlist-card dd {
+  margin: 0;
+  color: var(--sg-text);
+  font-size: .78rem;
+  font-weight: 650;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.infosec-effect {
+  margin: 0;
+  border-left: 3px solid var(--sg-blue);
+  color: var(--muted);
+  padding: 6px 9px;
+  font-size: .76rem;
+  line-height: 1.4;
+}
+
+.infosec-row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.infosec-disclosure {
+  min-width: 0;
+  border: 1px solid var(--sg-line-soft);
+  border-radius: 11px;
+  background: var(--sg-panel-deep);
+}
+
+.infosec-disclosure > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 48px;
+  cursor: pointer;
+  list-style: none;
+  padding: 10px 13px;
+}
+
+.infosec-disclosure > summary::-webkit-details-marker,
+.infosec-technical > summary::-webkit-details-marker {
+  display: none;
+}
+
+.infosec-disclosure > summary > span {
+  display: grid;
+  gap: 2px;
+}
+
+.infosec-disclosure > summary strong {
+  color: var(--sg-text);
+  font-size: .84rem;
+}
+
+.infosec-disclosure > summary small {
+  color: var(--muted);
+  font-size: .7rem;
+}
+
+.infosec-disclosure > summary b {
+  color: var(--sg-blue);
+  font-size: .72rem;
+}
+
+.infosec-disclosure[open] > summary {
+  border-bottom: 1px solid var(--sg-line-soft);
+}
+
+.infosec-disclosure[open] > summary b {
+  font-size: 0;
+}
+
+.infosec-disclosure[open] > summary b::after {
+  content: "Свернуть";
+  font-size: .72rem;
+}
+
+.infosec-disclosure > .infosec-form {
+  padding: 12px 13px 13px;
+}
+
+.infosec-disclosure--inside {
+  margin-top: 10px;
+}
+
+.infosec-form--compact {
+  grid-template-columns: minmax(180px, .8fr) minmax(300px, 1.2fr) minmax(220px, 1fr) auto;
+  align-items: end;
+}
+
+.infosec-form--compact > .infosec-form-row {
+  grid-template-columns: minmax(190px, 1fr) minmax(90px, .38fr);
+}
+
+.infosec-form--compact > button {
+  min-width: 150px;
+}
+
+.infosec-allowlist-form {
+  grid-template-columns: minmax(190px, .85fr) minmax(180px, .7fr) minmax(260px, 1.1fr) minmax(190px, .8fr) auto;
+  align-items: end;
+}
+
+.infosec-allowlist-card {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.1fr) minmax(260px, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.infosec-allowlist-card > div:first-child {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.infosec-allowlist-card > div:first-child strong {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  overflow-wrap: anywhere;
+}
+
+.infosec-allowlist-card > div:first-child span {
+  color: var(--muted);
+  font-size: .75rem;
+  overflow-wrap: anywhere;
+}
+
+.infosec-allowlist-card dl {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.infosec-history-stack {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.infosec-history-card > span,
+.infosec-audit-card p,
+.infosec-audit-card time {
+  color: var(--muted);
+  font-size: .74rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.infosec-audit-card p {
+  margin: 0;
+}
+
+.infosec-audit-card time {
+  font-variant-numeric: tabular-nums;
+}
+
+.infosec-technical {
+  min-width: 0;
+}
+
+.infosec-technical > summary {
+  width: max-content;
+  max-width: 100%;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: .7rem;
+  font-weight: 700;
+}
+
+.infosec-technical[open] > summary {
+  margin-bottom: 7px;
+  color: var(--sg-text);
+}
+
+.infosec-technical dl {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+  margin: 0;
+  border: 1px solid var(--sg-line-soft);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--sg-line-soft);
+}
+
+.infosec-technical dl > div {
+  display: grid;
+  grid-template-columns: minmax(130px, .45fr) minmax(0, 1fr);
+  gap: 10px;
+  min-width: 0;
+  background: var(--sg-panel);
+  padding: 6px 8px;
+}
+
+.infosec-technical dt {
+  color: var(--muted);
+  font-size: .67rem;
+  overflow-wrap: anywhere;
+}
+
+.infosec-technical dd {
+  min-width: 0;
+  margin: 0;
+  text-align: left;
+}
+
+.infosec-technical code {
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  color: var(--sg-text);
+  font-size: .67rem;
+}
+
+.infosec-control-disclosures {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.infosec-alert-list {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.infosec-alert-card {
+  align-content: start;
+}
+
+.infosec-rule-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.infosec-rule-list > span {
+  border: 1px solid var(--sg-line-soft);
+  border-radius: 999px;
+  background: var(--sg-panel);
+  color: var(--sg-text);
+  padding: 4px 8px;
+  font-size: .68rem;
+  line-height: 1.2;
+}
+
+@media (max-width: 1320px) {
+  .infosec-form--compact,
+  .infosec-allowlist-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .infosec-form--compact > button,
+  .infosec-allowlist-form > button {
+    width: 100%;
+  }
+}
+
+@media (max-width: 1040px) {
+  .infosec-alert-list,
+  .infosec-control-disclosures {
+    grid-template-columns: 1fr;
+  }
+
+  .infosec-allowlist-card {
+    grid-template-columns: 1fr auto;
+  }
+
+  .infosec-allowlist-card dl {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
+
+@media (max-width: 760px) {
+  .infosec-decision-main,
+  .infosec-alert-head,
+  .infosec-history-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .infosec-decision-meta,
+  .infosec-alert-meta,
+  .infosec-history-card dl,
+  .infosec-allowlist-card dl,
+  .infosec-form--compact,
+  .infosec-allowlist-form {
+    grid-template-columns: 1fr;
+  }
+
+  .infosec-form--compact > .infosec-form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .infosec-allowlist-card {
+    grid-template-columns: 1fr;
+  }
+
+  .infosec-allowlist-card dl,
+  .infosec-allowlist-card form {
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  .infosec-row-actions {
+    align-items: stretch;
+    justify-content: flex-start;
+    flex-direction: column;
+  }
+
+  .infosec-row-actions form,
+  .infosec-row-actions button {
+    width: 100%;
+  }
+
+  .infosec-technical dl > div {
+    grid-template-columns: 1fr;
+    gap: 3px;
+  }
+}
