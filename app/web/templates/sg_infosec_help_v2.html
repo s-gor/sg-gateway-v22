@@ -1,5 +1,10 @@
 {% extends "sg_infosec_help.html" %}
 
+{% block head %}
+  {{ super() }}
+  <link rel="stylesheet" href="{{ url_for('static', filename='sg-infosec-help-v2.css') }}">
+{% endblock %}
+
 {% block content %}
   {{ super() }}
 
