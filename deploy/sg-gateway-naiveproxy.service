@@ -1,0 +1,29 @@
+[Unit]
+Description=SG-Gateway NaiveProxy
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=/etc/sg-gateway/naiveproxy/Caddyfile
+
+[Service]
+Type=notify
+User=sg-naiveproxy
+Group=sg-naiveproxy
+ExecStart=/opt/sg-gateway/naiveproxy/bin/caddy run --environ --config /etc/sg-gateway/naiveproxy/Caddyfile --adapter caddyfile
+ExecReload=/opt/sg-gateway/naiveproxy/bin/caddy reload --config /etc/sg-gateway/naiveproxy/Caddyfile --adapter caddyfile --force
+TimeoutStopSec=10s
+LimitNOFILE=1048576
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+NoNewPrivileges=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+ReadWritePaths=/var/lib/sg-gateway/naiveproxy
+ReadOnlyPaths=/etc/sg-gateway/naiveproxy /etc/letsencrypt
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+
+[Install]
+WantedBy=multi-user.target
