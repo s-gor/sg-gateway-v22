@@ -10,6 +10,9 @@ from app.security.tls import overview as tls_overview
 
 
 def register_naiveproxy_http(app) -> None:
+    if not getattr(app, "_naiveproxy_ui_installed", False):
+        app.after_request(_inject_protocol_option)
+        app._naiveproxy_ui_installed = True
     if "naiveproxy_status" not in app.view_functions:
         def status():
             settings = get_connection_settings("naiveproxy")
@@ -59,3 +62,24 @@ def register_naiveproxy_http(app) -> None:
             view_func=settings_update,
             methods=["POST"],
         )
+
+
+def _inject_protocol_option(response):
+    if response.direct_passthrough or response.mimetype != "text/html":
+        return response
+    marker = "<!-- SG_PROTOCOL_ORDER_END -->"
+    body = response.get_data(as_text=True)
+    if marker not in body or 'value="naiveproxy"' in body:
+        return response
+    tls = tls_overview()
+    ready = bool(tls.get("https_ready"))
+    disabled = "" if ready else " disabled"
+    locked = "" if ready else " is-locked"
+    note = "HTTPS-прокси · отдельная ссылка · TCP 8447" if ready else "Требуется HTTPS в Security"
+    option = (
+        f'<label class="cv10-protocol{locked}">'
+        f'<input type="checkbox" name="protocols" value="naiveproxy"{disabled}>'
+        f'<span><strong>NaiveProxy</strong><small>{note}</small></span></label>\n      '
+    )
+    response.set_data(body.replace(marker, option + marker))
+    return response
