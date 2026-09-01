@@ -9,6 +9,8 @@ CONFIG_DIR="/etc/sg-gateway/naiveproxy"
 STATE_DIR="/var/lib/sg-gateway/naiveproxy"
 SERVICE="sg-gateway-naiveproxy.service"
 SERVICE_PATH="/etc/systemd/system/$SERVICE"
+HOSTD_SERVICE="sg-hostd.service"
+HOSTD_SERVICE_PATH="/etc/systemd/system/$HOSTD_SERVICE"
 SOURCE_ROOT="${SG_GATEWAY_SOURCE_ROOT:-/opt/sg-gateway}"
 TX_DIR=""
 INSTALL_OK=0
@@ -16,10 +18,13 @@ HAD_PREFIX=0
 HAD_CONFIG=0
 HAD_STATE=0
 HAD_UNIT=0
+HAD_HOSTD_UNIT=0
 HAD_USER=0
 HAD_GROUP=0
 WAS_ACTIVE=0
 WAS_ENABLED=0
+HOSTD_WAS_ACTIVE=0
+HOSTD_WAS_ENABLED=0
 
 log() { printf '[SG-Gateway] %s\n' "$*"; }
 die() { log "ERROR: $*" >&2; return 1; }
@@ -41,6 +46,20 @@ restore_path() {
   fi
 }
 
+restore_service_state() {
+  local service="$1" enabled="$2" active="$3"
+  if (( enabled == 1 )); then
+    systemctl enable "$service" >/dev/null 2>&1 || true
+  else
+    systemctl disable "$service" >/dev/null 2>&1 || true
+  fi
+  if (( active == 1 )); then
+    systemctl restart "$service" >/dev/null 2>&1 || true
+  else
+    systemctl stop "$service" >/dev/null 2>&1 || true
+  fi
+}
+
 cleanup() {
   [[ -z "$TX_DIR" ]] || rm -rf -- "$TX_DIR"
 }
@@ -55,17 +74,10 @@ rollback_install() {
     restore_path "$CONFIG_DIR" config "$HAD_CONFIG"
     restore_path "$STATE_DIR" state "$HAD_STATE"
     restore_path "$SERVICE_PATH" unit "$HAD_UNIT"
+    restore_path "$HOSTD_SERVICE_PATH" hostd-unit "$HAD_HOSTD_UNIT"
     systemctl daemon-reload >/dev/null 2>&1 || true
-    if (( WAS_ENABLED == 1 )); then
-      systemctl enable "$SERVICE" >/dev/null 2>&1 || true
-    else
-      systemctl disable "$SERVICE" >/dev/null 2>&1 || true
-    fi
-    if (( WAS_ACTIVE == 1 )); then
-      systemctl start "$SERVICE" >/dev/null 2>&1 || true
-    else
-      systemctl stop "$SERVICE" >/dev/null 2>&1 || true
-    fi
+    restore_service_state "$HOSTD_SERVICE" "$HOSTD_WAS_ENABLED" "$HOSTD_WAS_ACTIVE"
+    restore_service_state "$SERVICE" "$WAS_ENABLED" "$WAS_ACTIVE"
     if (( HAD_USER == 0 )); then
       userdel sg-naiveproxy >/dev/null 2>&1 || true
     fi
@@ -85,16 +97,20 @@ for tool in curl tar sha256sum systemctl; do
   command -v "$tool" >/dev/null 2>&1 || die "$tool is required"
 done
 [[ -f "$SOURCE_ROOT/deploy/$SERVICE" ]] || die "NaiveProxy systemd unit is missing"
+[[ -f "$SOURCE_ROOT/hostd/systemd/$HOSTD_SERVICE" ]] || die "NaiveProxy-capable hostd unit is missing"
 
 TX_DIR="$(mktemp -d /root/sg-gateway-naiveproxy-install.XXXXXX)"
 snapshot_path "$PREFIX" prefix HAD_PREFIX
 snapshot_path "$CONFIG_DIR" config HAD_CONFIG
 snapshot_path "$STATE_DIR" state HAD_STATE
 snapshot_path "$SERVICE_PATH" unit HAD_UNIT
+snapshot_path "$HOSTD_SERVICE_PATH" hostd-unit HAD_HOSTD_UNIT
 id -u sg-naiveproxy >/dev/null 2>&1 && HAD_USER=1
 getent group sg-naiveproxy >/dev/null 2>&1 && HAD_GROUP=1
 systemctl is-active --quiet "$SERVICE" 2>/dev/null && WAS_ACTIVE=1
 systemctl is-enabled --quiet "$SERVICE" 2>/dev/null && WAS_ENABLED=1
+systemctl is-active --quiet "$HOSTD_SERVICE" 2>/dev/null && HOSTD_WAS_ACTIVE=1
+systemctl is-enabled --quiet "$HOSTD_SERVICE" 2>/dev/null && HOSTD_WAS_ENABLED=1
 
 install -d -m 0755 "$PREFIX/bin"
 if ! getent group sg-naiveproxy >/dev/null; then groupadd --system sg-naiveproxy; fi
@@ -132,9 +148,15 @@ RUNTIME_URL=$RUNTIME_URL
 EOF
 
 install -m 0644 "$SOURCE_ROOT/deploy/$SERVICE" "$SERVICE_PATH"
+install -m 0644 "$SOURCE_ROOT/hostd/systemd/$HOSTD_SERVICE" "$HOSTD_SERVICE_PATH"
 systemctl daemon-reload
+if (( HOSTD_WAS_ACTIVE == 1 )); then
+  systemctl restart "$HOSTD_SERVICE"
+  systemctl is-active --quiet "$HOSTD_SERVICE" || die "sg-hostd failed after NaiveProxy sandbox update"
+fi
 if (( WAS_ACTIVE == 1 )); then
   systemctl restart "$SERVICE"
+  systemctl is-active --quiet "$SERVICE" || die "NaiveProxy service failed after runtime update"
 fi
 INSTALL_OK=1
 log "NaiveProxy runtime ${RUNTIME_VERSION} installed. Configure domain/users, validate, then enable $SERVICE."
