@@ -28,10 +28,10 @@ def test_runtime_installer_persists_channel_as_data_and_restarts_panel():
     assert 'systemctl is-active --quiet "$PANEL_SERVICE"' in source
 
 
-def test_failed_channel_migration_is_inside_config_and_service_rollback():
+def test_failed_channel_migration_restores_exact_env_and_service_state():
     source = (ROOT / "deploy/install-naiveproxy.sh").read_text()
-    assert 'snapshot_path "$CONFIG_DIR" config HAD_CONFIG' in source
-    assert 'restore_path "$CONFIG_DIR" config "$HAD_CONFIG"' in source
+    assert 'snapshot_path "$PANEL_ENV" panel-env HAD_PANEL_ENV' in source
+    assert 'restore_path "$PANEL_ENV" panel-env "$HAD_PANEL_ENV"' in source
     assert "PANEL_WAS_ACTIVE" in source
     assert "PANEL_WAS_ENABLED" in source
     assert 'restore_service_state "$PANEL_SERVICE" "$PANEL_WAS_ENABLED" "$PANEL_WAS_ACTIVE"' in source

@@ -22,6 +22,7 @@ HAD_CONFIG=0
 HAD_STATE=0
 HAD_UNIT=0
 HAD_HOSTD_UNIT=0
+HAD_PANEL_ENV=0
 HAD_USER=0
 HAD_GROUP=0
 WAS_ACTIVE=0
@@ -124,6 +125,7 @@ rollback_install() {
     restore_path "$STATE_DIR" state "$HAD_STATE"
     restore_path "$SERVICE_PATH" unit "$HAD_UNIT"
     restore_path "$HOSTD_SERVICE_PATH" hostd-unit "$HAD_HOSTD_UNIT"
+    restore_path "$PANEL_ENV" panel-env "$HAD_PANEL_ENV"
     systemctl daemon-reload >/dev/null 2>&1 || true
     restore_service_state "$HOSTD_SERVICE" "$HOSTD_WAS_ENABLED" "$HOSTD_WAS_ACTIVE"
     restore_service_state "$PANEL_SERVICE" "$PANEL_WAS_ENABLED" "$PANEL_WAS_ACTIVE"
@@ -155,6 +157,7 @@ snapshot_path "$CONFIG_DIR" config HAD_CONFIG
 snapshot_path "$STATE_DIR" state HAD_STATE
 snapshot_path "$SERVICE_PATH" unit HAD_UNIT
 snapshot_path "$HOSTD_SERVICE_PATH" hostd-unit HAD_HOSTD_UNIT
+snapshot_path "$PANEL_ENV" panel-env HAD_PANEL_ENV
 id -u sg-naiveproxy >/dev/null 2>&1 && HAD_USER=1
 getent group sg-naiveproxy >/dev/null 2>&1 && HAD_GROUP=1
 systemctl is-active --quiet "$SERVICE" 2>/dev/null && WAS_ACTIVE=1
