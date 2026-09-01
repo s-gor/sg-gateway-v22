@@ -11,11 +11,17 @@ def test_clients_backup_strips_only_server_fields_and_rebinds_naiveproxy():
     assert 'payload["password"]' not in source
 
 
-def test_tls_and_full_restore_resync_naiveproxy():
-    source = (ROOT / "hostd/sg_hostd/naiveproxy_backup_patch.py").read_text()
-    assert "operations.run_tls_maintenance = tls_maintenance" in source
-    assert "full.restore_uploaded_full_backup = restore" in source
-    assert source.count("_sync_if_configured()") >= 3
+def test_tls_resyncs_but_full_restore_uses_common_runtime_transaction():
+    backup = (ROOT / "hostd/sg_hostd/naiveproxy_backup_patch.py").read_text()
+    runtime = (
+        ROOT / "hostd/sg_hostd/naiveproxy_client_runtime_patch.py"
+    ).read_text()
+    commands = (ROOT / "hostd/sg_hostd/naiveproxy_commands.py").read_text()
+    assert "operations.run_tls_maintenance = tls_maintenance" in backup
+    assert "full.restore_uploaded_full_backup = restore" not in backup
+    assert "client_runtime.apply_all_clients = apply_all_clients" in runtime
+    assert "commands.apply_all_clients = apply_all_clients" in runtime
+    assert 'commands._COMMANDS["clients.apply"]' not in commands
 
 
 def test_02207_wrappers_refuse_stable_02206_and_install_runtime():
@@ -29,9 +35,12 @@ def test_02207_wrappers_refuse_stable_02206_and_install_runtime():
         assert "selected TCP port is managed" in source or "runtime transaction completed" in source
 
 
-def test_hostd_import_installs_backup_tls_patch():
+def test_hostd_import_installs_backup_and_common_runtime_patches():
     source = (ROOT / "hostd/sg_hostd/__init__.py").read_text()
     assert "naiveproxy_backup_patch" in source
+    assert "naiveproxy_client_runtime_patch" in source
+    assert "sg_hostd.client_runtime" in source
+    assert "sg_hostd.commands" in source
     assert "sg_hostd.full_backup_runtime" in source
     assert "sg_hostd.data_backup_runtime" in source
     assert "sg_hostd.operation_jobs" in source

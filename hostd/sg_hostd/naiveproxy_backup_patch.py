@@ -45,7 +45,7 @@ def _sync_if_configured() -> None:
     naiveproxy_runtime.sync()
 
 
-def install(full, data, operations) -> None:
+def install(_full, data, operations) -> None:
     if getattr(install, "_installed", False):
         return
 
@@ -89,14 +89,4 @@ def install(full, data, operations) -> None:
         return result
 
     operations.run_tls_maintenance = tls_maintenance
-
-    original_restore = full.restore_uploaded_full_backup
-
-    @wraps(original_restore)
-    def restore(*args, **kwargs):
-        result = original_restore(*args, **kwargs)
-        _sync_if_configured()
-        return result
-
-    full.restore_uploaded_full_backup = restore
     install._installed = True
