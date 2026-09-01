@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from typing import Any
 
+from flask import render_template
+
+from app.security.auth import require_auth
 from app.security.sg_infosec_presentation import (
     get_ip_intelligence_resolver,
     present_guard_overview,
@@ -22,6 +25,7 @@ def register_sg_infosec_presentation(app: Any) -> None:
         management = management_extension.get("client")
         original = getattr(management, "overview", None)
         if callable(original):
+
             def management_overview():
                 return present_management_overview(
                     original(),
@@ -35,6 +39,7 @@ def register_sg_infosec_presentation(app: Any) -> None:
         engine = guard_extension.get("engine")
         original_guard = getattr(engine, "overview", None)
         if callable(original_guard):
+
             def guard_overview():
                 return present_guard_overview(
                     original_guard(),
@@ -42,5 +47,14 @@ def register_sg_infosec_presentation(app: Any) -> None:
                 )
 
             engine.overview = guard_overview
+
+    view_functions = getattr(app, "view_functions", None)
+    if isinstance(view_functions, dict) and "security_infosec_help" in view_functions:
+
+        @require_auth
+        def security_infosec_help_v2():
+            return render_template("sg_infosec_help_v2.html")
+
+        view_functions["security_infosec_help"] = security_infosec_help_v2
 
     extensions["sg_infosec_presentation"] = True
