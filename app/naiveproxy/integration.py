@@ -31,8 +31,37 @@ def _request_sync() -> None:
             assigned = connection.execute(
                 "SELECT COUNT(*) AS total FROM device_credentials WHERE engine = 'naiveproxy'"
             ).fetchone()
-        if not (setting and str(setting["host"] or "").strip()) and int(assigned["total"] or 0) == 0:
+        assigned_total = int(assigned["total"] or 0)
+        configured_host = str(setting["host"] or "").strip() if setting else ""
+        if not configured_host and assigned_total == 0:
             return
+        if not configured_host:
+            from app.security.tls import overview as tls_overview
+            from app.connections.settings import update_connection_settings
+
+            tls = tls_overview()
+            domain = str(tls.get("domain") or "").strip()
+            if not tls.get("https_ready") or not domain:
+                from app.maintenance.operations import log_operation
+                log_operation(
+                    "naiveproxy.sync",
+                    "runtime:naiveproxy",
+                    "NaiveProxy ожидает настроенный HTTPS в Security",
+                    status="warning",
+                )
+                return
+            updated = update_connection_settings(
+                "naiveproxy",
+                domain,
+                DEFAULT_PORT,
+                {
+                    "domain": domain,
+                    "certificate_path": str(tls.get("certificate_path") or ""),
+                    "private_key_path": f"/etc/letsencrypt/live/{domain}/privkey.pem",
+                },
+            )
+            if not updated:
+                raise RuntimeError("Не удалось сохранить настройки NaiveProxy")
 
         from app.hostd.client import run_hostd_command
         from app.maintenance.operations import log_operation
@@ -111,7 +140,7 @@ def _patch_mutations(repository) -> None:
         @wraps(original)
         def wrapped(*args, __original=original, **kwargs):
             result = __original(*args, **kwargs)
-            if result not in (None, False):
+            if result is not False:
                 _request_sync()
             return result
 
