@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from flask import Flask, session
 
 from app.security.sg_infosec_management import register_sg_infosec_management
@@ -13,9 +15,11 @@ class FakeManagementClient:
             "status": "Работает",
             "active_decisions": [],
             "active_count": 0,
+            "history": [],
             "allowlist": [],
             "allowlist_count": 0,
             "audit": [],
+            "last_sync": "now",
             "error": "",
         }
 
@@ -68,6 +72,31 @@ def test_context_processor_exposes_overview_and_csrf_token():
             values.update(processor())
     assert values["sg_infosec"]["available"] is True
     assert values["sg_infosec_csrf_token"]
+
+
+def test_context_processor_does_not_probe_bridge_on_unrelated_pages():
+    app, management = build_app()
+    management.overview = lambda: (_ for _ in ()).throw(AssertionError("unexpected probe"))
+    with app.test_request_context("/login"):
+        values = {}
+        for processor in app.template_context_processors[None]:
+            values.update(processor())
+    assert "sg_infosec" not in values
+
+
+def test_registration_ignores_incomplete_production_test_stub():
+    class ProductionStub:
+        def context_processor(self, func):
+            return func
+
+    register_sg_infosec_management(ProductionStub())
+
+
+def test_partial_has_safe_defaults_and_no_static_endpoint_dependency():
+    body = Path("app/web/templates/_sg_infosec_management.html").read_text(encoding="utf-8")
+    assert "sg_infosec|default" in body
+    assert "url_for('security_infosec_" not in body
+    assert 'action="/security/infosec/block"' in body
 
 
 def test_mutation_requires_authenticated_session():
