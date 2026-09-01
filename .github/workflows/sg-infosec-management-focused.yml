@@ -74,6 +74,14 @@ jobs:
             app/production.py
           bash -n deploy/install-sg-infosec-management-bridge.sh
 
+      - name: Prepare unit verification paths
+        run: |
+          sudo install -d -m 0755 /opt/sg-gateway/.venv/bin /opt/sg-gateway/deploy /etc/sg-gateway
+          sudo ln -s "$(command -v python)" /opt/sg-gateway/.venv/bin/python
+          sudo ln -s /bin/true /opt/sg-gateway/.venv/bin/waitress-serve
+          sudo install -m 0755 deploy/install-sg-infosec-management-bridge.sh /opt/sg-gateway/deploy/install-sg-infosec-management-bridge.sh
+          sudo install -m 0644 /dev/null /etc/sg-gateway/sg-gateway.env
+
       - name: Verify systemd and Unix-only contracts
         run: |
           systemd-analyze verify \

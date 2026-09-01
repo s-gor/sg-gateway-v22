@@ -5,7 +5,7 @@ After=sg-infosec.service
 Wants=sg-infosec.service
 Before=sg-gateway.service
 PartOf=sg-gateway.service
-ConditionPathIsSocket=/run/sg-infosec/control.sock
+ConditionPathExists=/run/sg-infosec/control.sock
 
 [Service]
 Type=simple
