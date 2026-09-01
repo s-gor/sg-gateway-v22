@@ -94,16 +94,17 @@ def test_readable_layout_removes_mandatory_horizontal_tables():
     css = Path("app/web/static/sg-infosec-readable-v2.css").read_text(
         encoding="utf-8"
     )
+    compact = css.replace(" ", "")
     for contract in (
         ".infosec-decision-list",
         ".infosec-decision-card",
         ".infosec-alert-list",
         ".infosec-history-stack",
         ".infosec-disclosure",
-        "overflow-wrap:anywhere",
     ):
         assert contract in css
-    assert "overflow-x:auto" not in css.replace(" ", "")
+    assert "overflow-wrap:anywhere" in compact
+    assert "overflow-x:auto" not in compact
 
 
 def test_ip_intelligence_cache_is_persistent_in_service_and_update_contracts():
