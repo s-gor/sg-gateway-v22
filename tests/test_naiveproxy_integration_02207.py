@@ -76,13 +76,20 @@ def test_first_assignment_prepares_8447_from_security_tls():
     assert "NaiveProxy требует настроенный HTTPS" in source
 
 
-def test_common_clients_apply_includes_naiveproxy():
-    source = (Path(__file__).parents[1] / "hostd/sg_hostd/naiveproxy_commands.py").read_text()
-    assert 'commands._COMMANDS.get("clients.apply")' in source
-    assert 'commands._COMMANDS["clients.apply"] = clients_apply' in source
-    assert "naiveproxy_runtime.sync()" in source
-    assert 'status="error"' in source
-    assert 'combined["naiveproxy"]' in source
+def test_common_clients_apply_includes_naiveproxy_once_inside_runtime():
+    source = (
+        Path(__file__).parents[1]
+        / "hostd/sg_hostd/naiveproxy_client_runtime_patch.py"
+    ).read_text()
+    commands = (
+        Path(__file__).parents[1]
+        / "hostd/sg_hostd/naiveproxy_commands.py"
+    ).read_text()
+    assert "client_runtime.apply_all_clients = apply_all_clients" in source
+    assert "commands.apply_all_clients = apply_all_clients" in source
+    assert "runtime.sync()" in source
+    assert '"critical": True' in source
+    assert 'commands._COMMANDS["clients.apply"]' not in commands
 
 
 def test_hostd_checks_exact_service_pid_before_apply():
