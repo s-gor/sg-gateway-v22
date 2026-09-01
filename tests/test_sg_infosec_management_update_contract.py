@@ -6,6 +6,7 @@ UPDATE_CORE = (ROOT / "deploy/update-from-github-core.sh").read_text(encoding="u
 
 
 def test_update_tracks_bridge_service_state():
+    assert 'INFOSEC_SERVICE="sg-infosec.service"' in UPDATE_CORE
     assert 'INFOSEC_BRIDGE_SERVICE="sg-infosec-management-bridge.service"' in UPDATE_CORE
     assert '"$INFOSEC_BRIDGE_SERVICE"' in UPDATE_CORE
     assert '"$PANEL_SERVICE"|"$HOSTD_SERVICE"|"$AWG31_SERVICE"|"$INFOSEC_BRIDGE_SERVICE")' in UPDATE_CORE
@@ -28,3 +29,8 @@ def test_rollback_stops_bridge_and_removes_new_external_files():
         '"$INFOSEC_BRIDGE_TMPFILES"',
     ):
         assert variable in UPDATE_CORE
+
+
+def test_rollback_reloads_restored_sg_infosec_role_state():
+    assert 'systemctl is-active --quiet "$INFOSEC_SERVICE"' in UPDATE_CORE
+    assert 'systemctl restart "$INFOSEC_SERVICE"' in UPDATE_CORE
