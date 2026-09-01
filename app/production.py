@@ -14,6 +14,9 @@ from app.security.sg_infosec_guard_runtime import (
     register_hardened_sg_infosec_guard,
 )
 from app.security.sg_infosec_management import register_sg_infosec_management
+from app.security.sg_infosec_presentation_runtime import (
+    register_sg_infosec_presentation,
+)
 from app.system_disk_cleanup_http import register_system_disk_cleanup
 from app.xray.xmux_http import register_xmux_http
 
@@ -32,3 +35,4 @@ register_sg_infosec(app)
 register_hardened_sg_infosec_guard(app)
 register_sg_infosec_management(app)
 register_sg_infosec_guard_management(app)
+register_sg_infosec_presentation(app)
