@@ -8,6 +8,15 @@ from pathlib import Path
 ROOT = Path(__file__).parents[1]
 
 
+def _shell_function(source: str, name: str) -> str:
+    match = re.search(
+        rf"(?ms)^{re.escape(name)}\(\) \{{\n.*?^\}}$",
+        source,
+    )
+    assert match is not None, f"shell function is missing: {name}"
+    return match.group(0)
+
+
 def test_runtime_installer_installs_naiveproxy_capable_hostd_unit():
     source = (ROOT / "deploy/install-naiveproxy.sh").read_text()
     assert 'HOSTD_SERVICE="sg-hostd.service"' in source
@@ -55,3 +64,16 @@ def test_hostd_service_imports_with_unit_pythonpath():
         check=False,
     )
     assert result.returncode == 0, result.stderr
+
+
+def test_panel_update_installs_02207_hostd_unit_before_first_restart():
+    core = (ROOT / "deploy/update-from-github-core.sh").read_text()
+    prepare_light = _shell_function(core, "prepare_source_light")
+    deploy = _shell_function(core, "deploy_source")
+    main = _shell_function(core, "main")
+
+    assert "/hostd/systemd/sg-hostd.service" in prepare_light
+    assert '[[ -f "$PREFIX/hostd/systemd/sg-hostd.service" ]]' in deploy
+    assert 'install -m 0644 "$PREFIX/hostd/systemd/sg-hostd.service" "$HOSTD_UNIT"' in deploy
+    assert deploy.index('install -m 0644 "$PREFIX/hostd/systemd/sg-hostd.service" "$HOSTD_UNIT"') < deploy.index("systemctl daemon-reload")
+    assert main.index('run_stage 3 "Обновление исходников SG-Gateway + WSGI migration" deploy_source') < main.index('run_stage 5 "Перезапуск только panel + hostd" restart_panel')
