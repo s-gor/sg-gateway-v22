@@ -8,8 +8,11 @@ PANEL_STATE="${SG_GATEWAY_PANEL_UPDATE_STATE:-/var/lib/sg-gateway/updates/panel-
 BACKUP_ROOT="${SG_GATEWAY_UPDATE_BACKUP_ROOT:-/root/sg-gateway-update-safety}"
 PANEL_SERVICE="sg-gateway.service"
 HOSTD_SERVICE="sg-hostd.service"
+HOSTD_UNIT="/etc/systemd/system/${HOSTD_SERVICE}"
+HOSTD_HEALTH_URL="http://127.0.0.1:8090/health"
 NAIVE_SERVICE="sg-gateway-naiveproxy.service"
 NAIVE_UNIT="/etc/systemd/system/${NAIVE_SERVICE}"
+REQUESTED_SOURCE_COMMIT="${SG_GATEWAY_SOURCE_COMMIT:-}"
 TX_DIR=""
 TX_BACKUP_DIR=""
 SOURCE_COMMIT=""
@@ -29,7 +32,10 @@ trap cleanup EXIT INT TERM
   fail "22.07 updater refuses branch $BRANCH"
 [[ "$REPOSITORY" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || \
   fail "invalid GitHub repository: $REPOSITORY"
-for tool in python3 systemctl curl grep install tar; do
+[[ "$REQUESTED_SOURCE_COMMIT" =~ ^[0-9a-fA-F]{40}$ ]] || \
+  fail "22.07 updater requires exact SG_GATEWAY_SOURCE_COMMIT"
+REQUESTED_SOURCE_COMMIT="${REQUESTED_SOURCE_COMMIT,,}"
+for tool in python3 systemctl curl grep install tar journalctl; do
   command -v "$tool" >/dev/null 2>&1 || fail "$tool is required"
 done
 
@@ -54,6 +60,98 @@ capture_naive_prestate() {
   return 0
 }
 
+dump_required_service_failure() {
+  local service="$1"
+  log "Service readiness diagnostics: $service"
+  systemctl --no-pager --full status "$service" >&2 || true
+  journalctl -u "$service" -n 80 --no-pager >&2 || true
+}
+
+wait_for_required_service() {
+  local service="$1" attempt current_pid="" stable_pid="" consecutive=0 required=3
+  [[ "$service" == "$HOSTD_SERVICE" ]] && required=6
+
+  for attempt in {1..15}; do
+    current_pid=""
+    if systemctl is-active --quiet "$service"; then
+      current_pid="$(systemctl show -p MainPID --value "$service" 2>/dev/null || true)"
+      if [[ "$current_pid" =~ ^[1-9][0-9]*$ ]]; then
+        if [[ "$service" != "$HOSTD_SERVICE" ]] || \
+           curl -4fsS --connect-timeout 1 --max-time 2 "$HOSTD_HEALTH_URL" >/dev/null 2>&1; then
+          if [[ "$current_pid" == "$stable_pid" ]]; then
+            ((consecutive += 1))
+          else
+            stable_pid="$current_pid"
+            consecutive=1
+          fi
+          if (( consecutive >= required )); then
+            return 0
+          fi
+        else
+          stable_pid=""
+          consecutive=0
+        fi
+      else
+        stable_pid=""
+        consecutive=0
+      fi
+    else
+      stable_pid=""
+      consecutive=0
+    fi
+    sleep 1
+  done
+
+  return 1
+}
+
+prepare_hostd_preflight_bridge() {
+  local staged="$TX_DIR/sg-hostd-preflight.service"
+  local url="https://raw.githubusercontent.com/${REPOSITORY}/${REQUESTED_SOURCE_COMMIT}/hostd/systemd/sg-hostd.service"
+
+  log "Preparing exact-commit hostd preflight bridge: ${REQUESTED_SOURCE_COMMIT:0:12}"
+  curl -4fL \
+    --connect-timeout 15 \
+    --max-time 120 \
+    --retry 5 \
+    --retry-all-errors \
+    --retry-delay 2 \
+    -o "$staged" \
+    "$url" || return 1
+
+  grep -Fqx \
+    'Environment=PYTHONPATH=/opt/sg-gateway:/opt/sg-gateway/hostd' \
+    "$staged" || {
+      log "ERROR: preflight hostd unit has an invalid Python import path"
+      return 1
+    }
+  grep -Fqx \
+    'ReadWritePaths=-/run/sg-gateway -/usr/local/share/xray -/etc/sg-gateway/naiveproxy -/var/lib/sg-gateway' \
+    "$staged" || {
+      log "ERROR: preflight hostd unit has invalid writable paths"
+      return 1
+    }
+  grep -Fq 'sg_hostd.app:app' "$staged" || {
+    log "ERROR: preflight hostd unit has an unexpected ExecStart"
+    return 1
+  }
+
+  install -o root -g root -m 0644 "$staged" "$HOSTD_UNIT" || return 1
+  systemctl daemon-reload || return 1
+  if ! systemctl restart "$HOSTD_SERVICE"; then
+    dump_required_service_failure "$HOSTD_SERVICE"
+    return 1
+  fi
+  if ! wait_for_required_service "$HOSTD_SERVICE"; then
+    log "ERROR: hostd did not remain ready after exact-commit unit bridge"
+    dump_required_service_failure "$HOSTD_SERVICE"
+    return 1
+  fi
+
+  log "Hostd preflight bridge ready: stable MainPID + /health"
+  return 0
+}
+
 recover_required_services_after_panel_failure() {
   local service recovery_failed=0
 
@@ -66,16 +164,18 @@ recover_required_services_after_panel_failure() {
     if ! systemctl is-active --quiet "$service"; then
       if ! systemctl start "$service"; then
         log "ROLLBACK INCOMPLETE: failed to start required service $service"
+        dump_required_service_failure "$service"
         recovery_failed=1
         continue
       fi
     fi
 
-    if ! systemctl is-active --quiet "$service"; then
-      log "ROLLBACK INCOMPLETE: required service is not active: $service"
+    if ! wait_for_required_service "$service"; then
+      log "ROLLBACK INCOMPLETE: required service did not remain ready: $service"
+      dump_required_service_failure "$service"
       recovery_failed=1
     else
-      log "ROLLBACK VERIFIED: $service is active"
+      log "ROLLBACK VERIFIED: $service is ready"
     fi
   done
 
@@ -85,6 +185,8 @@ recover_required_services_after_panel_failure() {
 run_panel_update() {
   local panel_rc
 
+  prepare_hostd_preflight_bridge || return 1
+
   set +e
   SG_GATEWAY_GITHUB_BRANCH="$BRANCH" bash "$PREFIX/deploy/update-from-github.sh"
   panel_rc=$?
@@ -93,7 +195,7 @@ run_panel_update() {
   if (( panel_rc != 0 )); then
     log "Base panel update failed; verifying required services after rollback..."
     if recover_required_services_after_panel_failure; then
-      log "Base panel update failed; required services are active after rollback."
+      log "Base panel update failed; required services are ready after rollback."
     else
       log "ERROR: base panel update failed and rollback recovery is incomplete"
     fi
@@ -133,6 +235,8 @@ PY
   IFS=$'\t' read -r TX_BACKUP_DIR SOURCE_COMMIT <<< "$resolved"
   [[ -n "$TX_BACKUP_DIR" ]] || fail "empty Safety Backup path"
   [[ "$SOURCE_COMMIT" =~ ^[0-9a-f]{40}$ ]] || fail "invalid exact source commit"
+  [[ "$SOURCE_COMMIT" == "$REQUESTED_SOURCE_COMMIT" ]] || \
+    fail "panel update source commit does not match requested exact commit"
   tar -tf "$TX_BACKUP_DIR/state.tar" >/dev/null 2>&1 || \
     fail "Safety Backup archive is invalid: $TX_BACKUP_DIR"
 }
