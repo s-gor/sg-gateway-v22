@@ -6,6 +6,7 @@ RUNTIME_ARCHIVE_SHA256="19eccb7321dd877a5fb4a3dba6ef1b745185188b616c96cc6201f1a1
 RUNTIME_URL="https://github.com/klzgrad/forwardproxy/releases/download/${RUNTIME_VERSION}/caddy-forwardproxy-naive.tar.xz"
 PREFIX="/opt/sg-gateway/naiveproxy"
 CONFIG_DIR="/etc/sg-gateway/naiveproxy"
+PANEL_CONFIG_DIR="/etc/sg-gateway"
 STATE_DIR="/var/lib/sg-gateway/naiveproxy"
 SERVICE="sg-gateway-naiveproxy.service"
 SERVICE_PATH="/etc/systemd/system/$SERVICE"
@@ -16,6 +17,7 @@ PANEL_ENV="/etc/sg-gateway/sg-gateway.env"
 UPDATE_BRANCH="${SG_GATEWAY_UPDATE_BRANCH:-}"
 SOURCE_ROOT="${SG_GATEWAY_SOURCE_ROOT:-/opt/sg-gateway}"
 TX_DIR=""
+PANEL_CONFIG_MODE=""
 INSTALL_OK=0
 HAD_PREFIX=0
 HAD_CONFIG=0
@@ -126,6 +128,9 @@ rollback_install() {
     restore_path "$SERVICE_PATH" unit "$HAD_UNIT"
     restore_path "$HOSTD_SERVICE_PATH" hostd-unit "$HAD_HOSTD_UNIT"
     restore_path "$PANEL_ENV" panel-env "$HAD_PANEL_ENV"
+    if [[ -n "$PANEL_CONFIG_MODE" && -d "$PANEL_CONFIG_DIR" ]]; then
+      chmod "$PANEL_CONFIG_MODE" "$PANEL_CONFIG_DIR" || true
+    fi
     systemctl daemon-reload >/dev/null 2>&1 || true
     restore_service_state "$HOSTD_SERVICE" "$HOSTD_WAS_ENABLED" "$HOSTD_WAS_ACTIVE"
     restore_service_state "$PANEL_SERVICE" "$PANEL_WAS_ENABLED" "$PANEL_WAS_ACTIVE"
@@ -145,11 +150,12 @@ trap cleanup EXIT
 
 [[ ${EUID:-$(id -u)} -eq 0 ]] || die "install-naiveproxy.sh requires root"
 [[ "$(uname -m)" == "x86_64" ]] || die "Pinned NaiveProxy runtime currently supports x86_64 only"
-for tool in curl tar sha256sum systemctl python3; do
+for tool in curl tar sha256sum systemctl python3 stat; do
   command -v "$tool" >/dev/null 2>&1 || die "$tool is required"
 done
 [[ -f "$SOURCE_ROOT/deploy/$SERVICE" ]] || die "NaiveProxy systemd unit is missing"
 [[ -f "$SOURCE_ROOT/hostd/systemd/$HOSTD_SERVICE" ]] || die "NaiveProxy-capable hostd unit is missing"
+[[ -d "$PANEL_CONFIG_DIR" ]] || die "Panel config directory is missing: $PANEL_CONFIG_DIR"
 
 TX_DIR="$(mktemp -d /root/sg-gateway-naiveproxy-install.XXXXXX)"
 snapshot_path "$PREFIX" prefix HAD_PREFIX
@@ -158,6 +164,7 @@ snapshot_path "$STATE_DIR" state HAD_STATE
 snapshot_path "$SERVICE_PATH" unit HAD_UNIT
 snapshot_path "$HOSTD_SERVICE_PATH" hostd-unit HAD_HOSTD_UNIT
 snapshot_path "$PANEL_ENV" panel-env HAD_PANEL_ENV
+PANEL_CONFIG_MODE="$(stat -c '%a' "$PANEL_CONFIG_DIR")"
 id -u sg-naiveproxy >/dev/null 2>&1 && HAD_USER=1
 getent group sg-naiveproxy >/dev/null 2>&1 && HAD_GROUP=1
 systemctl is-active --quiet "$SERVICE" 2>/dev/null && WAS_ACTIVE=1
@@ -172,6 +179,7 @@ if ! getent group sg-naiveproxy >/dev/null; then groupadd --system sg-naiveproxy
 if ! id -u sg-naiveproxy >/dev/null 2>&1; then
   useradd --system --gid sg-naiveproxy --home-dir "$STATE_DIR" --shell /usr/sbin/nologin sg-naiveproxy
 fi
+chmod o+x "$PANEL_CONFIG_DIR"
 install -d -o root -g sg-naiveproxy -m 0750 "$CONFIG_DIR"
 install -d -o sg-naiveproxy -g sg-naiveproxy -m 0700 "$STATE_DIR"
 install -d -o sg-naiveproxy -g sg-naiveproxy -m 0750 "$STATE_DIR/site"
