@@ -365,7 +365,21 @@ run_naive_stage() {
   stage_naive_hostd_unit || return 1
   SG_GATEWAY_SOURCE_ROOT="$PREFIX" \
   SG_GATEWAY_UPDATE_BRANCH="$BRANCH" \
-    bash "$PREFIX/deploy/install-naiveproxy.sh"
+    bash "$PREFIX/deploy/install-naiveproxy.sh" || return 1
+
+  if ! wait_for_required_service "$HOSTD_SERVICE"; then
+    log "ERROR: hostd did not remain ready after NaiveProxy post-stage"
+    dump_required_service_failure "$HOSTD_SERVICE"
+    return 1
+  fi
+  if ! wait_for_required_service "$PANEL_SERVICE"; then
+    log "ERROR: panel did not remain ready after NaiveProxy post-stage"
+    dump_required_service_failure "$PANEL_SERVICE"
+    return 1
+  fi
+
+  log "Post-Naive readiness verified: hostd + panel"
+  return 0
 }
 
 capture_naive_prestate
