@@ -191,14 +191,18 @@ fi
 work="$TX_DIR/download"
 mkdir -p "$work"
 archive="$work/caddy-forwardproxy-naive.tar.xz"
-curl -fL --retry 3 --connect-timeout 15 -o "$archive" "$RUNTIME_URL"
+curl -fsSL --retry 3 --connect-timeout 15 -o "$archive" "$RUNTIME_URL"
 printf '%s  %s\n' "$RUNTIME_ARCHIVE_SHA256" "$archive" | sha256sum -c - >/dev/null
 tar -xJf "$archive" -C "$work"
 candidate="$work/caddy-forwardproxy-naive/caddy"
 [[ -x "$candidate" ]] || die "Pinned archive does not contain executable caddy"
 "$candidate" list-modules | grep -qx 'http.handlers.forward_proxy' || die "forward_proxy module missing"
 if [[ -f "$CONFIG_DIR/Caddyfile" ]]; then
-  "$candidate" validate --config "$CONFIG_DIR/Caddyfile" --adapter caddyfile >/dev/null
+  caddy_validate_log="$TX_DIR/caddy-validate.log"
+  if ! "$candidate" validate --config "$CONFIG_DIR/Caddyfile" --adapter caddyfile >"$caddy_validate_log" 2>&1; then
+    cat "$caddy_validate_log" >&2
+    die "Caddy configuration validation failed"
+  fi
 fi
 
 install -m 0755 "$candidate" "$PREFIX/bin/caddy.new"
