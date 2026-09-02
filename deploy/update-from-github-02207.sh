@@ -6,6 +6,8 @@ BRANCH="${SG_GATEWAY_GITHUB_BRANCH:-dev-02207}"
 PREFIX="${SG_GATEWAY_PREFIX:-/opt/sg-gateway}"
 PANEL_STATE="${SG_GATEWAY_PANEL_UPDATE_STATE:-/var/lib/sg-gateway/updates/panel-state.json}"
 BACKUP_ROOT="${SG_GATEWAY_UPDATE_BACKUP_ROOT:-/root/sg-gateway-update-safety}"
+PANEL_SERVICE="sg-gateway.service"
+HOSTD_SERVICE="sg-hostd.service"
 NAIVE_SERVICE="sg-gateway-naiveproxy.service"
 NAIVE_UNIT="/etc/systemd/system/${NAIVE_SERVICE}"
 TX_DIR=""
@@ -49,6 +51,55 @@ capture_naive_prestate() {
   if systemctl is-enabled --quiet "$NAIVE_SERVICE" 2>/dev/null; then
     NAIVE_WAS_ENABLED=1
   fi
+  return 0
+}
+
+recover_required_services_after_panel_failure() {
+  local service recovery_failed=0
+
+  if ! systemctl daemon-reload >/dev/null 2>&1; then
+    log "ROLLBACK INCOMPLETE: systemd daemon-reload failed"
+    recovery_failed=1
+  fi
+
+  for service in "$HOSTD_SERVICE" "$PANEL_SERVICE"; do
+    if ! systemctl is-active --quiet "$service"; then
+      if ! systemctl start "$service"; then
+        log "ROLLBACK INCOMPLETE: failed to start required service $service"
+        recovery_failed=1
+        continue
+      fi
+    fi
+
+    if ! systemctl is-active --quiet "$service"; then
+      log "ROLLBACK INCOMPLETE: required service is not active: $service"
+      recovery_failed=1
+    else
+      log "ROLLBACK VERIFIED: $service is active"
+    fi
+  done
+
+  return "$recovery_failed"
+}
+
+run_panel_update() {
+  local panel_rc
+
+  set +e
+  SG_GATEWAY_GITHUB_BRANCH="$BRANCH" bash "$PREFIX/deploy/update-from-github.sh"
+  panel_rc=$?
+  set -e
+
+  if (( panel_rc != 0 )); then
+    log "Base panel update failed; verifying required services after rollback..."
+    if recover_required_services_after_panel_failure; then
+      log "Base panel update failed; required services are active after rollback."
+    else
+      log "ERROR: base panel update failed and rollback recovery is incomplete"
+    fi
+    return "$panel_rc"
+  fi
+
   return 0
 }
 
@@ -155,6 +206,7 @@ restore_naive_identity_and_unit() {
 
 rollback_panel_update() {
   local core="$PREFIX/deploy/update-from-github-core.sh"
+  local rollback_rc=0
   [[ -f "$core" ]] || {
     log "ROLLBACK ERROR: core updater is missing: $core"
     return 1
@@ -166,8 +218,10 @@ rollback_panel_update() {
   BACKUP_DIR="$TX_BACKUP_DIR"
   BACKUP_READY=1
   UPDATE_FINISHED=0
-  rollback_update
+  rollback_update || rollback_rc=$?
   restore_naive_identity_and_unit
+  recover_required_services_after_panel_failure || rollback_rc=1
+  return "$rollback_rc"
 }
 
 run_naive_stage() {
@@ -178,7 +232,7 @@ run_naive_stage() {
 }
 
 capture_naive_prestate
-SG_GATEWAY_GITHUB_BRANCH="$BRANCH" bash "$PREFIX/deploy/update-from-github.sh"
+run_panel_update
 resolve_safety_backup
 
 set +e
