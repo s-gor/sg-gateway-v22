@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feature/02207-naiveproxy
+      - dev-02207
   pull_request:
     branches:
       - dev-02207
