@@ -55,3 +55,18 @@ def test_hostd_service_imports_with_unit_pythonpath():
         check=False,
     )
     assert result.returncode == 0, result.stderr
+
+
+def test_02207_hostd_import_survives_pre_migration_02206_unit_environment():
+    env = os.environ.copy()
+    env.pop("PYTHONPATH", None)
+    result = subprocess.run(
+        [sys.executable, "-c", "import sg_hostd.app"],
+        cwd=ROOT / "hostd",
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
