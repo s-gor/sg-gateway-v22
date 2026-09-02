@@ -42,6 +42,12 @@ done
 
 capture_naive_prestate() {
   TX_DIR="$(mktemp -d /root/sg-gateway-02207-transaction.XXXXXX)"
+  install -d -m 0700 "$TX_DIR/curl-home"
+  cat > "$TX_DIR/curl-home/.curlrc" <<'EOF'
+silent
+show-error
+EOF
+  export CURL_HOME="$TX_DIR/curl-home"
   if [[ -e "$NAIVE_UNIT" || -L "$NAIVE_UNIT" ]]; then
     cp -a -- "$NAIVE_UNIT" "$TX_DIR/naive-unit"
     NAIVE_UNIT_EXISTED=1
