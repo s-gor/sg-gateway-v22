@@ -22,6 +22,7 @@ def test_wrapper_stages_exact_naiveproxy_hostd_unit() -> None:
     assert "${SOURCE_COMMIT}/hostd/systemd/sg-hostd.service" in function
     assert '"$PREFIX/hostd/systemd/sg-hostd.service"' in function
     assert "ReadWritePaths=-/run/sg-gateway" in function
+    assert "Environment=PYTHONPATH=/opt/sg-gateway:/opt/sg-gateway/hostd" in function
 
 
 def test_hostd_unit_staging_is_inside_rollback_protected_stage() -> None:
