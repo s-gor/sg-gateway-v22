@@ -1,5 +1,21 @@
 """Limited host helper for SG-Gateway."""
 
+# During an in-place update the 22.07 Python sources are deployed before the
+# 22.07 sg-hostd systemd unit is installed. The still-running 22.06 unit starts
+# from /opt/sg-gateway/hostd without PYTHONPATH, while hostd modules import the
+# sibling top-level app package. Bootstrap the source-tree root before any
+# package initialization imports so the transition can start safely. The 22.07
+# unit still declares the explicit PYTHONPATH as the steady-state contract.
+import sys as _sys
+from pathlib import Path as _Path
+
+_runtime_root = str(_Path(__file__).resolve().parents[2])
+if _runtime_root not in _sys.path:
+    _sys.path.insert(0, _runtime_root)
+del _runtime_root
+del _Path
+del _sys
+
 
 # SG_GATEWAY_02206_CLIENTS_KEYS_FINAL_CONTRACT_V1
 def _install_clients_keys_contract() -> None:
