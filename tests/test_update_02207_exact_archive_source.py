@@ -18,7 +18,12 @@ export SG_GATEWAY_UPDATE_CORE_LIBRARY_ONLY=1
 export SG_GATEWAY_UPDATE_SOURCE_MODE=archive
 source {CORE!s}
 prepare_source_light() {{ printf '%s\\n' LIGHT >> {trace!s}; return 97; }}
-prepare_source_archive() {{ printf '%s\\n' ARCHIVE >> {trace!s}; return 0; }}
+prepare_source_archive() {{
+  mkdir -p {dest!s}
+  printf '%s\\n' ARCHIVE >> {trace!s}
+  printf '%s\\n' 0.1.0 > {dest!s}/VERSION
+  return 0
+}}
 prepare_source {dest!s} 5193bde751b14effba04450b4dc4619c67fd4162 {work!s}
 cat {trace!s}
 '''
