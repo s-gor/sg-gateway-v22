@@ -1,4 +1,5 @@
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -32,9 +33,18 @@ def test_stable_hostd_sandbox_requires_02207_unit_migration():
     assert "-/var/lib/sg-gateway" in unit
 
 
-def test_hostd_service_imports_from_systemd_working_directory():
+def test_hostd_service_imports_with_unit_pythonpath():
+    unit = (ROOT / "hostd/systemd/sg-hostd.service").read_text()
+    match = re.search(r"^Environment=PYTHONPATH=(.+)$", unit, re.MULTILINE)
+    assert match, "sg-hostd.service must declare PYTHONPATH"
+
+    configured = match.group(1).strip().strip('"')
+    assert "/opt/sg-gateway" in configured.split(":")
+    assert "/opt/sg-gateway/hostd" in configured.split(":")
+
+    local_pythonpath = configured.replace("/opt/sg-gateway", str(ROOT))
     env = os.environ.copy()
-    env.pop("PYTHONPATH", None)
+    env["PYTHONPATH"] = local_pythonpath
     result = subprocess.run(
         [sys.executable, "-c", "import sg_hostd.app"],
         cwd=ROOT / "hostd",
