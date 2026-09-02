@@ -188,7 +188,14 @@ run_panel_update() {
   prepare_hostd_preflight_bridge || return 1
 
   set +e
-  SG_GATEWAY_GITHUB_BRANCH="$BRANCH" bash "$PREFIX/deploy/update-from-github.sh"
+  GIT_TERMINAL_PROMPT=0 \
+  GIT_ASKPASS=/bin/false \
+  GCM_INTERACTIVE=Never \
+  SG_GATEWAY_GITHUB_REPOSITORY="$REPOSITORY" \
+  SG_GATEWAY_GIT_URL="https://github.com/${REPOSITORY}.git" \
+  SG_GATEWAY_GITHUB_BRANCH="$BRANCH" \
+  SG_GATEWAY_SOURCE_COMMIT="$REQUESTED_SOURCE_COMMIT" \
+    bash "$PREFIX/deploy/update-from-github.sh"
   panel_rc=$?
   set -e
 
