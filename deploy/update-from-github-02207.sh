@@ -110,6 +110,12 @@ stage_naive_hostd_unit() {
       log "ERROR: fetched hostd unit is not NaiveProxy-capable"
       return 1
     }
+  grep -Fqx \
+    'Environment=PYTHONPATH=/opt/sg-gateway:/opt/sg-gateway/hostd' \
+    "$staged" || {
+      log "ERROR: fetched hostd unit has an invalid Python import path"
+      return 1
+    }
   grep -Fq 'sg_hostd.app:app' "$staged" || {
     log "ERROR: fetched hostd unit has an unexpected ExecStart"
     return 1
