@@ -1,3 +1,6 @@
+import os
+import subprocess
+import sys
 from pathlib import Path
 
 
@@ -27,3 +30,18 @@ def test_stable_hostd_sandbox_requires_02207_unit_migration():
     unit = (ROOT / "hostd/systemd/sg-hostd.service").read_text()
     assert "-/etc/sg-gateway/naiveproxy" in unit
     assert "-/var/lib/sg-gateway" in unit
+
+
+def test_hostd_service_imports_from_systemd_working_directory():
+    env = os.environ.copy()
+    env.pop("PYTHONPATH", None)
+    result = subprocess.run(
+        [sys.executable, "-c", "import sg_hostd.app"],
+        cwd=ROOT / "hostd",
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
