@@ -17,6 +17,7 @@ ProtectHome=true
 ProtectSystem=strict
 RuntimeDirectory=sg-gateway
 RuntimeDirectoryMode=0755
+LogsDirectory=sg-gateway
 ReadWritePaths=-/run/sg-gateway -/usr/local/share/xray -/etc/sg-gateway/naiveproxy -/var/lib/sg-gateway
 
 [Install]

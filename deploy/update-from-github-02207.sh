@@ -131,6 +131,10 @@ prepare_hostd_preflight_bridge() {
       log "ERROR: preflight hostd unit has invalid writable paths"
       return 1
     }
+  grep -Fqx 'LogsDirectory=sg-gateway' "$staged" || {
+    log "ERROR: preflight hostd unit has no writable operation job log directory"
+    return 1
+  }
   grep -Fq 'sg_hostd.app:app' "$staged" || {
     log "ERROR: preflight hostd unit has an unexpected ExecStart"
     return 1
@@ -278,6 +282,10 @@ stage_naive_hostd_unit() {
       log "ERROR: fetched hostd unit has an invalid Python import path"
       return 1
     }
+  grep -Fqx 'LogsDirectory=sg-gateway' "$staged" || {
+    log "ERROR: fetched hostd unit has no writable operation job log directory"
+    return 1
+  }
   grep -Fq 'sg_hostd.app:app' "$staged" || {
     log "ERROR: fetched hostd unit has an unexpected ExecStart"
     return 1
