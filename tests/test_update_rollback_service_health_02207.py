@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).parents[1]
-CORE = ROOT / "deploy/update-from-github-core.sh"
+WRAPPER = ROOT / "deploy/update-from-github-02207.sh"
 
 
 def _shell_function(source: str, name: str) -> str:
@@ -17,29 +17,33 @@ def _shell_function(source: str, name: str) -> str:
     return match.group(0)
 
 
-def test_rollback_reports_failed_service_restoration_instead_of_false_ok():
-    source = CORE.read_text(encoding="utf-8")
-    rollback = _shell_function(source, "rollback_update")
+def test_02207_wrapper_recovers_required_services_after_base_update_failure():
+    source = WRAPPER.read_text(encoding="utf-8")
+    recovery = _shell_function(source, "recover_required_services_after_panel_failure")
 
-    assert "rollback_failed=0" in rollback
-    assert "ROLLBACK INCOMPLETE" in rollback
-    assert 'if ! systemctl restart "$service"' in rollback
-    assert 'if ! systemctl stop "$service"' in rollback
-    assert 'if ! systemctl enable "$service"' in rollback
-    assert 'if ! systemctl disable "$service"' in rollback
-    assert 'if (( rollback_failed != 0 )); then' in rollback
-
-    incomplete_pos = rollback.index("ROLLBACK INCOMPLETE")
-    ok_pos = rollback.index("ROLLBACK OK")
-    assert incomplete_pos < ok_pos
+    assert 'for service in "$HOSTD_SERVICE" "$PANEL_SERVICE"' in recovery
+    assert 'if ! systemctl is-active --quiet "$service"' in recovery
+    assert 'if ! systemctl start "$service"' in recovery
+    assert 'ROLLBACK INCOMPLETE' in recovery
+    assert 'ROLLBACK VERIFIED' in recovery
+    assert 'return "$recovery_failed"' in recovery
 
 
-def test_error_trap_allows_best_effort_rollback_to_finish_before_exit():
-    source = CORE.read_text(encoding="utf-8")
-    on_error = _shell_function(source, "on_error")
+def test_02207_wrapper_checks_recovery_when_base_updater_fails():
+    source = WRAPPER.read_text(encoding="utf-8")
+    runner = _shell_function(source, "run_panel_update")
 
-    # rollback_update performs all restoration attempts and reports its own
-    # health. The ERR handler must still preserve the original update rc.
-    assert "local rc=$?" in on_error
-    assert "rollback_update || true" in on_error
-    assert 'exit "$rc"' in on_error
+    assert "set +e" in runner
+    assert 'SG_GATEWAY_GITHUB_BRANCH="$BRANCH" bash "$PREFIX/deploy/update-from-github.sh"' in runner
+    assert "panel_rc=$?" in runner
+    assert "set -e" in runner
+    assert "if (( panel_rc != 0 )); then" in runner
+    assert "recover_required_services_after_panel_failure" in runner
+    assert 'return "$panel_rc"' in runner
+
+
+def test_02207_main_flow_uses_guarded_panel_update_runner():
+    source = WRAPPER.read_text(encoding="utf-8")
+    marker = "capture_naive_prestate\nrun_panel_update\nresolve_safety_backup"
+
+    assert marker in source
