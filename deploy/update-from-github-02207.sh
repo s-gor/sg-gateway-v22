@@ -106,7 +106,7 @@ wait_for_required_service() {
 }
 
 prepare_hostd_preflight_bridge() {
-  local staged="$TX_DIR/sg-hostd-preflight.service"
+  local staged="$TX_DIR/sg-hostd-preflight.service" required_env
   local url="https://raw.githubusercontent.com/${REPOSITORY}/${REQUESTED_SOURCE_COMMIT}/hostd/systemd/sg-hostd.service"
 
   log "Preparing exact-commit hostd preflight bridge: ${REQUESTED_SOURCE_COMMIT:0:12}"
@@ -135,6 +135,15 @@ prepare_hostd_preflight_bridge() {
     log "ERROR: preflight hostd unit has no writable operation job log directory"
     return 1
   }
+  for required_env in \
+    'EnvironmentFile=/etc/sg-gateway/sg-gateway.env' \
+    'EnvironmentFile=/etc/sg-gateway/runtime.env' \
+    'EnvironmentFile=/etc/sg-gateway/engine-secrets.env'; do
+    grep -Fqx "$required_env" "$staged" || {
+      log "ERROR: preflight hostd unit dropped required runtime environment: $required_env"
+      return 1
+    }
+  done
   grep -Fq 'sg_hostd.app:app' "$staged" || {
     log "ERROR: preflight hostd unit has an unexpected ExecStart"
     return 1
@@ -253,7 +262,7 @@ PY
 }
 
 stage_naive_hostd_unit() {
-  local staged="$TX_DIR/sg-hostd.service"
+  local staged="$TX_DIR/sg-hostd.service" required_env
   local target="$PREFIX/hostd/systemd/sg-hostd.service"
   local url="https://raw.githubusercontent.com/${REPOSITORY}/${SOURCE_COMMIT}/hostd/systemd/sg-hostd.service"
 
@@ -286,6 +295,15 @@ stage_naive_hostd_unit() {
     log "ERROR: fetched hostd unit has no writable operation job log directory"
     return 1
   }
+  for required_env in \
+    'EnvironmentFile=/etc/sg-gateway/sg-gateway.env' \
+    'EnvironmentFile=/etc/sg-gateway/runtime.env' \
+    'EnvironmentFile=/etc/sg-gateway/engine-secrets.env'; do
+    grep -Fqx "$required_env" "$staged" || {
+      log "ERROR: fetched hostd unit dropped required runtime environment: $required_env"
+      return 1
+    }
+  done
   grep -Fq 'sg_hostd.app:app' "$staged" || {
     log "ERROR: fetched hostd unit has an unexpected ExecStart"
     return 1
