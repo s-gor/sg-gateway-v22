@@ -16,6 +16,7 @@ REQUESTED_SOURCE_COMMIT="${SG_GATEWAY_SOURCE_COMMIT:-}"
 TX_DIR=""
 TX_BACKUP_DIR=""
 SOURCE_COMMIT=""
+PANEL_UPDATE_CORE=""
 NAIVE_UNIT_EXISTED=0
 NAIVE_USER_EXISTED=0
 NAIVE_GROUP_EXISTED=0
@@ -35,7 +36,7 @@ trap cleanup EXIT INT TERM
 [[ "$REQUESTED_SOURCE_COMMIT" =~ ^[0-9a-fA-F]{40}$ ]] || \
   fail "22.07 updater requires exact SG_GATEWAY_SOURCE_COMMIT"
 REQUESTED_SOURCE_COMMIT="${REQUESTED_SOURCE_COMMIT,,}"
-for tool in python3 systemctl curl grep install tar journalctl; do
+for tool in bash python3 systemctl curl grep install tar journalctl; do
   command -v "$tool" >/dev/null 2>&1 || fail "$tool is required"
 done
 
@@ -165,6 +166,45 @@ prepare_hostd_preflight_bridge() {
   return 0
 }
 
+prepare_panel_update_core() {
+  local staged="$TX_DIR/update-from-github-core.sh"
+  local url="https://raw.githubusercontent.com/${REPOSITORY}/${REQUESTED_SOURCE_COMMIT}/deploy/update-from-github-core.sh"
+
+  log "Preparing exact-commit panel updater core: ${REQUESTED_SOURCE_COMMIT:0:12}"
+  curl -4fL \
+    --connect-timeout 15 \
+    --max-time 120 \
+    --retry 5 \
+    --retry-all-errors \
+    --retry-delay 2 \
+    -o "$staged" \
+    "$url" || return 1
+
+  bash -n "$staged" || {
+    log "ERROR: exact-commit panel updater core has invalid shell syntax"
+    return 1
+  }
+  grep -Fq '# SG_GATEWAY_UPDATE_CORE' "$staged" || {
+    log "ERROR: exact-commit panel updater core marker is missing"
+    return 1
+  }
+  grep -Fq 'prepare_source_archive()' "$staged" || {
+    log "ERROR: exact-commit panel updater core has no archive source path"
+    return 1
+  }
+  grep -Fq 'prepare_source_light()' "$staged" || {
+    log "ERROR: exact-commit panel updater core has no source selector hook"
+    return 1
+  }
+  grep -Fq 'SG_GATEWAY_UPDATE_CORE_LIBRARY_ONLY' "$staged" || {
+    log "ERROR: exact-commit panel updater core cannot be sourced safely"
+    return 1
+  }
+
+  PANEL_UPDATE_CORE="$staged"
+  return 0
+}
+
 recover_required_services_after_panel_failure() {
   local service recovery_failed=0
 
@@ -199,16 +239,26 @@ run_panel_update() {
   local panel_rc
 
   prepare_hostd_preflight_bridge || return 1
+  prepare_panel_update_core || return 1
 
   set +e
-  GIT_TERMINAL_PROMPT=0 \
-  GIT_ASKPASS=/bin/false \
-  GCM_INTERACTIVE=Never \
+  SG_GATEWAY_UPDATE_CORE_LIBRARY_ONLY=1 \
   SG_GATEWAY_GITHUB_REPOSITORY="$REPOSITORY" \
-  SG_GATEWAY_GIT_URL="https://github.com/${REPOSITORY}.git" \
   SG_GATEWAY_GITHUB_BRANCH="$BRANCH" \
   SG_GATEWAY_SOURCE_COMMIT="$REQUESTED_SOURCE_COMMIT" \
-    bash "$PREFIX/deploy/update-from-github.sh"
+    bash -c '
+      set -Eeuo pipefail
+      core="$1"
+      source "$core"
+      printf "[SG-Gateway Update] 22.07 exact source policy: archive by commit; Git LIGHT disabled.\n"
+      prepare_source_light() {
+        prepare_source_archive
+      }
+      trap on_error ERR
+      trap "exit 130" INT TERM
+      trap cleanup EXIT
+      main
+    ' _ "$PANEL_UPDATE_CORE"
   panel_rc=$?
   set -e
 

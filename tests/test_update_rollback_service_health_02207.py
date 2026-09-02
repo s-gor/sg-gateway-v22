@@ -56,8 +56,8 @@ def test_02207_wrapper_installs_exact_hostd_bridge_before_base_preflight():
     assert 'systemctl restart "$HOSTD_SERVICE"' in bridge
     assert 'wait_for_required_service "$HOSTD_SERVICE"' in bridge
     assert runner.index("prepare_hostd_preflight_bridge") < runner.index(
-        'bash "$PREFIX/deploy/update-from-github.sh"'
-    )
+        "prepare_panel_update_core"
+    ) < runner.index("bash -c")
 
 
 def test_02207_wrapper_checks_recovery_when_base_updater_fails():
@@ -66,7 +66,9 @@ def test_02207_wrapper_checks_recovery_when_base_updater_fails():
 
     assert "set +e" in runner
     assert 'SG_GATEWAY_GITHUB_BRANCH="$BRANCH"' in runner
-    assert 'bash "$PREFIX/deploy/update-from-github.sh"' in runner
+    assert "prepare_panel_update_core" in runner
+    assert "SG_GATEWAY_UPDATE_CORE_LIBRARY_ONLY=1" in runner
+    assert "bash -c" in runner
     assert "panel_rc=$?" in runner
     assert "set -e" in runner
     assert "if (( panel_rc != 0 )); then" in runner
