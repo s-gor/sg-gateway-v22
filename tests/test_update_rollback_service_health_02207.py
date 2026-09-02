@@ -34,8 +34,9 @@ def test_02207_wrapper_waits_for_real_hostd_readiness_not_transient_active_state
     source = WRAPPER.read_text(encoding="utf-8")
     waiter = _shell_function(source, "wait_for_required_service")
 
+    assert 'HOSTD_HEALTH_URL="http://127.0.0.1:8090/health"' in source
     assert 'systemctl is-active --quiet "$service"' in waiter
-    assert 'http://127.0.0.1:8090/health' in waiter
+    assert '"$HOSTD_HEALTH_URL"' in waiter
     assert "curl -4fsS" in waiter
     assert "sleep" in waiter
     assert "return 1" in waiter
