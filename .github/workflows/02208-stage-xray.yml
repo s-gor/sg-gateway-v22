@@ -64,7 +64,10 @@ jobs:
               raise SystemExit(f'missing checksum entries: {sorted(missing)}')
           sums.write_text('\n'.join(output) + '\n', encoding='utf-8')
           PY
-          sha256sum -c vendor/cores/SHA256SUMS
+          (
+            cd vendor/cores
+            sha256sum -c SHA256SUMS
+          )
 
       - name: Focused XMUX and runtime tests
         run: |
