@@ -14,12 +14,13 @@ _COMPACT_STYLESHEET = (
 )
 
 _SETTINGS_PANEL = r"""
-<article id="sg-naiveproxy-settings"
-         class="xps2-parameter-row is-visible xps2-naiveproxy-card"
+<section id="sg-naiveproxy-settings"
+         class="cnv1-engine-card sg-ljd-card xps2-naiveproxy-card"
          data-naiveproxy-panel>
-  <div class="xps2-parameter-title">
-    <strong>NaiveProxy</strong>
-    <span>HTTPS Forward Proxy · TLS</span>
+  <div class="xps2-naiveproxy-copy">
+    <div class="cnv1-card-kicker">HTTPS FORWARD PROXY · ОТДЕЛЬНЫЙ LISTENER</div>
+    <h2>NaiveProxy</h2>
+    <p>HTTPS Forward Proxy · TLS</p>
   </div>
   <div class="xps2-naiveproxy-meta">
     <span>HTTPS-домен</span>
@@ -30,15 +31,11 @@ _SETTINGS_PANEL = r"""
     <button class="button primary" type="button" data-naive-submit>Проверить и применить</button>
   </div>
   <span class="xps2-naiveproxy-message" data-naive-message aria-live="polite"></span>
-</article>
+</section>
 <script>
 (() => {
   const root = document.querySelector('[data-naiveproxy-panel]');
   if (!root) return;
-  const parameterList = document.querySelector('.xps2-parameter-list');
-  if (parameterList && root.parentElement !== parameterList) {
-    parameterList.appendChild(root);
-  }
 
   const host = root.querySelector('[data-naive-host]');
   const state = root.querySelector('[data-naive-state]');
@@ -216,13 +213,9 @@ def _inject_naiveproxy_ui(response):
                 1,
             )
         if 'id="sg-naiveproxy-settings"' not in body:
-            script_marker = "<script>"
-            head, separator, tail = body.rpartition(script_marker)
-            body = (
-                head + _SETTINGS_PANEL + separator + tail
-                if separator
-                else body + _SETTINGS_PANEL
-            )
+            anchor = '<section class="cnv1-note-panel sg-ljd-card">'
+            if anchor in body:
+                body = body.replace(anchor, _SETTINGS_PANEL + anchor, 1)
 
     response.set_data(body)
     return response
