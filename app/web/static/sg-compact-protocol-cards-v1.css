@@ -36,7 +36,7 @@
   padding: 8px 12px;
   border: 1px solid var(--sg-line);
   border-radius: 12px;
-  background: var(--sg-surface-2);
+  background: var(--sg-panel-deep);
 }
 
 .xps2-naiveproxy-meta > span {
