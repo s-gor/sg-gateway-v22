@@ -53,9 +53,9 @@ def test_02207_waits_for_cloud_init_before_downloading_source() -> None:
 
     assert "wait_for_cloud_init() {" in source
     invocation = source.index("\nwait_for_cloud_init\n")
-    assert source.index('[[ "$(id -u)" -eq 0 ]]') < invocation
-    assert invocation < source.index('TEMP_DIR="$(mktemp -d')
-    assert invocation < source.index("curl -fsSL")
+    assert source.index('[[ ${EUID:-$(id -u)} -eq 0 ]]') < invocation
+    assert invocation < source.index('TMP="$(mktemp -d')
+    assert invocation < source.index("curl -fL")
 
 
 def test_02207_cloud_init_exit_zero_continues(tmp_path: Path) -> None:
