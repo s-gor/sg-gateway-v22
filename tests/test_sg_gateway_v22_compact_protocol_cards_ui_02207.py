@@ -10,18 +10,20 @@ def _read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def test_naiveproxy_is_compact_third_card_without_visible_port_or_runtime_clutter() -> None:
+def test_naiveproxy_is_compact_bottom_engine_card_without_visible_port_or_runtime_clutter() -> None:
     naive = _read(NAIVE)
 
-    assert '<article id="sg-naiveproxy-settings"' in naive
-    assert 'class="xps2-parameter-row is-visible xps2-naiveproxy-card"' in naive
+    assert '<section id="sg-naiveproxy-settings"' in naive
+    assert 'class="cnv1-engine-card sg-ljd-card xps2-naiveproxy-card"' in naive
     assert "HTTPS Forward Proxy · TLS" in naive
     assert "data-naive-host" in naive
     assert "data-naive-port" not in naive
     assert "data-naive-runtime" not in naive
     assert "TCP-порт NaiveProxy" not in naive
-    assert "const parameterList = document.querySelector('.xps2-parameter-list');" in naive
-    assert "parameterList.appendChild(root);" in naive
+    assert "document.querySelector('.xps2-parameter-list')" not in naive
+    assert "parameterList.appendChild(root)" not in naive
+    assert 'anchor = \'<section class="cnv1-note-panel sg-ljd-card">\'' in naive
+    assert "body.replace(anchor, _SETTINGS_PANEL + anchor, 1)" in naive
     assert "let activePort = 8447;" in naive
     assert "activePort = Number(payload.port || payload.default_port || 8447);" in naive
     assert "body: JSON.stringify({port: Number(activePort)})" in naive
