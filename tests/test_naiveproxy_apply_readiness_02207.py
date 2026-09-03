@@ -21,7 +21,12 @@ assert SPEC.loader is not None
 SPEC.loader.exec_module(listener_patch)
 
 
-def _runtime(*, initially_active: bool, listener_after_apply: bool):
+def _runtime(
+    *,
+    initially_active: bool,
+    listener_after_apply: bool,
+    expose_listener_pid: bool = True,
+):
     calls: list[tuple[str, ...]] = []
     state = {"started": initially_active}
     service_pid = 321
@@ -31,9 +36,14 @@ def _runtime(*, initially_active: bool, listener_after_apply: bool):
         calls.append(command)
         if command[:3] == ("ss", "-H", "-ltnp"):
             if state["started"] and listener_after_apply:
+                process = (
+                    f' users:(("caddy",pid={service_pid},fd=3))'
+                    if expose_listener_pid
+                    else ""
+                )
                 stdout = (
-                    "LISTEN 0 4096 0.0.0.0:8447 0.0.0.0:* "
-                    f'users:(("caddy",pid={service_pid},fd=3))\n'
+                    "LISTEN 0 4096 0.0.0.0:8447 0.0.0.0:*"
+                    f"{process}\n"
                 )
             else:
                 stdout = ""
@@ -80,7 +90,7 @@ def _runtime(*, initially_active: bool, listener_after_apply: bool):
     return runtime, calls
 
 
-def test_apply_fails_when_systemd_returns_success_without_owned_listener(monkeypatch):
+def test_apply_fails_when_systemd_returns_success_without_listener(monkeypatch):
     runtime, _calls = _runtime(
         initially_active=False,
         listener_after_apply=False,
@@ -91,6 +101,19 @@ def test_apply_fails_when_systemd_returns_success_without_owned_listener(monkeyp
 
     with pytest.raises(RuntimeError, match="listener"):
         runtime.sync()
+
+
+def test_apply_accepts_active_listener_without_pid_metadata(monkeypatch):
+    runtime, _calls = _runtime(
+        initially_active=False,
+        listener_after_apply=True,
+        expose_listener_pid=False,
+    )
+    monkeypatch.setattr(listener_patch, "_READINESS_ATTEMPTS", 1, raising=False)
+    monkeypatch.setattr(listener_patch, "_READINESS_DELAY", 0, raising=False)
+    listener_patch.install(runtime)
+
+    assert runtime.sync() == {"ok": True}
 
 
 def test_reapply_restarts_an_already_active_service(monkeypatch):
