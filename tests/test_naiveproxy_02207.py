@@ -23,7 +23,8 @@ def test_default_port_is_8447_and_never_claims_443():
     assert runtime.DEFAULT_PORT == 8447
     assert ":8447, vpn.example.com:8447" in config
     assert ":443" not in config
-    assert "auto_https disable_redirects" in config
+    assert "auto_https off" in config
+    assert "auto_https disable_redirects" not in config
 
 
 def test_caddyfile_uses_existing_certificate_and_probe_resistance():
