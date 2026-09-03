@@ -1,0 +1,98 @@
+name: 02208 XMUX and Xray 26.7.28 verification
+
+on:
+  push:
+    branches:
+      - feature/02208-xmux-26728
+
+permissions:
+  contents: write
+
+jobs:
+  verify-and-stage:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Apply 02208 text updates
+        run: python tools/apply_02208_xmux_26728.py
+
+      - name: Vendor official Xray-core 26.7.28
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fL --retry 5 --retry-delay 2 \
+            https://github.com/XTLS/Xray-core/releases/download/v26.7.28/Xray-linux-64.zip \
+            -o vendor/cores/Xray-linux-64.zip
+          echo '8195d909f1109b8f3d99eefe401a3c451d7bf4af71f24d3815420f77e5dd2a40  vendor/cores/Xray-linux-64.zip' | sha256sum -c -
+
+      - name: Refresh vendored checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib
+
+          root = Path('.')
+          sums = root / 'vendor/cores/SHA256SUMS'
+          replacements = {
+              'Xray-linux-64.zip': hashlib.sha256((root / 'vendor/cores/Xray-linux-64.zip').read_bytes()).hexdigest(),
+              'VERSIONS.env': hashlib.sha256((root / 'vendor/cores/VERSIONS.env').read_bytes()).hexdigest(),
+          }
+          output = []
+          seen = set()
+          for raw in sums.read_text(encoding='utf-8').splitlines():
+              parts = raw.split(maxsplit=1)
+              if len(parts) == 2 and parts[1] in replacements:
+                  name = parts[1]
+                  raw = f'{replacements[name]}  {name}'
+                  seen.add(name)
+              output.append(raw)
+          missing = set(replacements) - seen
+          if missing:
+              raise SystemExit(f'missing checksum entries: {sorted(missing)}')
+          sums.write_text('\n'.join(output) + '\n', encoding='utf-8')
+          PY
+          sha256sum -c vendor/cores/SHA256SUMS
+
+      - name: Focused XMUX and runtime tests
+        run: |
+          python -m pytest -q \
+            tests/test_sg_gateway_02208_xmux_xray26728.py \
+            tests/test_sg_gateway_02204_xmux_sgpanel_contract.py \
+            tests/test_sg_gateway_021_xmux_rf.py \
+            tests/test_sg_gateway_v22_xmux_integration.py \
+            tests/test_sg_gateway_021_vendored_five_engines.py
+
+      - name: Full regression suite
+        run: python -m pytest -q
+
+      - name: Commit verified runtime and contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add \
+            app/xray/profiles.py \
+            install.sh \
+            vendor/cores/VERSIONS.env \
+            vendor/cores/SHA256SUMS \
+            vendor/cores/Xray-linux-64.zip \
+            tests/test_sg_gateway_02204_xmux_sgpanel_contract.py \
+            tests/test_sg_gateway_021_xmux_rf.py
+          git diff --cached --check
+          git diff --cached --quiet && { echo 'Nothing to commit'; exit 1; }
+          git commit -m 'feat: pin Xray 26.7.28 and refresh XMUX contracts'
+          git push origin HEAD:feature/02208-xmux-26728
