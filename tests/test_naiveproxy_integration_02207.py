@@ -54,17 +54,21 @@ def test_first_failed_start_restores_absent_first_install_without_previous_files
     assert "active.unlink(missing_ok=True)" in source
 
 
-def test_ui_injects_protocol_and_real_connections_port_control():
+def test_ui_injects_protocol_and_compact_connections_control():
     source = (Path(__file__).parents[1] / "app/naiveproxy/http.py").read_text()
     assert '<input type="checkbox" name="protocols" value="naiveproxy"' in source
     assert "SG_PROTOCOL_ORDER_END" in source
-    assert "configured_port" in source
     assert "app.after_request(_inject_naiveproxy_ui)" in source
     assert 'id="sg-naiveproxy-settings"' in source
-    assert "data-naive-port" in source
+    assert 'class="xps2-parameter-row is-visible xps2-naiveproxy-card"' in source
+    assert "data-naive-port" not in source
+    assert "TCP-порт NaiveProxy" not in source
+    assert "let activePort = 8447;" in source
+    assert "activePort = Number(payload.port || payload.default_port || 8447);" in source
     assert "'/api/naiveproxy/status'" in source
     assert "'/api/naiveproxy/settings'" in source
-    assert "JSON.stringify({port: Number(port.value)})" in source
+    assert "JSON.stringify({port: Number(activePort)})" in source
+    assert "sg-compact-protocol-cards-v1.css" in source
 
 
 def test_first_assignment_prepares_8447_from_security_tls():
