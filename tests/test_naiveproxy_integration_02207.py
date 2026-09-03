@@ -60,9 +60,11 @@ def test_ui_injects_protocol_and_compact_connections_control():
     assert "SG_PROTOCOL_ORDER_END" in source
     assert "app.after_request(_inject_naiveproxy_ui)" in source
     assert 'id="sg-naiveproxy-settings"' in source
-    assert 'class="xps2-parameter-row is-visible xps2-naiveproxy-card"' in source
+    assert 'class="cnv1-engine-card sg-ljd-card xps2-naiveproxy-card"' in source
     assert "data-naive-port" not in source
     assert "TCP-порт NaiveProxy" not in source
+    assert "document.querySelector('.xps2-parameter-list')" not in source
+    assert 'anchor = \'<section class="cnv1-note-panel sg-ljd-card">\'' in source
     assert "let activePort = 8447;" in source
     assert "activePort = Number(payload.port || payload.default_port || 8447);" in source
     assert "'/api/naiveproxy/status'" in source
