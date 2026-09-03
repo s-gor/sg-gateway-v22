@@ -83,7 +83,9 @@ def _build_app(monkeypatch):
     @app.get("/connections")
     def connections():
         return Response(
-            "<html><body><main>Connections</main><script>window.base=true;</script></body></html>",
+            '<html><body><main>Connections</main>'
+            '<section class="cnv1-note-panel sg-ljd-card"></section>'
+            '<script>window.base=true;</script></body></html>',
             mimetype="text/html",
         )
 
@@ -133,7 +135,9 @@ def test_connections_renders_compact_card_without_visible_port_control_after_aut
     assert "let activePort = 8447;" in body
     assert "'/api/naiveproxy/status'" in body
     assert "'/api/naiveproxy/settings'" in body
-    assert body.index('id="sg-naiveproxy-settings"') < body.rindex("<script>")
+    assert body.index('id="sg-naiveproxy-settings"') < body.index(
+        '<section class="cnv1-note-panel sg-ljd-card">'
+    )
 
 
 def test_protocol_picker_hides_the_configured_port(monkeypatch):
