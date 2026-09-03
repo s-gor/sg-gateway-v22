@@ -10,10 +10,38 @@ fail(){ printf '[SG-Gateway 22.07] ERROR: %s\n' "$*" >&2; exit 1; }
 cleanup(){ [[ -z "$TMP" ]] || rm -rf "$TMP"; }
 trap cleanup EXIT INT TERM
 
+wait_for_cloud_init() {
+  if ! command -v cloud-init >/dev/null 2>&1; then
+    printf '[SG-Gateway 22.07] cloud-init not present; continuing with local Ubuntu state.\n'
+    return 0
+  fi
+
+  printf '[SG-Gateway 22.07] Waiting for cloud-init to finish...\n'
+  local rc=0
+  if cloud-init status --wait; then
+    rc=0
+  else
+    rc=$?
+  fi
+
+  case "$rc" in
+    0)
+      ;;
+    2)
+      printf '[SG-Gateway 22.07] cloud-init completed with recoverable warnings; continuing.\n'
+      ;;
+    *)
+      fail "cloud-init did not finish successfully; resolve the Ubuntu first-boot state and rerun the installer"
+      ;;
+  esac
+  printf '[SG-Gateway 22.07] cloud-init: ready.\n'
+}
+
 [[ ${EUID:-$(id -u)} -eq 0 ]] || fail "run through sudo"
 [[ "$BRANCH" == "dev-02207" || "$BRANCH" == feature/02207-* ]] || fail "22.07 installer refuses branch $BRANCH"
 [[ -z "$SOURCE_COMMIT" || "$SOURCE_COMMIT" =~ ^[0-9a-f]{40}$ ]] || fail "invalid exact commit"
 [[ ! -e /opt/sg-gateway/VERSION ]] || fail "clean install is blocked on an existing server; use update-from-github-02207.sh"
+wait_for_cloud_init
 for tool in curl tar gzip python3; do command -v "$tool" >/dev/null || fail "$tool is required"; done
 TMP="$(mktemp -d /tmp/sg-gateway-02207.XXXXXX)"
 mkdir -p "$TMP/source"
