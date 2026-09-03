@@ -39,6 +39,14 @@ def _listener_pids(line: str) -> set[int]:
     }
 
 
+def _line_has_port(line: str, port: int) -> bool:
+    fields = str(line).split()
+    needle = f":{port}"
+    return len(fields) >= 4 and any(
+        field.endswith(needle) for field in fields[3:5]
+    )
+
+
 def _listener_owned_by_service(runtime, port: int) -> bool:
     active = runtime._run(
         ["systemctl", "is-active", "--quiet", runtime.SERVICE],
@@ -52,21 +60,35 @@ def _listener_owned_by_service(runtime, port: int) -> bool:
     result = runtime._run(["ss", "-H", "-ltnp"], timeout=10)
     if result.returncode != 0:
         return False
-    needle = f":{port}"
     for line in (result.stdout or "").splitlines():
-        fields = line.split()
-        if len(fields) < 4 or not any(
-            field.endswith(needle) for field in fields[3:5]
-        ):
+        if not _line_has_port(line, port):
             continue
         if service_pid in _listener_pids(line):
             return True
     return False
 
 
+def _listener_present(runtime, port: int) -> bool:
+    result = runtime._run(["ss", "-H", "-ltnp"], timeout=10)
+    if result.returncode != 0:
+        return False
+    return any(
+        _line_has_port(line, port)
+        for line in (result.stdout or "").splitlines()
+    )
+
+
+def _service_ready(runtime, port: int) -> bool:
+    active = runtime._run(
+        ["systemctl", "is-active", "--quiet", runtime.SERVICE],
+        timeout=10,
+    )
+    return active.returncode == 0 and _listener_present(runtime, port)
+
+
 def _wait_for_listener(runtime, port: int) -> bool:
     for attempt in range(_READINESS_ATTEMPTS):
-        if _listener_owned_by_service(runtime, port):
+        if _service_ready(runtime, port):
             return True
         if attempt + 1 < _READINESS_ATTEMPTS and _READINESS_DELAY > 0:
             time.sleep(_READINESS_DELAY)
@@ -86,12 +108,8 @@ def install(runtime) -> None:
         if result.returncode != 0:
             raise RuntimeError("Cannot inspect TCP listeners before NaiveProxy apply")
         service_pid = _service_main_pid(runtime)
-        needle = f":{port}"
         for line in (result.stdout or "").splitlines():
-            fields = line.split()
-            if len(fields) < 4 or not any(
-                field.endswith(needle) for field in fields[3:5]
-            ):
+            if not _line_has_port(line, port):
                 continue
             listener_pids = _listener_pids(line)
             if service_pid <= 0 or service_pid not in listener_pids:
@@ -130,8 +148,8 @@ def install(runtime) -> None:
                 1,
                 stdout=started.stdout,
                 stderr=(
-                    f"NaiveProxy listener {port} is not ready or is not owned "
-                    f"by {runtime.SERVICE}"
+                    f"NaiveProxy listener {port} is not ready after "
+                    f"{runtime.SERVICE} activation"
                 ),
             )
 
