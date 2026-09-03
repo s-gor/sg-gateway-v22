@@ -134,7 +134,7 @@ def render_caddyfile(settings: NaiveProxySettings, users: list[NaiveProxyUser]) 
     )
     return f"""{{
     admin off
-    auto_https disable_redirects
+    auto_https off
 {order_line}    log {{
         exclude http.log.error
     }}
