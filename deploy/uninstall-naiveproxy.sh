@@ -46,6 +46,7 @@ systemctl disable --now "$SERVICE" >/dev/null 2>&1 || true
 rm -f -- "$UNIT"
 systemctl daemon-reload
 rm -rf -- "$PREFIX" "$CONFIG_DIR"
+rm -rf -- "$STATE_DIR/xdg-data" "$STATE_DIR/xdg-config"
 
 if id -u sg-naiveproxy >/dev/null 2>&1; then
   userdel sg-naiveproxy >/dev/null 2>&1 || true
