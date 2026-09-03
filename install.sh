@@ -21,8 +21,8 @@ AWG3_TOOLS_VERSION="3.0.20260805"
 AWG3_GO_VERSION="v3.0.0"
 PANEL_USER="sg-gateway"
 PANEL_GROUP="sg-gateway"
-XRAY_REQUIRED_VERSION="v26.6.27"
-XRAY_MINIMUM_VERSION="v26.6.27"
+XRAY_REQUIRED_VERSION="v26.7.28"
+XRAY_MINIMUM_VERSION="v26.7.28"
 
 # SG-Gateway V22 vendor bundle. Clean installation does not download these
 # runtimes from upstream projects. The files are committed with the source.

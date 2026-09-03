@@ -638,9 +638,9 @@
         "obfs-password"
       ]
     },
-    "minimum_version": "v26.6.27",
+    "minimum_version": "v26.7.28",
     "preview31_32_invalid_pair_migration": true,
-    "required_version": "v26.6.27",
+    "required_version": "v26.7.28",
     "server_xhttp_mode": "auto",
     "updates": {
       "automatic_rollback": true,

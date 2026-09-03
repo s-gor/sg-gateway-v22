@@ -12,11 +12,11 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def test_rf_xmux_values_are_exact():
     assert XHTTP_XMUX_RF == {
-        "maxConcurrency": 0,
-        "maxConnections": 6,
+        "maxConcurrency": 5,
+        "maxConnections": 0,
         "cMaxReuseTimes": 0,
-        "hMaxRequestTimes": "600-900",
-        "hMaxReusableSecs": "1800-3000",
+        "hMaxRequestTimes": "300-600",
+        "hMaxReusableSecs": "900-1800",
         "hKeepAlivePeriod": 0,
     }
 
