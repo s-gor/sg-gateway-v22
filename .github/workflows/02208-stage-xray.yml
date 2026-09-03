@@ -48,7 +48,6 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           import hashlib
-
           root = Path('.')
           sums = root / 'vendor/cores/SHA256SUMS'
           replacements = {
@@ -69,10 +68,7 @@ jobs:
               raise SystemExit(f'missing checksum entries: {sorted(missing)}')
           sums.write_text('\n'.join(output) + '\n', encoding='utf-8')
           PY
-          (
-            cd vendor/cores
-            sha256sum -c SHA256SUMS
-          )
+          (cd vendor/cores && sha256sum -c SHA256SUMS)
 
       - name: Focused XMUX and runtime tests
         run: |
@@ -95,9 +91,11 @@ jobs:
           git add \
             app/xray/profiles.py \
             install.sh \
+            release-manifest.json \
             vendor/cores/VERSIONS.env \
             vendor/cores/SHA256SUMS \
             vendor/cores/Xray-linux-64.zip \
+            tests/test_preview31_xray_updates.py \
             tests/test_sg_gateway_02204_xmux_sgpanel_contract.py \
             tests/test_sg_gateway_021_xmux_rf.py
           git diff --cached --check
