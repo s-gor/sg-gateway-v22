@@ -118,7 +118,7 @@ def test_naiveproxy_api_is_not_public(monkeypatch):
     assert commands == []
 
 
-def test_connections_renders_one_real_port_control_after_auth(monkeypatch):
+def test_connections_renders_compact_card_without_visible_port_control_after_auth(monkeypatch):
     app, _, _, _ = _build_app(monkeypatch)
     client = app.test_client()
     _authenticate(client)
@@ -128,14 +128,15 @@ def test_connections_renders_one_real_port_control_after_auth(monkeypatch):
 
     assert response.status_code == 200
     assert body.count('id="sg-naiveproxy-settings"') == 1
-    assert "data-naive-port" in body
-    assert "min=\"1\" max=\"65535\"" in body
+    assert "data-naive-port" not in body
+    assert "TCP-порт NaiveProxy" not in body
+    assert "let activePort = 8447;" in body
     assert "'/api/naiveproxy/status'" in body
     assert "'/api/naiveproxy/settings'" in body
     assert body.index('id="sg-naiveproxy-settings"') < body.rindex("<script>")
 
 
-def test_protocol_picker_shows_the_configured_port(monkeypatch):
+def test_protocol_picker_hides_the_configured_port(monkeypatch):
     app, _, _, _ = _build_app(monkeypatch)
     client = app.test_client()
     _authenticate(client)
@@ -145,7 +146,8 @@ def test_protocol_picker_shows_the_configured_port(monkeypatch):
 
     assert response.status_code == 200
     assert body.count('value="naiveproxy"') == 1
-    assert "TCP 8447" in body
+    assert "HTTPS-прокси · отдельная ссылка" in body
+    assert "TCP 8447" not in body
 
 
 def test_status_is_secret_safe_and_authenticated(monkeypatch):
