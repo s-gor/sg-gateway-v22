@@ -8,6 +8,9 @@ ConditionPathExists=/etc/sg-gateway/naiveproxy/Caddyfile
 Type=notify
 User=sg-naiveproxy
 Group=sg-naiveproxy
+Environment=HOME=/var/lib/sg-gateway/naiveproxy
+Environment=XDG_DATA_HOME=/var/lib/sg-gateway/naiveproxy/xdg-data
+Environment=XDG_CONFIG_HOME=/var/lib/sg-gateway/naiveproxy/xdg-config
 ExecStart=/opt/sg-gateway/naiveproxy/bin/caddy run --environ --config /etc/sg-gateway/naiveproxy/Caddyfile --adapter caddyfile
 ExecReload=/opt/sg-gateway/naiveproxy/bin/caddy reload --config /etc/sg-gateway/naiveproxy/Caddyfile --adapter caddyfile --force
 TimeoutStopSec=10s
