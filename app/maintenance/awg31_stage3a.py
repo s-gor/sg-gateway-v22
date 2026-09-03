@@ -235,18 +235,19 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "migrate":
         seeded_awg3_created = ensure_seeded_admin_awg3(database=database)
         result = installer.migrate(database=database)
-        print(
-            json.dumps(
-                {
-                    "created_credentials": result.created_credentials,
-                    "total_credentials": result.total_credentials,
-                    "server_config": str(result.server_config),
-                    "peer_configs": result.peer_configs,
-                    "seeded_awg3_created": seeded_awg3_created,
-                },
-                sort_keys=True,
+        if os.environ.get("SG_GATEWAY_UPDATE_CORE_LIBRARY_ONLY") != "1":
+            print(
+                json.dumps(
+                    {
+                        "created_credentials": result.created_credentials,
+                        "total_credentials": result.total_credentials,
+                        "server_config": str(result.server_config),
+                        "peer_configs": result.peer_configs,
+                        "seeded_awg3_created": seeded_awg3_created,
+                    },
+                    sort_keys=True,
+                )
             )
-        )
     else:
         installer.uninstall(database=database, purge_data=args.purge_data)
     return 0
