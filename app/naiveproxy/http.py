@@ -4,7 +4,7 @@ from flask import jsonify, request
 
 from app.connections.settings import get_connection_settings, update_connection_settings
 from app.hostd.client import run_hostd_command
-from app.naiveproxy.integration import reserved_ports
+from app.naiveproxy.integration import _restore_connection_settings, reserved_ports
 from app.naiveproxy.runtime import DEFAULT_PORT, NaiveProxyError, validate_port
 from app.security.tls import overview as tls_overview
 
@@ -176,25 +176,30 @@ def register_naiveproxy_http(app) -> None:
                 return jsonify({"ok": False, "message": "Настройки NaiveProxy отклонены"}), 400
             result = run_hostd_command("naiveproxy.sync", timeout=60)
             if result.status != "ok":
-                restored = update_connection_settings(
-                    "naiveproxy",
-                    previous.host,
-                    previous.port,
-                    dict(previous.config),
-                )
+                if str(previous.host or "").strip():
+                    restored = update_connection_settings(
+                        "naiveproxy",
+                        previous.host,
+                        previous.port,
+                        dict(previous.config),
+                    )
+                else:
+                    restored = _restore_connection_settings(previous)
                 if not restored:
                     return jsonify({
                         "ok": False,
                         "message": (
-                            f"{result.message}. Runtime откатился, но восстановить "
-                            "предыдущие настройки в БД не удалось"
+                            f"{result.message}. Восстановить предыдущие "
+                            "настройки в БД не удалось"
                         ),
                         "runtime": result.payload,
                         "settings_rollback": False,
                     }), 500
                 return jsonify({
                     "ok": False,
-                    "message": f"{result.message}. Предыдущие настройки восстановлены",
+                    "message": (
+                        f"{result.message}. Предыдущие настройки в БД восстановлены"
+                    ),
                     "runtime": result.payload,
                     "settings_rollback": True,
                 }), 503

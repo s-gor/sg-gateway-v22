@@ -23,12 +23,48 @@ DEFAULT_CONNECTION = {
 def _restore_connection_settings(previous) -> bool:
     from app.connections.settings import update_connection_settings
 
-    return update_connection_settings(
-        "naiveproxy",
-        previous.host,
-        previous.port,
-        dict(previous.config),
-    )
+    host = str(previous.host or "")
+    if host.strip():
+        return update_connection_settings(
+            "naiveproxy",
+            host,
+            previous.port,
+            dict(previous.config),
+        )
+
+    from app.db import connect
+
+    try:
+        port = int(previous.port)
+    except (TypeError, ValueError):
+        return False
+    if not 1 <= port <= 65535:
+        return False
+    try:
+        config_json = json.dumps(
+            dict(previous.config),
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+    except (TypeError, ValueError):
+        return False
+
+    try:
+        with connect() as connection:
+            cursor = connection.execute(
+                """
+                UPDATE connection_settings
+                SET host = ?,
+                    port = ?,
+                    config_json = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE engine = 'naiveproxy'
+                """,
+                (host, port, config_json),
+            )
+    except Exception:
+        return False
+    return cursor.rowcount > 0
 
 
 def _prepare_runtime_settings():

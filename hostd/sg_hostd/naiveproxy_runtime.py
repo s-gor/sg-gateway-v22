@@ -175,7 +175,7 @@ def _render(settings: dict, users: list[dict]) -> str:
     )
     return f"""{{
     admin off
-    auto_https disable_redirects
+    auto_https off
 {order}    log {{
         exclude http.log.error
     }}
