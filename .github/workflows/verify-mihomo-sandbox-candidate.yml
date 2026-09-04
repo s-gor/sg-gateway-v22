@@ -1,0 +1,131 @@
+name: Verify Mihomo sandbox candidate
+
+on:
+  push:
+    branches:
+      - verify/02207-mihomo-state-sandbox-4bd8c31e
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/02207-mihomo-state-sandbox
+          fetch-depth: 0
+
+      - name: Refresh source integrity manifest
+        id: finalize
+        run: |
+          python3 -B - <<'PY'
+          import hashlib
+          import subprocess
+          from pathlib import Path
+
+          tracked = subprocess.check_output(
+              ["git", "ls-files"], text=True, encoding="utf-8"
+          ).splitlines()
+          tracked = sorted(path for path in tracked if path != "SOURCE-SHA256SUMS")
+          rows = []
+          for path in tracked:
+              data = subprocess.check_output(["git", "show", f"HEAD:{path}"])
+              rows.append(f"{hashlib.sha256(data).hexdigest()}  {path}")
+          Path("SOURCE-SHA256SUMS").write_text(
+              "\n".join(rows) + "\n", encoding="utf-8", newline="\n"
+          )
+          print(f"SOURCE-SHA256SUMS refreshed: {len(tracked)} tracked files")
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          if ! git diff --quiet -- SOURCE-SHA256SUMS; then
+            git add SOURCE-SHA256SUMS
+            git commit -m 'chore: refresh source integrity for Mihomo sandbox fix'
+            git push origin HEAD:fix/02207-mihomo-state-sandbox
+          fi
+          FINAL_SHA="$(git rev-parse HEAD)"
+          echo "final_sha=$FINAL_SHA" >> "$GITHUB_OUTPUT"
+          echo "Final candidate SHA: $FINAL_SHA"
+
+      - name: Verify source integrity from git blobs
+        run: |
+          python3 -B - <<'PY'
+          import hashlib
+          import re
+          import subprocess
+          from pathlib import Path
+
+          rows = Path("SOURCE-SHA256SUMS").read_text(encoding="utf-8").splitlines()
+          expected = {}
+          for line_no, raw in enumerate(rows, 1):
+              if not raw.strip():
+                  continue
+              match = re.fullmatch(r"([0-9a-f]{64})  (.+)", raw)
+              if match is None:
+                  raise SystemExit(f"invalid SOURCE-SHA256SUMS line {line_no}: {raw!r}")
+              digest, path = match.groups()
+              if path in expected:
+                  raise SystemExit(f"duplicate checksum path: {path}")
+              expected[path] = digest
+
+          tracked = set(subprocess.check_output(["git", "ls-files"], text=True).splitlines())
+          tracked.discard("SOURCE-SHA256SUMS")
+          if set(expected) != tracked:
+              raise SystemExit(
+                  f"checksum inventory mismatch: missing={sorted(tracked-set(expected))} extra={sorted(set(expected)-tracked)}"
+              )
+          for path in sorted(tracked):
+              data = subprocess.check_output(["git", "show", f"HEAD:{path}"])
+              actual = hashlib.sha256(data).hexdigest()
+              if actual != expected[path]:
+                  raise SystemExit(f"source hash mismatch: {path}")
+          print(f"Git-blob source integrity ok: {len(tracked)} tracked files verified")
+          PY
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+
+      - name: Validate syntax and focused Mihomo contracts
+        run: |
+          bash -n deploy/update-from-github-02207.sh
+          python -B -c "from pathlib import Path; files=list(Path('app').rglob('*.py'))+list(Path('engines').rglob('*.py'))+list(Path('hostd/sg_hostd').rglob('*.py'))+list(Path('tests').rglob('*.py')); [compile(p.read_text(encoding='utf-8'), str(p), 'exec') for p in files]; print(f'syntax ok: {len(files)} files')"
+          python -m pytest -q \
+            tests/test_hostd_client_runtime_sandbox_02207.py \
+            tests/test_update_02207_hostd_writable_paths_contract.py \
+            tests/test_mihomo_candidate_permissions.py \
+            tests/test_mihomo_ready_runtime.py \
+            tests/test_sg_gateway_021_mihomo_startup_ready.py \
+            tests/test_sg_gateway_021_mihomo_tls_state.py \
+            tests/test_sg_gateway_021_mihomo_working_rollback.py \
+            tests/test_sg_gateway_v22_mihomo_restart_services.py \
+            tests/test_sg_gateway_v22_mihomo_service_tools_ui.py
+
+      - name: Run full test suite
+        run: python -m pytest -q tests
+
+      - name: Restore test-mutated tracked files
+        run: git restore --worktree .
+
+      - name: Verify vendored core checksums
+        run: |
+          cd vendor/cores
+          sha256sum -c SHA256SUMS
+
+      - name: Build and verify exact FULL package
+        run: |
+          echo "Packaging exact candidate $(git rev-parse HEAD)"
+          VERSION="$(tr -d '[:space:]' < VERSION)"
+          OUT="/tmp/SG-Gateway-${VERSION}-MIHOMO-SANDBOX-FULL.run"
+          bash build-run.sh "$OUT"
+          bash "$OUT" --verify-only
+          sha256sum "$OUT"
