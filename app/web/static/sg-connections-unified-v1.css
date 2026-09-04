@@ -1,0 +1,368 @@
+/* SG-Gateway 022.07 · canonical Connections geometry.
+   One geometry contract for Xray, XMUX, AWG, Mihomo/sing-box and NaiveProxy.
+   Theme-specific palette/depth remains owned by the existing theme stylesheets. */
+
+body.page-connections .cnv1-page {
+  gap: var(--sgui-page-gap);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Outer surfaces                                                              */
+/* -------------------------------------------------------------------------- */
+
+body.page-connections :is(
+  .cnv1-engine-xray,
+  #xray-xmux .xmux1-card,
+  .awgd-shell,
+  .mhv2-panel,
+  #sg-naiveproxy-settings,
+  .xps2-naiveproxy-card
+) {
+  min-width: 0;
+  border: 1px solid var(--sg-line);
+  border-radius: var(--sgui-radius-card);
+  background: var(--sg-panel);
+  box-shadow: var(--sgui-card-shadow);
+}
+
+body.page-connections :is(
+  .cnv1-engine-head,
+  #xray-xmux .xmux1-head,
+  .mhv2-head
+) {
+  gap: var(--sgui-section-gap);
+}
+
+body.page-connections .cnv1-engine-head {
+  padding: var(--sgui-card-padding);
+}
+
+body.page-connections #xray-xmux .xmux1-card,
+body.page-connections .mhv2-panel,
+body.page-connections #sg-naiveproxy-settings {
+  padding: var(--sgui-card-padding);
+}
+
+body.page-connections #xray-xmux .xmux1-head {
+  margin-bottom: var(--sgui-section-gap);
+}
+
+body.page-connections .mhv2-panel {
+  gap: var(--sgui-section-gap);
+  margin-top: 0;
+}
+
+body.page-connections #sg-naiveproxy-settings {
+  margin: 0;
+  gap: var(--sgui-grid-gap);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Shared nested surfaces                                                      */
+/* -------------------------------------------------------------------------- */
+
+body.page-connections :is(
+  .xps2-selection,
+  .xps2-parameters,
+  .xps2-parameter-row,
+  .xps2-choice,
+  .cnv1-endpoint-card,
+  .awgd-card,
+  .awgd-shared-dns,
+  .mhv2-listener,
+  .mhv2-pending,
+  .mhv2-tls-warning,
+  .mhv2-tls-ready,
+  #xray-xmux .xmux1-mode > span,
+  #xray-xmux .xmux1-extra,
+  #xray-xmux .xmux1-dialog-grid > div,
+  #xray-xmux .xmux1-dialog-json,
+  .xps2-naiveproxy-meta
+) {
+  border-color: var(--sg-line-soft);
+  border-radius: var(--sgui-radius-nested);
+  background: var(--sg-panel-soft);
+}
+
+body.page-connections :is(
+  .xps2-parameter-row,
+  .xps2-choice,
+  .cnv1-endpoint-card,
+  .awgd-shared-dns,
+  .mhv2-listener,
+  .mhv2-pending,
+  .mhv2-tls-warning,
+  .mhv2-tls-ready,
+  #xray-xmux .xmux1-mode > span,
+  .xps2-naiveproxy-meta
+) {
+  padding: var(--sgui-nested-padding);
+}
+
+body.page-connections :is(
+  .xps2-selection,
+  .xps2-parameters
+) {
+  padding: var(--sgui-summary-padding);
+}
+
+body.page-connections :is(
+  .xps2-parameter-list,
+  .xps2-choice-grid,
+  .awgd-grid,
+  .mhv2-listeners,
+  #xray-xmux .xmux1-modes
+) {
+  gap: var(--sgui-grid-gap);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Xray                                                                        */
+/* -------------------------------------------------------------------------- */
+
+body.page-connections .cnv1-engine-xray .xps2-panel {
+  display: grid;
+  gap: var(--sgui-section-gap);
+}
+
+body.page-connections .cnv1-engine-xray .xps2-top-actions {
+  padding-inline: var(--sgui-card-padding);
+}
+
+body.page-connections .cnv1-engine-xray :is(
+  .xps2-selection,
+  .xps2-parameters,
+  .xps2-actions
+) {
+  margin-inline: var(--sgui-card-padding);
+}
+
+body.page-connections .cnv1-engine-xray .xps2-actions {
+  border-radius: var(--sgui-radius-nested);
+  padding: var(--sgui-summary-padding);
+}
+
+/* -------------------------------------------------------------------------- */
+/* XMUX                                                                        */
+/* -------------------------------------------------------------------------- */
+
+body.page-connections #xray-xmux .xmux1-wrap {
+  margin-top: 0;
+}
+
+body.page-connections #xray-xmux .xmux1-mode > span {
+  min-height: 0;
+  gap: var(--sgui-grid-gap);
+}
+
+body.page-connections #xray-xmux .xmux1-extra {
+  margin-top: var(--sgui-grid-gap);
+}
+
+body.page-connections #xray-xmux .xmux1-extra summary {
+  padding: var(--sgui-nested-padding);
+}
+
+body.page-connections #xray-xmux .xmux1-extra label {
+  padding: 0 12px 12px;
+}
+
+body.page-connections #xray-xmux .xmux1-actions {
+  margin-top: var(--sgui-grid-gap);
+}
+
+/* -------------------------------------------------------------------------- */
+/* AmneziaWG                                                                   */
+/* -------------------------------------------------------------------------- */
+
+body.page-connections .awgd-grid {
+  padding: 0 var(--sgui-card-padding) var(--sgui-card-padding);
+}
+
+body.page-connections .awgd-card {
+  overflow: hidden;
+}
+
+body.page-connections .awgd-head {
+  gap: var(--sgui-grid-gap);
+  padding: var(--sgui-summary-padding);
+}
+
+body.page-connections .awgd-card .cnv1-endpoint-card {
+  margin: 0 17px;
+}
+
+body.page-connections .awgd-shared-dns {
+  gap: var(--sgui-section-gap);
+  margin: 0 var(--sgui-card-padding) var(--sgui-card-padding);
+}
+
+body.page-connections .awgd-shared-dns-form {
+  gap: var(--sgui-grid-gap);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Mihomo / sing-box                                                           */
+/* -------------------------------------------------------------------------- */
+
+body.page-connections .mhv2-form,
+body.page-connections .mhv2-form-compact {
+  gap: var(--sgui-grid-gap);
+}
+
+body.page-connections .mhv2-listener {
+  gap: var(--sgui-grid-gap);
+}
+
+body.page-connections .mhv2-actions,
+body.page-connections .mhv2-client-actions {
+  gap: var(--sgui-grid-gap);
+}
+
+body.page-connections .mhv2-basic-fields,
+body.page-connections .mhv2-advanced-body {
+  gap: var(--sgui-grid-gap);
+}
+
+/* -------------------------------------------------------------------------- */
+/* NaiveProxy                                                                  */
+/* -------------------------------------------------------------------------- */
+
+body.page-connections .xps2-naiveproxy-card {
+  border-radius: var(--sgui-radius-card);
+}
+
+body.page-connections .xps2-naiveproxy-meta {
+  border-radius: var(--sgui-radius-nested);
+}
+
+body.page-connections .xps2-naiveproxy-action {
+  gap: var(--sgui-grid-gap);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Controls and capsules                                                       */
+/* -------------------------------------------------------------------------- */
+
+body.page-connections :is(
+  .xps2-parameter-row input:not([type="checkbox"]):not([type="radio"]),
+  .xps2-parameter-row select,
+  .xray-reality-value-row input,
+  .xray-reality-value-row textarea,
+  .awgd-shared-dns-form input,
+  .mhv2-basic-fields input,
+  .mhv2-basic-fields select,
+  .mhv2-advanced-body input,
+  .mhv2-advanced-body select,
+  #xray-xmux textarea
+) {
+  border-radius: var(--sgui-radius-control);
+}
+
+body.page-connections :is(
+  .xps2-parameter-row input:not([type="checkbox"]):not([type="radio"]),
+  .xps2-parameter-row select,
+  .xray-reality-value-row input,
+  .xray-reality-value-row textarea,
+  .awgd-shared-dns-form input,
+  .mhv2-basic-fields input,
+  .mhv2-basic-fields select,
+  .mhv2-advanced-body input,
+  .mhv2-advanced-body select
+) {
+  min-height: var(--sgui-button-height);
+}
+
+body.page-connections .button {
+  min-height: var(--sgui-button-height);
+  border-radius: var(--sgui-radius-control);
+}
+
+body.page-connections :is(
+  .xps2-salamander-modes label,
+  .xps2-salamander-modes span
+) {
+  min-height: var(--sgui-button-height-small);
+}
+
+body.page-connections :is(
+  .cnv1-engine-status,
+  .xps2-choice-status,
+  #xray-xmux .xmux1-chip,
+  .mhv2-state,
+  .cdv2-badge
+) {
+  min-height: var(--sgui-badge-height);
+  border-radius: var(--sgui-radius-badge);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Shared typography                                                           */
+/* -------------------------------------------------------------------------- */
+
+body.page-connections :is(
+  .cnv1-card-kicker,
+  .mhv2-kicker,
+  .cdv2-kicker
+) {
+  font-size: var(--sgui-micro);
+}
+
+body.page-connections :is(
+  .cnv1-engine-head h2,
+  #xray-xmux .xmux1-head h2,
+  .mhv2-head h2,
+  .xps2-naiveproxy-copy h2
+) {
+  font-size: var(--sgui-section-title);
+}
+
+body.page-connections :is(
+  .cnv1-engine-head p,
+  #xray-xmux .xmux1-head p,
+  .mhv2-head p,
+  .xps2-naiveproxy-copy p
+) {
+  font-size: var(--sgui-body);
+  line-height: 1.5;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Responsive                                                                  */
+/* -------------------------------------------------------------------------- */
+
+@media (max-width: 900px) {
+  body.page-connections :is(
+    .cnv1-engine-head,
+    #xray-xmux .xmux1-head,
+    .mhv2-head
+  ) {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  body.page-connections .awgd-grid,
+  body.page-connections .mhv2-listeners,
+  body.page-connections #xray-xmux .xmux1-modes {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 650px) {
+  body.page-connections :is(
+    .cnv1-engine-head,
+    #xray-xmux .xmux1-card,
+    .mhv2-panel,
+    #sg-naiveproxy-settings
+  ) {
+    padding: var(--sgui-nested-padding);
+  }
+
+  body.page-connections .awgd-grid {
+    padding: 0 12px 12px;
+  }
+
+  body.page-connections .awgd-shared-dns {
+    margin: 0 12px 12px;
+  }
+}
