@@ -55,8 +55,19 @@ def test_connections_unified_css_has_no_theme_palette_and_only_one_legacy_specif
         "border-radius: var(--sgui-radius-nested) !important;",
         "background: var(--sg-panel-soft) !important;",
     ]
-    assert 'html[data-theme="light"] body.page-connections .mhv2-listener.sg-ljd-nested' in css
+    assert 'html[data-theme="light"] body.page-connections .sg-ljd-nested' in css
     assert "legacy light material class" in css.lower()
+
+
+def test_light_connections_fence_covers_all_legacy_nested_surfaces_on_the_page():
+    css = _unified_css()
+    connections = (ROOT / "app/web/templates/connections.html").read_text(encoding="utf-8")
+    awg31 = (ROOT / "app/web/templates/_awg31_panel.html").read_text(encoding="utf-8")
+    mihomo = (ROOT / "app/web/templates/_mihomo_panel.html").read_text(encoding="utf-8")
+    assert "sg-ljd-nested" in connections
+    assert "sg-ljd-nested" in awg31
+    assert "sg-ljd-nested" in mihomo
+    assert 'html[data-theme="light"] body.page-connections .sg-ljd-nested {' in css
 
 
 def test_connections_unified_css_covers_all_connection_families():
