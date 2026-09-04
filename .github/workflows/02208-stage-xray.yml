@@ -83,16 +83,7 @@ jobs:
       - name: Full regression suite
         run: python -m pytest -q
 
-      - name: Build and verify FULL package
-        shell: bash
-        run: |
-          set -euo pipefail
-          VERSION="$(tr -d '[:space:]' < VERSION)"
-          OUT="/tmp/SG-Gateway-${VERSION}-02208-FULL.run"
-          bash build-run.sh "$OUT"
-          bash "$OUT" --verify-only
-
-      - name: Commit final candidate
+      - name: Commit final candidate locally
         shell: bash
         run: |
           set -euo pipefail
@@ -101,6 +92,7 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git commit -m 'chore: finalize XMUX 26.7.28 candidate'
+          echo "Final local candidate: $(git rev-parse HEAD)"
 
       - name: Verify committed git-blob source integrity
         run: |
@@ -139,5 +131,14 @@ jobs:
           PY
           test -z "$(git status --porcelain)"
 
-      - name: Push final candidate
+      - name: Build and verify FULL package from committed HEAD
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(tr -d '[:space:]' < VERSION)"
+          OUT="/tmp/SG-Gateway-${VERSION}-02208-FULL.run"
+          bash build-run.sh "$OUT"
+          bash "$OUT" --verify-only
+
+      - name: Push verified final candidate
         run: git push origin HEAD:feature/02208-xmux-26728
