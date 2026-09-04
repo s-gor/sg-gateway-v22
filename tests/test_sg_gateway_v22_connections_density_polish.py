@@ -42,5 +42,5 @@ def test_connections_bottom_incomplete_port_summary_is_removed():
 
 def test_mobile_xmux_gutter_does_not_double_inset_the_card():
     css = _css()
-    assert "body.page-connections #xray-xmux.xmux1-wrap {\n    padding: 0;" in css
+    assert "body.page-connections #xray-xmux.xmux1-wrap {\n    margin-inline: 0;\n    padding: 0;" in css
     assert "body.page-connections #xray-xmux #xray-xmux-form {\n    padding: 0 var(--sgui-nested-padding) var(--sgui-nested-padding);" in css
