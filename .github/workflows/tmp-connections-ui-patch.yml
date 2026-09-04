@@ -1,0 +1,92 @@
+name: Temporary Connections UI patch
+
+on:
+  push:
+    branches:
+      - feature/02207-connections-ui-unification
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-verify:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/02207-connections-ui-unification
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Apply deterministic template patch
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('app/web/templates/base.html')
+          text = path.read_text(encoding='utf-8')
+          marker = "sg-connections-unified-v1.css"
+          if marker not in text:
+              needle = "  {% if active_page|default('') == 'connections' %}<link rel=\"stylesheet\" href=\"{{ url_for('static', filename='sg-connections-dark-classic-v1.css') }}?v={{ app_version }}-connections-dark-classic-v1\">{% endif %}\n"
+              insert = "  {% if active_page|default('') == 'connections' %}<link rel=\"stylesheet\" href=\"{{ url_for('static', filename='sg-connections-unified-v1.css') }}?v={{ app_version }}-connections-unified-v1\">{% endif %}\n"
+              if needle not in text:
+                  raise SystemExit('Connections dark-classic anchor not found in base.html')
+              text = text.replace(needle, insert + needle, 1)
+              path.write_text(text, encoding='utf-8')
+          PY
+
+      - name: Remove temporary workflow from final tree
+        run: git rm .github/workflows/tmp-connections-ui-patch.yml
+
+      - name: Refresh source integrity inventory
+        run: |
+          python - <<'PY'
+          import hashlib
+          import subprocess
+          from pathlib import Path
+
+          tracked = subprocess.check_output(['git', 'ls-files'], text=True, encoding='utf-8').splitlines()
+          rows = []
+          for name in sorted(tracked):
+              if name == 'SOURCE-SHA256SUMS':
+                  continue
+              digest = hashlib.sha256(Path(name).read_bytes()).hexdigest()
+              rows.append(f'{digest}  {name}')
+          Path('SOURCE-SHA256SUMS').write_text('\n'.join(rows) + '\n', encoding='utf-8')
+          print(f'refreshed {len(rows)} source hashes')
+          PY
+
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+
+      - name: Run Connections focused regressions
+        run: |
+          python -m pytest -q \
+            tests/test_sg_gateway_v22_connections_unified_ui.py \
+            tests/test_ui_connections_visual_v1.py \
+            tests/test_connections_layout_v24.py \
+            tests/test_sg_gateway_v22_awg_cards_unified_ui.py \
+            tests/test_sg_gateway_v22_mihomo_panel_cleanup_ui.py \
+            tests/test_sg_gateway_v22_mihomo_service_tools_ui.py \
+            tests/test_sg_gateway_02204_xmux_sgpanel_contract.py \
+            tests/test_sg_gateway_02208_xmux_xray26728.py \
+            tests/test_sg_gateway_v22_compact_protocol_cards_ui_02207.py \
+            tests/test_naiveproxy_http_02207.py
+
+      - name: Run full regression suite
+        run: python -m pytest -q tests
+
+      - name: Commit verified implementation
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/web/templates/base.html app/web/static/sg-connections-unified-v1.css app/web/static/sg-compact-protocol-cards-v1.css tests/test_sg_gateway_v22_connections_unified_ui.py SOURCE-SHA256SUMS
+          git status --short
+          git commit -m 'feat: unify Connections UI geometry'
+          git push origin HEAD:feature/02207-connections-ui-unification
