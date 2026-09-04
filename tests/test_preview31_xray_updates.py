@@ -5,6 +5,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[1]
 HOSTD = ROOT / "hostd"
 if str(ROOT) not in sys.path:
@@ -14,7 +16,7 @@ if str(HOSTD) not in sys.path:
 
 from app.maintenance import xray_updates
 from app.xray import profiles
-from sg_hostd import client_runtime
+from sg_hostd import client_runtime, xray_update_runtime
 from sg_hostd.commands import list_allowed_commands
 
 
@@ -65,6 +67,40 @@ def test_hostd_minimum_policy_accepts_newer(monkeypatch):
         ),
     )
     assert client_runtime._require_xray_version() == "26.7.28"
+
+
+def test_xray_updater_allows_recovery_upgrade_from_installed_below_minimum(monkeypatch, tmp_path):
+    monkeypatch.setattr(xray_update_runtime, "LOCK_FILE", tmp_path / "xray-update.lock")
+    monkeypatch.setattr(xray_update_runtime, "_installed_version", lambda *args, **kwargs: "26.6.27")
+    monkeypatch.setattr(
+        xray_update_runtime,
+        "_latest_release",
+        lambda channel: {"tag_name": "v26.7.28"},
+    )
+
+    def reached_asset_stage():
+        raise RuntimeError("reached-asset-stage")
+
+    monkeypatch.setattr(xray_update_runtime, "_asset_filename", reached_asset_stage)
+
+    with pytest.raises(RuntimeError, match="reached-asset-stage"):
+        xray_update_runtime.update_xray("prerelease")
+
+
+def test_xray_updater_rejects_target_below_minimum_even_during_recovery(monkeypatch, tmp_path):
+    monkeypatch.setattr(xray_update_runtime, "LOCK_FILE", tmp_path / "xray-update.lock")
+    monkeypatch.setattr(xray_update_runtime, "_installed_version", lambda *args, **kwargs: "26.6.27")
+    monkeypatch.setattr(
+        xray_update_runtime,
+        "_latest_release",
+        lambda channel: {"tag_name": "v26.7.11"},
+    )
+
+    with pytest.raises(
+        xray_update_runtime.XrayUpdateRuntimeError,
+        match="целевая версия Xray v26.7.11 ниже минимально поддерживаемой v26.7.28",
+    ):
+        xray_update_runtime.update_xray("prerelease")
 
 
 def test_update_commands_are_explicitly_allowlisted():
