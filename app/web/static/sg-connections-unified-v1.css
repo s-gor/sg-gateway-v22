@@ -15,7 +15,6 @@ body.page-connections :is(
   #xray-xmux .xmux1-card,
   .awgd-shell,
   .mhv2-panel,
-  #sg-naiveproxy-settings,
   .xps2-naiveproxy-card
 ) {
   min-width: 0;
@@ -30,31 +29,31 @@ body.page-connections :is(
   #xray-xmux .xmux1-head,
   .mhv2-head
 ) {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
   gap: var(--sgui-section-gap);
-}
-
-body.page-connections .cnv1-engine-head {
   padding: var(--sgui-card-padding);
+  margin: 0;
 }
 
-body.page-connections #xray-xmux .xmux1-card,
-body.page-connections .mhv2-panel,
-body.page-connections #sg-naiveproxy-settings {
-  padding: var(--sgui-card-padding);
-}
-
-body.page-connections #xray-xmux .xmux1-head {
-  margin-bottom: var(--sgui-section-gap);
+body.page-connections #xray-xmux .xmux1-card {
+  padding: 0;
 }
 
 body.page-connections .mhv2-panel {
-  gap: var(--sgui-section-gap);
+  padding: 0;
+  gap: 0;
   margin-top: 0;
 }
 
 body.page-connections #sg-naiveproxy-settings {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
   margin: 0;
-  gap: var(--sgui-grid-gap);
+  gap: 0;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -82,6 +81,7 @@ body.page-connections :is(
   border-color: var(--sg-line-soft);
   border-radius: var(--sgui-radius-nested);
   background: var(--sg-panel-soft);
+  box-shadow: none;
 }
 
 body.page-connections :is(
@@ -157,16 +157,34 @@ body.page-connections .cnv1-engine-xray .xps2-actions {
 
 body.page-connections #xray-xmux.xmux1-wrap {
   margin-top: 0;
-  padding-inline: var(--sgui-card-padding);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+body.page-connections #xray-xmux .xmux1-card {
+  padding: 0;
+}
+
+body.page-connections #xray-xmux .xmux1-head {
+  padding: var(--sgui-card-padding);
+  margin: 0;
+}
+
+body.page-connections #xray-xmux #xray-xmux-form {
+  display: grid;
+  gap: var(--sgui-grid-gap);
+  padding: 0 var(--sgui-card-padding) var(--sgui-card-padding);
 }
 
 body.page-connections #xray-xmux .xmux1-mode > span {
-  min-height: 0;
+  min-height: var(--sgui-button-height);
   gap: var(--sgui-grid-gap);
 }
 
 body.page-connections #xray-xmux .xmux1-extra {
-  margin-top: var(--sgui-grid-gap);
+  margin-top: 0;
 }
 
 body.page-connections #xray-xmux .xmux1-extra summary {
@@ -178,7 +196,7 @@ body.page-connections #xray-xmux .xmux1-extra label {
 }
 
 body.page-connections #xray-xmux .xmux1-actions {
-  margin-top: var(--sgui-grid-gap);
+  margin-top: 0;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -220,12 +238,35 @@ body.page-connections .awgd-shared-dns-form {
 /* -------------------------------------------------------------------------- */
 
 body.page-connections #mihomo {
-  row-gap: var(--sgui-grid-gap);
+  row-gap: 0;
 }
 
-body.page-connections #mihomo .mhv2-compact-meta,
-body.page-connections #mihomo .mhv2-runtime-note {
+body.page-connections .mhv2-head {
+  padding: var(--sgui-card-padding);
   margin: 0;
+}
+
+body.page-connections #mihomo :is(
+  .mhv2-compact-meta,
+  .mhv2-form,
+  .mhv2-runtime-note
+) {
+  margin-inline: var(--sgui-card-padding);
+}
+
+body.page-connections #mihomo .mhv2-compact-meta {
+  margin-top: 0;
+  margin-bottom: var(--sgui-grid-gap);
+}
+
+body.page-connections #mihomo .mhv2-form {
+  margin-top: 0;
+  margin-bottom: var(--sgui-grid-gap);
+}
+
+body.page-connections #mihomo .mhv2-runtime-note {
+  margin-top: 0;
+  margin-bottom: var(--sgui-card-padding);
 }
 
 body.page-connections .mhv2-form,
@@ -237,13 +278,32 @@ body.page-connections .mhv2-listener {
   gap: var(--sgui-grid-gap);
 }
 
-body.page-connections .mhv2-actions,
-body.page-connections .mhv2-client-actions {
+body.page-connections .mhv2-basic-fields,
+body.page-connections .mhv2-advanced-body {
   gap: var(--sgui-grid-gap);
 }
 
-body.page-connections .mhv2-basic-fields,
-body.page-connections .mhv2-advanced-body {
+/* -------------------------------------------------------------------------- */
+/* Shared action rhythm                                                        */
+/* -------------------------------------------------------------------------- */
+
+body.page-connections :is(
+  #xray-xmux .xmux1-actions,
+  .mhv2-actions
+) {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--sgui-grid-gap);
+  margin-top: var(--sgui-grid-gap);
+}
+
+/* Inline component CSS still exists for Mihomo; this page-scoped selector is
+   intentionally stronger so the canonical page geometry owns alignment. */
+body.page-connections #mihomo .mhv2-actions {
+  justify-content: flex-end;
+}
+
+body.page-connections .mhv2-client-actions {
   gap: var(--sgui-grid-gap);
 }
 
@@ -339,6 +399,7 @@ body.page-connections :is(
   .mhv2-head h2,
   .xps2-naiveproxy-copy h2
 ) {
+  margin: 5px 0 0;
   font-size: var(--sgui-section-title);
 }
 
@@ -348,6 +409,7 @@ body.page-connections :is(
   .mhv2-head p,
   .xps2-naiveproxy-copy p
 ) {
+  margin: 6px 0 0;
   font-size: var(--sgui-body);
   line-height: 1.5;
 }
@@ -375,16 +437,31 @@ body.page-connections :is(
 
 @media (max-width: 650px) {
   body.page-connections #xray-xmux.xmux1-wrap {
-    padding-inline: 0;
+    padding: 0;
   }
 
   body.page-connections :is(
     .cnv1-engine-head,
-    #xray-xmux .xmux1-card,
-    .mhv2-panel,
-    #sg-naiveproxy-settings
+    #xray-xmux .xmux1-head,
+    .mhv2-head
   ) {
     padding: var(--sgui-nested-padding);
+  }
+
+  body.page-connections #xray-xmux #xray-xmux-form {
+    padding: 0 var(--sgui-nested-padding) var(--sgui-nested-padding);
+  }
+
+  body.page-connections #mihomo :is(
+    .mhv2-compact-meta,
+    .mhv2-form,
+    .mhv2-runtime-note
+  ) {
+    margin-inline: var(--sgui-nested-padding);
+  }
+
+  body.page-connections #mihomo .mhv2-runtime-note {
+    margin-bottom: var(--sgui-nested-padding);
   }
 
   body.page-connections .awgd-grid {
