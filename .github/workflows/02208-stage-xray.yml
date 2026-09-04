@@ -36,23 +36,6 @@ jobs:
           git rm .github/workflows/02208-stage-xray.yml
           git rm tools/apply_02208_xmux_26728.py
 
-      - name: Refresh SOURCE-SHA256SUMS for final tree
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          import hashlib
-          import subprocess
-
-          paths = subprocess.check_output(["git", "ls-files"], text=True, encoding="utf-8").splitlines()
-          paths = sorted(path for path in paths if path != "SOURCE-SHA256SUMS")
-          rows = []
-          for path in paths:
-              digest = hashlib.sha256(Path(path).read_bytes()).hexdigest()
-              rows.append(f"{digest}  {path}")
-          Path("SOURCE-SHA256SUMS").write_text("\n".join(rows) + "\n", encoding="utf-8")
-          print(f"SOURCE-SHA256SUMS refreshed: {len(rows)} tracked files")
-          PY
-
       - name: Verify official vendored Xray 26.7.28
         shell: bash
         run: |
@@ -82,6 +65,31 @@ jobs:
 
       - name: Full regression suite
         run: python -m pytest -q
+
+      - name: Discard test mutations and refresh final source inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo 'Tracked changes left by tests before restore:'
+          git status --short || true
+          # The two intended helper deletions are already staged in the index.
+          # Restore every worktree file from that index so tests cannot leak
+          # mutations (notably data/sg-gateway.sqlite) into the release commit.
+          git restore --worktree .
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib
+          import subprocess
+
+          paths = subprocess.check_output(["git", "ls-files"], text=True, encoding="utf-8").splitlines()
+          paths = sorted(path for path in paths if path != "SOURCE-SHA256SUMS")
+          rows = []
+          for path in paths:
+              digest = hashlib.sha256(Path(path).read_bytes()).hexdigest()
+              rows.append(f"{digest}  {path}")
+          Path("SOURCE-SHA256SUMS").write_text("\n".join(rows) + "\n", encoding="utf-8")
+          print(f"SOURCE-SHA256SUMS refreshed after tests: {len(rows)} tracked files")
+          PY
 
       - name: Commit final candidate locally
         shell: bash
