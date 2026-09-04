@@ -155,8 +155,9 @@ body.page-connections .cnv1-engine-xray .xps2-actions {
 /* XMUX                                                                        */
 /* -------------------------------------------------------------------------- */
 
-body.page-connections #xray-xmux .xmux1-wrap {
+body.page-connections #xray-xmux.xmux1-wrap {
   margin-top: 0;
+  padding-inline: var(--sgui-card-padding);
 }
 
 body.page-connections #xray-xmux .xmux1-mode > span {
@@ -183,6 +184,10 @@ body.page-connections #xray-xmux .xmux1-actions {
 /* -------------------------------------------------------------------------- */
 /* AmneziaWG                                                                   */
 /* -------------------------------------------------------------------------- */
+
+body.page-connections .awgd-shell > .cnv1-engine-head {
+  border-bottom: 0;
+}
 
 body.page-connections .awgd-grid {
   padding: 0 var(--sgui-card-padding) var(--sgui-card-padding);
@@ -213,6 +218,15 @@ body.page-connections .awgd-shared-dns-form {
 /* -------------------------------------------------------------------------- */
 /* Mihomo / sing-box                                                           */
 /* -------------------------------------------------------------------------- */
+
+body.page-connections #mihomo {
+  row-gap: var(--sgui-grid-gap);
+}
+
+body.page-connections #mihomo .mhv2-compact-meta,
+body.page-connections #mihomo .mhv2-runtime-note {
+  margin: 0;
+}
 
 body.page-connections .mhv2-form,
 body.page-connections .mhv2-form-compact {
@@ -360,6 +374,10 @@ body.page-connections :is(
 }
 
 @media (max-width: 650px) {
+  body.page-connections #xray-xmux.xmux1-wrap {
+    padding-inline: 0;
+  }
+
   body.page-connections :is(
     .cnv1-engine-head,
     #xray-xmux .xmux1-card,
