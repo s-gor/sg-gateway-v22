@@ -117,9 +117,9 @@ body.page-connections :is(
 }
 
 /* The legacy light material class is intentionally stronger than ordinary
-   page CSS. Keep this migration fence narrow: Mihomo listener cards are the
-   only canonical nested surface that still carries sg-ljd-nested in markup. */
-html[data-theme="light"] body.page-connections .mhv2-listener.sg-ljd-nested {
+   page CSS. This page-scoped fence keeps every sg-ljd-nested surface on the
+   same canonical nested geometry without changing the global light theme. */
+html[data-theme="light"] body.page-connections .sg-ljd-nested {
   border-color: var(--sg-line-soft) !important;
   border-radius: var(--sgui-radius-nested) !important;
   background: var(--sg-panel-soft) !important;
