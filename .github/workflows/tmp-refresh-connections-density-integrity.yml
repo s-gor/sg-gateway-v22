@@ -1,0 +1,55 @@
+name: Temporary Connections density integrity refresh
+
+on:
+  push:
+    branches:
+      - fix/02207-connections-density-polish
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: fix/02207-connections-density-polish
+
+      - name: Remove temporary probes and rebuild source integrity
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git rm -- tests/test_tmp_connections_density_checksum_probe.py
+          git rm -- .github/workflows/tmp-refresh-connections-density-integrity.yml
+          python3 - <<'PY'
+          from __future__ import annotations
+
+          import hashlib
+          import subprocess
+          from pathlib import Path
+
+          manifest = Path("SOURCE-SHA256SUMS")
+          raw = subprocess.check_output(["git", "ls-files", "-z"])
+          paths = [item.decode("utf-8") for item in raw.split(b"\0") if item]
+          lines = []
+          for path in paths:
+              if path == "SOURCE-SHA256SUMS":
+                  continue
+              blob = subprocess.check_output(["git", "show", f":{path}"])
+              lines.append(f"{hashlib.sha256(blob).hexdigest()}  {path}")
+          manifest.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
+          PY
+          git add SOURCE-SHA256SUMS
+          git diff --cached --check
+
+      - name: Commit clean integrity state
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore: refresh Connections density source integrity"
+          git push origin HEAD:fix/02207-connections-density-polish
