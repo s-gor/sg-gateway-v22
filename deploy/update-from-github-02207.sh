@@ -133,7 +133,7 @@ prepare_hostd_preflight_bridge() {
       return 1
     }
   grep -Fqx \
-    'ReadWritePaths=-/run/sg-gateway -/usr/local/share/xray -/usr/local/etc/xray -/etc/amnezia/amneziawg -/etc/sysctl.d -/etc/mihomo -/etc/sing-box -/etc/sg-gateway/naiveproxy -/var/lib/sg-gateway' \
+    'ReadWritePaths=-/run/sg-gateway -/usr/local/share/xray -/usr/local/etc/xray -/etc/amnezia/amneziawg -/etc/sysctl.d -/etc/mihomo -/etc/sing-box -/etc/sg-gateway/naiveproxy -/var/lib/sg-gateway -/var/lib/mihomo' \
     "$staged" || {
       log "ERROR: preflight hostd unit has invalid writable paths"
       return 1
@@ -336,7 +336,7 @@ stage_naive_hostd_unit() {
     "$url" || return 1
 
   grep -Fqx \
-    'ReadWritePaths=-/run/sg-gateway -/usr/local/share/xray -/usr/local/etc/xray -/etc/amnezia/amneziawg -/etc/sysctl.d -/etc/mihomo -/etc/sing-box -/etc/sg-gateway/naiveproxy -/var/lib/sg-gateway' \
+    'ReadWritePaths=-/run/sg-gateway -/usr/local/share/xray -/usr/local/etc/xray -/etc/amnezia/amneziawg -/etc/sysctl.d -/etc/mihomo -/etc/sing-box -/etc/sg-gateway/naiveproxy -/var/lib/sg-gateway -/var/lib/mihomo' \
     "$staged" || {
       log "ERROR: fetched hostd unit is not NaiveProxy-capable"
       return 1
