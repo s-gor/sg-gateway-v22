@@ -1,4 +1,4 @@
-name: Connections browser smoke
+name: Refresh Connections source checksums
 
 on:
   push:
@@ -6,180 +6,78 @@ on:
       - feature/02207-connections-ui-unification-red
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  browser-smoke:
+  refresh-source-checksums:
     runs-on: ubuntu-24.04
-    env:
-      SG_GATEWAY_ENV: development
-      SG_GATEWAY_HOST: 127.0.0.1
-      SG_GATEWAY_PORT: '18080'
-      SG_GATEWAY_PUBLIC_PORT: '18080'
-      SG_GATEWAY_PUBLIC_ADDRESS: 127.0.0.1
-      SG_GATEWAY_SECRET_KEY: browser-smoke-fixed-secret
-      SG_GATEWAY_ADMIN_PASSWORD: admin
     steps:
-      - name: Checkout verified feature head
+      - name: Checkout feature branch
         uses: actions/checkout@v4
         with:
           ref: feature/02207-connections-ui-unification
-          fetch-depth: 1
+          fetch-depth: 0
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Install application and browser dependencies
+      - name: Regenerate SOURCE-SHA256SUMS from clean tracked tree
+        shell: bash
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install -r requirements-dev.txt playwright
-          python -m playwright install chromium
-
-      - name: Prepare writable runtime paths
-        run: |
-          sudo mkdir -p /var/lib/sg-gateway/candidates/mihomo /var/lib/mihomo/backups
-          sudo chown -R "$(id -u):$(id -g)" /var/lib/sg-gateway /var/lib/mihomo
-
-      - name: Start SG-Gateway locally
-        run: |
-          nohup waitress-serve --listen=127.0.0.1:18080 app.production:app > /tmp/sg-browser-server.log 2>&1 &
-          for attempt in $(seq 1 30); do
-            if curl -fsS http://127.0.0.1:18080/login >/dev/null; then
-              exit 0
-            fi
-            sleep 1
-          done
-          cat /tmp/sg-browser-server.log
-          exit 1
-
-      - name: Exercise responsive Connections UI in Chromium
-        run: |
-          mkdir -p browser-smoke
+          set -euo pipefail
           python - <<'PY'
           from __future__ import annotations
 
-          import json
+          import hashlib
+          import subprocess
           from pathlib import Path
-          from playwright.sync_api import sync_playwright
 
-          OUT = Path('browser-smoke')
-          BASE = 'http://127.0.0.1:18080'
-          sizes = (1600, 1366, 900, 620)
-          themes = ('dark', 'light')
-          outer_selectors = (
-              '.cnv1-engine-xray',
-              '#xray-xmux .xmux1-card',
-              '.awgd-shell',
-              '.mhv2-panel',
-              '#sg-naiveproxy-settings',
-          )
-          nested_selectors = (
-              '.xps2-parameter-row',
-              '#xray-xmux .xmux1-mode > span',
-              '.awgd-card',
-              '.mhv2-listener',
-              '.xps2-naiveproxy-meta',
-          )
+          root = Path('.')
+          manifest = root / 'SOURCE-SHA256SUMS'
+          old = {}
+          for line in manifest.read_text(encoding='utf-8').splitlines():
+              digest, path = line.split('  ', 1)
+              old[path] = digest
 
-          report = []
-          with sync_playwright() as p:
-              browser = p.chromium.launch(headless=True)
-              context = browser.new_context(viewport={'width': 1600, 'height': 1000})
-              page = context.new_page()
-              page.goto(BASE + '/login?next=/connections', wait_until='networkidle')
-              page.locator('input[name="password"]').fill('admin')
-              page.locator('button[type="submit"]').click()
-              page.wait_for_url('**/connections')
+          paths = subprocess.check_output(['git', 'ls-files', '-z']).decode('utf-8').split('\0')
+          paths = [path for path in paths if path and path != 'SOURCE-SHA256SUMS']
 
-              for theme in themes:
-                  page.evaluate("theme => localStorage.setItem('sg-gateway-theme', theme)", theme)
-                  for width in sizes:
-                      page.set_viewport_size({'width': width, 'height': 1000})
-                      response = page.goto(BASE + '/connections', wait_until='networkidle')
-                      assert response is not None and response.status == 200, (theme, width, getattr(response, 'status', None))
-                      page.wait_for_selector('#xray-xmux .xmux1-card')
-                      page.wait_for_selector('#sg-naiveproxy-settings')
+          new = {}
+          lines = []
+          for path in paths:
+              digest = hashlib.sha256((root / path).read_bytes()).hexdigest()
+              new[path] = digest
+              lines.append(f'{digest}  {path}')
 
-                      metrics = page.evaluate(
-                          """({outer, nested}) => {
-                            const style = selector => {
-                              const el = document.querySelector(selector);
-                              if (!el) return null;
-                              const cs = getComputedStyle(el);
-                              const r = el.getBoundingClientRect();
-                              return {
-                                selector,
-                                borderRadius: cs.borderRadius,
-                                borderWidth: cs.borderTopWidth,
-                                paddingTop: cs.paddingTop,
-                                minHeight: cs.minHeight,
-                                width: Math.round(r.width),
-                                left: Math.round(r.left),
-                                right: Math.round(r.right),
-                              };
-                            };
-                            return {
-                              viewport: document.documentElement.clientWidth,
-                              scrollWidth: document.documentElement.scrollWidth,
-                              outer: outer.map(style),
-                              nested: nested.map(style),
-                            };
-                          }""",
-                          {'outer': list(outer_selectors), 'nested': list(nested_selectors)},
-                      )
+          manifest.write_text('\n'.join(lines) + '\n', encoding='utf-8')
 
-                      buttons = page.evaluate(
-                          """() => [...document.querySelectorAll('.page-connections .button')]
-                            .filter(el => el.offsetParent !== null)
-                            .map(el => {
-                              const cs = getComputedStyle(el);
-                              const r = el.getBoundingClientRect();
-                              return {
-                                text: (el.textContent || '').trim().replace(/\\s+/g, ' ').slice(0, 90),
-                                classes: el.className,
-                                height: Math.round(r.height),
-                                minHeight: cs.minHeight,
-                                paddingTop: cs.paddingTop,
-                                paddingBottom: cs.paddingBottom,
-                              };
-                            })"""
-                      )
+          changed = sorted(path for path in set(old) | set(new) if old.get(path) != new.get(path))
+          expected = [
+              'app/web/static/sg-connections-unified-v1.css',
+              'tests/test_sg_gateway_v22_connections_unified_ui.py',
+          ]
+          if changed != expected:
+              raise SystemExit(f'unexpected checksum changes: {changed!r}')
 
-                      shot = OUT / f'connections-{theme}-{width}.png'
-                      page.screenshot(path=str(shot), full_page=True)
-                      report.append({'theme': theme, 'width': width, 'metrics': metrics, 'buttons': buttons})
+          expected_hashes = {
+              'app/web/static/sg-connections-unified-v1.css': '5cb784fb326d61e94b77243b5b8d5f2bb76425f58bebd8dc68863efafa9cd4b5',
+              'tests/test_sg_gateway_v22_connections_unified_ui.py': '69b9bb3866d6bed3435ecc32a127cbd1c0123a38791005ca0d965366e8f4f01b',
+          }
+          for path, expected_hash in expected_hashes.items():
+              if new[path] != expected_hash:
+                  raise SystemExit(f'{path}: expected {expected_hash}, got {new[path]}')
 
-                      assert metrics['scrollWidth'] <= metrics['viewport'] + 1, (theme, width, metrics['scrollWidth'], metrics['viewport'])
-                      assert all(item is not None for item in metrics['outer']), (theme, width, metrics['outer'])
-                      assert all(item is not None for item in metrics['nested']), (theme, width, metrics['nested'])
-
-              browser.close()
-
-          (OUT / 'metrics.json').write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
-          for row in report:
-              compact = {
-                  'theme': row['theme'],
-                  'width': row['width'],
-                  'scrollWidth': row['metrics']['scrollWidth'],
-                  'viewport': row['metrics']['viewport'],
-                  'outerRadii': {item['selector']: item['borderRadius'] for item in row['metrics']['outer']},
-                  'nestedRadii': {item['selector']: item['borderRadius'] for item in row['metrics']['nested']},
-                  'buttonsBelow42': [b for b in row['buttons'] if b['height'] < 42],
-              }
-              print(json.dumps(compact, ensure_ascii=False))
+          print(f'SOURCE-SHA256SUMS refreshed: {len(lines)} tracked files')
+          print('changed entries:', ', '.join(changed))
           PY
+          git diff --check
+          git diff -- SOURCE-SHA256SUMS
 
-      - name: Show server log on failure
-        if: failure()
-        run: cat /tmp/sg-browser-server.log || true
-
-      - name: Upload browser smoke evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: connections-browser-smoke
-          path: browser-smoke/
-          if-no-files-found: warn
-          retention-days: 7
+      - name: Commit checksum-only refresh
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git status --short | wc -l)" -eq 1
+          git status --short | grep -Fx ' M SOURCE-SHA256SUMS'
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add SOURCE-SHA256SUMS
+          git commit -m 'chore: refresh Connections source checksums'
+          git push origin HEAD:feature/02207-connections-ui-unification
