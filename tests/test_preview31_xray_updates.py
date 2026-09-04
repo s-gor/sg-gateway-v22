@@ -50,9 +50,10 @@ def test_channel_state_blocks_downgrade_and_allows_upgrade():
 
 
 def test_profiles_accept_newer_xray_and_reject_older():
-    assert profiles._version_supported("26.6.27") is True
-    assert profiles._version_supported("26.7.11") is True
-    assert profiles._version_supported("26.3.27") is False
+    assert profiles._version_supported("26.7.28") is True
+    assert profiles._version_supported("26.8.1") is True
+    assert profiles._version_supported("26.7.11") is False
+    assert profiles._version_supported("26.6.27") is False
 
 
 def test_hostd_minimum_policy_accepts_newer(monkeypatch):
@@ -60,10 +61,10 @@ def test_hostd_minimum_policy_accepts_newer(monkeypatch):
         client_runtime,
         "_run",
         lambda *args, **kwargs: subprocess.CompletedProcess(
-            args=["xray", "version"], returncode=0, stdout="Xray 26.7.11 test\n", stderr=""
+            args=["xray", "version"], returncode=0, stdout="Xray 26.7.28 test\n", stderr=""
         ),
     )
-    assert client_runtime._require_xray_version() == "26.7.11"
+    assert client_runtime._require_xray_version() == "26.7.28"
 
 
 def test_update_commands_are_explicitly_allowlisted():
@@ -74,8 +75,8 @@ def test_update_commands_are_explicitly_allowlisted():
 
 def test_installer_bootstraps_26627_but_preserves_supported_newer():
     installer = (ROOT / "install.sh").read_text(encoding="utf-8")
-    assert 'XRAY_REQUIRED_VERSION="v26.6.27"' in installer
-    assert 'XRAY_MINIMUM_VERSION="v26.6.27"' in installer
+    assert 'XRAY_REQUIRED_VERSION="v26.7.28"' in installer
+    assert 'XRAY_MINIMUM_VERSION="v26.7.28"' in installer
     assert "install_xray_from_vendor" in installer
     assert 'XRAY_VENDOR_FILE="Xray-linux-64.zip"' in installer
     assert 'dpkg --compare-versions "${installed_xray#v}" ge "${XRAY_MINIMUM_VERSION#v}"' in installer
@@ -88,7 +89,8 @@ def test_manifest_and_updates_ui_declare_safe_update_flow():
     runtime = (ROOT / "hostd/sg_hostd/xray_update_runtime.py").read_text(encoding="utf-8")
     version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
     assert manifest["version"] == version
-    assert manifest["xray"]["minimum_version"] == "v26.6.27"
+    assert manifest["xray"]["minimum_version"] == "v26.7.28"
+    assert manifest["xray"]["required_version"] == "v26.7.28"
     assert manifest["xray"]["updates"]["automatic_rollback"] is True
     assert "Backups" in template and "Updates" in template
     assert "Стабильная версия" in template

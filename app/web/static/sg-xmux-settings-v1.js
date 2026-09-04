@@ -538,7 +538,7 @@
       const manualPreview = dialog?.querySelector('[data-xmux-manual-preview]');
       const modeTitles = {
         auto: 'Стандартный',
-        reduced: 'Для РФ — уменьшенный',
+        reduced: 'Для РФ — быстрая ротация',
         expert: 'Ручной',
       };
 
