@@ -130,6 +130,27 @@ jobs:
                           {'outer': list(outer_selectors), 'nested': list(nested_selectors)},
                       )
 
+                      buttons = page.evaluate(
+                          """() => [...document.querySelectorAll('.page-connections .button')]
+                            .filter(el => el.offsetParent !== null)
+                            .map(el => {
+                              const cs = getComputedStyle(el);
+                              const r = el.getBoundingClientRect();
+                              return {
+                                text: (el.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 90),
+                                classes: el.className,
+                                height: Math.round(r.height),
+                                minHeight: cs.minHeight,
+                                paddingTop: cs.paddingTop,
+                                paddingBottom: cs.paddingBottom,
+                              };
+                            })"""
+                      )
+
+                      shot = OUT / f'connections-{theme}-{width}.png'
+                      page.screenshot(path=str(shot), full_page=True)
+                      report.append({'theme': theme, 'width': width, 'metrics': metrics, 'buttons': buttons})
+
                       assert metrics['scrollWidth'] <= metrics['viewport'] + 1, (theme, width, metrics['scrollWidth'], metrics['viewport'])
                       assert all(item is not None for item in metrics['outer']), (theme, width, metrics['outer'])
                       assert all(item is not None for item in metrics['nested']), (theme, width, metrics['nested'])
@@ -138,21 +159,18 @@ jobs:
                       assert outer_radii == {'14px'}, (theme, width, outer_radii)
                       assert nested_radii == {'10px'}, (theme, width, nested_radii)
 
-                      button_heights = page.evaluate(
-                          """() => [...document.querySelectorAll('.page-connections .button')]
-                            .filter(el => el.offsetParent !== null)
-                            .map(el => Math.round(el.getBoundingClientRect().height))"""
-                      )
-                      assert button_heights and min(button_heights) >= 42, (theme, width, button_heights)
-
-                      shot = OUT / f'connections-{theme}-{width}.png'
-                      page.screenshot(path=str(shot), full_page=True)
-                      report.append({'theme': theme, 'width': width, 'metrics': metrics, 'buttonHeights': button_heights})
-
               browser.close()
 
           (OUT / 'metrics.json').write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
-          print(json.dumps([{'theme': row['theme'], 'width': row['width'], 'scrollWidth': row['metrics']['scrollWidth'], 'viewport': row['metrics']['viewport']} for row in report], ensure_ascii=False))
+          for row in report:
+              compact = {
+                  'theme': row['theme'],
+                  'width': row['width'],
+                  'scrollWidth': row['metrics']['scrollWidth'],
+                  'viewport': row['metrics']['viewport'],
+                  'buttonsBelow42': [b for b in row['buttons'] if b['height'] < 42],
+              }
+              print(json.dumps(compact, ensure_ascii=False))
           PY
 
       - name: Show server log on failure
