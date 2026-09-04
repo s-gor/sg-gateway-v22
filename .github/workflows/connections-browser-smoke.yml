@@ -37,6 +37,11 @@ jobs:
           python -m pip install -r requirements-dev.txt playwright
           python -m playwright install chromium
 
+      - name: Prepare writable runtime paths
+        run: |
+          sudo mkdir -p /var/lib/sg-gateway/candidates/mihomo /var/lib/mihomo/backups
+          sudo chown -R "$(id -u):$(id -g)" /var/lib/sg-gateway /var/lib/mihomo
+
       - name: Start SG-Gateway locally
         run: |
           nohup waitress-serve --listen=127.0.0.1:18080 app.production:app > /tmp/sg-browser-server.log 2>&1 &
