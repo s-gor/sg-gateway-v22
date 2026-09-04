@@ -1,4 +1,4 @@
-name: Refresh Connections source checksums
+name: Apply Connections density polish
 
 on:
   push:
@@ -9,68 +9,88 @@ permissions:
   contents: write
 
 jobs:
-  refresh-source-checksums:
+  apply-density-polish:
     runs-on: ubuntu-24.04
     steps:
-      - name: Checkout verified feature head
+      - name: Checkout density feature branch
         uses: actions/checkout@v4
         with:
-          ref: feature/02207-connections-ui-unification
+          ref: fix/02207-connections-density-polish
           fetch-depth: 0
 
-      - name: Regenerate SOURCE-SHA256SUMS from clean tracked tree
+      - name: Apply approved Connections geometry changes
         shell: bash
         run: |
           set -euo pipefail
-          python - <<'PY'
-          from __future__ import annotations
-
-          import hashlib
-          import subprocess
+          python3 -B - <<'PY'
           from pathlib import Path
 
-          root = Path('.')
-          manifest = root / 'SOURCE-SHA256SUMS'
-          old = {}
-          for line in manifest.read_text(encoding='utf-8').splitlines():
-              digest, path = line.split('  ', 1)
-              old[path] = digest
+          css_path = Path('app/web/static/sg-connections-unified-v1.css')
+          css = css_path.read_text(encoding='utf-8')
 
-          paths = subprocess.check_output(['git', 'ls-files', '-z']).decode('utf-8').split('\0')
-          paths = [path for path in paths if path and path != 'SOURCE-SHA256SUMS']
-
-          new = {}
-          lines = []
-          for path in paths:
-              digest = hashlib.sha256((root / path).read_bytes()).hexdigest()
-              new[path] = digest
-              lines.append(f'{digest}  {path}')
-
-          manifest.write_text('\n'.join(lines) + '\n', encoding='utf-8')
-
-          changed = sorted(path for path in set(old) | set(new) if old.get(path) != new.get(path))
-          expected = [
-              'app/web/static/sg-connections-unified-v1.css',
-              'tests/test_sg_gateway_v22_connections_unified_ui.py',
+          replacements = [
+              (
+                  '''body.page-connections #xray-xmux .xmux1-wrap {\n  margin-top: 0;\n}\n''',
+                  '''body.page-connections #xray-xmux.xmux1-wrap {\n  margin-top: 0;\n  padding-inline: var(--sgui-card-padding);\n}\n''',
+                  'XMUX wrapper',
+              ),
+              (
+                  '''/* -------------------------------------------------------------------------- */\n/* AmneziaWG                                                                   */\n/* -------------------------------------------------------------------------- */\n\nbody.page-connections .awgd-grid {\n''',
+                  '''/* -------------------------------------------------------------------------- */\n/* AmneziaWG                                                                   */\n/* -------------------------------------------------------------------------- */\n\nbody.page-connections .awgd-shell > .cnv1-engine-head {\n  border-bottom: 0;\n}\n\nbody.page-connections .awgd-grid {\n''',
+                  'AWG header',
+              ),
+              (
+                  '''/* -------------------------------------------------------------------------- */\n/* Mihomo / sing-box                                                           */\n/* -------------------------------------------------------------------------- */\n\nbody.page-connections .mhv2-form,\n''',
+                  '''/* -------------------------------------------------------------------------- */\n/* Mihomo / sing-box                                                           */\n/* -------------------------------------------------------------------------- */\n\nbody.page-connections #mihomo {\n  row-gap: var(--sgui-grid-gap);\n}\n\nbody.page-connections #mihomo .mhv2-compact-meta,\nbody.page-connections #mihomo .mhv2-runtime-note {\n  margin: 0;\n}\n\nbody.page-connections .mhv2-form,\n''',
+                  'Mihomo rhythm',
+              ),
+              (
+                  '''@media (max-width: 650px) {\n  body.page-connections :is(\n''',
+                  '''@media (max-width: 650px) {\n  body.page-connections #xray-xmux.xmux1-wrap {\n    padding-inline: 0;\n  }\n\n  body.page-connections :is(\n''',
+                  'mobile XMUX gutter',
+              ),
           ]
-          if changed != expected:
-              raise SystemExit(f'unexpected checksum changes: {changed!r}')
+          for old, new, label in replacements:
+              if old not in css:
+                  raise SystemExit(f'{label} anchor not found')
+              css = css.replace(old, new, 1)
+          css_path.write_text(css, encoding='utf-8', newline='\n')
 
-          print(f'SOURCE-SHA256SUMS refreshed: {len(lines)} tracked files')
-          for path in changed:
-              print(f'{new[path]}  {path}')
+          template_path = Path('app/web/templates/connections.html')
+          template = template_path.read_text(encoding='utf-8')
+          footer = '''  <footer class="cnv1-page-footer">\n    <span>AWG2: {{ awg_public_host }}:{{ awg_settings.port }}</span>\n    <span>AWG3: {{ awg3_public_host }}:{{ awg3_settings.port }}</span>\n    <span>Xray Reality: {{ xray_public_host }}:{{ xray_settings.port }}</span>\n    <span>Mihomo: {{ mihomo_public_host }} · {{ mihomo.listener_active }}/{{ mihomo.listener_total }}</span>\n  </footer>\n'''
+          if footer not in template:
+              raise SystemExit('stale Connections footer not found')
+          template_path.write_text(template.replace(footer, '', 1), encoding='utf-8', newline='\n')
           PY
           git diff --check
-          git diff -- SOURCE-SHA256SUMS
+          git diff -- app/web/static/sg-connections-unified-v1.css app/web/templates/connections.html
 
-      - name: Commit checksum-only refresh
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+
+      - name: Run focused UI contracts
+        run: |
+          python -m pytest -q \
+            tests/test_sg_gateway_v22_connections_density_polish.py \
+            tests/test_sg_gateway_v22_connections_unified_ui.py \
+            tests/test_ui_connections_visual_v1.py \
+            tests/test_connections_layout_v24.py
+
+      - name: Commit verified implementation
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git status --short | wc -l)" -eq 1
-          git status --short | grep -Fx ' M SOURCE-SHA256SUMS'
+          git restore --worktree data/sg-gateway.sqlite data/system-activity.json 2>/dev/null || true
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add SOURCE-SHA256SUMS
-          git commit -m 'chore: refresh final Connections source checksums'
-          git push origin HEAD:feature/02207-connections-ui-unification
+          git add app/web/static/sg-connections-unified-v1.css app/web/templates/connections.html
+          git commit -m 'style: compact Connections layout geometry'
+          git push origin HEAD:fix/02207-connections-density-polish
