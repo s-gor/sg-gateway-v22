@@ -27,3 +27,5 @@ def test_hostd_sandbox_allows_managed_client_runtime_writes_without_opening_etc(
     assert "-/etc/mihomo" in paths
     assert "-/etc/sing-box" in paths
     assert "-/var/lib/sg-gateway" in paths
+    assert "-/var/lib/mihomo" in paths
+    assert "-/var/lib" not in paths
