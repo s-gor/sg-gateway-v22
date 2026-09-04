@@ -123,7 +123,6 @@ html[data-theme="light"] body.page-connections .sg-ljd-nested {
   border-color: var(--sg-line-soft) !important;
   border-radius: var(--sgui-radius-nested) !important;
   background: var(--sg-panel-soft) !important;
-  box-shadow: none !important;
 }
 
 /* -------------------------------------------------------------------------- */
