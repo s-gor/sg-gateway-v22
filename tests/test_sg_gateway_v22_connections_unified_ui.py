@@ -43,13 +43,20 @@ def test_connections_unified_css_uses_global_geometry_tokens():
         assert f"var({token})" in css
 
 
-def test_connections_unified_css_has_no_theme_palette_or_specificity_escalation():
+def test_connections_unified_css_has_no_theme_palette_and_only_one_legacy_specificity_fence():
     css = _unified_css()
-    assert "!important" not in css
     assert re.search(r"#[0-9a-fA-F]{3,8}\b", css) is None
     assert "rgb(" not in css.lower()
     assert "rgba(" not in css.lower()
-    assert "html[data-theme=" not in css
+
+    important_lines = [line.strip() for line in css.splitlines() if "!important" in line]
+    assert important_lines == [
+        "border-color: var(--sg-line-soft) !important;",
+        "border-radius: var(--sgui-radius-nested) !important;",
+        "background: var(--sg-panel-soft) !important;",
+    ]
+    assert 'html[data-theme="light"] body.page-connections .mhv2-listener.sg-ljd-nested' in css
+    assert "legacy light material class" in css.lower()
 
 
 def test_connections_unified_css_covers_all_connection_families():
@@ -76,7 +83,16 @@ def test_connections_unified_css_defines_shared_outer_nested_control_and_status_
     assert "border-radius: var(--sgui-radius-control);" in css
     assert "border-radius: var(--sgui-radius-badge);" in css
     assert "min-height: var(--sgui-button-height);" in css
+    assert "height: var(--sgui-button-height);" in css
     assert "min-height: var(--sgui-badge-height);" in css
+
+
+def test_connections_unified_css_pins_real_controls_to_canonical_height():
+    css = _unified_css()
+    assert "body.page-connections .button {\n  height: var(--sgui-button-height);" in css
+    assert ".xps2-parameter-row input:not([type=\"checkbox\"]):not([type=\"radio\"])" in css
+    assert ".awgd-shared-dns-form input" in css
+    assert ".mhv2-basic-fields select" in css
 
 
 def test_naiveproxy_late_stylesheet_uses_same_geometry_tokens():
