@@ -8,6 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 TARGETS = (
     "app/web/static/sg-connections-unified-v1.css",
     "app/web/templates/connections.html",
+    "tests/test_sg_gateway_02112_all_connections_domain_fix3.py",
     "tests/test_sg_gateway_v22_connections_density_polish.py",
 )
 
