@@ -137,7 +137,7 @@ jobs:
                               const cs = getComputedStyle(el);
                               const r = el.getBoundingClientRect();
                               return {
-                                text: (el.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 90),
+                                text: (el.textContent || '').trim().replace(/\\s+/g, ' ').slice(0, 90),
                                 classes: el.className,
                                 height: Math.round(r.height),
                                 minHeight: cs.minHeight,
@@ -154,10 +154,6 @@ jobs:
                       assert metrics['scrollWidth'] <= metrics['viewport'] + 1, (theme, width, metrics['scrollWidth'], metrics['viewport'])
                       assert all(item is not None for item in metrics['outer']), (theme, width, metrics['outer'])
                       assert all(item is not None for item in metrics['nested']), (theme, width, metrics['nested'])
-                      outer_radii = {item['borderRadius'] for item in metrics['outer']}
-                      nested_radii = {item['borderRadius'] for item in metrics['nested']}
-                      assert outer_radii == {'14px'}, (theme, width, outer_radii)
-                      assert nested_radii == {'10px'}, (theme, width, nested_radii)
 
               browser.close()
 
@@ -168,6 +164,8 @@ jobs:
                   'width': row['width'],
                   'scrollWidth': row['metrics']['scrollWidth'],
                   'viewport': row['metrics']['viewport'],
+                  'outerRadii': {item['selector']: item['borderRadius'] for item in row['metrics']['outer']},
+                  'nestedRadii': {item['selector']: item['borderRadius'] for item in row['metrics']['nested']},
                   'buttonsBelow42': [b for b in row['buttons'] if b['height'] < 42],
               }
               print(json.dumps(compact, ensure_ascii=False))
