@@ -99,13 +99,13 @@
 }
 
 .xps2-parameter-row[data-profile-panel="hysteria2"] {
-  gap: var(--sgui-grid-gap);
-  padding: var(--sgui-nested-padding);
+  gap: 8px 10px;
+  padding: 10px 12px;
 }
 
 .xps2-parameter-row[data-profile-panel="hysteria2"] .xps2-salamander {
-  gap: var(--sgui-grid-gap);
-  padding: var(--sgui-nested-padding);
+  gap: 8px 10px;
+  padding: 9px 11px;
 }
 
 .xps2-parameter-row[data-profile-panel="hysteria2"] .xps2-salamander > header > div {
@@ -118,7 +118,7 @@
 
 .xps2-parameter-row[data-profile-panel="hysteria2"] .xps2-salamander-modes label,
 .xps2-parameter-row[data-profile-panel="hysteria2"] .xps2-salamander-modes span {
-  min-height: var(--sgui-button-height-small);
+  min-height: 30px;
 }
 
 .xps2-parameter-row[data-profile-panel="hysteria2"] .xps2-salamander-modes span {
@@ -126,13 +126,13 @@
 }
 
 .xps2-parameter-row[data-profile-panel="hysteria2"] .xps2-salamander-secret {
-  gap: var(--sgui-grid-gap);
+  gap: 8px;
 }
 
 .xps2-parameter-row[data-profile-panel="hysteria2"] .xps2-salamander-secret input[type="password"],
 .xps2-parameter-row[data-profile-panel="hysteria2"] .xps2-salamander-secret input[type="text"],
 .xps2-parameter-row[data-profile-panel="hysteria2"] .xps2-salamander-buttons .button {
-  min-height: var(--sgui-button-height);
+  min-height: 34px;
 }
 
 html[data-theme="light"] body.page-connections .xps2-parameter-row[data-fingerprint-panel] {
