@@ -157,6 +157,7 @@ body.page-connections .cnv1-engine-xray .xps2-actions {
 
 body.page-connections #xray-xmux.xmux1-wrap {
   margin-top: 0;
+  margin-inline: calc(var(--sgui-card-padding) * 2);
   padding: 0;
   border: 0;
   background: transparent;
@@ -255,11 +256,13 @@ body.page-connections #mihomo :is(
 }
 
 body.page-connections #mihomo .mhv2-compact-meta {
+  margin-inline: calc(var(--sgui-card-padding) * 2);
   margin-top: 0;
   margin-bottom: var(--sgui-grid-gap);
 }
 
 body.page-connections #mihomo .mhv2-form {
+  margin-inline: var(--sgui-card-padding);
   margin-top: 0;
   margin-bottom: var(--sgui-grid-gap);
 }
@@ -312,7 +315,15 @@ body.page-connections .mhv2-client-actions {
 /* -------------------------------------------------------------------------- */
 
 body.page-connections .xps2-naiveproxy-card {
+  min-height: 104px;
+  align-items: center;
+  padding-block: var(--sgui-card-padding);
   border-radius: var(--sgui-radius-card);
+}
+
+body.page-connections .xps2-naiveproxy-copy {
+  display: grid;
+  align-content: center;
 }
 
 body.page-connections .xps2-naiveproxy-meta {
@@ -437,6 +448,7 @@ body.page-connections :is(
 
 @media (max-width: 650px) {
   body.page-connections #xray-xmux.xmux1-wrap {
+    margin-inline: 0;
     padding: 0;
   }
 
@@ -457,6 +469,10 @@ body.page-connections :is(
     .mhv2-form,
     .mhv2-runtime-note
   ) {
+    margin-inline: var(--sgui-nested-padding);
+  }
+
+  body.page-connections #mihomo .mhv2-compact-meta {
     margin-inline: var(--sgui-nested-padding);
   }
 
