@@ -217,22 +217,29 @@ def update_xray(channel: str) -> dict[str, Any]:
         installed = _installed_version()
         if not installed:
             raise XrayUpdateRuntimeError("Установленный Xray не найден")
-        if compare_versions(installed, XRAY_MINIMUM_VERSION) < 0:
-            raise XrayUpdateRuntimeError(
-                f"Установлен неподдерживаемый Xray v{installed}; минимум v{XRAY_MINIMUM_VERSION}"
-            )
+        recovery_upgrade = compare_versions(installed, XRAY_MINIMUM_VERSION) < 0
 
         release = _latest_release(channel)
         tag = str(release.get("tag_name") or "").strip()
         target = tag.lstrip("v")
         if not version_key(target):
             raise XrayUpdateRuntimeError(f"Некорректная версия релиза: {tag or 'пусто'}")
+        if compare_versions(target, XRAY_MINIMUM_VERSION) < 0:
+            raise XrayUpdateRuntimeError(
+                f"целевая версия Xray v{target} ниже минимально поддерживаемой v{XRAY_MINIMUM_VERSION}"
+            )
         comparison = compare_versions(target, installed)
         if comparison == 0:
             raise XrayUpdateRuntimeError(f"Xray v{target} уже установлен")
         if comparison < 0:
             raise XrayUpdateRuntimeError(
                 f"Понижение Xray с v{installed} до v{target} заблокировано"
+            )
+        if recovery_upgrade:
+            print(
+                f"[Xray Update] Восстановительное обновление: установлен v{installed}, "
+                f"минимум v{XRAY_MINIMUM_VERSION}; продолжаю до v{target}",
+                flush=True,
             )
 
         asset_name = _asset_filename()
