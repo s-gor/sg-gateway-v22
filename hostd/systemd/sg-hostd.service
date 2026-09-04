@@ -21,7 +21,7 @@ ProtectSystem=strict
 RuntimeDirectory=sg-gateway
 RuntimeDirectoryMode=0755
 LogsDirectory=sg-gateway
-ReadWritePaths=-/run/sg-gateway -/usr/local/share/xray -/usr/local/etc/xray -/etc/amnezia/amneziawg -/etc/sysctl.d -/etc/mihomo -/etc/sing-box -/etc/sg-gateway/naiveproxy -/var/lib/sg-gateway
+ReadWritePaths=-/run/sg-gateway -/usr/local/share/xray -/usr/local/etc/xray -/etc/amnezia/amneziawg -/etc/sysctl.d -/etc/mihomo -/etc/sing-box -/etc/sg-gateway/naiveproxy -/var/lib/sg-gateway -/var/lib/mihomo
 
 [Install]
 WantedBy=multi-user.target
