@@ -1,0 +1,164 @@
+name: Connections browser smoke
+
+on:
+  push:
+    branches:
+      - feature/02207-connections-ui-unification-red
+
+permissions:
+  contents: read
+
+jobs:
+  browser-smoke:
+    runs-on: ubuntu-24.04
+    env:
+      SG_GATEWAY_ENV: development
+      SG_GATEWAY_HOST: 127.0.0.1
+      SG_GATEWAY_PORT: '18080'
+      SG_GATEWAY_PUBLIC_PORT: '18080'
+      SG_GATEWAY_PUBLIC_ADDRESS: 127.0.0.1
+      SG_GATEWAY_SECRET_KEY: browser-smoke-fixed-secret
+      SG_GATEWAY_ADMIN_PASSWORD: admin
+    steps:
+      - name: Checkout verified feature head
+        uses: actions/checkout@v4
+        with:
+          ref: feature/02207-connections-ui-unification
+          fetch-depth: 1
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install application and browser dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt playwright
+          python -m playwright install chromium
+
+      - name: Start SG-Gateway locally
+        run: |
+          nohup waitress-serve --listen=127.0.0.1:18080 app.production:app > /tmp/sg-browser-server.log 2>&1 &
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:18080/login >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/sg-browser-server.log
+          exit 1
+
+      - name: Exercise responsive Connections UI in Chromium
+        run: |
+          mkdir -p browser-smoke
+          python - <<'PY'
+          from __future__ import annotations
+
+          import json
+          from pathlib import Path
+          from playwright.sync_api import sync_playwright
+
+          OUT = Path('browser-smoke')
+          BASE = 'http://127.0.0.1:18080'
+          sizes = (1600, 1366, 900, 620)
+          themes = ('dark', 'light')
+          outer_selectors = (
+              '.cnv1-engine-xray',
+              '#xray-xmux .xmux1-card',
+              '.awgd-shell',
+              '.mhv2-panel',
+              '#sg-naiveproxy-settings',
+          )
+          nested_selectors = (
+              '.xps2-parameter-row',
+              '#xray-xmux .xmux1-mode > span',
+              '.awgd-card',
+              '.mhv2-listener',
+              '.xps2-naiveproxy-meta',
+          )
+
+          report = []
+          with sync_playwright() as p:
+              browser = p.chromium.launch(headless=True)
+              context = browser.new_context(viewport={'width': 1600, 'height': 1000})
+              page = context.new_page()
+              page.goto(BASE + '/login?next=/connections', wait_until='networkidle')
+              page.locator('input[name="password"]').fill('admin')
+              page.locator('button[type="submit"]').click()
+              page.wait_for_url('**/connections')
+
+              for theme in themes:
+                  page.evaluate("theme => localStorage.setItem('sg-gateway-theme', theme)", theme)
+                  for width in sizes:
+                      page.set_viewport_size({'width': width, 'height': 1000})
+                      response = page.goto(BASE + '/connections', wait_until='networkidle')
+                      assert response is not None and response.status == 200, (theme, width, getattr(response, 'status', None))
+                      page.wait_for_selector('#xray-xmux .xmux1-card')
+                      page.wait_for_selector('#sg-naiveproxy-settings')
+
+                      metrics = page.evaluate(
+                          """({outer, nested}) => {
+                            const style = selector => {
+                              const el = document.querySelector(selector);
+                              if (!el) return null;
+                              const cs = getComputedStyle(el);
+                              const r = el.getBoundingClientRect();
+                              return {
+                                selector,
+                                borderRadius: cs.borderRadius,
+                                borderWidth: cs.borderTopWidth,
+                                paddingTop: cs.paddingTop,
+                                minHeight: cs.minHeight,
+                                width: Math.round(r.width),
+                                left: Math.round(r.left),
+                                right: Math.round(r.right),
+                              };
+                            };
+                            return {
+                              viewport: document.documentElement.clientWidth,
+                              scrollWidth: document.documentElement.scrollWidth,
+                              outer: outer.map(style),
+                              nested: nested.map(style),
+                            };
+                          }""",
+                          {'outer': list(outer_selectors), 'nested': list(nested_selectors)},
+                      )
+
+                      assert metrics['scrollWidth'] <= metrics['viewport'] + 1, (theme, width, metrics['scrollWidth'], metrics['viewport'])
+                      assert all(item is not None for item in metrics['outer']), (theme, width, metrics['outer'])
+                      assert all(item is not None for item in metrics['nested']), (theme, width, metrics['nested'])
+                      outer_radii = {item['borderRadius'] for item in metrics['outer']}
+                      nested_radii = {item['borderRadius'] for item in metrics['nested']}
+                      assert outer_radii == {'14px'}, (theme, width, outer_radii)
+                      assert nested_radii == {'10px'}, (theme, width, nested_radii)
+
+                      button_heights = page.evaluate(
+                          """() => [...document.querySelectorAll('.page-connections .button')]
+                            .filter(el => el.offsetParent !== null)
+                            .map(el => Math.round(el.getBoundingClientRect().height))"""
+                      )
+                      assert button_heights and min(button_heights) >= 42, (theme, width, button_heights)
+
+                      shot = OUT / f'connections-{theme}-{width}.png'
+                      page.screenshot(path=str(shot), full_page=True)
+                      report.append({'theme': theme, 'width': width, 'metrics': metrics, 'buttonHeights': button_heights})
+
+              browser.close()
+
+          (OUT / 'metrics.json').write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
+          print(json.dumps([{'theme': row['theme'], 'width': row['width'], 'scrollWidth': row['metrics']['scrollWidth'], 'viewport': row['metrics']['viewport']} for row in report], ensure_ascii=False))
+          PY
+
+      - name: Show server log on failure
+        if: failure()
+        run: cat /tmp/sg-browser-server.log || true
+
+      - name: Upload browser smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: connections-browser-smoke
+          path: browser-smoke/
+          if-no-files-found: warn
+          retention-days: 7
