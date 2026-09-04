@@ -1,0 +1,65 @@
+name: Fix130 refresh source checksums
+
+on:
+  push:
+    branches:
+      - fix/02207-xray-updater-below-minimum
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Refresh changed source checksums
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib
+
+          targets = [
+              "hostd/sg_hostd/xray_update_runtime.py",
+              "tests/test_preview31_xray_updates.py",
+          ]
+          sums_path = Path("SOURCE-SHA256SUMS")
+          lines = sums_path.read_text(encoding="utf-8").splitlines()
+          replacements = {
+              name: hashlib.sha256(Path(name).read_bytes()).hexdigest()
+              for name in targets
+          }
+          found = set()
+          out = []
+          for line in lines:
+              parts = line.split(maxsplit=1)
+              if len(parts) == 2 and parts[1] in replacements:
+                  name = parts[1]
+                  out.append(f"{replacements[name]}  {name}")
+                  found.add(name)
+              else:
+                  out.append(line)
+          missing = set(targets) - found
+          if missing:
+              raise SystemExit(f"SOURCE-SHA256SUMS entries missing: {sorted(missing)}")
+          sums_path.write_text("\n".join(out) + "\n", encoding="utf-8")
+          for name in targets:
+              print(replacements[name], name)
+          PY
+          for f in hostd/sg_hostd/xray_update_runtime.py tests/test_preview31_xray_updates.py; do
+            expected="$(awk -v f="$f" '$2 == f {print $1}' SOURCE-SHA256SUMS)"
+            actual="$(sha256sum "$f" | awk '{print $1}')"
+            test "$expected" = "$actual"
+          done
+      - name: Commit checksum refresh
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add SOURCE-SHA256SUMS
+          git diff --cached --check
+          git diff --cached --quiet && exit 0
+          git commit -m 'chore: refresh Xray updater source checksums'
+          git push origin HEAD:fix/02207-xray-updater-below-minimum
