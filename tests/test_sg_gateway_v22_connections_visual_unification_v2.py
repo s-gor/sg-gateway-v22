@@ -12,14 +12,16 @@ def block(selector: str) -> str:
     return CSS[open_brace + 1 : close_brace]
 
 
-def test_xmux_is_one_outer_surface_with_header_and_body_spacing():
+def test_xmux_is_nested_outer_surface_with_header_and_body_spacing():
     wrapper = block("body.page-connections #xray-xmux.xmux1-wrap")
-    assert "padding: 0;" in wrapper
-    assert "border: 0;" in wrapper
+    assert "padding: var(--sgui-card-padding) 0;" in wrapper
+    assert "border: 1px solid var(--sg-line);" in wrapper
+    assert "border-radius: var(--sgui-radius-card);" in wrapper
     assert "background: var(--sg-panel);" in wrapper
-    assert "box-shadow: none;" in wrapper
+    assert "box-shadow: var(--sgui-card-shadow);" in wrapper
 
     card = block("body.page-connections #xray-xmux .xmux1-card")
+    assert "margin-inline: var(--sgui-card-padding);" in card
     assert "padding: 0;" in card
 
     head = block("body.page-connections #xray-xmux .xmux1-head")
