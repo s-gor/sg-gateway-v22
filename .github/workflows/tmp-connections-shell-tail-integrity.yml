@@ -1,0 +1,45 @@
+name: Temporary Connections shell-tail integrity
+
+on:
+  push:
+    branches:
+      - fix/02207-connections-shell-tail-polish
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: fix/02207-connections-shell-tail-polish
+
+      - name: Rebuild source integrity from clean tracked tree
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git rm .github/workflows/tmp-connections-shell-tail-integrity.yml
+          python3 - <<'PY'
+          import hashlib
+          import subprocess
+          from pathlib import Path
+
+          raw = subprocess.check_output(['git', 'ls-files', '-z'])
+          paths = [item.decode('utf-8') for item in raw.split(b'\0') if item]
+          lines = []
+          for name in paths:
+              if name == 'SOURCE-SHA256SUMS':
+                  continue
+              lines.append(f"{hashlib.sha256(Path(name).read_bytes()).hexdigest()}  {name}\n")
+          Path('SOURCE-SHA256SUMS').write_text(''.join(lines), encoding='utf-8')
+          PY
+          git add SOURCE-SHA256SUMS
+          git diff --cached --check
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git commit -m 'chore: refresh Connections shell-tail source integrity'
+          git push origin HEAD:fix/02207-connections-shell-tail-polish
