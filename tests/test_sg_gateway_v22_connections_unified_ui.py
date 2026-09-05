@@ -3,6 +3,7 @@ import re
 
 ROOT = Path(__file__).resolve().parents[1]
 UNIFIED = ROOT / "app/web/static/sg-connections-unified-v1.css"
+LAYOUT = ROOT / "app/web/static/sg-layout-contract-v1.css"
 
 
 def _unified_css() -> str:
@@ -23,7 +24,7 @@ def test_connections_unified_stylesheet_is_loaded_once_between_controls_and_dark
     assert base.index(marker) < base.index("sg-connections-dark-classic-v1.css")
 
 
-def test_connections_unified_css_uses_global_geometry_tokens():
+def test_connections_unified_css_uses_global_and_shared_layout_geometry_tokens():
     css = _unified_css()
     for token in (
         "--sgui-page-gap",
@@ -33,14 +34,17 @@ def test_connections_unified_css_uses_global_geometry_tokens():
         "--sgui-radius-nested",
         "--sgui-radius-control",
         "--sgui-radius-badge",
-        "--sgui-card-padding",
         "--sgui-nested-padding",
         "--sgui-button-height",
         "--sgui-button-height-small",
         "--sgui-badge-height",
         "--sgui-card-shadow",
+        "--sg-layout-card-inset",
     ):
         assert f"var({token})" in css
+
+    layout = LAYOUT.read_text(encoding="utf-8")
+    assert "--sg-layout-card-inset: var(--sgui-card-padding);" in layout
 
 
 def test_connections_unified_css_has_no_theme_palette_and_only_one_legacy_specificity_fence():
@@ -101,7 +105,7 @@ def test_connections_unified_css_defines_shared_outer_nested_control_and_status_
 def test_connections_unified_css_pins_real_controls_to_canonical_height():
     css = _unified_css()
     assert "body.page-connections .button {\n  height: var(--sgui-button-height);" in css
-    assert ".xps2-parameter-row input:not([type=\"checkbox\"]):not([type=\"radio\"])" in css
+    assert '.xps2-parameter-row input:not([type="checkbox"]):not([type="radio"])' in css
     assert ".awgd-shared-dns-form input" in css
     assert ".mhv2-basic-fields select" in css
 
