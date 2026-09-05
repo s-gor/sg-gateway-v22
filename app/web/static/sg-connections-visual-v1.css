@@ -55,122 +55,43 @@
   font-size: 9px;
 }
 
-.cnv1-summary {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 13px;
-}
 
-.cnv1-summary-card {
-  display: grid;
-  grid-template-columns: 44px minmax(0, 1fr);
-  gap: 14px;
-  min-height: 126px;
-  overflow: hidden;
-  border: 1px solid var(--sg-line);
-  border-radius: 15px;
-  background:
-    radial-gradient(circle at 90% -20%, rgba(96, 169, 243, .09), transparent 45%),
-    var(--sg-panel);
-  padding: 18px;
-  box-shadow: inset 0 1px rgba(255,255,255,.025);
-}
 
-.cnv1-summary-icon {
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  border: 1px solid rgba(96, 169, 243, .25);
-  border-radius: 12px;
-  background: rgba(60, 126, 193, .13);
-  color: var(--sg-blue);
-}
 
-.cnv1-summary-icon.green {
-  border-color: rgba(49, 207, 145, .24);
-  background: rgba(49, 207, 145, .11);
-  color: var(--sg-green);
-}
 
-.cnv1-summary-icon.violet {
-  border-color: rgba(157, 122, 255, .24);
-  background: rgba(126, 93, 226, .12);
-  color: #aa91ff;
-}
 
-.cnv1-summary-icon.amber {
-  border-color: color-mix(in srgb, var(--sg-yellow) 28%, transparent);
-  background: color-mix(in srgb, var(--sg-yellow) 11%, transparent);
-  color: var(--sg-yellow);
-}
 
-.cnv1-summary-icon svg {
-  width: 23px;
-  height: 23px;
-}
 
-.cnv1-summary-label {
-  color: var(--sg-text);
-  font-size: 12px;
-  font-weight: 720;
-}
 
-.cnv1-summary-value {
-  margin-top: 10px;
-  color: var(--sg-text);
-  font-size: 27px;
-  font-weight: 780;
-  letter-spacing: -.035em;
-  line-height: 1;
-}
 
-.cnv1-summary-value.good {
-  color: var(--sg-green);
-}
 
-.cnv1-summary-note {
-  margin-top: 9px;
-  color: var(--sg-muted);
-  font-size: 9.5px;
-  line-height: 1.45;
-}
 
-.cnv1-summary-ports {
-  display: flex;
-  gap: 6px;
-  margin-top: 10px;
-  flex-wrap: wrap;
-}
 
-.cnv1-summary-ports span {
-  display: inline-flex;
-  align-items: center;
-  min-height: 25px;
-  border: 1px solid var(--sg-line);
-  border-radius: 999px;
-  background: var(--sg-panel-deep);
-  color: var(--sg-text);
-  padding: 0 9px;
-  font-size: 8px;
-  font-weight: 760;
-}
 
-.cnv1-map-panel,
+
+
+
+
+
+
+
+
+
+
+
+
+
 .cnv1-engine-card,
-.cnv1-note-panel {
+.cnv1-note-panel{
   border: 1px solid var(--sg-line);
   border-radius: 15px;
   background: var(--sg-panel);
   box-shadow: inset 0 1px rgba(255,255,255,.018);
 }
 
-.cnv1-map-panel {
-  padding: 18px;
-}
 
-.cnv1-panel-head,
-.cnv1-engine-head {
+
+.cnv1-engine-head{
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -184,161 +105,56 @@
   letter-spacing: .13em;
 }
 
-.cnv1-panel-head h2,
-.cnv1-engine-head h2 {
+.cnv1-engine-head h2{
   margin: 5px 0 0;
   font-size: 19px;
 }
 
-.cnv1-panel-head p,
-.cnv1-engine-head p {
+.cnv1-engine-head p{
   margin: 6px 0 0;
   color: var(--sg-muted);
   font-size: 9.5px;
 }
 
-.cnv1-map-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 31px;
-  border: 1px solid var(--sg-green-line);
-  border-radius: 999px;
-  background: var(--sg-green-bg);
-  color: var(--sg-green);
-  padding: 0 11px;
-  font-size: 7.5px;
-  font-weight: 760;
-  white-space: nowrap;
-}
 
-.cnv1-map-status > span {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--sg-green);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--sg-green) 10%, transparent);
-}
 
-.cnv1-map {
-  display: grid;
-  grid-template-columns: minmax(150px, .58fr) 95px minmax(0, 1.42fr);
-  align-items: center;
-  gap: 16px;
-  margin-top: 18px;
-}
 
-.cnv1-map-node {
-  border: 1px solid var(--sg-line-soft);
-  border-radius: 12px;
-  background:
-    radial-gradient(circle at 100% 0, rgba(96, 169, 243, .07), transparent 47%),
-    var(--sg-panel-deep);
-  padding: 15px;
-}
 
-.cnv1-map-internet {
-  display: grid;
-  place-items: center;
-  min-height: 142px;
-  text-align: center;
-}
 
-.cnv1-map-icon {
-  display: grid;
-  place-items: center;
-  width: 39px;
-  height: 39px;
-  border-radius: 11px;
-  background: rgba(96, 169, 243, .11);
-  color: var(--sg-blue);
-}
 
-.cnv1-map-icon svg {
-  width: 20px;
-  height: 20px;
-}
 
-.cnv1-map-node strong {
-  margin-top: 10px;
-  color: var(--sg-text);
-  font-size: 11px;
-}
 
-.cnv1-map-node small {
-  margin-top: 4px;
-  color: var(--sg-muted);
-  font-size: 8px;
-}
 
-.cnv1-map-branch {
-  position: relative;
-  height: 120px;
-}
 
-.cnv1-map-branch i {
-  position: absolute;
-  top: 50%;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, var(--sg-blue), color-mix(in srgb, var(--sg-blue) 45%, transparent));
-}
 
-.cnv1-map-branch::after {
-  content: "";
-  position: absolute;
-  top: 24px;
-  right: 0;
-  bottom: 24px;
-  width: 1px;
-  background: color-mix(in srgb, var(--sg-blue) 45%, transparent);
-}
 
-.cnv1-map-branch span {
-  position: absolute;
-  right: -4px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--sg-blue);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--sg-blue) 10%, transparent);
-}
 
-.cnv1-map-branch span:first-child {
-  top: 20px;
-}
 
-.cnv1-map-branch span:last-child {
-  bottom: 20px;
-}
 
-.cnv1-map-targets {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
 
-.cnv1-map-targets .cnv1-map-node {
-  min-height: 142px;
-}
 
-.cnv1-map-node-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
-}
 
-.cnv1-map-awg .cnv1-map-icon {
-  background: rgba(49, 207, 145, .11);
-  color: var(--sg-green);
-}
 
-.cnv1-map-xray .cnv1-map-icon {
-  background: rgba(126, 93, 226, .12);
-  color: #aa91ff;
-}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 .cnv1-engine-status {
   display: inline-flex;
@@ -458,9 +274,7 @@
   min-width: 0;
 }
 
-.cnv1-endpoint-main span,
-.cnv1-engine-metrics span,
-.cnv1-form-section-title > span {
+.cnv1-endpoint-main span{
   color: var(--sg-muted);
   font-size: 6.8px;
   font-weight: 850;
@@ -495,40 +309,15 @@
   white-space: nowrap;
 }
 
-.cnv1-engine-metrics {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  overflow: hidden;
-  margin: 12px 18px 0;
-  border: 1px solid var(--sg-line-soft);
-  border-radius: 10px;
-  background: var(--sg-line-soft);
-  gap: 1px;
-}
 
-.cnv1-engine-metrics > div {
-  display: grid;
-  gap: 6px;
-  min-height: 58px;
-  background: var(--sg-panel);
-  padding: 11px;
-}
 
-.cnv1-engine-metrics strong {
-  overflow: hidden;
-  color: var(--sg-text);
-  font-size: 9px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 
-.cnv1-engine-metrics strong.ready {
-  color: var(--sg-green);
-}
 
-.cnv1-engine-metrics strong.warning {
-  color: var(--sg-yellow);
-}
+
+
+
+
+
 
 .cnv1-engine-form {
   display: grid;
@@ -538,17 +327,9 @@
   padding: 16px 18px 18px;
 }
 
-.cnv1-form-section-title {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-}
 
-.cnv1-form-section-title small {
-  color: var(--sg-muted);
-  font-size: 7.5px;
-}
+
+
 
 .cnv1-form-grid {
   display: grid;
@@ -556,9 +337,7 @@
   gap: 10px;
 }
 
-.cnv1-field-wide {
-  grid-column: 2;
-}
+
 
 .cnv1-engine-form label {
   display: grid;
@@ -625,11 +404,7 @@
   line-height: 1.45;
 }
 
-.cnv1-key-grid {
-  display: grid;
-  grid-template-columns: 1fr .52fr;
-  gap: 10px;
-}
+
 
 .cnv1-form-actions {
   display: flex;
@@ -699,21 +474,10 @@
   font-size: 8px;
 }
 
-.cnv1-page-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  min-height: 50px;
-  border-top: 1px solid var(--sg-line-soft);
-  color: var(--sg-dim);
-  padding: 3px 4px 0;
-  font-size: 8.5px;
-}
+
 
 @media (max-width: 1320px) {
-  .cnv1-summary {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+  
 
   .cnv1-engines {
     grid-template-columns: 1fr;
@@ -721,17 +485,11 @@
 }
 
 @media (max-width: 920px) {
-  .cnv1-map {
-    grid-template-columns: 1fr;
-  }
+  
 
-  .cnv1-map-branch {
-    display: none;
-  }
+  
 
-  .cnv1-map-targets {
-    grid-template-columns: 1fr 1fr;
-  }
+  
 }
 
 @media (max-width: 760px) {
@@ -748,16 +506,11 @@
     flex: 1;
   }
 
-  .cnv1-summary,
-  .cnv1-map-targets,
-  .cnv1-form-grid,
-  .cnv1-key-grid {
+  .cnv1-form-grid{
     grid-template-columns: 1fr;
   }
 
-  .cnv1-field-wide {
-    grid-column: auto;
-  }
+  
 
   .cnv1-form-actions,
   .cnv1-note-panel {
@@ -774,12 +527,7 @@
     width: 100%;
   }
 
-  .cnv1-page-footer {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 5px;
-    padding-block: 14px;
-  }
+  
 }
 
 /* V23: engine editors are full-width; Xray selection must not be squeezed into half a page. */
