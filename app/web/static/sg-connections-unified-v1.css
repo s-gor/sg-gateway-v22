@@ -33,12 +33,12 @@ body.page-connections :is(
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--sgui-section-gap);
-  padding: var(--sgui-card-padding);
+  padding: var(--sg-layout-card-inset);
   margin: 0;
 }
 
 body.page-connections #xray-xmux .xmux1-card {
-  margin-inline: var(--sgui-card-padding);
+  margin-inline: var(--sg-layout-card-inset);
   padding: 0;
 }
 
@@ -137,7 +137,7 @@ body.page-connections .cnv1-engine-xray .xps2-panel {
 }
 
 body.page-connections .cnv1-engine-xray .xps2-top-actions {
-  padding-inline: var(--sgui-card-padding);
+  padding-inline: var(--sg-layout-card-inset);
 }
 
 body.page-connections .cnv1-engine-xray :is(
@@ -145,7 +145,7 @@ body.page-connections .cnv1-engine-xray :is(
   .xps2-parameters,
   .xps2-actions
 ) {
-  margin-inline: var(--sgui-card-padding);
+  margin-inline: var(--sg-layout-card-inset);
 }
 
 body.page-connections .cnv1-engine-xray .xps2-actions {
@@ -160,7 +160,7 @@ body.page-connections .cnv1-engine-xray .xps2-actions {
 body.page-connections #xray-xmux.xmux1-wrap {
   margin-top: 0;
   margin-inline: 0;
-  padding: var(--sgui-card-padding) 0;
+  padding: var(--sg-layout-card-inset) 0;
   border: 1px solid var(--sg-line);
   border-radius: var(--sgui-radius-card);
   background: var(--sg-panel);
@@ -168,14 +168,14 @@ body.page-connections #xray-xmux.xmux1-wrap {
 }
 
 body.page-connections #xray-xmux .xmux1-head {
-  padding: var(--sgui-card-padding);
+  padding: var(--sg-layout-card-inset);
   margin: 0;
 }
 
 body.page-connections #xray-xmux #xray-xmux-form {
   display: grid;
   gap: var(--sgui-grid-gap);
-  padding: 0 var(--sgui-card-padding) var(--sgui-card-padding);
+  padding: 0 var(--sg-layout-card-inset) var(--sg-layout-card-inset);
 }
 
 body.page-connections #xray-xmux .xmux1-mode > span {
@@ -192,7 +192,7 @@ body.page-connections #xray-xmux .xmux1-extra summary {
 }
 
 body.page-connections #xray-xmux .xmux1-extra label {
-  padding: 0 12px 12px;
+  padding: 0 var(--sg-layout-compact-inset) var(--sg-layout-compact-inset);
 }
 
 body.page-connections #xray-xmux .xmux1-actions {
@@ -208,7 +208,7 @@ body.page-connections .awgd-shell > .cnv1-engine-head {
 }
 
 body.page-connections .awgd-grid {
-  padding: 0 var(--sgui-card-padding) var(--sgui-card-padding);
+  padding: 0 var(--sg-layout-card-inset) var(--sg-layout-card-inset);
 }
 
 body.page-connections .awgd-card {
@@ -221,12 +221,12 @@ body.page-connections .awgd-head {
 }
 
 body.page-connections .awgd-card .cnv1-endpoint-card {
-  margin: 0 17px;
+  margin: 0 var(--sg-layout-nested-inset);
 }
 
 body.page-connections .awgd-shared-dns {
   gap: var(--sgui-section-gap);
-  margin: 0 var(--sgui-card-padding) var(--sgui-card-padding);
+  margin: 0 var(--sg-layout-card-inset) var(--sg-layout-card-inset);
 }
 
 body.page-connections .awgd-shared-dns-form {
@@ -242,7 +242,7 @@ body.page-connections #mihomo {
 }
 
 body.page-connections .mhv2-head {
-  padding: var(--sgui-card-padding);
+  padding: var(--sg-layout-card-inset);
   margin: 0;
 }
 
@@ -251,24 +251,24 @@ body.page-connections #mihomo :is(
   .mhv2-form,
   .mhv2-runtime-note
 ) {
-  margin-inline: var(--sgui-card-padding);
+  margin-inline: var(--sg-layout-card-inset);
 }
 
 body.page-connections #mihomo .mhv2-compact-meta {
-  margin-inline: calc(var(--sgui-card-padding) * 2);
+  margin-inline: var(--sg-layout-deep-inset);
   margin-top: 0;
   margin-bottom: var(--sgui-grid-gap);
 }
 
 body.page-connections #mihomo .mhv2-form {
-  margin-inline: var(--sgui-card-padding);
+  margin-inline: var(--sg-layout-card-inset);
   margin-top: 0;
   margin-bottom: var(--sgui-grid-gap);
 }
 
 body.page-connections #mihomo .mhv2-runtime-note {
   margin-top: 0;
-  margin-bottom: var(--sgui-card-padding);
+  margin-bottom: var(--sg-layout-card-inset);
 }
 
 body.page-connections .mhv2-form,
@@ -316,7 +316,7 @@ body.page-connections .mhv2-client-actions {
 body.page-connections .xps2-naiveproxy-card {
   min-height: 104px;
   align-items: center;
-  padding-block: var(--sgui-card-padding);
+  padding-block: var(--sg-layout-card-inset);
   border-radius: var(--sgui-radius-card);
 }
 
@@ -484,10 +484,10 @@ body.page-connections :is(
   }
 
   body.page-connections .awgd-grid {
-    padding: 0 12px 12px;
+    padding: 0 var(--sg-layout-compact-inset) var(--sg-layout-compact-inset);
   }
 
   body.page-connections .awgd-shared-dns {
-    margin: 0 12px 12px;
+    margin: 0 var(--sg-layout-mobile-inset) var(--sg-layout-mobile-inset);
   }
 }

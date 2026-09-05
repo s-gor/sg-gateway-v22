@@ -1,0 +1,72 @@
+/* SG-Gateway 022.07 · shared layout contract.
+   Layout only: reusable rails, card geometry and action rhythm.
+   Palette and protocol-specific presentation remain owned by page/theme CSS. */
+
+:root {
+  --sg-layout-card-inset: var(--sgui-card-padding);
+  --sg-layout-nested-inset: 17px;
+  --sg-layout-compact-inset: 12px;
+  --sg-layout-deep-inset: calc(var(--sg-layout-card-inset) * 2);
+  --sg-layout-mobile-inset: 12px;
+}
+
+.sg-layout-page {
+  display: grid;
+  gap: var(--sgui-page-gap);
+  min-width: 0;
+}
+
+.sg-layout-card {
+  min-width: 0;
+  border: 1px solid var(--sg-line);
+  border-radius: var(--sgui-radius-card);
+  background: var(--sg-panel);
+  box-shadow: var(--sgui-card-shadow);
+}
+
+.sg-layout-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sgui-section-gap);
+  padding: var(--sg-layout-card-inset);
+  margin: 0;
+}
+
+.sg-layout-card-body {
+  min-width: 0;
+  padding: 0 var(--sg-layout-card-inset) var(--sg-layout-card-inset);
+}
+
+.sg-layout-nested {
+  min-width: 0;
+  border: 1px solid var(--sg-line-soft);
+  border-radius: var(--sgui-radius-nested);
+  padding: var(--sgui-nested-padding);
+  background: var(--sg-panel-soft);
+  box-shadow: none;
+}
+
+.sg-layout-grid {
+  display: grid;
+  gap: var(--sgui-grid-gap);
+  min-width: 0;
+}
+
+.sg-layout-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--sgui-grid-gap);
+}
+
+@media (max-width: 650px) {
+  .sg-layout-card-head {
+    padding: var(--sg-layout-mobile-inset);
+  }
+
+  .sg-layout-card-body {
+    padding: 0 var(--sg-layout-mobile-inset) var(--sg-layout-mobile-inset);
+  }
+}
