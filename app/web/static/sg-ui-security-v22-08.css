@@ -1,0 +1,46 @@
+/* SG-Gateway 22.08 Security page ownership. Shared layout owns horizontal rails. */
+[data-sg-ui-page="security"] {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+}
+
+[data-sg-ui-page="security"] > .sg-ui-page-head,
+[data-sg-ui-page="security"] > [data-sg-section] {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  margin-inline: 0;
+}
+
+.sg-ui-security-head {
+  min-height: 68px;
+  padding-block: 4px 10px;
+  border-bottom: 1px solid var(--sg-ui-border);
+}
+
+.sg-ui-security-head > div:first-child {
+  min-width: 0;
+}
+
+.sg-ui-security-head h1 {
+  font-size: 27px;
+  line-height: 1.05;
+}
+
+.sg-ui-security-head .sg-ui-actions {
+  min-width: 0;
+}
+
+@media (max-width: 760px) {
+  .sg-ui-security-head {
+    min-height: 0;
+  }
+
+  .sg-ui-security-head .sg-ui-actions {
+    width: 100%;
+  }
+}
