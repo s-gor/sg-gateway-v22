@@ -2,7 +2,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-CSS = (ROOT / "app/web/static/sg-connections-unified-v1.css").read_text(encoding="utf-8")
+CSS = (ROOT / "app/web/static/sg-ui-connections-v22-08.css").read_text(encoding="utf-8")
 
 
 def block(selector: str) -> str:
@@ -12,12 +12,17 @@ def block(selector: str) -> str:
     return CSS[open_brace + 1 : close_brace]
 
 
-def test_xmux_outer_shell_uses_same_panel_surface_as_inner_card():
-    wrapper = block("body.page-connections #xray-xmux.xmux1-wrap")
-    assert "background: var(--sg-panel);" in wrapper
-    assert "background: transparent;" not in wrapper
+def test_xray_outer_shell_drops_legacy_padding_tail():
+    card = block("body.page-connections .cnv1-engine-xray.sg-ui-card")
+    assert "padding: 0;" in card
 
 
-def test_xray_profile_panel_drops_legacy_bottom_tail():
-    panel = block("body.page-connections .cnv1-engine-xray .xps2-panel")
-    assert "margin-bottom: 0;" in panel
+def test_xray_profile_panel_uses_section_gap_without_local_outer_margin():
+    panel = block("body.page-connections .cnv1-engine-xray .xps2-panel.sg-ui-section")
+    assert "gap: var(--sg-ui-section-gap, 16px);" in panel
+    assert "margin" not in panel
+
+
+def test_connections_shell_tail_has_no_22_07_compensation_tokens():
+    assert "--sg-layout-" not in CSS
+    assert "calc(" not in CSS
