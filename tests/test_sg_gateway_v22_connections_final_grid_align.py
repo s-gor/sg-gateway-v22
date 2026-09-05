@@ -2,7 +2,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-CSS = (ROOT / "app/web/static/sg-connections-unified-v1.css").read_text(encoding="utf-8")
+CSS = (ROOT / "app/web/static/sg-ui-connections-v22-08.css").read_text(encoding="utf-8")
 
 
 def block(selector: str) -> str:
@@ -12,35 +12,36 @@ def block(selector: str) -> str:
     return CSS[open_brace + 1 : close_brace]
 
 
-def test_xmux_visible_card_uses_xray_inner_working_width():
-    wrapper = block("body.page-connections #xray-xmux.xmux1-wrap")
-    assert "margin-inline: 0;" in wrapper
-
-    card = block("body.page-connections #xray-xmux .xmux1-card")
-    assert "margin-inline: var(--sg-layout-card-inset);" in card
+def test_xray_inner_working_width_uses_one_canonical_rail():
+    rail = block("body.page-connections .cnv1-engine-xray .sg-ui-rail")
+    assert "padding-inline: var(--sg-ui-rail-inset, 18px);" in rail
+    assert "margin-inline:" not in rail
 
 
-def test_mihomo_https_warning_matches_listener_row_width():
-    warning_wrap = block("body.page-connections #mihomo .mhv2-compact-meta")
-    assert "margin-inline: var(--sg-layout-deep-inset);" in warning_wrap
-
-    form = block("body.page-connections #mihomo .mhv2-form")
-    assert "margin-inline: var(--sg-layout-card-inset);" in form
-
-
-def test_naiveproxy_card_has_standard_header_height_and_vertical_rhythm():
-    card = block("body.page-connections .xps2-naiveproxy-card")
-    assert "min-height: 104px;" in card
-    assert "padding-block: var(--sg-layout-card-inset);" in card
-    assert "align-items: center;" in card
-
-    copy = block("body.page-connections .xps2-naiveproxy-copy")
-    assert "display: grid;" in copy
-    assert "align-content: center;" in copy
+def test_awg_mihomo_pair_uses_canonical_grid_without_compensation_offsets():
+    pair = block("body.page-connections .cnv1-engine-pair.sg-ui-grid")
+    assert "grid-template-columns: repeat(2, minmax(0, 1fr));" in pair
+    assert "gap: var(--sg-ui-grid-gap, 12px);" in pair
+    assert "margin" not in pair
+    assert "padding" not in pair
 
 
-def test_mobile_final_grid_does_not_keep_desktop_double_inset():
-    mobile = CSS[CSS.index("@media (max-width: 650px)") :]
-    assert "body.page-connections #xray-xmux.xmux1-wrap {\n    margin-inline: 0;" in mobile
-    assert "body.page-connections #xray-xmux .xmux1-card {\n    margin-inline: 0;" in mobile
-    assert "body.page-connections #mihomo .mhv2-compact-meta {\n    margin-inline: var(--sgui-nested-padding);" in mobile
+def test_connections_css_contains_no_22_07_offset_contract():
+    assert "--sg-layout-" not in CSS
+    assert "--sgui-" not in CSS
+    assert "calc(" not in CSS
+    for stale in (
+        "margin-inline: var(--sg-layout-card-inset)",
+        "margin-inline: var(--sg-layout-deep-inset)",
+        "var(--sg-layout-mobile-inset)",
+    ):
+        assert stale not in CSS
+
+
+def test_mobile_grid_collapses_without_reintroducing_double_inset():
+    mobile = CSS[CSS.index("@media (max-width: 760px)") :]
+    assert "padding-inline: var(--sg-ui-rail-inset, 14px);" in mobile
+    assert "margin-inline" not in mobile
+
+    responsive = CSS[CSS.index("@media (max-width: 900px)") :]
+    assert "grid-template-columns: minmax(0, 1fr);" in responsive
