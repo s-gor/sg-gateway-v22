@@ -1,0 +1,47 @@
+name: Temporary XMUX Rail Integrity
+
+on:
+  push:
+    branches:
+      - fix/02207-xmux-cumulative-inner-rail
+    paths:
+      - .github/workflows/tmp-xmux-rail-integrity.yml
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/02207-xmux-cumulative-inner-rail
+          fetch-depth: 0
+
+      - name: Refresh manifest and remove temporary workflow
+        shell: bash
+        run: |
+          git rm .github/workflows/tmp-xmux-rail-integrity.yml
+          python - <<'PY'
+          import hashlib
+          import subprocess
+          from pathlib import Path
+
+          excluded = {'SOURCE-SHA256SUMS'}
+          raw = subprocess.check_output(['git', 'ls-files', '-z'])
+          paths = [p.decode('utf-8') for p in raw.split(b'\0') if p]
+          lines = []
+          for path in paths:
+              if path in excluded:
+                  continue
+              blob = Path(path).read_bytes()
+              lines.append(f"{hashlib.sha256(blob).hexdigest()}  {path}\n")
+          Path('SOURCE-SHA256SUMS').write_text(''.join(lines), encoding='utf-8')
+          PY
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add SOURCE-SHA256SUMS
+          git commit -m "chore: refresh XMUX rail integrity manifest"
+          git push origin HEAD:fix/02207-xmux-cumulative-inner-rail
