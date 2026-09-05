@@ -1,3 +1,4 @@
+# run 2: macro-generated Routing names are tested at the template contract
 name: TEMP 22.08 Routing stage 3
 
 on:
@@ -14,10 +15,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 4
+          fetch-depth: 5
       - name: Prepare exact Stage 2 base
         run: |
           cp tools/tmp_02208_routing_stage3.py /tmp/stage3.py
+          cp tools/tmp_02208_routing_stage3_testfix.py /tmp/stage3_testfix.py
           git fetch --no-tags --depth=1 origin 9c1eb91366392fce2ccf1f476778efe9fe3ad66b
           git checkout --detach FETCH_HEAD
           test "$(git rev-parse HEAD)" = "9c1eb91366392fce2ccf1f476778efe9fe3ad66b"
@@ -32,9 +34,11 @@ jobs:
         run: |
           python - <<'PY'
           import importlib.util
-          spec=importlib.util.spec_from_file_location('stage3','/tmp/stage3.py')
-          mod=importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
-          mod.write_tests()
+          def load(name, path):
+              spec=importlib.util.spec_from_file_location(name,path)
+              mod=importlib.util.module_from_spec(spec); spec.loader.exec_module(mod); return mod
+          load('stage3','/tmp/stage3.py').write_tests()
+          load('stage3_testfix','/tmp/stage3_testfix.py').fix_generated_contract_test()
           PY
           if python -m pytest -q tests/test_sg_gateway_v22_routing_contract_02208.py; then
             echo 'Expected Routing 22.08 structural contract to fail before migration' >&2
