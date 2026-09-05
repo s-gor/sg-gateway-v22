@@ -1,4 +1,4 @@
-# run 6: migrate stale 22.07 presentation assertions to 22.08 semantic contracts
+# run 7: migrate stale package ownership checks to 22.08 page assets
 name: TEMP 22.08 Clients stage 2
 
 on:
@@ -15,12 +15,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 6
+          fetch-depth: 7
       - name: Prepare clean base and runners
         run: |
           cp tools/tmp_02208_clients_stage2.py /tmp/stage2.py
           cp tools/tmp_02208_clients_frame_fix.py /tmp/frame_fix.py
           cp tools/tmp_02208_clients_update_legacy_tests.py /tmp/legacy_tests.py
+          cp tools/tmp_02208_clients_package_contract_fix.py /tmp/package_fix.py
           git fetch --no-tags --depth=1 origin bc6d423e43ad387f9fb640a77bd85aa3011f8630
           git checkout --detach FETCH_HEAD
           test "$(git rev-parse HEAD)" = "bc6d423e43ad387f9fb640a77bd85aa3011f8630"
@@ -66,6 +67,26 @@ jobs:
           frame.migrate_legacy_frame()
           load('legacy_tests','/tmp/legacy_tests.py').main()
           PY
+      - name: Confirm RED package contract
+        run: |
+          python - <<'PY'
+          import importlib.util
+          spec=importlib.util.spec_from_file_location('package_fix','/tmp/package_fix.py')
+          mod=importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
+          mod.write_test()
+          PY
+          if python -m pytest -q tests/test_sg_gateway_v22_clients_package_contract_02208.py; then
+            echo 'Expected old build-run package contract to fail before migration' >&2
+            exit 1
+          fi
+      - name: Apply 22.08 package contract
+        run: |
+          python - <<'PY'
+          import importlib.util
+          spec=importlib.util.spec_from_file_location('package_fix','/tmp/package_fix.py')
+          mod=importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
+          mod.migrate_build_run()
+          PY
           git add -A
       - name: Focused GREEN
         run: |
@@ -73,6 +94,7 @@ jobs:
             tests/test_sg_gateway_v22_clients_contract_02208.py \
             tests/test_sg_gateway_v22_clients_geometry_02208.py \
             tests/test_sg_gateway_v22_clients_legacy_frame_02208.py \
+            tests/test_sg_gateway_v22_clients_package_contract_02208.py \
             tests/test_sg_gateway_v22_ui_function_contract_02208.py \
             tests/test_sg_gateway_v22_ui_architecture_02208.py \
             tests/test_sg_gateway_02110_cumulative.py \
