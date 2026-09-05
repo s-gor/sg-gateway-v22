@@ -24,7 +24,7 @@ def test_02208_connections_all_page_assets_use_late_shared_asset_slot():
     assert "{% block head %}" not in template
     page_styles = template.split("{% block page_styles %}", 1)[1].split("{% endblock %}", 1)[0]
     for asset in (
-        "sg-connections-visual-v1.css",
+        "sg-ui-connections-components-v22-08.css",
         "sg-xray-profiles-v2.css",
         "sg-xmux-settings-v1.css",
         "sg-awg-dual-v1.css",

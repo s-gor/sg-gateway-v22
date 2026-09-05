@@ -2,7 +2,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-VISUAL = ROOT / "app/web/static/sg-connections-visual-v1.css"
+VISUAL = ROOT / "app/web/static/sg-ui-connections-components-v22-08.css"
 
 DEAD_CNV1_CLASSES = {
     "cnv1-engine-metrics",

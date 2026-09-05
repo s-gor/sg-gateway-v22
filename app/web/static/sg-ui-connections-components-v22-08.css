@@ -1,18 +1,8 @@
-/* SG-Gateway UI STEP 5 — Connections Visual V1 */
+/* SG-Gateway 22.08 · Connections visual components only. Page geometry belongs to the canonical sg-ui layout. */
 
-.cnv1-page {
-  display: grid;
-  gap: 18px;
-  min-width: 0;
-}
 
-.cnv1-heading {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 24px;
-  padding: 0 4px 2px;
-}
+
+
 
 .cnv1-kicker {
   display: flex;
@@ -43,11 +33,7 @@
   font-size: 13.5px;
 }
 
-.cnv1-heading-actions {
-  display: flex;
-  gap: 9px;
-  flex-wrap: wrap;
-}
+
 
 .cnv1-heading-actions .button {
   min-height: 43px;
@@ -190,12 +176,7 @@
   background: currentColor;
 }
 
-.cnv1-engines {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  align-items: start;
-  gap: 14px;
-}
+
 
 .cnv1-engine-card {
   overflow: hidden;
@@ -476,31 +457,14 @@
 
 
 
-@media (max-width: 1320px) {
-  
 
-  .cnv1-engines {
-    grid-template-columns: 1fr;
-  }
-}
 
-@media (max-width: 920px) {
-  
 
-  
-
-  
-}
 
 @media (max-width: 760px) {
-  .cnv1-heading {
-    align-items: flex-start;
-    flex-direction: column;
-  }
+  
 
-  .cnv1-heading-actions {
-    width: 100%;
-  }
+  
 
   .cnv1-heading-actions .button {
     flex: 1;
@@ -531,10 +495,6 @@
 }
 
 /* V23: engine editors are full-width; Xray selection must not be squeezed into half a page. */
-.cnv1-engines {
-  grid-template-columns: 1fr;
-}
 
-.cnv1-engine-wide {
-  grid-column: 1 / -1;
-}
+
+
