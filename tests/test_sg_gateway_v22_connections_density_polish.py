@@ -15,7 +15,7 @@ def test_xmux_outer_card_uses_single_surface_without_wrapper_inset():
     assert "body.page-connections #xray-xmux.xmux1-wrap" in css
     assert "padding: 0;" in css
     assert "body.page-connections #xray-xmux #xray-xmux-form" in css
-    assert "padding: 0 var(--sgui-card-padding) var(--sgui-card-padding);" in css
+    assert "padding: 0 var(--sg-layout-card-inset) var(--sg-layout-card-inset);" in css
 
 
 def test_awg_header_has_no_visual_separator_before_profile_cards():
