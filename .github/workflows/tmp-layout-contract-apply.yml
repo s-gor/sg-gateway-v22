@@ -1,4 +1,4 @@
-name: Temporary Layout Contract Apply
+name: Temporary Layout Contract Finalize
 
 on:
   push:
@@ -11,7 +11,7 @@ permissions:
   contents: write
 
 jobs:
-  apply:
+  finalize:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -19,122 +19,32 @@ jobs:
           ref: feature/02207-layout-contract-connections
           fetch-depth: 0
 
-      - name: Apply shared layout contract
+      - name: Rebuild source integrity from tracked blobs
         shell: bash
         run: |
           python - <<'PY'
+          import hashlib
+          import subprocess
           from pathlib import Path
 
-          base_path = Path('app/web/templates/base.html')
-          base = base_path.read_text(encoding='utf-8')
-          marker = "  <link rel=\"stylesheet\" href=\"{{ url_for('static', filename='sg-global-ui-system-v1.css') }}\">\n"
-          addition = marker + "  <link rel=\"stylesheet\" href=\"{{ url_for('static', filename='sg-layout-contract-v1.css') }}?v={{ app_version }}-layout-contract-v1\">\n"
-          if 'sg-layout-contract-v1.css' not in base:
-              assert marker in base
-              base = base.replace(marker, addition, 1)
-              base_path.write_text(base, encoding='utf-8')
-
-          layout = '''/* SG-Gateway 022.07 · shared layout contract.
-             Layout only: reusable rails, card geometry and action rhythm.
-             Palette and protocol-specific presentation remain owned by page/theme CSS. */
-
-          :root {
-            --sg-layout-card-inset: var(--sgui-card-padding);
-            --sg-layout-nested-inset: 17px;
-            --sg-layout-compact-inset: 12px;
-            --sg-layout-deep-inset: calc(var(--sg-layout-card-inset) * 2);
-            --sg-layout-mobile-inset: 12px;
+          excluded = {
+              'SOURCE-SHA256SUMS',
+              '.github/workflows/tmp-layout-contract-apply.yml',
           }
+          raw = subprocess.check_output(['git', 'ls-files', '-z'])
+          paths = [p.decode('utf-8') for p in raw.split(b'\0') if p]
+          lines = []
+          for path in paths:
+              if path in excluded:
+                  continue
+              blob = subprocess.check_output(['git', 'cat-file', 'blob', f'HEAD:{path}'])
+              lines.append(f"{hashlib.sha256(blob).hexdigest()}  {path}\n")
 
-          .sg-layout-page {
-            display: grid;
-            gap: var(--sgui-page-gap);
-            min-width: 0;
-          }
-
-          .sg-layout-card {
-            min-width: 0;
-            border: 1px solid var(--sg-line);
-            border-radius: var(--sgui-radius-card);
-            background: var(--sg-panel);
-            box-shadow: var(--sgui-card-shadow);
-          }
-
-          .sg-layout-card-head {
-            display: flex;
-            align-items: flex-start;
-            justify-content: space-between;
-            gap: var(--sgui-section-gap);
-            padding: var(--sg-layout-card-inset);
-            margin: 0;
-          }
-
-          .sg-layout-card-body {
-            min-width: 0;
-            padding: 0 var(--sg-layout-card-inset) var(--sg-layout-card-inset);
-          }
-
-          .sg-layout-nested {
-            min-width: 0;
-            border: 1px solid var(--sg-line-soft);
-            border-radius: var(--sgui-radius-nested);
-            padding: var(--sgui-nested-padding);
-            background: var(--sg-panel-soft);
-            box-shadow: none;
-          }
-
-          .sg-layout-grid {
-            display: grid;
-            gap: var(--sgui-grid-gap);
-            min-width: 0;
-          }
-
-          .sg-layout-actions {
-            display: flex;
-            align-items: center;
-            justify-content: flex-end;
-            flex-wrap: wrap;
-            gap: var(--sgui-grid-gap);
-          }
-
-          @media (max-width: 650px) {
-            .sg-layout-card-head {
-              padding: var(--sg-layout-mobile-inset);
-            }
-
-            .sg-layout-card-body {
-              padding: 0 var(--sg-layout-mobile-inset) var(--sg-layout-mobile-inset);
-            }
-          }
-          '''
-          Path('app/web/static/sg-layout-contract-v1.css').write_text(layout, encoding='utf-8')
-
-          css_path = Path('app/web/static/sg-connections-unified-v1.css')
-          css = css_path.read_text(encoding='utf-8')
-          replacements = [
-              ('padding-inline: var(--sgui-card-padding);', 'padding-inline: var(--sg-layout-card-inset);'),
-              ('margin-inline: var(--sgui-card-padding);', 'margin-inline: var(--sg-layout-card-inset);'),
-              ('padding: 0 var(--sgui-card-padding) var(--sgui-card-padding);', 'padding: 0 var(--sg-layout-card-inset) var(--sg-layout-card-inset);'),
-              ('margin: 0 var(--sgui-card-padding) var(--sgui-card-padding);', 'margin: 0 var(--sg-layout-card-inset) var(--sg-layout-card-inset);'),
-              ('margin: 0 17px;', 'margin: 0 var(--sg-layout-nested-inset);'),
-              ('margin-inline: calc(var(--sgui-card-padding) * 2);', 'margin-inline: var(--sg-layout-deep-inset);'),
-              ('padding: 0 12px 12px;', 'padding: 0 var(--sg-layout-compact-inset) var(--sg-layout-compact-inset);'),
-              ('margin: 0 12px 12px;', 'margin: 0 var(--sg-layout-mobile-inset) var(--sg-layout-mobile-inset);'),
-          ]
-          for old, new in replacements:
-              assert old in css, old
-              css = css.replace(old, new)
-
-          css = css.replace('padding: var(--sgui-card-padding);', 'padding: var(--sg-layout-card-inset);')
-          css = css.replace('padding: var(--sgui-card-padding) 0;', 'padding: var(--sg-layout-card-inset) 0;')
-          css = css.replace('margin-bottom: var(--sgui-card-padding);', 'margin-bottom: var(--sg-layout-card-inset);')
-          css = css.replace('padding-block: var(--sgui-card-padding);', 'padding-block: var(--sg-layout-card-inset);')
-
-          css_path.write_text(css, encoding='utf-8')
+          Path('SOURCE-SHA256SUMS').write_text(''.join(lines), encoding='utf-8')
           PY
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add app/web/templates/base.html app/web/static/sg-layout-contract-v1.css app/web/static/sg-connections-unified-v1.css
-          git commit -m "refactor: move Connections rails to shared layout contract"
+          git add SOURCE-SHA256SUMS
+          git commit -m "chore: refresh source integrity manifest"
           git push origin HEAD:feature/02207-layout-contract-connections
