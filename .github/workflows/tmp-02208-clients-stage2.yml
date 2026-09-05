@@ -1,4 +1,4 @@
-# run 5: robust :is() arm removal
+# run 6: migrate stale 22.07 presentation assertions to 22.08 semantic contracts
 name: TEMP 22.08 Clients stage 2
 
 on:
@@ -15,11 +15,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 5
+          fetch-depth: 6
       - name: Prepare clean base and runners
         run: |
           cp tools/tmp_02208_clients_stage2.py /tmp/stage2.py
           cp tools/tmp_02208_clients_frame_fix.py /tmp/frame_fix.py
+          cp tools/tmp_02208_clients_update_legacy_tests.py /tmp/legacy_tests.py
           git fetch --no-tags --depth=1 origin bc6d423e43ad387f9fb640a77bd85aa3011f8630
           git checkout --detach FETCH_HEAD
           test "$(git rev-parse HEAD)" = "bc6d423e43ad387f9fb640a77bd85aa3011f8630"
@@ -48,7 +49,7 @@ jobs:
             echo 'Expected legacy frame contract to fail before migration' >&2
             exit 1
           fi
-      - name: Apply Clients 22.08 migration
+      - name: Apply Clients 22.08 migration and update stale tests
         run: |
           python - <<'PY'
           import importlib.util
@@ -63,6 +64,7 @@ jobs:
           stage2.migrate_base()
           stage2.write_css()
           frame.migrate_legacy_frame()
+          load('legacy_tests','/tmp/legacy_tests.py').main()
           PY
           git add -A
       - name: Focused GREEN
@@ -72,7 +74,11 @@ jobs:
             tests/test_sg_gateway_v22_clients_geometry_02208.py \
             tests/test_sg_gateway_v22_clients_legacy_frame_02208.py \
             tests/test_sg_gateway_v22_ui_function_contract_02208.py \
-            tests/test_sg_gateway_v22_ui_architecture_02208.py
+            tests/test_sg_gateway_v22_ui_architecture_02208.py \
+            tests/test_sg_gateway_02110_cumulative.py \
+            tests/test_sg_gateway_021_full_publication_ru.py \
+            tests/test_sg_gateway_v22_awg31_client_picker.py \
+            tests/test_sg_gateway_v22_sg_subscription_dual_ui.py
       - name: Refresh source integrity
         run: |
           python - <<'PY'
@@ -114,4 +120,4 @@ jobs:
           bash build-run.sh "$OUT"
           bash "$OUT" --verify-only
       - name: Publish GREEN candidate
-        run: git push origin HEAD:refs/heads/feature/02208-clients-stage2-green
+        run: git push --force origin HEAD:refs/heads/feature/02208-clients-stage2-green
