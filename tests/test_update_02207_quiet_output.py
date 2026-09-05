@@ -34,8 +34,9 @@ def test_nested_panel_core_keeps_inherited_curl_config_enabled():
 def test_naive_runtime_download_and_successful_caddy_validation_are_quiet():
     source = NAIVE_INSTALLER.read_text(encoding="utf-8")
 
-    assert "curl -fsSL --retry 3 --connect-timeout 15" in source
-    assert "curl -fL --retry 3 --connect-timeout 15" not in source
+    assert 'curl -fsSL --connect-timeout 15 -o "$part" "$url"' in source
+    assert 'curl -fL --connect-timeout 15 -o "$part" "$url"' not in source
+    assert 'download_runtime_archive "$RUNTIME_URL" "$archive"' in source
     assert 'caddy_validate_log="$TX_DIR/caddy-validate.log"' in source
     assert 'if ! "$candidate" validate --config "$CONFIG_DIR/Caddyfile" --adapter caddyfile >"$caddy_validate_log" 2>&1; then' in source
     assert 'cat "$caddy_validate_log" >&2' in source

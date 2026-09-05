@@ -39,6 +39,31 @@ PANEL_WAS_ENABLED=0
 log() { printf '[SG-Gateway] %s\n' "$*"; }
 die() { log "ERROR: $*" >&2; return 1; }
 
+download_runtime_archive() {
+  local url="$1" destination="$2" attempts="${3:-5}"
+  local part="${destination}.part" attempt rc=1
+
+  rm -f -- "$destination" "$part"
+  for (( attempt=1; attempt<=attempts; attempt++ )); do
+    rm -f -- "$part"
+    if curl -fsSL --connect-timeout 15 -o "$part" "$url"; then
+      mv -f -- "$part" "$destination"
+      return 0
+    else
+      rc=$?
+    fi
+
+    rm -f -- "$part"
+    if (( attempt < attempts )); then
+      printf '[SG-Gateway] NaiveProxy download attempt %d/%d failed (curl rc=%d); retrying\n' \
+        "$attempt" "$attempts" "$rc" >&2
+      sleep 2
+    fi
+  done
+
+  return "$rc"
+}
+
 snapshot_path() {
   local source="$1" name="$2" flag="$3"
   if [[ -e "$source" || -L "$source" ]]; then
@@ -194,7 +219,7 @@ fi
 work="$TX_DIR/download"
 mkdir -p "$work"
 archive="$work/caddy-forwardproxy-naive.tar.xz"
-curl -fsSL --retry 3 --connect-timeout 15 -o "$archive" "$RUNTIME_URL"
+download_runtime_archive "$RUNTIME_URL" "$archive"
 printf '%s  %s\n' "$RUNTIME_ARCHIVE_SHA256" "$archive" | sha256sum -c - >/dev/null
 tar -xJf "$archive" -C "$work"
 candidate="$work/caddy-forwardproxy-naive/caddy"
