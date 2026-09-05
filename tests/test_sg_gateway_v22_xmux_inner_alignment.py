@@ -21,7 +21,7 @@ def test_xmux_outer_section_keeps_full_major_card_width():
 
 def test_xmux_inner_card_aligns_with_xray_inner_action_boundaries():
     card = block("body.page-connections #xray-xmux .xmux1-card")
-    assert "margin-inline: var(--sgui-card-padding);" in card
+    assert "margin-inline: var(--sg-layout-card-inset);" in card
 
     xray = block("body.page-connections .cnv1-engine-xray :is(\n  .xps2-selection,\n  .xps2-parameters,\n  .xps2-actions\n)")
-    assert "margin-inline: var(--sgui-card-padding);" in xray
+    assert "margin-inline: var(--sg-layout-card-inset);" in xray

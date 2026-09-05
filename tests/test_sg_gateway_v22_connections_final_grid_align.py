@@ -17,21 +17,21 @@ def test_xmux_visible_card_uses_xray_inner_working_width():
     assert "margin-inline: 0;" in wrapper
 
     card = block("body.page-connections #xray-xmux .xmux1-card")
-    assert "margin-inline: var(--sgui-card-padding);" in card
+    assert "margin-inline: var(--sg-layout-card-inset);" in card
 
 
 def test_mihomo_https_warning_matches_listener_row_width():
     warning_wrap = block("body.page-connections #mihomo .mhv2-compact-meta")
-    assert "margin-inline: calc(var(--sgui-card-padding) * 2);" in warning_wrap
+    assert "margin-inline: var(--sg-layout-deep-inset);" in warning_wrap
 
     form = block("body.page-connections #mihomo .mhv2-form")
-    assert "margin-inline: var(--sgui-card-padding);" in form
+    assert "margin-inline: var(--sg-layout-card-inset);" in form
 
 
 def test_naiveproxy_card_has_standard_header_height_and_vertical_rhythm():
     card = block("body.page-connections .xps2-naiveproxy-card")
     assert "min-height: 104px;" in card
-    assert "padding-block: var(--sgui-card-padding);" in card
+    assert "padding-block: var(--sg-layout-card-inset);" in card
     assert "align-items: center;" in card
 
     copy = block("body.page-connections .xps2-naiveproxy-copy")
