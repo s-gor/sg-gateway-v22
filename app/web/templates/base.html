@@ -59,14 +59,6 @@
   <link rel="stylesheet" href="{{ static_asset('sg-ui-layout-v22-08.css') }}">
   <link rel="stylesheet" href="{{ static_asset('sg-ui-components-v22-08.css') }}">
   {% block page_styles %}{% endblock %}
-  {% if active_page|default('') == 'clients' %}
-  <!-- SG_DEVICE_COLLAPSE_V4_LAST_CSS -->
-  <link rel="stylesheet" href="{{ url_for('static', filename='sg-device-collapse-v4.css') }}?v={{ app_version }}-devices-collapse-v4">
-  {% endif %}
-  {% if active_page|default('') == 'clients' %}
-  <!-- SG_DEVICE_EXPANDED_CLEANUP_V1_LAST_CSS -->
-  <link rel="stylesheet" href="{{ url_for('static', filename='sg-device-expanded-cleanup-v1.css') }}?v={{ app_version }}-device-expanded-cleanup-v1">
-  {% endif %}
   {% if active_page|default('') == 'maintenance' %}
   <script src="{{ url_for('static', filename='sg-maintenance-recovery-v1.js') }}?v={{ app_version }}-maintenance-recovery-v2" defer></script>
   <script src="{{ url_for('static', filename='sg-clients-keys-download-v1.js') }}?v={{ app_version }}-clients-keys-https-sqlite-v2" defer></script>

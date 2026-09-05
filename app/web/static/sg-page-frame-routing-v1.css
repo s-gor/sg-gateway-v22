@@ -29,7 +29,7 @@ html[data-theme="light"] {
   --sgpf-shadow: 0 18px 36px rgba(43, 52, 46, .16), 0 2px 5px rgba(43, 52, 46, .10);
 }
 
-:is(.sv1-page, .cv2-page, .ob49-page, .mtv2-page, .secv2-page, .hlpv1-page) {
+:is(.sv1-page, .ob49-page, .mtv2-page, .secv2-page, .hlpv1-page){
   display: grid !important;
   gap: 0 !important;
   min-width: 0;
@@ -39,7 +39,7 @@ html[data-theme="light"] {
   box-shadow: var(--sgpf-shadow);
 }
 
-:is(.sv1-heading, .cv2-heading.cv15-heading, .ob49-heading, .mtv2-heading, .ts2-page-heading, .hlpv1-heading) {
+:is(.sv1-heading, .ob49-heading, .mtv2-heading, .ts2-page-heading, .hlpv1-heading){
   display: flex !important;
   justify-content: space-between !important;
   align-items: center !important;
@@ -147,64 +147,38 @@ html[data-theme="light"]
   box-shadow: 0 10px 22px rgba(69, 111, 92, .20), 0 2px 5px rgba(43, 52, 46, .12) !important;
 }
 
-:is(.sv1-page, .cv2-page, .ob49-page, .mtv2-page, .secv2-page, .hlpv1-page)
-> :not(.sv1-heading, .cv2-heading, .ob49-heading, .mtv2-heading, .ts2-page-heading, .hlpv1-heading) {
+:is(.sv1-page, .ob49-page, .mtv2-page, .secv2-page, .hlpv1-page)
+> :not(.sv1-heading, .cv2-heading, .ob49-heading, .mtv2-heading, .ts2-page-heading, .hlpv1-heading){
   margin-right: 18px !important;
   margin-left: 18px !important;
 }
 
-:is(.sv1-page, .cv2-page, .ob49-page, .mtv2-page, .secv2-page, .hlpv1-page) > :nth-child(2) {
+:is(.sv1-page, .ob49-page, .mtv2-page, .secv2-page, .hlpv1-page) > :nth-child(2){
   margin-top: 14px !important;
 }
 
-:is(.sv1-page, .cv2-page, .ob49-page, .mtv2-page, .secv2-page, .hlpv1-page) > :last-child {
+:is(.sv1-page, .ob49-page, .mtv2-page, .secv2-page, .hlpv1-page) > :last-child{
   margin-bottom: 18px !important;
 }
 
 @media (max-width: 760px) {
-  :is(.sv1-heading, .cv2-heading.cv15-heading, .ob49-heading, .mtv2-heading, .ts2-page-heading, .hlpv1-heading) {
+  :is(.sv1-heading, .ob49-heading, .mtv2-heading, .ts2-page-heading, .hlpv1-heading){
     display: grid !important;
     align-items: stretch !important;
     padding: 12px 10px !important;
   }
 
-  :is(.sv1-page, .cv2-page, .ob49-page, .mtv2-page, .secv2-page, .hlpv1-page)
-  > :not(.sv1-heading, .cv2-heading, .ob49-heading, .mtv2-heading, .ts2-page-heading, .hlpv1-heading) {
+  :is(.sv1-page, .ob49-page, .mtv2-page, .secv2-page, .hlpv1-page)
+  > :not(.sv1-heading, .cv2-heading, .ob49-heading, .mtv2-heading, .ts2-page-heading, .hlpv1-heading){
     margin-right: 10px !important;
     margin-left: 10px !important;
   }
 }
 
 /* SG-Gateway 021 · client detail uses the exact Routing page frame */
-.dv16-page {
-  display: grid !important;
-  gap: 0 !important;
-  width: 100% !important;
-  max-width: none !important;
-  min-width: 0 !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  border: 1px solid var(--sgpf-line-strong) !important;
-  border-radius: 16px !important;
-  background: var(--sgpf-page-bg) !important;
-  box-shadow: var(--sgpf-shadow) !important;
-  overflow: hidden;
-}
 
-.dv16-heading {
-  display: flex !important;
-  justify-content: space-between !important;
-  align-items: flex-start !important;
-  gap: 20px !important;
-  min-height: 78px !important;
-  margin: 0 !important;
-  padding: 12px 18px !important;
-  border: 0 !important;
-  border-bottom: 1px solid var(--sgpf-line-strong) !important;
-  border-radius: 16px 16px 0 0 !important;
-  background: var(--sgpf-header) !important;
-  box-shadow: var(--sgpf-shadow) !important;
-}
+
+
 
 .dv16-heading > div:first-child {
   min-width: 0;
@@ -245,14 +219,7 @@ html[data-theme="light"]
   background: var(--sgpf-accent) !important;
 }
 
-.dv16-heading-actions {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: flex-end !important;
-  flex-wrap: wrap !important;
-  gap: 8px !important;
-  max-width: 760px !important;
-}
+
 
 .dv16-heading-actions form {
   margin: 0 !important;
@@ -272,93 +239,60 @@ html[data-theme="light"]
   margin-top: 10px !important;
 }
 
-.dv16-devices {
-  display: grid !important;
-  gap: 14px !important;
-  margin: 14px 18px 18px !important;
-}
 
-@media (max-width: 1000px) {
-  .dv16-heading {
-    display: grid !important;
-    align-items: stretch !important;
-  }
 
-  .dv16-heading-actions {
-    justify-content: flex-start !important;
-    max-width: none !important;
-  }
-}
 
-@media (max-width: 760px) {
-  .dv16-heading {
-    padding: 12px 10px !important;
-  }
 
-  .dv16-devices {
-    margin: 10px !important;
-  }
-}
+
 
 /* SG-Gateway 021 · page frame spacing fix
    Keep the accepted Routing-style outer frame without pushing every direct
    grid item outside its own track. */
 
-:is(.sv1-page, .cv2-page, .ob49-page, .mtv2-page, .secv2-page, .hlpv1-page) {
+:is(.sv1-page, .ob49-page, .mtv2-page, .secv2-page, .hlpv1-page){
   box-sizing: border-box !important;
   gap: 14px !important;
   padding: 0 18px 18px !important;
 }
 
-:is(.sv1-heading, .cv2-heading.cv15-heading, .ob49-heading, .mtv2-heading, .ts2-page-heading, .hlpv1-heading) {
+:is(.sv1-heading, .ob49-heading, .mtv2-heading, .ts2-page-heading, .hlpv1-heading){
   grid-column: 1 / -1 !important;
   width: auto !important;
   margin: 0 -18px !important;
 }
 
-:is(.sv1-page, .cv2-page, .ob49-page, .mtv2-page, .secv2-page, .hlpv1-page)
-> :not(.sv1-heading, .cv2-heading, .ob49-heading, .mtv2-heading, .ts2-page-heading, .hlpv1-heading) {
+:is(.sv1-page, .ob49-page, .mtv2-page, .secv2-page, .hlpv1-page)
+> :not(.sv1-heading, .cv2-heading, .ob49-heading, .mtv2-heading, .ts2-page-heading, .hlpv1-heading){
   min-width: 0 !important;
   margin-right: 0 !important;
   margin-left: 0 !important;
 }
 
-:is(.sv1-page, .cv2-page, .ob49-page, .mtv2-page, .secv2-page, .hlpv1-page) > :nth-child(2) {
+:is(.sv1-page, .ob49-page, .mtv2-page, .secv2-page, .hlpv1-page) > :nth-child(2){
   margin-top: 0 !important;
 }
 
-:is(.sv1-page, .cv2-page, .ob49-page, .mtv2-page, .secv2-page, .hlpv1-page) > :last-child {
+:is(.sv1-page, .ob49-page, .mtv2-page, .secv2-page, .hlpv1-page) > :last-child{
   margin-bottom: 0 !important;
 }
 
 /* The client-detail page uses the same safe frame geometry. */
-.dv16-page {
-  box-sizing: border-box !important;
-  gap: 14px !important;
-  padding: 0 18px 18px !important;
-}
 
-.dv16-heading {
-  grid-column: 1 / -1 !important;
-  width: auto !important;
-  margin: 0 -18px !important;
-}
 
-.dv16-client-state,
-.dv16-devices {
+
+
+.dv16-client-state{
   min-width: 0 !important;
   margin: 0 !important;
 }
 
 @media (max-width: 760px) {
-  :is(.sv1-page, .cv2-page, .ob49-page, .mtv2-page, .secv2-page, .hlpv1-page),
-  .dv16-page {
+  :is(.sv1-page, .ob49-page, .mtv2-page, .secv2-page, .hlpv1-page){
     gap: 10px !important;
     padding: 0 10px 10px !important;
   }
 
-  :is(.sv1-heading, .cv2-heading.cv15-heading, .ob49-heading, .mtv2-heading, .ts2-page-heading, .hlpv1-heading),
-  .dv16-heading {
+  :is(.sv1-heading, .ob49-heading, .mtv2-heading, .ts2-page-heading, .hlpv1-heading){
     margin-right: -10px !important;
     margin-left: -10px !important;
   }
