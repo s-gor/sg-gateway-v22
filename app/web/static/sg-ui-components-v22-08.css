@@ -130,3 +130,35 @@
     flex: 1 1 auto;
   }
 }
+
+/* SG-Gateway 22.08 canonical tabs. Structural rail ownership remains in sg-ui-layout. */
+.sg-ui-tabs {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.sg-ui-tab {
+  display: inline-flex;
+  min-height: var(--sg-ui-control-height-sm, 32px);
+  align-items: center;
+  justify-content: center;
+  padding: 7px 13px;
+  border: 1px solid var(--sg-ui-border-strong);
+  border-radius: var(--sg-ui-control-radius, 9px);
+  background: var(--sg-ui-surface-raised);
+  color: var(--sg-ui-text-muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sg-ui-tab.active {
+  border-color: color-mix(in srgb, var(--sg-ui-accent) 60%, var(--sg-ui-border-strong));
+  background: var(--sg-ui-accent-soft);
+  color: var(--sg-ui-accent);
+}
+
