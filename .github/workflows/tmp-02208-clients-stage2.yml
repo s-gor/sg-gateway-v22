@@ -1,4 +1,4 @@
-# run 3: Clients heading ownership cleanup
+# run 4: fetch exact clean base before Clients migration
 name: TEMP 22.08 Clients stage 2
 
 on:
@@ -20,7 +20,9 @@ jobs:
         run: |
           cp tools/tmp_02208_clients_stage2.py /tmp/stage2.py
           cp tools/tmp_02208_clients_frame_fix.py /tmp/frame_fix.py
-          git checkout --detach bc6d423e43ad387f9fb640a77bd85aa3011f8630
+          git fetch --no-tags --depth=1 origin bc6d423e43ad387f9fb640a77bd85aa3011f8630
+          git checkout --detach FETCH_HEAD
+          test "$(git rev-parse HEAD)" = "bc6d423e43ad387f9fb640a77bd85aa3011f8630"
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
