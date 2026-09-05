@@ -79,11 +79,11 @@ def test_02208_layout_has_one_outer_page_padding_owner():
     sources = _canonical_sources()
     layout = sources["sg-ui-layout-v22-08.css"]
 
-    content_blocks = re.findall(r"\.sg-content\s*\{([^}]]+)\}", layout, flags=re.S)
+    content_blocks = re.findall(r"\.sg-content\s*\{([^}]+)\}", layout, flags=re.S)
     assert len(content_blocks) == 1, "sg-content must have exactly one canonical layout block"
     assert re.search(r"padding-inline\s*:\s*(?:var\([^)]*30px[^)]*\)|30px)", content_blocks[0])
 
-    page_blocks = re.findall(r"\.sg-ui-page\s*\{([^}]]+)\}", layout, flags=re.S)
+    page_blocks = re.findall(r"\.sg-ui-page\s*\{([^}]+)\}", layout, flags=re.S)
     assert page_blocks, "sg-ui-page layout primitive is missing"
     assert all("padding-inline" not in block for block in page_blocks)
     assert all("margin-inline" not in block for block in page_blocks)
