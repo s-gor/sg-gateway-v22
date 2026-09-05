@@ -43,8 +43,8 @@ def _split_top_level_selectors(text: str) -> list[str]:
 
 
 def _remove_cv2_page_arm(selector: str) -> str:
-    selector = selector.replace(", .cv2-page", "")
-    selector = selector.replace(".cv2-page, ", "")
+    selector = re.sub(r",\s*\.cv2-page(?=\s*[,\)])", "", selector)
+    selector = re.sub(r"(?<=\()\s*\.cv2-page\s*,\s*", "", selector)
     return selector
 
 
@@ -52,8 +52,16 @@ def _remove_exact_cv2_heading_arm(selector: str) -> str:
     stripped = selector.strip()
     if stripped.count(":is(") != 1 or not stripped.endswith(")"):
         return selector
-    selector = selector.replace(", .cv2-heading.cv15-heading", "")
-    selector = selector.replace(".cv2-heading.cv15-heading, ", "")
+    selector = re.sub(
+        r",\s*\.cv2-heading\.cv15-heading(?=\s*[,\)])",
+        "",
+        selector,
+    )
+    selector = re.sub(
+        r"(?<=\()\s*\.cv2-heading\.cv15-heading\s*,\s*",
+        "",
+        selector,
+    )
     return selector
 
 
@@ -127,6 +135,8 @@ def migrate_legacy_frame() -> None:
     cleaned = tinycss2.serialize(_filter_rules(rules))
     if ".cv2-page" in cleaned or ".dv16-page" in cleaned:
         raise RuntimeError("legacy Clients page ownership remained after migration")
+    if re.search(r"(?s):is\([^{}]*\.cv2-heading\.cv15-heading[^{}]*\)\s*\{", cleaned):
+        raise RuntimeError("legacy Clients heading ownership remained after migration")
     FRAME.write_text(cleaned, encoding="utf-8")
 
 
