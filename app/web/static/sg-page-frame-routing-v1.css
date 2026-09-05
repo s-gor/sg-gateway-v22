@@ -29,7 +29,7 @@ html[data-theme="light"] {
   --sgpf-shadow: 0 18px 36px rgba(43, 52, 46, .16), 0 2px 5px rgba(43, 52, 46, .10);
 }
 
-:is(.sv1-page, .cv2-page, .cnv1-page, .ob49-page, .mtv2-page, .secv2-page, .hlpv1-page) {
+:is(.sv1-page, .cv2-page, .ob49-page, .mtv2-page, .secv2-page, .hlpv1-page) {
   display: grid !important;
   gap: 0 !important;
   min-width: 0;
@@ -39,7 +39,7 @@ html[data-theme="light"] {
   box-shadow: var(--sgpf-shadow);
 }
 
-:is(.sv1-heading, .cv2-heading.cv15-heading, .cnv1-heading, .ob49-heading, .mtv2-heading, .ts2-page-heading, .hlpv1-heading) {
+:is(.sv1-heading, .cv2-heading.cv15-heading, .ob49-heading, .mtv2-heading, .ts2-page-heading, .hlpv1-heading) {
   display: flex !important;
   justify-content: space-between !important;
   align-items: center !important;
@@ -54,11 +54,11 @@ html[data-theme="light"] {
   box-shadow: var(--sgpf-shadow) !important;
 }
 
-:is(.sv1-heading, .cv2-heading.cv15-heading, .cnv1-heading, .ob49-heading, .mtv2-heading, .ts2-page-heading, .hlpv1-heading) > div:first-child {
+:is(.sv1-heading, .cv2-heading.cv15-heading, .ob49-heading, .mtv2-heading, .ts2-page-heading, .hlpv1-heading) > div:first-child {
   min-width: 0;
 }
 
-:is(.sv1-heading, .cv2-heading.cv15-heading, .cnv1-heading, .ob49-heading, .mtv2-heading, .ts2-page-heading, .hlpv1-heading) h1 {
+:is(.sv1-heading, .cv2-heading.cv15-heading, .ob49-heading, .mtv2-heading, .ts2-page-heading, .hlpv1-heading) h1 {
   margin: 6px 0 2px !important;
   color: var(--sgpf-text) !important;
   font-size: 27px !important;
@@ -67,7 +67,7 @@ html[data-theme="light"] {
   letter-spacing: 0 !important;
 }
 
-:is(.sv1-heading, .cv2-heading.cv15-heading, .cnv1-heading, .ob49-heading, .mtv2-heading, .ts2-page-heading, .hlpv1-heading) p {
+:is(.sv1-heading, .cv2-heading.cv15-heading, .ob49-heading, .mtv2-heading, .ts2-page-heading, .hlpv1-heading) p {
   margin: 0 !important;
   color: var(--sgpf-muted) !important;
   font-size: 13px !important;
@@ -102,7 +102,7 @@ html[data-theme="light"] {
   background: var(--sgpf-accent);
 }
 
-:is(.sv1-heading-actions, .cv2-heading-actions, .cnv1-heading-actions, .ob49-heading-actions, .mtv2-heading-actions, .ts2-heading-actions, .hlpv1-heading-actions) {
+:is(.sv1-heading-actions, .cv2-heading-actions-actions, .ob49-heading-actions, .mtv2-heading-actions, .ts2-heading-actions, .hlpv1-heading-actions) {
   display: flex !important;
   align-items: center !important;
   justify-content: flex-end !important;
@@ -110,7 +110,7 @@ html[data-theme="light"] {
   gap: 8px !important;
 }
 
-:is(.sv1-heading, .cv2-heading.cv15-heading, .cnv1-heading, .ob49-heading, .mtv2-heading, .ts2-page-heading, .hlpv1-heading)
+:is(.sv1-heading, .cv2-heading.cv15-heading, .ob49-heading, .mtv2-heading, .ts2-page-heading, .hlpv1-heading)
 :is(a.button, button.button, .ob49-help, .cv2-create-button, a[class*="heading"]) {
   display: inline-flex !important;
   align-items: center !important;
@@ -130,7 +130,7 @@ html[data-theme="light"] {
 }
 
 html[data-theme="dark"]
-:is(.sv1-heading, .cv2-heading.cv15-heading, .cnv1-heading, .ob49-heading, .mtv2-heading, .ts2-page-heading, .hlpv1-heading)
+:is(.sv1-heading, .cv2-heading.cv15-heading, .ob49-heading, .mtv2-heading, .ts2-page-heading, .hlpv1-heading)
 :is(.primary, .sg-ljd-key-action, .cv2-create-button) {
   border-color: #4E82B1 !important;
   background: var(--sgpf-primary) !important;
@@ -139,7 +139,7 @@ html[data-theme="dark"]
 }
 
 html[data-theme="light"]
-:is(.sv1-heading, .cv2-heading.cv15-heading, .cnv1-heading, .ob49-heading, .mtv2-heading, .ts2-page-heading, .hlpv1-heading)
+:is(.sv1-heading, .cv2-heading.cv15-heading, .ob49-heading, .mtv2-heading, .ts2-page-heading, .hlpv1-heading)
 :is(.primary, .sg-ljd-key-action, .cv2-create-button) {
   border-color: #5C846F !important;
   background: var(--sgpf-primary) !important;
@@ -147,29 +147,29 @@ html[data-theme="light"]
   box-shadow: 0 10px 22px rgba(69, 111, 92, .20), 0 2px 5px rgba(43, 52, 46, .12) !important;
 }
 
-:is(.sv1-page, .cv2-page, .cnv1-page, .ob49-page, .mtv2-page, .secv2-page, .hlpv1-page)
-> :not(.sv1-heading, .cv2-heading, .cnv1-heading, .ob49-heading, .mtv2-heading, .ts2-page-heading, .hlpv1-heading) {
+:is(.sv1-page, .cv2-page, .ob49-page, .mtv2-page, .secv2-page, .hlpv1-page)
+> :not(.sv1-heading, .cv2-heading, .ob49-heading, .mtv2-heading, .ts2-page-heading, .hlpv1-heading) {
   margin-right: 18px !important;
   margin-left: 18px !important;
 }
 
-:is(.sv1-page, .cv2-page, .cnv1-page, .ob49-page, .mtv2-page, .secv2-page, .hlpv1-page) > :nth-child(2) {
+:is(.sv1-page, .cv2-page, .ob49-page, .mtv2-page, .secv2-page, .hlpv1-page) > :nth-child(2) {
   margin-top: 14px !important;
 }
 
-:is(.sv1-page, .cv2-page, .cnv1-page, .ob49-page, .mtv2-page, .secv2-page, .hlpv1-page) > :last-child {
+:is(.sv1-page, .cv2-page, .ob49-page, .mtv2-page, .secv2-page, .hlpv1-page) > :last-child {
   margin-bottom: 18px !important;
 }
 
 @media (max-width: 760px) {
-  :is(.sv1-heading, .cv2-heading.cv15-heading, .cnv1-heading, .ob49-heading, .mtv2-heading, .ts2-page-heading, .hlpv1-heading) {
+  :is(.sv1-heading, .cv2-heading.cv15-heading, .ob49-heading, .mtv2-heading, .ts2-page-heading, .hlpv1-heading) {
     display: grid !important;
     align-items: stretch !important;
     padding: 12px 10px !important;
   }
 
-  :is(.sv1-page, .cv2-page, .cnv1-page, .ob49-page, .mtv2-page, .secv2-page, .hlpv1-page)
-  > :not(.sv1-heading, .cv2-heading, .cnv1-heading, .ob49-heading, .mtv2-heading, .ts2-page-heading, .hlpv1-heading) {
+  :is(.sv1-page, .cv2-page, .ob49-page, .mtv2-page, .secv2-page, .hlpv1-page)
+  > :not(.sv1-heading, .cv2-heading, .ob49-heading, .mtv2-heading, .ts2-page-heading, .hlpv1-heading) {
     margin-right: 10px !important;
     margin-left: 10px !important;
   }
@@ -304,30 +304,30 @@ html[data-theme="light"]
    Keep the accepted Routing-style outer frame without pushing every direct
    grid item outside its own track. */
 
-:is(.sv1-page, .cv2-page, .cnv1-page, .ob49-page, .mtv2-page, .secv2-page, .hlpv1-page) {
+:is(.sv1-page, .cv2-page, .ob49-page, .mtv2-page, .secv2-page, .hlpv1-page) {
   box-sizing: border-box !important;
   gap: 14px !important;
   padding: 0 18px 18px !important;
 }
 
-:is(.sv1-heading, .cv2-heading.cv15-heading, .cnv1-heading, .ob49-heading, .mtv2-heading, .ts2-page-heading, .hlpv1-heading) {
+:is(.sv1-heading, .cv2-heading.cv15-heading, .ob49-heading, .mtv2-heading, .ts2-page-heading, .hlpv1-heading) {
   grid-column: 1 / -1 !important;
   width: auto !important;
   margin: 0 -18px !important;
 }
 
-:is(.sv1-page, .cv2-page, .cnv1-page, .ob49-page, .mtv2-page, .secv2-page, .hlpv1-page)
-> :not(.sv1-heading, .cv2-heading, .cnv1-heading, .ob49-heading, .mtv2-heading, .ts2-page-heading, .hlpv1-heading) {
+:is(.sv1-page, .cv2-page, .ob49-page, .mtv2-page, .secv2-page, .hlpv1-page)
+> :not(.sv1-heading, .cv2-heading, .ob49-heading, .mtv2-heading, .ts2-page-heading, .hlpv1-heading) {
   min-width: 0 !important;
   margin-right: 0 !important;
   margin-left: 0 !important;
 }
 
-:is(.sv1-page, .cv2-page, .cnv1-page, .ob49-page, .mtv2-page, .secv2-page, .hlpv1-page) > :nth-child(2) {
+:is(.sv1-page, .cv2-page, .ob49-page, .mtv2-page, .secv2-page, .hlpv1-page) > :nth-child(2) {
   margin-top: 0 !important;
 }
 
-:is(.sv1-page, .cv2-page, .cnv1-page, .ob49-page, .mtv2-page, .secv2-page, .hlpv1-page) > :last-child {
+:is(.sv1-page, .cv2-page, .ob49-page, .mtv2-page, .secv2-page, .hlpv1-page) > :last-child {
   margin-bottom: 0 !important;
 }
 
@@ -351,13 +351,13 @@ html[data-theme="light"]
 }
 
 @media (max-width: 760px) {
-  :is(.sv1-page, .cv2-page, .cnv1-page, .ob49-page, .mtv2-page, .secv2-page, .hlpv1-page),
+  :is(.sv1-page, .cv2-page, .ob49-page, .mtv2-page, .secv2-page, .hlpv1-page),
   .dv16-page {
     gap: 10px !important;
     padding: 0 10px 10px !important;
   }
 
-  :is(.sv1-heading, .cv2-heading.cv15-heading, .cnv1-heading, .ob49-heading, .mtv2-heading, .ts2-page-heading, .hlpv1-heading),
+  :is(.sv1-heading, .cv2-heading.cv15-heading, .ob49-heading, .mtv2-heading, .ts2-page-heading, .hlpv1-heading),
   .dv16-heading {
     margin-right: -10px !important;
     margin-left: -10px !important;
