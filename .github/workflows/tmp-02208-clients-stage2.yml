@@ -14,37 +14,52 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 3
-      - name: Prepare clean base and runner
+          fetch-depth: 5
+      - name: Prepare clean base and runners
         run: |
           cp tools/tmp_02208_clients_stage2.py /tmp/stage2.py
-          git checkout --detach HEAD^^
+          cp tools/tmp_02208_clients_frame_fix.py /tmp/frame_fix.py
+          git checkout --detach bc6d423e43ad387f9fb640a77bd85aa3011f8630
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       - name: Install dependencies
         run: |
-          python -m pip install -r requirements-dev.txt
+          python -m pip install -r requirements-dev.txt tinycss2
           python -m playwright install --with-deps chromium
-      - name: Confirm RED geometry contract
+      - name: Confirm RED geometry and legacy-frame contracts
         run: |
           python - <<'PY'
           import importlib.util
-          spec=importlib.util.spec_from_file_location('stage2','/tmp/stage2.py')
-          mod=importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
-          mod.write_tests()
+          def load(name, path):
+              spec=importlib.util.spec_from_file_location(name,path)
+              mod=importlib.util.module_from_spec(spec); spec.loader.exec_module(mod); return mod
+          load('stage2','/tmp/stage2.py').write_tests()
+          load('frame_fix','/tmp/frame_fix.py').write_regression_test()
           PY
           if python -m pytest -q tests/test_sg_gateway_v22_clients_geometry_02208.py; then
             echo 'Expected Clients geometry contract to fail before migration' >&2
+            exit 1
+          fi
+          if python -m pytest -q tests/test_sg_gateway_v22_clients_legacy_frame_02208.py; then
+            echo 'Expected legacy frame contract to fail before migration' >&2
             exit 1
           fi
       - name: Apply Clients 22.08 migration
         run: |
           python - <<'PY'
           import importlib.util
-          spec=importlib.util.spec_from_file_location('stage2','/tmp/stage2.py')
-          mod=importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
-          mod.migrate_clients(); mod.migrate_detail(); mod.migrate_dialogs(); mod.migrate_base(); mod.write_css()
+          def load(name, path):
+              spec=importlib.util.spec_from_file_location(name,path)
+              mod=importlib.util.module_from_spec(spec); spec.loader.exec_module(mod); return mod
+          stage2=load('stage2','/tmp/stage2.py')
+          frame=load('frame_fix','/tmp/frame_fix.py')
+          stage2.migrate_clients()
+          stage2.migrate_detail()
+          stage2.migrate_dialogs()
+          stage2.migrate_base()
+          stage2.write_css()
+          frame.migrate_legacy_frame()
           PY
           git add -A
       - name: Focused GREEN
@@ -52,6 +67,7 @@ jobs:
           python -m pytest -q \
             tests/test_sg_gateway_v22_clients_contract_02208.py \
             tests/test_sg_gateway_v22_clients_geometry_02208.py \
+            tests/test_sg_gateway_v22_clients_legacy_frame_02208.py \
             tests/test_sg_gateway_v22_ui_function_contract_02208.py \
             tests/test_sg_gateway_v22_ui_architecture_02208.py
       - name: Refresh source integrity
