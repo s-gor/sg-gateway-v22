@@ -1,0 +1,95 @@
+name: Temporary XMUX cache-bust finalizer
+
+on:
+  push:
+    branches:
+      - fix/02207-xmux-cache-bust
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/02207-xmux-cache-bust
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Prove SOURCE-SHA256SUMS generation contract on accepted base
+        run: |
+          git worktree add --detach /tmp/source-base b114501a8b85953b535e25cf032edcf82becaab5
+          cd /tmp/source-base
+          python3 - <<'PY'
+          import hashlib
+          import subprocess
+          from pathlib import Path
+
+          paths = subprocess.check_output(["git", "ls-files", "-z"]).decode().split("\0")
+          paths = sorted(path for path in paths if path and path != "SOURCE-SHA256SUMS")
+          generated = "".join(
+              f"{hashlib.sha256(Path(path).read_bytes()).hexdigest()}  {path}\n"
+              for path in paths
+          )
+          Path("/tmp/source-base.generated").write_text(generated, encoding="utf-8")
+          PY
+          cmp SOURCE-SHA256SUMS /tmp/source-base.generated
+
+      - name: Apply content-derived Connections CSS cache key
+        run: |
+          git rm .github/workflows/tmp-xmux-cache-bust.yml
+          python3 - <<'PY'
+          import hashlib
+          from pathlib import Path
+
+          template = Path("app/web/templates/base.html")
+          css = Path("app/web/static/sg-connections-unified-v1.css")
+          key = hashlib.sha256(css.read_bytes()).hexdigest()[:16]
+          body = template.read_text(encoding="utf-8")
+          old = "{{ url_for('static', filename='sg-connections-unified-v1.css') }}?v={{ app_version }}-connections-unified-v1"
+          new = "{{ url_for('static', filename='sg-connections-unified-v1.css') }}?v=" + key
+          if body.count(old) != 1:
+              raise SystemExit(f"expected one legacy Connections CSS URL, found {body.count(old)}")
+          template.write_text(body.replace(old, new), encoding="utf-8")
+          print(f"Connections CSS cache key: {key}")
+          PY
+
+      - name: Regenerate SOURCE-SHA256SUMS
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import subprocess
+          from pathlib import Path
+
+          paths = subprocess.check_output(["git", "ls-files", "-z"]).decode().split("\0")
+          paths = sorted(path for path in paths if path and path != "SOURCE-SHA256SUMS")
+          generated = "".join(
+              f"{hashlib.sha256(Path(path).read_bytes()).hexdigest()}  {path}\n"
+              for path in paths
+          )
+          Path("SOURCE-SHA256SUMS").write_text(generated, encoding="utf-8")
+          PY
+
+      - name: Run focused regression tests
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+          python -m pytest -q \
+            tests/test_sg_gateway_v22_static_asset_cache_bust.py \
+            tests/test_sg_gateway_v22_xmux_inner_alignment.py
+
+      - name: Commit finalized feature tree
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add app/web/templates/base.html tests/test_sg_gateway_v22_static_asset_cache_bust.py SOURCE-SHA256SUMS
+          git add -u .github/workflows/tmp-xmux-cache-bust.yml
+          git diff --cached --check
+          git commit -m 'fix(ui): bust stale Connections stylesheet cache'
+          git push origin HEAD:fix/02207-xmux-cache-bust
