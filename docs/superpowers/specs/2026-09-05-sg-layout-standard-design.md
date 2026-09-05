@@ -25,7 +25,7 @@ Canonical primitives:
 - `.sg-ui-actions` — shared action-row alignment and spacing.
 - `.sg-ui-section--compact` — allowed only for intentionally short sections such as NaiveProxy; it changes vertical density, not horizontal geometry.
 
-These primitives will reuse the existing global tokens rather than introduce per-component pixel values.
+These primitives reuse the existing global tokens rather than introduce per-component pixel values.
 
 ## Canonical geometry
 
@@ -50,12 +50,14 @@ MAJOR SECTION (.sg-ui-section)
 Rules:
 
 1. Every major section occupies the same outer width.
-2. Every major section has exactly one canonical inner rail.
-3. Component-specific CSS may style content inside the rail, but must not redefine the rail's left/right position.
-4. A component may contain nested cards, but nested cards inherit the rail width unless their own internal grid explicitly subdivides it.
-5. Header, body and action rows align to the same rail unless the header is intentionally full-bleed inside the section.
-6. Horizontal geometry is token-driven. No page-specific `calc()` or extra `margin-inline` may compensate for a different component structure.
-7. Mobile reduces the canonical rail inset using the existing nested-padding token; it does not create a separate component-specific mobile geometry.
+2. Every major section uses exactly one canonical inner-rail coordinate system.
+3. `.sg-ui-rail` is a geometry primitive, not a requirement for one physical wrapper element. Multiple sibling surfaces may carry the class when form semantics or existing DOM ownership make one wrapper undesirable; all such surfaces resolve to the same left/right coordinates.
+4. Component-specific CSS may style content inside the rail, but must not redefine the rail's left/right position.
+5. A component may contain nested cards, but nested cards inherit the rail width unless their own internal grid explicitly subdivides it.
+6. A major section header uses canonical section padding. Primary inner surfaces use the canonical rail. When the whole component is intentionally nested (XMUX), the inner card itself sits on the rail and owns its local header.
+7. Horizontal geometry is token-driven. No page-specific `calc()` or extra `margin-inline` may compensate for a different component structure.
+8. Mobile reduces the canonical rail inset using the existing nested-padding token; it does not create a separate component-specific mobile geometry.
+9. Migration must not change form nesting, form ownership, element IDs, input names or JavaScript lookup targets merely to achieve layout alignment.
 
 ## Connections adoption
 
@@ -65,26 +67,26 @@ Connections is the first and reference implementation.
 
 - Keep existing form, profile cards, Reality fields and actions.
 - Major Xray surface becomes `.sg-ui-section`.
-- Endpoint, profile selection, parameters and bottom action surface all sit on `.sg-ui-rail`.
+- Endpoint, profile selection, parameters and bottom action surface all use `.sg-ui-rail` coordinates.
 - The bottom Xray action surface defines no private horizontal geometry.
 
 ### XMUX
 
 - Keep the card-in-card composition approved in screenshots.
 - The outer XMUX section remains the same full major-section width as Xray/AWG/Mihomo.
-- The inner XMUX card sits on the same `.sg-ui-rail` as Xray's internal action/parameter surfaces.
+- The inner XMUX card sits on the same `.sg-ui-rail` coordinates as Xray's internal action/parameter surfaces.
 - XMUX-specific CSS owns only its tabs, JSON body and controls, not section/rail width.
 
 ### AmneziaWG
 
 - Major AWG surface becomes `.sg-ui-section`.
-- AWG three-card grid and shared DNS row sit on `.sg-ui-rail`.
+- AWG three-card grid and shared DNS row use `.sg-ui-rail` coordinates.
 - Internal endpoint cards may keep their internal card padding, but they do not create a second page-level rail.
 
 ### Mihomo / sing-box
 
 - Major Mihomo surface becomes `.sg-ui-section`.
-- HTTPS warning/ready surface, listener grid, actions and runtime note sit on the same `.sg-ui-rail`.
+- HTTPS warning/ready surface, listener grid, actions and runtime note use the same `.sg-ui-rail` coordinates.
 - The listener grid may subdivide the rail into three columns; the warning does not get a different horizontal inset.
 
 ### NaiveProxy
@@ -136,7 +138,7 @@ This debt is why the rollout must be incremental rather than a single global rew
 
 ## CSS ownership
 
-Add one new global geometry layer, tentatively `sg-layout-contract-v1.css`, loaded after `sg-global-ui-system-v1.css` and before final page/theme-specific visual overrides.
+Add one global geometry layer named `sg-layout-contract-v1.css`, loaded after `sg-global-ui-system-v1.css` and before final page/theme-specific visual overrides.
 
 Ownership order:
 
@@ -153,7 +155,7 @@ TDD requirements:
 
 1. RED tests first for semantic class adoption on all five Connections sections.
 2. Contract test: all major Connections sections share `.sg-ui-section`.
-3. Contract test: Xray inner surfaces, XMUX inner card, AWG grid/DNS, Mihomo warning/listeners/actions and NaiveProxy content use the same `.sg-ui-rail` ownership.
+3. Contract test: Xray inner surfaces, XMUX inner card, AWG grid/DNS, Mihomo warning/listeners/actions and NaiveProxy content share `.sg-ui-rail` coordinate ownership.
 4. Contract test: component CSS does not redefine section/rail `margin-inline` after migration.
 5. Responsive test: mobile rail changes in one global rule, not per component.
 6. Existing full suite remains green.
