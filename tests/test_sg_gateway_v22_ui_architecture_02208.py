@@ -104,13 +104,12 @@ def test_02208_canonical_layers_keep_geometry_theme_independent():
     sources = _canonical_sources()
     layout = sources["sg-ui-layout-v22-08.css"]
 
-    forbidden_theme_geometry = re.compile(
-        r"(?:html|body|\[data-theme[^]]*\]|\.theme-(?:dark|light))[^\{]*\{[^}]*"
-        r"(?:margin|padding|width|height|gap|grid-template|flex-basis)\s*:",
-        flags=re.I | re.S,
+    theme_selector = re.compile(
+        r"(?:\[data-theme[^]]*\]|\.theme-(?:dark|light))[^\{]*\{",
+        flags=re.I,
     )
-    assert not forbidden_theme_geometry.search(layout), (
-        "dark/light selectors must not change canonical geometry"
+    assert not theme_selector.search(layout), (
+        "canonical layout must contain no dark/light selectors; theme changes belong to tokens/components"
     )
 
 

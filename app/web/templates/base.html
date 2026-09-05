@@ -56,6 +56,9 @@
   {% if active_page|default('') == 'system' %}<link rel="stylesheet" href="{{ url_for('static', filename='sg-system-simple-dials-v1.css') }}?v={{ app_version }}">{% endif %}
   <link rel="stylesheet" href="{{ url_for('static', filename='sg-mobile-sidebar-v1.css') }}?v={{ app_version }}-mobile-v1">
   <link rel="stylesheet" href="{{ url_for('static', filename='sg-low-resolution-v1.css') }}?v={{ app_version }}-low-resolution-v1">
+  <link rel="stylesheet" href="{{ static_asset('sg-ui-foundation-v22-08.css') }}">
+  <link rel="stylesheet" href="{{ static_asset('sg-ui-layout-v22-08.css') }}">
+  <link rel="stylesheet" href="{{ static_asset('sg-ui-components-v22-08.css') }}">
   {% if active_page|default('') == 'clients' %}
   <!-- SG_DEVICE_COLLAPSE_V4_LAST_CSS -->
   <link rel="stylesheet" href="{{ url_for('static', filename='sg-device-collapse-v4.css') }}?v={{ app_version }}-devices-collapse-v4">

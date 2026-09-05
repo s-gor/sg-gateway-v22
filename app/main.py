@@ -54,6 +54,7 @@ from app.connections.awg_dns import (
     set_shared_awg_dns,
 )
 from app.db import init_db
+from app.web.assets import static_asset
 from app.help.content import get_topic, list_topics
 from app.maintenance.backups import (
     backup_cleanup_preview,
@@ -641,6 +642,7 @@ def create_app() -> Flask:
             panel_health = "warning"
         return {
             "app_version": get_version(),
+            "static_asset": static_asset,
             "is_authenticated": is_authenticated(),
             "country_options": COUNTRY_OPTIONS,
             "country_name": country_name,
