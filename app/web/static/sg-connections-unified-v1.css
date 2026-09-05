@@ -158,14 +158,16 @@ body.page-connections .cnv1-engine-xray .xps2-actions {
 
 body.page-connections #xray-xmux.xmux1-wrap {
   margin-top: 0;
-  margin-inline: calc(var(--sgui-card-padding) * 2);
-  padding: 0;
-  border: 0;
+  margin-inline: 0;
+  padding: var(--sgui-card-padding) 0;
+  border: 1px solid var(--sg-line);
+  border-radius: var(--sgui-radius-card);
   background: var(--sg-panel);
-  box-shadow: none;
+  box-shadow: var(--sgui-card-shadow);
 }
 
 body.page-connections #xray-xmux .xmux1-card {
+  margin-inline: var(--sgui-card-padding);
   padding: 0;
 }
 
@@ -451,6 +453,10 @@ body.page-connections :is(
   body.page-connections #xray-xmux.xmux1-wrap {
     margin-inline: 0;
     padding: 0;
+  }
+
+  body.page-connections #xray-xmux .xmux1-card {
+    margin-inline: 0;
   }
 
   body.page-connections :is(
