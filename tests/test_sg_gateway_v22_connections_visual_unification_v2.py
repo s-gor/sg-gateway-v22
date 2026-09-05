@@ -2,7 +2,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-CSS = (ROOT / "app/web/static/sg-connections-unified-v1.css").read_text(encoding="utf-8")
+CSS = (ROOT / "app/web/static/sg-ui-connections-v22-08.css").read_text(encoding="utf-8")
 
 
 def block(selector: str) -> str:
@@ -12,59 +12,43 @@ def block(selector: str) -> str:
     return CSS[open_brace + 1 : close_brace]
 
 
-def test_xmux_is_nested_outer_surface_with_header_and_body_spacing():
-    wrapper = block("body.page-connections #xray-xmux.xmux1-wrap")
-    assert "padding: var(--sg-layout-card-inset) 0;" in wrapper
-    assert "border: 1px solid var(--sg-line);" in wrapper
-    assert "border-radius: var(--sgui-radius-card);" in wrapper
-    assert "background: var(--sg-panel);" in wrapper
-    assert "box-shadow: var(--sgui-card-shadow);" in wrapper
-
-    card = block("body.page-connections #xray-xmux .xmux1-card")
-    assert "margin-inline: var(--sg-layout-card-inset);" in card
-    assert "padding: 0;" in card
-
-    head = block("body.page-connections #xray-xmux .xmux1-head")
-    assert "padding: var(--sg-layout-card-inset);" in head
-    assert "margin: 0;" in head
-
-    form = block("body.page-connections #xray-xmux #xray-xmux-form")
-    assert "padding: 0 var(--sg-layout-card-inset) var(--sg-layout-card-inset);" in form
+def test_connection_families_share_canonical_card_and_nested_radii():
+    assert ".cnv1-engine-xray" in CSS
+    assert ".awgd-shell" in CSS
+    assert ".mhv2-panel" in CSS
+    assert "#xray-xmux .xmux1-card" in CSS
+    assert ".xps2-naiveproxy-card" in CSS
+    assert "border-radius: var(--sg-ui-card-radius, 14px);" in CSS
+    assert "border-radius: var(--sg-ui-nested-radius, 10px);" in CSS
 
 
-def test_mihomo_uses_same_header_body_footer_geometry_as_other_engines():
-    panel = block("body.page-connections .mhv2-panel")
-    assert "padding: 0;" in panel
+def test_xray_uses_semantic_section_and_one_inner_rail():
+    section = block("body.page-connections .cnv1-engine-xray.sg-ui-section")
+    assert "gap: 0;" in section
 
-    head = block("body.page-connections .mhv2-head")
-    assert "padding: var(--sg-layout-card-inset);" in head
-    assert "margin: 0;" in head
+    panel = block("body.page-connections .cnv1-engine-xray .xps2-panel.sg-ui-section")
+    assert "gap: var(--sg-ui-section-gap, 16px);" in panel
 
-    body = block("body.page-connections #mihomo :is(")
-    assert ".mhv2-compact-meta" in CSS[CSS.index("body.page-connections #mihomo :is(") : CSS.index("{", CSS.index("body.page-connections #mihomo :is("))]
-    assert ".mhv2-form" in CSS[CSS.index("body.page-connections #mihomo :is(") : CSS.index("{", CSS.index("body.page-connections #mihomo :is("))]
-    assert ".mhv2-runtime-note" in CSS[CSS.index("body.page-connections #mihomo :is(") : CSS.index("{", CSS.index("body.page-connections #mihomo :is("))]
-    assert "margin-inline: var(--sg-layout-card-inset);" in body
+    rail = block("body.page-connections .cnv1-engine-xray .sg-ui-rail")
+    assert "padding-inline: var(--sg-ui-rail-inset, 18px);" in rail
 
 
-def test_nested_surfaces_share_flat_visual_depth():
-    marker = "body.page-connections :is(\n  .xps2-selection,"
-    start = CSS.index(marker)
-    open_brace = CSS.index("{", start)
-    close_brace = CSS.index("}", open_brace)
-    shared = CSS[open_brace + 1 : close_brace]
-    assert "box-shadow: none;" in shared
-
-
-def test_xmux_and_mihomo_actions_follow_same_right_aligned_rhythm():
-    actions = block("body.page-connections :is(\n  #xray-xmux .xmux1-actions,\n  .mhv2-actions")
+def test_xmux_mihomo_and_form_actions_share_canonical_action_rhythm():
+    marker = "body.page-connections :is(\n  #xray-xmux .xmux1-actions,\n  .mhv2-actions,\n  .cnv1-form-actions"
+    actions = block(marker)
+    assert "align-items: center;" in actions
     assert "justify-content: flex-end;" in actions
-    assert "margin-top: var(--sgui-grid-gap);" in actions
+    assert "gap: var(--sg-ui-grid-gap, 12px);" in CSS
 
 
-def test_naiveproxy_wrapper_does_not_create_a_card_inside_a_card():
-    wrapper = block("body.page-connections #sg-naiveproxy-settings")
-    assert "padding: 0;" in wrapper
-    assert "border: 0;" in wrapper
-    assert "background: transparent;" in wrapper
-    assert "box-shadow: none;" in wrapper
+def test_controls_and_statuses_use_canonical_dimensions():
+    assert "border-radius: var(--sg-ui-control-radius, 9px);" in CSS
+    assert "min-height: var(--sg-ui-control-height, 42px);" in CSS
+    assert "min-height: var(--sg-ui-badge-height, 28px);" in CSS
+
+
+def test_visual_composition_has_no_legacy_offset_or_theme_fence():
+    assert "--sg-layout-" not in CSS
+    assert "--sgui-" not in CSS
+    assert "calc(" not in CSS
+    assert "!important" not in CSS
