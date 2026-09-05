@@ -19,6 +19,22 @@ def test_02208_connections_loads_one_page_css_via_shared_asset_helper():
     )
 
 
+def test_02208_connections_all_page_assets_use_late_shared_asset_slot():
+    template = TEMPLATE.read_text(encoding="utf-8")
+    assert "{% block head %}" not in template
+    page_styles = template.split("{% block page_styles %}", 1)[1].split("{% endblock %}", 1)[0]
+    for asset in (
+        "sg-connections-visual-v1.css",
+        "sg-xray-profiles-v2.css",
+        "sg-xmux-settings-v1.css",
+        "sg-awg-dual-v1.css",
+        "sg-ui-connections-v22-08.css",
+    ):
+        assert page_styles.count(asset) == 1
+        assert re.search(rf"static_asset\(['\"]{re.escape(asset)}['\"]\)", page_styles)
+    assert "?v={{ app_version }}" not in page_styles
+
+
 def test_02208_connections_outer_dom_uses_canonical_semantic_layout():
     template = TEMPLATE.read_text(encoding="utf-8")
 
