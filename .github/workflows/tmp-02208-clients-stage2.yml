@@ -1,4 +1,4 @@
-# run 7: migrate stale package ownership checks to 22.08 page assets
+# run 8: corrected package contract assertions
 name: TEMP 22.08 Clients stage 2
 
 on:
@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 7
+          fetch-depth: 8
       - name: Prepare clean base and runners
         run: |
           cp tools/tmp_02208_clients_stage2.py /tmp/stage2.py
