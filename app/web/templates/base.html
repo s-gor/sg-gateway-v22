@@ -59,6 +59,7 @@
   <link rel="stylesheet" href="{{ static_asset('sg-ui-foundation-v22-08.css') }}">
   <link rel="stylesheet" href="{{ static_asset('sg-ui-layout-v22-08.css') }}">
   <link rel="stylesheet" href="{{ static_asset('sg-ui-components-v22-08.css') }}">
+  {% block page_styles %}{% endblock %}
   {% if active_page|default('') == 'clients' %}
   <!-- SG_DEVICE_COLLAPSE_V4_LAST_CSS -->
   <link rel="stylesheet" href="{{ url_for('static', filename='sg-device-collapse-v4.css') }}?v={{ app_version }}-devices-collapse-v4">
