@@ -38,6 +38,7 @@ body.page-connections :is(
 }
 
 body.page-connections #xray-xmux .xmux1-card {
+  margin-inline: var(--sgui-card-padding);
   padding: 0;
 }
 
@@ -164,11 +165,6 @@ body.page-connections #xray-xmux.xmux1-wrap {
   border-radius: var(--sgui-radius-card);
   background: var(--sg-panel);
   box-shadow: var(--sgui-card-shadow);
-}
-
-body.page-connections #xray-xmux .xmux1-card {
-  margin-inline: var(--sgui-card-padding);
-  padding: 0;
 }
 
 body.page-connections #xray-xmux .xmux1-head {
