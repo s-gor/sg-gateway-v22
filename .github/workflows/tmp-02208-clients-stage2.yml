@@ -1,4 +1,4 @@
-# run 4: fetch exact clean base before Clients migration
+# run 5: robust :is() arm removal
 name: TEMP 22.08 Clients stage 2
 
 on:
