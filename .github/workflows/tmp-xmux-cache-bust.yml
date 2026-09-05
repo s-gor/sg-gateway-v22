@@ -89,7 +89,6 @@ jobs:
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add app/web/templates/base.html tests/test_sg_gateway_v22_static_asset_cache_bust.py SOURCE-SHA256SUMS
-          git add -u .github/workflows/tmp-xmux-cache-bust.yml
           git diff --cached --check
           git commit -m 'fix(ui): bust stale Connections stylesheet cache'
           git push origin HEAD:fix/02207-xmux-cache-bust
