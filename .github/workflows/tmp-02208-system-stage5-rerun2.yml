@@ -1,4 +1,4 @@
-name: TEMP 22.08 System stage 5 rerun2
+name: TEMP 22.08 System stage 5 final
 
 on:
   push:
@@ -20,6 +20,7 @@ jobs:
           cp tools/tmp_02208_system_stage5.py /tmp/stage5.py
           cp tools/tmp_02208_system_stage5_fix.py /tmp/stage5fix.py
           cp tools/tmp_02208_system_stage5_fix2.py /tmp/stage5fix2.py
+          cp tools/tmp_02208_system_stage5_fix3.py /tmp/stage5fix3.py
           git fetch --no-tags --depth=1 origin 51a6b8037351b8c9ef0fc9630cfb23fc1200287c
           git checkout --detach FETCH_HEAD
           test "$(git rev-parse HEAD)" = "51a6b8037351b8c9ef0fc9630cfb23fc1200287c"
@@ -37,6 +38,9 @@ jobs:
           spec=importlib.util.spec_from_file_location('stage5','/tmp/stage5.py')
           mod=importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
           mod.write_tests()
+          fixspec3=importlib.util.spec_from_file_location('stage5fix3','/tmp/stage5fix3.py')
+          fixmod3=importlib.util.module_from_spec(fixspec3); fixspec3.loader.exec_module(fixmod3)
+          fixmod3.rewrite_simple_dials_contract()
           PY
           if python -m pytest -q tests/test_sg_gateway_v22_system_contract_02208.py; then
             echo 'Expected System 22.08 structural contract to fail before migration' >&2
@@ -44,6 +48,10 @@ jobs:
           fi
           if python -m pytest -q tests/test_sg_gateway_v22_system_geometry_02208.py; then
             echo 'Expected System 22.08 geometry to fail before migration' >&2
+            exit 1
+          fi
+          if python -m pytest -q tests/test_system_simple_dials_v1.py; then
+            echo 'Expected page-owned System dial asset contract to fail before migration' >&2
             exit 1
           fi
       - name: Apply System 22.08 migration
@@ -66,6 +74,7 @@ jobs:
           python -m pytest -q \
             tests/test_sg_gateway_v22_system_contract_02208.py \
             tests/test_sg_gateway_v22_system_geometry_02208.py \
+            tests/test_system_simple_dials_v1.py \
             tests/test_sg_gateway_v22_ui_function_contract_02208.py \
             tests/test_sg_gateway_v22_ui_architecture_02208.py \
             tests/test_sg_gateway_v22_security_geometry_02208.py \
