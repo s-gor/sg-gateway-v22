@@ -1,6 +1,17 @@
 from pathlib import Path
+import re
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def _class_tag_index(template: str, tag: str, class_name: str, start: int = 0) -> int:
+    match = re.search(
+        rf'<{tag}\b[^>]*class="[^"]*\b{re.escape(class_name)}\b[^"]*"[^>]*>',
+        template[start:],
+    )
+    if match is None:
+        raise ValueError(f"{tag} with class token {class_name!r} not found")
+    return start + match.start()
 
 
 def test_decorative_map_is_removed():
@@ -14,7 +25,7 @@ def test_xray_is_full_width_before_equal_awg_mihomo_pair():
     template = (ROOT / "app/web/templates/connections.html").read_text(encoding="utf-8")
     xray = template.index('class="cnv1-engines cnv1-xray-row"')
     xray_card = template.index("cnv1-engine-xray", xray)
-    pair = template.index('class="cnv1-engine-pair"', xray_card)
+    pair = _class_tag_index(template, "section", "cnv1-engine-pair", xray_card)
     awg = template.index("cnv1-engine-awg", pair)
     mihomo = template.index('_mihomo_panel.html', awg)
     pair_end = template.index("</section>", mihomo)
@@ -85,4 +96,6 @@ def test_awg_and_mihomo_are_equal_height_on_desktop():
 
 def test_preview28_connections_order_is_xray_then_awg_mihomo():
     template = (ROOT / "app/web/templates/connections.html").read_text(encoding="utf-8")
-    assert template.index('class="cnv1-engines cnv1-xray-row"') < template.index('class="cnv1-engine-pair"')
+    assert template.index('class="cnv1-engines cnv1-xray-row"') < _class_tag_index(
+        template, "section", "cnv1-engine-pair"
+    )
