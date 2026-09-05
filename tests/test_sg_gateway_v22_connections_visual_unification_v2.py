@@ -16,7 +16,7 @@ def test_xmux_is_one_outer_surface_with_header_and_body_spacing():
     wrapper = block("body.page-connections #xray-xmux.xmux1-wrap")
     assert "padding: 0;" in wrapper
     assert "border: 0;" in wrapper
-    assert "background: transparent;" in wrapper
+    assert "background: var(--sg-panel);" in wrapper
     assert "box-shadow: none;" in wrapper
 
     card = block("body.page-connections #xray-xmux .xmux1-card")

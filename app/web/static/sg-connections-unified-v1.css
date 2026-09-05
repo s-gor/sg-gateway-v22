@@ -132,6 +132,7 @@ html[data-theme="light"] body.page-connections .sg-ljd-nested {
 body.page-connections .cnv1-engine-xray .xps2-panel {
   display: grid;
   gap: var(--sgui-section-gap);
+  margin-bottom: 0;
 }
 
 body.page-connections .cnv1-engine-xray .xps2-top-actions {
@@ -160,7 +161,7 @@ body.page-connections #xray-xmux.xmux1-wrap {
   margin-inline: calc(var(--sgui-card-padding) * 2);
   padding: 0;
   border: 0;
-  background: transparent;
+  background: var(--sg-panel);
   box-shadow: none;
 }
 
