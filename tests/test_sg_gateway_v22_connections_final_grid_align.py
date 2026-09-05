@@ -14,7 +14,10 @@ def block(selector: str) -> str:
 
 def test_xmux_visible_card_uses_xray_inner_working_width():
     wrapper = block("body.page-connections #xray-xmux.xmux1-wrap")
-    assert "margin-inline: calc(var(--sgui-card-padding) * 2);" in wrapper
+    assert "margin-inline: 0;" in wrapper
+
+    card = block("body.page-connections #xray-xmux .xmux1-card")
+    assert "margin-inline: var(--sgui-card-padding);" in card
 
 
 def test_mihomo_https_warning_matches_listener_row_width():
@@ -39,4 +42,5 @@ def test_naiveproxy_card_has_standard_header_height_and_vertical_rhythm():
 def test_mobile_final_grid_does_not_keep_desktop_double_inset():
     mobile = CSS[CSS.index("@media (max-width: 650px)") :]
     assert "body.page-connections #xray-xmux.xmux1-wrap {\n    margin-inline: 0;" in mobile
+    assert "body.page-connections #xray-xmux .xmux1-card {\n    margin-inline: 0;" in mobile
     assert "body.page-connections #mihomo .mhv2-compact-meta {\n    margin-inline: var(--sgui-nested-padding);" in mobile
