@@ -84,3 +84,9 @@ def test_02208_connections_preserves_partial_boundaries_and_functional_ids():
         'id="mihomo"',
     ):
         assert required in template or required in partials
+
+
+def test_02208_connections_is_detached_from_legacy_routing_page_frame():
+    legacy = (STATIC / "sg-page-frame-routing-v1.css").read_text(encoding="utf-8")
+    assert ".cnv1-page" not in legacy
+    assert ".cnv1-heading" not in legacy
