@@ -21,7 +21,7 @@ def test_xmux_is_nested_outer_surface_with_header_and_body_spacing():
     assert "box-shadow: var(--sgui-card-shadow);" in wrapper
 
     card = block("body.page-connections #xray-xmux .xmux1-card")
-    assert "margin-inline: var(--sg-layout-card-inset);" in card
+    assert "margin-inline: var(--sg-layout-deep-inset);" in card
     assert "padding: 0;" in card
 
     head = block("body.page-connections #xray-xmux .xmux1-head")
