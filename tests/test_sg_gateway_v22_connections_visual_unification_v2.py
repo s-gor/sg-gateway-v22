@@ -14,22 +14,22 @@ def block(selector: str) -> str:
 
 def test_xmux_is_nested_outer_surface_with_header_and_body_spacing():
     wrapper = block("body.page-connections #xray-xmux.xmux1-wrap")
-    assert "padding: var(--sgui-card-padding) 0;" in wrapper
+    assert "padding: var(--sg-layout-card-inset) 0;" in wrapper
     assert "border: 1px solid var(--sg-line);" in wrapper
     assert "border-radius: var(--sgui-radius-card);" in wrapper
     assert "background: var(--sg-panel);" in wrapper
     assert "box-shadow: var(--sgui-card-shadow);" in wrapper
 
     card = block("body.page-connections #xray-xmux .xmux1-card")
-    assert "margin-inline: var(--sgui-card-padding);" in card
+    assert "margin-inline: var(--sg-layout-card-inset);" in card
     assert "padding: 0;" in card
 
     head = block("body.page-connections #xray-xmux .xmux1-head")
-    assert "padding: var(--sgui-card-padding);" in head
+    assert "padding: var(--sg-layout-card-inset);" in head
     assert "margin: 0;" in head
 
     form = block("body.page-connections #xray-xmux #xray-xmux-form")
-    assert "padding: 0 var(--sgui-card-padding) var(--sgui-card-padding);" in form
+    assert "padding: 0 var(--sg-layout-card-inset) var(--sg-layout-card-inset);" in form
 
 
 def test_mihomo_uses_same_header_body_footer_geometry_as_other_engines():
@@ -37,14 +37,14 @@ def test_mihomo_uses_same_header_body_footer_geometry_as_other_engines():
     assert "padding: 0;" in panel
 
     head = block("body.page-connections .mhv2-head")
-    assert "padding: var(--sgui-card-padding);" in head
+    assert "padding: var(--sg-layout-card-inset);" in head
     assert "margin: 0;" in head
 
     body = block("body.page-connections #mihomo :is(")
     assert ".mhv2-compact-meta" in CSS[CSS.index("body.page-connections #mihomo :is(") : CSS.index("{", CSS.index("body.page-connections #mihomo :is("))]
     assert ".mhv2-form" in CSS[CSS.index("body.page-connections #mihomo :is(") : CSS.index("{", CSS.index("body.page-connections #mihomo :is("))]
     assert ".mhv2-runtime-note" in CSS[CSS.index("body.page-connections #mihomo :is(") : CSS.index("{", CSS.index("body.page-connections #mihomo :is("))]
-    assert "margin-inline: var(--sgui-card-padding);" in body
+    assert "margin-inline: var(--sg-layout-card-inset);" in body
 
 
 def test_nested_surfaces_share_flat_visual_depth():
