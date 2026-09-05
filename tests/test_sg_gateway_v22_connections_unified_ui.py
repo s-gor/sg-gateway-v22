@@ -2,80 +2,69 @@ from pathlib import Path
 import re
 
 ROOT = Path(__file__).resolve().parents[1]
-UNIFIED = ROOT / "app/web/static/sg-connections-unified-v1.css"
-LAYOUT = ROOT / "app/web/static/sg-layout-contract-v1.css"
+PAGE_CSS = ROOT / "app/web/static/sg-ui-connections-v22-08.css"
+LEGACY_CSS = ROOT / "app/web/static/sg-connections-unified-v1.css"
 
 
-def _unified_css() -> str:
-    assert UNIFIED.is_file(), "Connections canonical geometry stylesheet is missing"
-    return UNIFIED.read_text(encoding="utf-8")
+def _page_css() -> str:
+    assert PAGE_CSS.is_file(), "22.08 Connections stylesheet is missing"
+    return PAGE_CSS.read_text(encoding="utf-8")
 
 
-def test_connections_unified_stylesheet_exists():
-    assert UNIFIED.is_file()
-
-
-def test_connections_unified_stylesheet_is_loaded_once_between_controls_and_dark_theme():
+def test_connections_uses_22_08_page_stylesheet_and_not_legacy_unified_asset():
     base = (ROOT / "app/web/templates/base.html").read_text(encoding="utf-8")
-    marker = "sg-connections-unified-v1.css"
-    assert base.count(marker) == 1
-    assert "active_page|default('') == 'connections'" in base
-    assert base.index("sg-controls-final-v1.css") < base.index(marker)
-    assert base.index(marker) < base.index("sg-connections-dark-classic-v1.css")
+    template = (ROOT / "app/web/templates/connections.html").read_text(encoding="utf-8")
+
+    assert "sg-connections-unified-v1.css" not in base
+    assert template.count("sg-ui-connections-v22-08.css") == 1
+    assert re.search(
+        r"static_asset\(['\"]sg-ui-connections-v22-08\.css['\"]\)",
+        template,
+    )
 
 
-def test_connections_unified_css_uses_global_and_shared_layout_geometry_tokens():
-    css = _unified_css()
+def test_connections_22_08_css_uses_only_canonical_geometry_tokens():
+    css = _page_css()
     for token in (
-        "--sgui-page-gap",
-        "--sgui-section-gap",
-        "--sgui-grid-gap",
-        "--sgui-radius-card",
-        "--sgui-radius-nested",
-        "--sgui-radius-control",
-        "--sgui-radius-badge",
-        "--sgui-nested-padding",
-        "--sgui-button-height",
-        "--sgui-button-height-small",
-        "--sgui-badge-height",
-        "--sgui-card-shadow",
-        "--sg-layout-card-inset",
+        "--sg-ui-page-gap",
+        "--sg-ui-section-gap",
+        "--sg-ui-grid-gap",
+        "--sg-ui-card-radius",
+        "--sg-ui-nested-radius",
+        "--sg-ui-control-radius",
+        "--sg-ui-control-height",
+        "--sg-ui-badge-height",
+        "--sg-ui-rail-inset",
     ):
-        assert f"var({token})" in css
+        assert f"var({token}" in css
 
-    layout = LAYOUT.read_text(encoding="utf-8")
-    assert "--sg-layout-card-inset: var(--sgui-card-padding);" in layout
+    assert "--sg-layout-" not in css
+    assert "--sgui-" not in css
+    assert "calc(" not in css
 
 
-def test_connections_unified_css_has_no_theme_palette_and_only_one_legacy_specificity_fence():
-    css = _unified_css()
+def test_connections_22_08_css_does_not_own_global_shell_or_outer_page_rail():
+    css = _page_css()
+    assert ".sg-content" not in css
+    assert ".sg-shell" not in css
+    assert not re.search(
+        r"\.cnv1-page\.sg-ui-page\s*\{[^}]*(?:padding-inline|margin-inline|border)\s*:",
+        css,
+        flags=re.S,
+    )
+
+
+def test_connections_22_08_css_has_no_theme_palette_or_important_fence():
+    css = _page_css()
     assert re.search(r"#[0-9a-fA-F]{3,8}\b", css) is None
     assert "rgb(" not in css.lower()
     assert "rgba(" not in css.lower()
-
-    important_lines = [line.strip() for line in css.splitlines() if "!important" in line]
-    assert important_lines == [
-        "border-color: var(--sg-line-soft) !important;",
-        "border-radius: var(--sgui-radius-nested) !important;",
-        "background: var(--sg-panel-soft) !important;",
-    ]
-    assert 'html[data-theme="light"] body.page-connections .sg-ljd-nested' in css
-    assert "legacy light material class" in css.lower()
+    assert "!important" not in css
+    assert "html[data-theme=" not in css
 
 
-def test_light_connections_fence_covers_all_legacy_nested_surfaces_on_the_page():
-    css = _unified_css()
-    connections = (ROOT / "app/web/templates/connections.html").read_text(encoding="utf-8")
-    awg31 = (ROOT / "app/web/templates/_awg31_panel.html").read_text(encoding="utf-8")
-    mihomo = (ROOT / "app/web/templates/_mihomo_panel.html").read_text(encoding="utf-8")
-    assert "sg-ljd-nested" in connections
-    assert "sg-ljd-nested" in awg31
-    assert "sg-ljd-nested" in mihomo
-    assert 'html[data-theme="light"] body.page-connections .sg-ljd-nested {' in css
-
-
-def test_connections_unified_css_covers_all_connection_families():
-    css = _unified_css()
+def test_connections_22_08_css_covers_all_connection_families():
+    css = _page_css()
     for selector in (
         ".cnv1-engine-xray",
         "#xray-xmux .xmux1-card",
@@ -83,36 +72,22 @@ def test_connections_unified_css_covers_all_connection_families():
         ".awgd-card",
         ".mhv2-panel",
         ".mhv2-listener",
-        "#sg-naiveproxy-settings",
         ".xps2-naiveproxy-card",
     ):
         assert selector in css
 
 
-def test_connections_unified_css_defines_shared_outer_nested_control_and_status_contracts():
-    css = _unified_css()
-    assert "background: var(--sg-panel);" in css
-    assert "background: var(--sg-panel-soft);" in css
-    assert "border-radius: var(--sgui-radius-card);" in css
-    assert "border-radius: var(--sgui-radius-nested);" in css
-    assert "border-radius: var(--sgui-radius-control);" in css
-    assert "border-radius: var(--sgui-radius-badge);" in css
-    assert "min-height: var(--sgui-button-height);" in css
-    assert "height: var(--sgui-button-height);" in css
-    assert "min-height: var(--sgui-badge-height);" in css
-
-
-def test_connections_unified_css_pins_real_controls_to_canonical_height():
-    css = _unified_css()
-    assert "body.page-connections .button {\n  height: var(--sgui-button-height);" in css
+def test_connections_22_08_css_pins_controls_badges_and_nested_surfaces_to_canonical_tokens():
+    css = _page_css()
+    assert "border-radius: var(--sg-ui-card-radius" in css
+    assert "border-radius: var(--sg-ui-nested-radius" in css
+    assert "border-radius: var(--sg-ui-control-radius" in css
+    assert "min-height: var(--sg-ui-control-height" in css
+    assert "min-height: var(--sg-ui-badge-height" in css
     assert '.xps2-parameter-row input:not([type="checkbox"]):not([type="radio"])' in css
     assert ".awgd-shared-dns-form input" in css
     assert ".mhv2-basic-fields select" in css
 
 
-def test_naiveproxy_late_stylesheet_uses_same_geometry_tokens():
-    css = (ROOT / "app/web/static/sg-compact-protocol-cards-v1.css").read_text(encoding="utf-8")
-    naive = css.split(".xps2-naiveproxy-card", 1)[1]
-    assert "var(--sgui-radius-card)" in naive
-    assert "var(--sgui-radius-nested)" in naive
-    assert "var(--sgui-button-height)" in naive
+def test_legacy_connections_unified_stylesheet_is_removed_after_migration():
+    assert not LEGACY_CSS.exists()
