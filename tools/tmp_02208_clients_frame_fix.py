@@ -42,27 +42,49 @@ def _split_top_level_selectors(text: str) -> list[str]:
     return out
 
 
-def _remove_cv2_page_arm(selector: str) -> str:
-    selector = re.sub(r",\s*\.cv2-page(?=\s*[,\)])", "", selector)
-    selector = re.sub(r"(?<=\()\s*\.cv2-page\s*,\s*", "", selector)
-    return selector
+def _remove_flat_is_arm(selector: str, arm: str) -> str:
+    pattern = re.compile(r":is\(([^()]*)\)")
+
+    def repl(match: re.Match[str]) -> str:
+        parts = [part.strip() for part in match.group(1).split(",")]
+        if arm not in parts:
+            return match.group(0)
+        parts = [part for part in parts if part != arm]
+        if not parts:
+            raise RuntimeError(f"cannot remove last :is() arm {arm!r} from {selector!r}")
+        return ":is(" + ", ".join(parts) + ")"
+
+    return pattern.sub(repl, selector)
 
 
-def _remove_exact_cv2_heading_arm(selector: str) -> str:
+def _is_exact_single_is_selector(selector: str) -> bool:
     stripped = selector.strip()
-    if stripped.count(":is(") != 1 or not stripped.endswith(")"):
-        return selector
-    selector = re.sub(
-        r",\s*\.cv2-heading\.cv15-heading(?=\s*[,\)])",
-        "",
-        selector,
-    )
-    selector = re.sub(
-        r"(?<=\()\s*\.cv2-heading\.cv15-heading\s*,\s*",
-        "",
-        selector,
-    )
-    return selector
+    if not stripped.startswith(":is(") or stripped.count(":is(") != 1:
+        return False
+    depth = 0
+    quote: str | None = None
+    escaped = False
+    close_index = None
+    for index, ch in enumerate(stripped):
+        if quote is not None:
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == quote:
+                quote = None
+            continue
+        if ch in {"'", '"'}:
+            quote = ch
+            continue
+        if ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+            if depth == 0:
+                close_index = index
+                break
+    return close_index == len(stripped) - 1
 
 
 def _filter_rule_prelude(prelude: str) -> str | None:
@@ -72,8 +94,15 @@ def _filter_rule_prelude(prelude: str) -> str | None:
         exact = selector.strip()
         if exact in {".dv16-page", ".dv16-heading", ".dv16-heading-actions", ".dv16-devices"}:
             continue
-        selector = _remove_cv2_page_arm(selector)
-        selector = _remove_exact_cv2_heading_arm(selector)
+
+        # cv2 page geometry must disappear from every legacy :is() ownership rule.
+        selector = _remove_flat_is_arm(selector, ".cv2-page")
+
+        # Remove the Clients heading only when the whole selector is the shared
+        # structural heading selector. Descendant component rules remain intact.
+        if _is_exact_single_is_selector(selector):
+            selector = _remove_flat_is_arm(selector, ".cv2-heading.cv15-heading")
+
         if ".cv2-page" in selector:
             raise RuntimeError(f"cv2 page ownership survived selector transform: {selector}")
         if selector.strip():
@@ -116,9 +145,24 @@ def _filter_rules(nodes):
     return result
 
 
+def _exact_heading_owner_present(css: str) -> bool:
+    rules = tinycss2.parse_stylesheet(css, skip_whitespace=True, skip_comments=True)
+    for node in rules:
+        if node.type == "qualified-rule":
+            prelude = tinycss2.serialize(node.prelude).strip()
+            for selector in _split_top_level_selectors(prelude):
+                if _is_exact_single_is_selector(selector) and ".cv2-heading.cv15-heading" in selector:
+                    return True
+        elif node.type == "at-rule" and node.content is not None and node.lower_at_keyword in {"media", "supports", "layer", "container"}:
+            rendered = tinycss2.serialize(node.content)
+            if _exact_heading_owner_present(rendered):
+                return True
+    return False
+
+
 def write_regression_test() -> None:
     TEST.write_text(
-        '''from pathlib import Path\nimport re\n\nROOT = Path(__file__).resolve().parents[1]\nFRAME = ROOT / "app/web/static/sg-page-frame-routing-v1.css"\n\ndef test_02208_clients_no_longer_belong_to_legacy_routing_page_frame():\n    css = FRAME.read_text(encoding="utf-8")\n    assert ".cv2-page" not in css\n    assert ".dv16-page" not in css\n    for selector in ("dv16-heading", "dv16-heading-actions", "dv16-devices"):\n        assert re.search(rf"(?m)^\\s*\\.{selector}\\s*\\{{", css) is None, selector\n    assert re.search(r"(?s):is\\([^{}]*\\.cv2-heading\\.cv15-heading[^{}]*\\)\\s*\\{", css) is None\n''',
+        '''from pathlib import Path\nimport re\n\nROOT = Path(__file__).resolve().parents[1]\nFRAME = ROOT / "app/web/static/sg-page-frame-routing-v1.css"\n\ndef test_02208_clients_no_longer_belong_to_legacy_routing_page_frame():\n    css = FRAME.read_text(encoding="utf-8")\n    assert ".cv2-page" not in css\n    assert ".dv16-page" not in css\n    for selector in ("dv16-heading", "dv16-heading-actions", "dv16-devices"):\n        assert re.search(rf"(?m)^\\s*\\.{selector}\\s*\\{{", css) is None, selector\n    for prelude in re.findall(r"([^{}]+)\\{", css):\n        candidate = prelude.strip()\n        if candidate.startswith(":is(") and candidate.count(":is(") == 1 and candidate.endswith(")"):\n            assert ".cv2-heading.cv15-heading" not in candidate, candidate\n''',
         encoding="utf-8",
     )
 
@@ -135,7 +179,7 @@ def migrate_legacy_frame() -> None:
     cleaned = tinycss2.serialize(_filter_rules(rules))
     if ".cv2-page" in cleaned or ".dv16-page" in cleaned:
         raise RuntimeError("legacy Clients page ownership remained after migration")
-    if re.search(r"(?s):is\([^{}]*\.cv2-heading\.cv15-heading[^{}]*\)\s*\{", cleaned):
+    if _exact_heading_owner_present(cleaned):
         raise RuntimeError("legacy Clients heading ownership remained after migration")
     FRAME.write_text(cleaned, encoding="utf-8")
 
