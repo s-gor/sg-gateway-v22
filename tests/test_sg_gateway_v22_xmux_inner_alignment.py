@@ -3,7 +3,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 UNIFIED_CSS = (ROOT / "app/web/static/sg-connections-unified-v1.css").read_text(encoding="utf-8")
-XRAY_CSS = (ROOT / "app/web/static/sg-xray-profiles-v2.css").read_text(encoding="utf-8")
+CONNECTIONS_VISUAL_CSS = (ROOT / "app/web/static/sg-connections-visual-v1.css").read_text(encoding="utf-8")
 LAYOUT_CSS = (ROOT / "app/web/static/sg-layout-contract-v1.css").read_text(encoding="utf-8")
 GLOBAL_CSS = (ROOT / "app/web/static/sg-global-ui-system-v1.css").read_text(encoding="utf-8")
 
@@ -22,27 +22,21 @@ def test_xmux_outer_section_keeps_full_major_card_width():
     assert "border-radius: var(--sgui-radius-card);" in wrapper
 
 
-def test_xray_action_rail_is_two_card_insets_from_the_major_card_edge():
+def test_upper_xray_inner_surface_uses_one_card_inset():
     global_root = block(GLOBAL_CSS, ":root")
     assert "--sgui-card-padding: 18px;" in global_root
 
-    xray_panel = block(XRAY_CSS, ".xps2-panel")
-    assert "margin: 18px;" in xray_panel
-
-    xray_children = block(
-        UNIFIED_CSS,
-        "body.page-connections .cnv1-engine-xray :is(\n  .xps2-selection,\n  .xps2-parameters,\n  .xps2-actions\n)",
-    )
-    assert "margin-inline: var(--sg-layout-card-inset);" in xray_children
+    endpoint = block(CONNECTIONS_VISUAL_CSS, ".cnv1-endpoint-card")
+    assert "margin: 0 18px;" in endpoint
 
     layout_root = block(LAYOUT_CSS, ":root")
     assert "--sg-layout-card-inset: var(--sgui-card-padding);" in layout_root
-    assert "--sg-layout-deep-inset: calc(var(--sg-layout-card-inset) * 2);" in layout_root
 
 
-def test_xmux_inner_card_uses_the_same_cumulative_rail_as_xray_actions():
+def test_xmux_inner_card_matches_the_upper_xray_inner_surface_width():
     card = block(UNIFIED_CSS, "body.page-connections #xray-xmux .xmux1-card")
-    assert "margin-inline: var(--sg-layout-deep-inset);" in card
+    assert "margin-inline: var(--sg-layout-card-inset);" in card
+    assert "var(--sg-layout-deep-inset)" not in card
 
 
 def test_mobile_xmux_removes_the_desktop_inner_rail():
