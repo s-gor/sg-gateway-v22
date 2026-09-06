@@ -377,6 +377,8 @@
     {% include "_mihomo_panel.html" %}
   </section>
 
+  {% include "_naiveproxy_panel.html" %}
+
   <section class="cnv1-note-panel sg-ljd-card sg-ui-card">
     <div class="cnv1-note-icon">
       <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -390,8 +392,6 @@
     </div>
     <a class="button" href="{{ url_for('clients') }}">Перейти к клиентам</a>
   </section>
-
-  {% include "_naiveproxy_panel.html" %}
 
 </section>
 {% endblock %}
