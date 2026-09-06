@@ -40,7 +40,7 @@ def test_reboot_required_stops_before_gateway_install_without_rebooting() -> Non
 def test_clean_install_bootstrap_uses_quiet_green_progress_contract() -> None:
     source = _installer_source()
 
-    assert 'BOOTSTRAP_LOG="/var/log/sg-gateway-bootstrap-02206.log"' in source
+    assert 'BOOTSTRAP_LOG="/var/log/sg-gateway-bootstrap-02208.log"' in source
     assert "run_quiet()" in source
     assert "local frames=('|' '/' '-' \"\\\\\")" in source
     assert "\\033[1;32m" in source

@@ -13,6 +13,12 @@
 - real-browser проверки Chromium на desktop, tablet и mobile widths в dark/light;
 - сохранены AWG 2.0, AWG 3.0, AWG 3.1, Xray, NaiveProxy, backup/restore, update rollback и clean-install/reinstall contracts.
 
+## Документация
+
+- [Полная справка SG-Gateway 022.06](docs/SG-GATEWAY-02206-GUIDE.md) — базовые эксплуатационные и runtime-контракты, унаследованные 22.08.
+- [Отличия 022.06 от 022.04](docs/CHANGES-02204-TO-02206.md) — история функциональной линии.
+- [Техническое устройство SG-Gateway](docs/TECHNICAL.md).
+
 ## Проверка выпуска
 
 Перед публикацией обязательны source integrity, полный pytest с browser geometry, сборка и `--verify-only` FULL-пакета, Clean Install и Full Uninstall → Reinstall на Ubuntu 24.04.
