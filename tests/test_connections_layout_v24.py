@@ -40,6 +40,18 @@ def test_connections_has_native_naiveproxy_panel_without_html_injection():
     assert 'request.endpoint == "connections"' not in http
 
 
+def test_naiveproxy_runtime_meta_row_is_not_rendered():
+    panel = (ROOT / "app/web/templates/_naiveproxy_panel.html").read_text(encoding="utf-8")
+    assert "xps2-naiveproxy-meta" not in panel
+    assert "Состояние runtime" not in panel
+    assert "data-naive-runtime" not in panel
+
+
+def test_awg_header_has_no_visual_divider():
+    css = (ROOT / "app/web/static/sg-awg-dual-v1.css").read_text(encoding="utf-8")
+    assert ".awgd-shell > .cnv1-engine-head { border-bottom:" not in css
+
+
 def test_awg_is_compact_but_keeps_required_post_fields():
     template = (ROOT / "app/web/templates/connections.html").read_text(encoding="utf-8")
     awg_start = template.index("cnv1-engine-awg")
