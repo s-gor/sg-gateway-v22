@@ -4,17 +4,13 @@ from pathlib import Path
 ROOT = Path(__file__).parents[1]
 
 
-def test_clean_and_update_wrappers_pass_dev_channel_into_transaction():
-    clean = (ROOT / "deploy/install-from-github-02207.sh").read_text()
-    update = (ROOT / "deploy/update-from-github-02207.sh").read_text()
-    assert 'SG_GATEWAY_UPDATE_BRANCH="$BRANCH"' in clean
-    assert 'SG_GATEWAY_UPDATE_BRANCH="$BRANCH"' in update
-    assert clean.index('SG_GATEWAY_UPDATE_BRANCH="$BRANCH"') < clean.index(
-        'bash "$patched_installer"'
-    )
-    assert update.index('SG_GATEWAY_UPDATE_BRANCH="$BRANCH"') < update.index(
-        'bash "$PREFIX/deploy/install-naiveproxy.sh"'
-    )
+def test_runtime_installer_accepts_current_02208_release_channels():
+    source = (ROOT / "deploy/install-naiveproxy.sh").read_text()
+    assert 'stable-02208' in source
+    assert 'release/02208-*' in source
+    assert 'feature/02208-*' in source
+    assert 'Refusing invalid 22.08 update channel' in source
+    assert 'Refusing invalid 22.07 update channel' not in source
 
 
 def test_runtime_installer_persists_channel_as_data_and_restarts_panel():
