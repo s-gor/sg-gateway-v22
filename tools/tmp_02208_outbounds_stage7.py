@@ -50,7 +50,9 @@ def _close(a: float, b: float, tolerance: float = 1.0) -> None:
 
 
 def test_02208_outbounds_outer_rail_is_single_and_theme_invariant() -> None:
+    foundation = (ROOT / "app/web/static/sg-ui-foundation-v22-08.css").read_text(encoding="utf-8")
     layout = (ROOT / "app/web/static/sg-ui-layout-v22-08.css").read_text(encoding="utf-8")
+    components = (ROOT / "app/web/static/sg-ui-components-v22-08.css").read_text(encoding="utf-8")
     page_css = (ROOT / "app/web/static/sg-ui-outbounds-v22-08.css").read_text(encoding="utf-8")
     html = """<!doctype html><html><body style='margin:0'><main class='sg-content'>
       <section class='ob49-page sg-ui-page sg-ui-outbounds' data-sg-ui-page='outbounds'>
@@ -68,7 +70,9 @@ def test_02208_outbounds_outer_rail_is_single_and_theme_invariant() -> None:
                 for theme in ("dark", "light"):
                     page = browser.new_page(viewport=viewport)
                     page.set_content(html)
+                    page.add_style_tag(content=foundation)
                     page.add_style_tag(content=layout)
+                    page.add_style_tag(content=components)
                     page.add_style_tag(content=page_css)
                     page.evaluate("theme => document.documentElement.dataset.theme = theme", theme)
                     assert page.evaluate("document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1")
