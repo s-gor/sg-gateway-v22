@@ -5,9 +5,9 @@
     {% set profile = matches[0] %}
     {% set token = 'xray_' ~ profile.id %}
     {% set selected = token in selected_tokens %}
-    <label class="dv16-protocol {{ 'is-locked' if not profile.ready and not selected else '' }}">
-      <input type="checkbox" name="protocols" value="{{ token }}" {% if selected %}checked{% endif %} {% if not profile.ready and not selected %}disabled{% endif %}>
-      <span><strong>{{ profile.title }}</strong><small>{% if selected %}Подключён — реквизиты сохранятся{% elif profile.ready %}Доступен для добавления{% elif profile.tls_required %}Нужен HTTPS{% else %}{{ unavailable_note }}{% endif %}</small></span>
+    <label class="dv16-protocol {{ 'is-locked' if not profile.ready else '' }}">
+      <input type="checkbox" name="protocols" value="{{ token }}" {% if selected and profile.ready %}checked{% endif %} {% if not profile.ready %}disabled{% endif %}>
+      <span><strong>{{ profile.title }}</strong><small>{% if selected and not profile.ready %}Выключен на сервере — при сохранении будет удалён{% elif selected %}Подключён — реквизиты сохранятся{% elif profile.ready %}Доступен для добавления{% elif profile.tls_required %}Нужен HTTPS{% else %}{{ unavailable_note }}{% endif %}</small></span>
     </label>
   {% endif %}
 {%- endmacro %}
