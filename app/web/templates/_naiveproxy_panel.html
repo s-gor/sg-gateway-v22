@@ -1,0 +1,123 @@
+<article id="sg-naiveproxy-settings"
+         class="cnv1-engine-card cnv1-engine-naiveproxy sg-ljd-card sg-ui-card xps2-naiveproxy-card"
+         data-naiveproxy-panel>
+  <header class="cnv1-engine-head">
+    <div class="cnv1-engine-title">
+      <div class="cnv1-engine-logo naiveproxy" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      </div>
+      <div>
+        <div class="cnv1-card-kicker">HTTPS FORWARD PROXY · TLS</div>
+        <h2>NaiveProxy</h2>
+        <p>Отдельный HTTPS listener и отдельная ссылка клиента.</p>
+      </div>
+    </div>
+    <span class="cnv1-engine-status warning" data-naive-state><span></span><b>Проверка…</b></span>
+  </header>
+
+  <section class="cnv1-endpoint-card sg-ljd-nested sg-ui-nested">
+    <div class="cnv1-endpoint-main">
+      <div>
+        <span>HTTPS-ДОМЕН</span>
+        <strong data-naive-host>—</strong>
+        <small data-naive-endpoint>Порт 8447 · требуется HTTPS в Security</small>
+      </div>
+    </div>
+    <span class="cnv1-port-chip" data-naive-port>8447/TCP</span>
+  </section>
+
+  <div class="cnv1-engine-form cnv1-engine-form-compact xps2-naiveproxy-body">
+    <div class="xps2-naiveproxy-meta sg-ljd-nested sg-ui-nested">
+      <span>Состояние runtime</span>
+      <strong data-naive-runtime>Проверяется</strong>
+      <small>Настройка использует действующий TLS-домен SG-Gateway. Клиентские credentials создаются отдельно для каждого устройства.</small>
+    </div>
+
+    <footer class="cnv1-form-actions">
+      <span class="xps2-naiveproxy-message" data-naive-message aria-live="polite"></span>
+      <button class="button primary" type="button" data-naive-submit>Проверить и применить</button>
+    </footer>
+  </div>
+</article>
+
+<script>
+(() => {
+  const root = document.querySelector('[data-naiveproxy-panel]');
+  if (!root) return;
+
+  const host = root.querySelector('[data-naive-host]');
+  const endpoint = root.querySelector('[data-naive-endpoint]');
+  const portChip = root.querySelector('[data-naive-port]');
+  const runtimeState = root.querySelector('[data-naive-runtime]');
+  const state = root.querySelector('[data-naive-state]');
+  const stateText = state?.querySelector('b');
+  const message = root.querySelector('[data-naive-message]');
+  const submit = root.querySelector('[data-naive-submit]');
+  let activePort = 8447;
+
+  const setMessage = (text, error = false) => {
+    if (!message) return;
+    message.textContent = text || '';
+    message.dataset.tone = error ? 'error' : 'ok';
+  };
+
+  const paintState = (healthy, label) => {
+    if (!state) return;
+    state.classList.toggle('success', healthy);
+    state.classList.toggle('warning', !healthy);
+    if (stateText) stateText.textContent = label;
+  };
+
+  const load = async () => {
+    const response = await fetch('/api/naiveproxy/status', {
+      credentials: 'same-origin',
+      headers: {'X-Requested-With': 'XMLHttpRequest'}
+    });
+    const payload = await response.json();
+    const runtime = payload.runtime || {};
+    activePort = Number(payload.port || payload.default_port || 8447);
+    const domain = payload.host || '';
+    if (host) host.textContent = domain || 'HTTPS не настроен';
+    if (endpoint) endpoint.textContent = domain
+      ? `${domain}:${activePort}`
+      : `Порт ${activePort} · требуется HTTPS в Security`;
+    if (portChip) portChip.textContent = `${activePort}/TCP`;
+    const healthy = response.ok && payload.status === 'ok' && runtime.ok === true;
+    if (runtimeState) runtimeState.textContent = healthy ? 'Работает' : (payload.message || 'Не настроен');
+    paintState(healthy, healthy ? 'Работает' : 'Не настроен');
+    return payload;
+  };
+
+  submit?.addEventListener('click', async () => {
+    submit.disabled = true;
+    setMessage('Проверка и применение…');
+    try {
+      const response = await fetch('/api/naiveproxy/settings', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({port: Number(activePort)})
+      });
+      const payload = await response.json();
+      if (!response.ok || payload.ok !== true) {
+        throw new Error(payload.message || 'Настройки не применены');
+      }
+      setMessage(payload.message || 'NaiveProxy применён.');
+      await load();
+    } catch (error) {
+      setMessage(error.message || 'Настройки не применены', true);
+    } finally {
+      submit.disabled = false;
+    }
+  });
+
+  load().catch(error => {
+    paintState(false, 'Недоступен');
+    if (runtimeState) runtimeState.textContent = 'Статус недоступен';
+    setMessage(error.message || 'Статус недоступен', true);
+  });
+})();
+</script>
