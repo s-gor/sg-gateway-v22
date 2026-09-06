@@ -1,0 +1,75 @@
+/* NaiveProxy is appended after the restored 22.08 Connections page.
+   Every selector is scoped to this bottom block so the legacy layout stays untouched. */
+
+body.page-connections .sg-naiveproxy-bottom {
+  width: 100%;
+  min-width: 0;
+  margin-top: var(--sg-ui-page-gap, 18px);
+}
+
+body.page-connections .sg-naiveproxy-bottom > .xps2-naiveproxy-card {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--sg-ui-card-radius, 14px);
+}
+
+body.page-connections .sg-naiveproxy-bottom .cnv1-engine-logo.naiveproxy {
+  border: 1px solid color-mix(in srgb, var(--sg-blue) 30%, var(--sg-line));
+  background: color-mix(in srgb, var(--sg-blue) 11%, var(--sg-panel-soft));
+  color: var(--sg-blue);
+}
+
+body.page-connections .sg-naiveproxy-bottom .cnv1-engine-logo.naiveproxy svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+body.page-connections .sg-naiveproxy-bottom .xps2-naiveproxy-body {
+  flex: 1 1 auto;
+}
+
+body.page-connections .sg-naiveproxy-bottom .xps2-naiveproxy-meta {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+  padding: 13px;
+  border: 1px solid var(--sg-line-soft);
+  border-radius: var(--sg-ui-nested-radius, 10px);
+  background: var(--sg-panel-deep);
+}
+
+body.page-connections .sg-naiveproxy-bottom .xps2-naiveproxy-meta > span,
+body.page-connections .sg-naiveproxy-bottom .xps2-naiveproxy-meta > small {
+  color: var(--sg-muted);
+}
+
+body.page-connections .sg-naiveproxy-bottom .xps2-naiveproxy-meta > span {
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+body.page-connections .sg-naiveproxy-bottom .xps2-naiveproxy-meta > strong {
+  font-size: 13px;
+}
+
+body.page-connections .sg-naiveproxy-bottom .xps2-naiveproxy-meta > small,
+body.page-connections .sg-naiveproxy-bottom .xps2-naiveproxy-message {
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+body.page-connections .sg-naiveproxy-bottom .xps2-naiveproxy-message[data-tone="error"] {
+  color: var(--sg-red, #d75b5b);
+}
+
+body.page-connections .sg-naiveproxy-bottom .xps2-naiveproxy-message[data-tone="ok"] {
+  color: var(--sg-green);
+}

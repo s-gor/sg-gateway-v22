@@ -14,31 +14,6 @@ body.page-connections .cnv1-heading-actions.sg-ui-actions {
   gap: var(--sg-ui-grid-gap, 12px);
 }
 
-/* One canonical grid owns the complete Connections engine layout. */
-body.page-connections .cnv1-engine-grid.sg-ui-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  align-items: stretch;
-  gap: var(--sg-ui-grid-gap, 12px);
-}
-
-body.page-connections .cnv1-grid-cell,
-body.page-connections .cnv1-grid-span-2 {
-  min-width: 0;
-  align-self: stretch;
-}
-
-body.page-connections .cnv1-grid-span-2 {
-  grid-column: 1 / -1;
-}
-
-body.page-connections .cnv1-grid-cell > :first-child,
-body.page-connections .cnv1-grid-span-2 > :first-child {
-  width: 100%;
-  height: 100%;
-  margin: 0;
-}
-
 body.page-connections :is(
   .cnv1-engine-xray,
   .awgd-shell,
@@ -87,6 +62,15 @@ body.page-connections .cnv1-engine-xray .xps2-panel.sg-ui-section {
 
 body.page-connections .cnv1-engine-xray .sg-ui-rail {
   padding-inline: var(--sg-ui-rail-inset, 18px);
+}
+
+body.page-connections .cnv1-engine-pair.sg-ui-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sg-ui-grid-gap, 12px);
+}
+
+body.page-connections .cnv1-engine-pair.sg-ui-grid > * {
+  min-width: 0;
 }
 
 body.page-connections :is(
@@ -156,82 +140,13 @@ body.page-connections :is(
   border-radius: 999px;
 }
 
-body.page-connections .cnv1-engine-logo.naiveproxy {
-  border: 1px solid color-mix(in srgb, var(--sg-blue) 30%, var(--sg-line));
-  background: color-mix(in srgb, var(--sg-blue) 11%, var(--sg-panel-soft));
-  color: var(--sg-blue);
-}
-
-body.page-connections .cnv1-engine-logo.naiveproxy svg {
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.8;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-body.page-connections .xps2-naiveproxy-card,
-body.page-connections #xray-xmux .xmux1-card,
-body.page-connections .awgd-shell,
-body.page-connections .mhv2-panel {
-  display: flex;
-  min-height: 100%;
-  flex-direction: column;
-}
-
-body.page-connections .xps2-naiveproxy-body {
-  flex: 1 1 auto;
-}
-
-body.page-connections .xps2-naiveproxy-meta {
-  display: grid;
-  gap: 6px;
-  padding: 13px;
-  border: 1px solid var(--sg-line-soft);
-  background: var(--sg-panel-deep);
-}
-
-body.page-connections .xps2-naiveproxy-meta > span,
-body.page-connections .xps2-naiveproxy-meta > small {
-  color: var(--sg-muted);
-}
-
-body.page-connections .xps2-naiveproxy-meta > span {
-  font-size: 8px;
-  font-weight: 800;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-}
-
-body.page-connections .xps2-naiveproxy-meta > strong {
-  font-size: 13px;
-}
-
-body.page-connections .xps2-naiveproxy-meta > small,
-body.page-connections .xps2-naiveproxy-message {
-  font-size: 9px;
-  line-height: 1.45;
-}
-
-body.page-connections .xps2-naiveproxy-message[data-tone="error"] {
-  color: var(--sg-red, #d75b5b);
-}
-
-body.page-connections .xps2-naiveproxy-message[data-tone="ok"] {
-  color: var(--sg-green);
-}
-
 body.page-connections .cnv1-note-panel.sg-ui-card {
   padding: var(--sg-ui-card-pad, 18px);
 }
 
 @media (max-width: 900px) {
-  body.page-connections .cnv1-engine-grid.sg-ui-grid {
+  body.page-connections .cnv1-engine-pair.sg-ui-grid {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  body.page-connections .cnv1-grid-span-2 {
-    grid-column: auto;
   }
 }
 
