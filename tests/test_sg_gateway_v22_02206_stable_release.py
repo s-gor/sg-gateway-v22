@@ -1,22 +1,9 @@
-import json
 from pathlib import Path
-
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_02206_stable_identity_and_channel():
-    manifest = json.loads((ROOT / "release-manifest.json").read_text(encoding="utf-8"))
-    assert (ROOT / "VERSION").read_text(encoding="utf-8").strip() == "0.1.0-022.06"
-    assert (ROOT / "BUILD-ID").read_text(encoding="utf-8").strip() == "MAIN-02206-STABLE"
-    assert manifest["version"] == "0.1.0-022.06"
-    assert manifest["build"] == "MAIN-02206-STABLE"
-    assert manifest["status"] == "STABLE"
-    assert manifest["channel"] == "stable-02206"
-    assert manifest["maintenance_updates"]["panel"]["channel"] == "stable-02206"
-
-
-def test_02206_publication_and_release_workflow_are_complete():
+def test_02206_historical_release_artifacts_remain_intact():
     publication = (ROOT / "PUBLICATION-02206.md").read_text(encoding="utf-8")
     workflow = (ROOT / ".github" / "workflows" / "release-02206-stable.yml").read_text(encoding="utf-8")
     for marker in (
@@ -39,9 +26,6 @@ def test_02206_publication_and_release_workflow_are_complete():
     assert "--latest" in workflow
 
 
-def test_02206_readme_exposes_stable_commands():
+def test_02206_history_stays_linked_from_readme():
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
-    assert "0.1.0-022.06 STABLE" in readme
-    assert "stable-02206/deploy/install-from-github.sh" in readme
-    assert "stable-02206/deploy/update-from-github.sh" in readme
-    assert "stable-02206/deploy/uninstall-from-github.sh" in readme
+    assert "PUBLICATION-02206.md" in readme

@@ -1,6 +1,6 @@
 {
-  "build": "MAIN-02206-STABLE",
-  "channel": "stable-02206",
+  "build": "MAIN-02208-STABLE",
+  "channel": "stable-02208",
   "client_access_model": {
     "awg2_awg3_independent_selection": true,
     "hysteria_auth_per_device": true,
@@ -254,7 +254,7 @@
     "sg_admin_enter_defaults_to_yes": true,
     "stage9_exact_failure_logging": true,
     "template_endpoint_audit": true,
-    "version": "02206-stable",
+    "version": "02208-stable",
     "warp_panel_port_v017": true,
     "xhttp_reality_stream_one_migration": true
   },
@@ -283,7 +283,7 @@
     },
     "panel": {
       "automatic_rollback": true,
-      "channel": "stable-02206",
+      "channel": "stable-02208",
       "full_code_backup": true,
       "health_checks": [
         "sg-hostd",
@@ -297,7 +297,7 @@
         "cores"
       ],
       "requirements_change_blocks_panel_only_update": true,
-      "source": "github-stable-02206-exact-commit",
+      "source": "github-stable-02208-exact-commit",
       "staging": true
     }
   },
@@ -322,7 +322,7 @@
     "public_sni_router_port": 443,
     "reality_internal_listener": "127.0.0.1:7443"
   },
-  "next_development_line": "0.1.0-022.07",
+  "next_development_line": "0.1.0-022.09",
   "portable_full_backup": {
     "automatic_safety_backup_before_restore": true,
     "certificate_files_verified_before_success": true,
@@ -359,7 +359,7 @@
     "baseline": "0.1.0-021.12",
     "publication_requires_real_clean_install": true
   },
-  "rebuild_target": "0.1.0-022.06",
+  "rebuild_target": "0.1.0-022.08",
   "rollback": {
     "atomic_application": true,
     "requires_backup": true,
@@ -484,7 +484,7 @@
     ],
     "xray_status_cards_theme_fixed": true
   },
-  "version": "0.1.0-022.06",
+  "version": "0.1.0-022.08",
   "vless_sg_panel_port": {
     "client_contract": {
       "fingerprint_normalized": true,
