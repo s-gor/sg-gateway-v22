@@ -1,0 +1,82 @@
+name: Prepare 022.08 RC release identity
+
+on:
+  push:
+    branches:
+      - automation/02208-rc-release-identity
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: release/02208-rc
+          fetch-depth: 0
+
+      - name: Apply 022.08 release identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          def replace_exact(path, old, new):
+              p = Path(path)
+              text = p.read_text(encoding="utf-8")
+              count = text.count(old)
+              if count == 0:
+                  raise SystemExit(f"missing replacement anchor in {path}: {old!r}")
+              p.write_text(text.replace(old, new), encoding="utf-8")
+              print(f"{path}: replaced {count} occurrence(s)")
+
+          Path("VERSION").write_text("0.1.0-022.08\n", encoding="utf-8")
+          Path("BUILD-ID").write_text("MAIN-02208-STABLE\n", encoding="utf-8")
+          Path("DEVELOPMENT-VERSION").write_text("0.1.0-022.09-dev\n", encoding="utf-8")
+
+          manifest_path = Path("release-manifest.json")
+          manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+          manifest["version"] = "0.1.0-022.08"
+          manifest["build"] = "MAIN-02208-STABLE"
+          manifest["status"] = "STABLE"
+          manifest["channel"] = "stable-02208"
+          manifest["rebuild_target"] = "0.1.0-022.08"
+          manifest["next_development_line"] = "0.1.0-022.09"
+          manifest["maintenance_updates"]["panel"]["channel"] = "stable-02208"
+          manifest["maintenance_updates"]["panel"]["source"] = "github-stable-02208-exact-commit"
+          manifest["installer_update"]["version"] = "02208-stable"
+          manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+          ci = Path(".github/workflows/ci.yml")
+          ci_text = ci.read_text(encoding="utf-8")
+          old = "assert manifest['rebuild_target']=='0.1.0-022.06'; assert manifest['next_development_line']=='0.1.0-022.07'; assert manifest['channel']=='stable-02206'; assert manifest['build']=='MAIN-02206-STABLE'"
+          new = "assert manifest['rebuild_target']=='0.1.0-022.08'; assert manifest['next_development_line']=='0.1.0-022.09'; assert manifest['channel']=='stable-02208'; assert manifest['build']=='MAIN-02208-STABLE'"
+          if ci_text.count(old) != 1:
+              raise SystemExit("CI release-manifest anchor must occur exactly once")
+          ci.write_text(ci_text.replace(old, new), encoding="utf-8")
+
+          replace_exact("deploy/install-from-github.sh", "stable-02206", "stable-02208")
+          replace_exact("deploy/install-from-github.sh", "bootstrap-02206", "bootstrap-02208")
+          replace_exact("deploy/update-from-github.sh", "stable-02206", "stable-02208")
+          replace_exact("deploy/uninstall-from-github.sh", "stable-02206", "stable-02208")
+
+          Path("tests/test_sg_gateway_v22_02206_stable_release.py").write_text('''import json\nfrom pathlib import Path\n\nROOT = Path(__file__).resolve().parents[1]\n\n\ndef test_02206_historical_release_artifacts_remain_intact():\n    publication = (ROOT / "PUBLICATION-02206.md").read_text(encoding="utf-8")\n    workflow = (ROOT / ".github" / "workflows" / "release-02206-stable.yml").read_text(encoding="utf-8")\n    for marker in (\n        "AWG 2.0",\n        "AWG 3.0",\n        "AWG 3.1",\n        "Full Backup/Restore",\n        "Clean Install",\n        "Full Uninstall",\n        "stable-02206",\n        "v0.1.0-022.06-final",\n    ):\n        assert marker in publication\n    assert "TAG: v0.1.0-022.06-final" in workflow\n    assert "TITLE: SG-Gateway 0.1.0-022.06 Final" in workflow\n    assert "SG-Gateway-0.1.0-022.06-FULL.run" in workflow\n    assert "PUBLICATION-02206.md" in workflow\n    assert "python -m pytest tests" in workflow\n    assert "--verify-only" in workflow\n    assert "--latest" in workflow\n\n\ndef test_02206_history_stays_linked_from_readme():\n    readme = (ROOT / "README.md").read_text(encoding="utf-8")\n    assert "PUBLICATION-02206.md" in readme\n''', encoding="utf-8")
+
+          Path(".github/workflows/release-02208-stable.yml").write_text('''name: Release 0.1.0-022.08 Final\n\non:\n  push:\n    branches: [main]\n    paths:\n      - ".github/workflows/release-02208-stable.yml"\n  workflow_dispatch:\n\npermissions:\n  contents: write\n\nenv:\n  TAG: v0.1.0-022.08-final\n  TITLE: SG-Gateway 0.1.0-022.08 Final\n  RUN_NAME: SG-Gateway-0.1.0-022.08-FULL.run\n\njobs:\n  release:\n    runs-on: ubuntu-24.04\n    steps:\n      - uses: actions/checkout@v4\n        with:\n          fetch-depth: 0\n\n      - name: Verify release identity\n        shell: bash\n        run: |\n          set -euo pipefail\n          test "$(cat VERSION)" = "0.1.0-022.08"\n          test "$(cat BUILD-ID)" = "MAIN-02208-STABLE"\n          python3 - <<'PYID'\n          import json\n          from pathlib import Path\n          manifest=json.loads(Path("release-manifest.json").read_text(encoding="utf-8"))\n          assert manifest["version"] == "0.1.0-022.08"\n          assert manifest["build"] == "MAIN-02208-STABLE"\n          assert manifest["status"] == "STABLE"\n          assert manifest["channel"] == "stable-02208"\n          assert manifest["rebuild_target"] == "0.1.0-022.08"\n          assert manifest["next_development_line"] == "0.1.0-022.09"\n          PYID\n\n      - uses: actions/setup-python@v5\n        with:\n          python-version: "3.12"\n\n      - name: Install dependencies\n        run: |\n          python -m pip install --upgrade pip\n          python -m pip install -r requirements-dev.txt\n\n      - name: Install Chromium for browser UI tests\n        run: python -m playwright install --with-deps chromium\n\n      - name: Run full test suite\n        run: python -m pytest tests\n\n      - name: Verify source integrity\n        shell: bash\n        run: |\n          set -euo pipefail\n          tmp="$(mktemp)"\n          git ls-files -z | while IFS= read -r -d '' f; do\n            [ "$f" = "SOURCE-SHA256SUMS" ] && continue\n            sha256sum "$f"\n          done | LC_ALL=C sort -k2 > "$tmp"\n          diff -u SOURCE-SHA256SUMS "$tmp"\n\n      - name: Build and verify FULL package\n        shell: bash\n        run: |\n          set -euo pipefail\n          bash build-run.sh "$RUN_NAME"\n          bash "$RUN_NAME" --verify-only\n          sha256sum "$RUN_NAME" > "${RUN_NAME%.run}-SHA256.txt"\n\n      - name: Publish final GitHub release\n        env:\n          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}\n        shell: bash\n        run: |\n          set -euo pipefail\n          gh release view "$TAG" >/dev/null 2>&1 && gh release delete "$TAG" --yes --cleanup-tag || true\n          gh release create "$TAG" \\\n            "$RUN_NAME" \\\n            "${RUN_NAME%.run}-SHA256.txt" \\\n            --title "$TITLE" \\\n            --notes-file PUBLICATION-02208.md \\\n            --latest\n''', encoding="utf-8")
+
+          Path("PUBLICATION-02208.md").write_text('''# SG-Gateway 0.1.0-022.08 — финальный стабильный выпуск\n\nСтатус: **FINAL / STABLE**. Стабильный канал: `stable-02208`. Финальный тег: `v0.1.0-022.08-final`.\n\nВерсия 22.08 переносит интерфейс SG-Gateway на единый UI-контракт без изменения проверенных протокольных и backup/runtime гарантий предыдущей линии.\n\n## Главное\n\n- единая система UI primitives и layout для основных страниц панели;\n- согласованная геометрия Connections, Clients, Routing, Security, System, Maintenance и Outbounds;\n- единый standalone-frame для Login и Recovery;\n- Help и Operation Job переведены на тот же 22.08 UI-контракт;\n- real-browser проверки Chromium на desktop, tablet и mobile widths в dark/light;\n- сохранены AWG 2.0, AWG 3.0, AWG 3.1, Xray, NaiveProxy, backup/restore, update rollback и clean-install/reinstall contracts.\n\n## Проверка выпуска\n\nПеред публикацией обязательны source integrity, полный pytest с browser geometry, сборка и `--verify-only` FULL-пакета, Clean Install и Full Uninstall → Reinstall на Ubuntu 24.04.\n\nПубличные команды после promotion публикуются в `deploy/GITHUB-COMMANDS.md`; Clean Install закрепляется на проверенный exact source commit, Update и Full Uninstall — на `stable-02208`.\n''', encoding="utf-8")
+          PY
+
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add VERSION BUILD-ID DEVELOPMENT-VERSION release-manifest.json \
+            .github/workflows/ci.yml .github/workflows/release-02208-stable.yml \
+            PUBLICATION-02208.md deploy/install-from-github.sh deploy/update-from-github.sh \
+            deploy/uninstall-from-github.sh tests/test_sg_gateway_v22_02206_stable_release.py
+          git commit -m "release: prepare SG-Gateway 0.1.0-022.08 identity"
+          git push origin HEAD:release/02208-rc
