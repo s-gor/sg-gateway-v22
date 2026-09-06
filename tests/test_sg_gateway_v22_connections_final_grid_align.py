@@ -17,7 +17,7 @@ def test_xmux_visible_card_uses_xray_inner_working_width():
     assert "margin-inline: 0;" in wrapper
 
     card = block("body.page-connections #xray-xmux .xmux1-card")
-    assert "margin-inline: var(--sg-layout-card-inset);" in card
+    assert "margin-inline: var(--sg-layout-deep-inset);" in card
 
 
 def test_mihomo_https_warning_matches_listener_row_width():
