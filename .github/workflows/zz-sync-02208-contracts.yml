@@ -1,0 +1,37 @@
+name: "Sync 22.08 current contracts"
+
+on:
+  push:
+    branches:
+      - "release/02208-rc"
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: "Apply current product contracts"
+        run: python .github/scripts/zz_sync_02208_contracts.py
+      - name: "Run focused regressions"
+        run: |
+          bash -n install.sh
+          python -m pip install -q pytest
+          python -m pytest -q tests/test_connections_layout_v24.py tests/test_connections_restore_naiveproxy_bottom_02208.py tests/test_naiveproxy_http_02207.py tests/test_naiveproxy_integration_02207.py tests/test_sg_gateway_02112_final_cumulative_cleanup_r5.py tests/test_sg_gateway_v22_02206_hardening.py tests/test_sg_gateway_v22_awg_cards_unified_ui.py tests/test_sg_gateway_v22_compact_protocol_cards_ui_02207.py
+      - name: "Refresh manifest and commit"
+        run: |
+          git rm .github/workflows/zz-sync-02208-contracts.yml
+          git rm .github/scripts/zz_sync_02208_contracts.py
+          python -c 'from pathlib import Path; import hashlib, subprocess; root=Path("."); paths=[p for p in subprocess.check_output(["git","ls-files"], text=True).splitlines() if p != "SOURCE-SHA256SUMS"]; Path("SOURCE-SHA256SUMS").write_text("".join(f"{hashlib.sha256((root/p).read_bytes()).hexdigest()}  {p}\n" for p in paths), encoding="utf-8")'
+          git add install.sh tests/test_connections_restore_naiveproxy_bottom_02208.py tests/test_naiveproxy_http_02207.py tests/test_naiveproxy_integration_02207.py tests/test_sg_gateway_v22_awg_cards_unified_ui.py tests/test_sg_gateway_v22_compact_protocol_cards_ui_02207.py SOURCE-SHA256SUMS
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "test: sync 22.08 contracts with current UI"
+          git push
