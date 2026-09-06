@@ -38,7 +38,7 @@ body.page-connections :is(
 }
 
 body.page-connections #xray-xmux .xmux1-card {
-  margin-inline: var(--sg-layout-card-inset);
+  margin-inline: var(--sg-layout-deep-inset);
   padding: 0;
 }
 
