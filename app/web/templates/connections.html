@@ -1,13 +1,548 @@
-{% extends "connections_legacy_8f7481cb.html" %}
+{% extends "base.html" %}
+{% block title %}SG-Gateway · Connections{% endblock %}
 
 {% block page_styles %}
-  {{ super() }}
-  <link rel="stylesheet" href="{{ static_asset('sg-naiveproxy-bottom-v1.css') }}">
+  <link rel="stylesheet" href="{{ static_asset('sg-ui-connections-components-v22-08.css') }}">
+  <link rel="stylesheet" href="{{ static_asset('sg-xray-profiles-v2.css') }}">
+  <link rel="stylesheet" href="{{ static_asset('sg-xmux-settings-v1.css') }}">
+  <link rel="stylesheet" href="{{ static_asset('sg-awg-dual-v1.css') }}">
+  <link rel="stylesheet" href="{{ static_asset('sg-ui-connections-v22-08.css') }}">
 {% endblock %}
 
 {% block content %}
-  {{ super() }}
-  <section class="sg-naiveproxy-bottom" aria-label="NaiveProxy">
-    {% include "_naiveproxy_panel.html" %}
+{% set awg_key_ready = awg_settings.enabled and awg_settings.config.get('server_public_key', '') and 'PLACEHOLDER' not in awg_settings.config.get('server_public_key', '') %}
+{% set awg3_key_ready = awg3_settings.enabled and awg3_settings.config.get('server_public_key', '') and 'PLACEHOLDER' not in awg3_settings.config.get('server_public_key', '') %}
+{% set xray_key_ready = xray_settings.enabled and xray_settings.config.get('public_key', '') and 'PLACEHOLDER' not in xray_settings.config.get('public_key', '') %}
+{% set xray_short_ready = xray_settings.config.get('short_id', '') and 'PLACEHOLDER' not in xray_settings.config.get('short_id', '') %}
+{% set xray_ready = xray_key_ready and xray_short_ready %}
+{% set awg_country = connections[0].country_code if connections else 'unknown' %}
+{% set xray_country = connections[1].country_code if connections | length > 1 else 'unknown' %}
+{% set awg_public_host = connections[0].public_host if connections else awg_settings.host %}
+{% set xray_public_host = connections[1].public_host if connections | length > 1 else xray_settings.host %}
+{% set mihomo_public_host = connections[2].public_host if connections | length > 2 else mihomo.settings.host %}
+{% set awg3_country = connections[3].country_code if connections | length > 3 else awg_country %}
+{% set awg3_public_host = connections[3].public_host if connections | length > 3 else awg3_settings.host %}
+{% set awg31_public_host = awg3_public_host %}
+
+<section class="cnv1-page sg-ui-page">
+  <header class="cnv1-heading sg-ui-page-head">
+    <div>
+      <div class="cnv1-kicker"><span></span> SG-GATEWAY / CONNECTIONS</div>
+      <h1>Connections</h1>
+      <p>AmneziaWG 2 / 3, четыре независимых Xray-профиля и Mihomo.</p>
+    </div>
+
+    <div class="cnv1-heading-actions sg-ui-actions">
+      <a class="button primary" href="{{ url_for('clients') }}">Открыть Clients</a>
+      <a class="button" href="{{ url_for('routing') }}">Открыть Routing</a>
+    </div>
+  </header>
+
+  <section class="cnv1-engines cnv1-xray-row">
+    <article class="cnv1-engine-card cnv1-engine-xray cnv1-engine-wide sg-ljd-card sg-ui-card sg-ui-section">
+      <header class="cnv1-engine-head">
+        <div class="cnv1-engine-title">
+          <div class="cnv1-engine-logo xray">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 5 6v5c0 4.8 2.9 8.1 7 10 4.1-1.9 7-5.2 7-10V6l-7-3Z"/></svg>
+          </div>
+          <div>
+            <div class="cnv1-card-kicker">XRAY · НЕЗАВИСИМЫЕ ПРОФИЛИ</div>
+            <h2>Xray Server</h2>
+            <p>Выберите нужные карточки, затем проверьте и примените конфигурацию.</p>
+          </div>
+        </div>
+        <div class="xps2-version-stack">
+          <span class="cnv1-engine-status {{ 'success' if xray_profiles.version_ready else 'warning' }}">
+            <span></span>Xray {{ xray_profiles.installed_version or 'не найден' }}
+          </span>
+          <small>Закреплена версия {{ xray_profiles.required_version }}</small>
+        </div>
+      </header>
+
+      <section class="cnv1-endpoint-card sg-ljd-nested sg-ui-nested">
+        <div class="cnv1-endpoint-main">
+          <img src="{{ country_flag_url(xray_country) }}" alt="{{ country_name(xray_country) }}" width="30" height="20">
+          <div>
+            <span>ВНЕШНЯЯ ТОЧКА</span>
+            <strong>{{ xray_public_host }}</strong>
+            <small>{{ country_name(xray_country) }} · каждый профиль использует собственный listener</small>
+          </div>
+        </div>
+        <span class="cnv1-port-chip">{{ xray_profiles.profiles | length }} профиля</span>
+      </section>
+
+      <div id="xray-profiles" class="xps2-panel sg-ui-section">
+        <form id="xps2-form" method="post" action="{{ url_for('update_xray_profiles') }}">
+          <input type="hidden" name="host" value="{{ xray_public_host }}">
+
+          <div class="xps2-top-actions">
+            <button class="button primary sg-ljd-key-action" type="button" data-xps2-top-apply>Проверить и запустить</button>
+          </div>
+
+          <section class="xps2-selection sg-ljd-nested sg-ui-nested sg-ui-rail">
+            <header class="xps2-section-head">
+              <div>
+                <div class="cnv1-card-kicker">ВЫБОР ПРОФИЛЕЙ</div>
+                <h3>Серверные подключения Xray</h3>
+                <p>Карточки выбираются независимо. Простое нажатие ничего не применяет.</p>
+              </div>
+              {% if not xray_profiles.tls_ready %}
+              <span class="xps2-https-state">HTTPS не настроен</span>
+              {% endif %}
+            </header>
+
+            <div class="xps2-choice-grid">
+              {% for profile in xray_profiles.profiles %}
+              {% set tls_locked = profile.tls_required and not xray_profiles.tls_ready %}
+              {% set encryption_locked = profile.encryption_required and not profile.encryption_ready %}
+              {% set locked = tls_locked or encryption_locked %}
+              {% set initial_label = 'Нужен HTTPS' if tls_locked else ('Нужен VLESS Encryption' if encryption_locked else ('Работает сейчас' if profile.enabled and profile.ready and xray_profiles.service_active else ('Включён' if profile.enabled else ('Готов к включению' if profile.tls_required and xray_profiles.tls_ready else 'Выключен')))) %}
+              <input class="xps2-selector" type="checkbox"
+                     id="xps2-{{ profile.id }}"
+                     name="{{ profile.id }}_enabled"
+                     value="1"
+                     data-profile="{{ profile.id }}"
+                     data-initial="{{ '1' if profile.enabled else '0' }}"
+                     {% if profile.enabled %}checked{% endif %}
+                     {% if locked %}disabled{% endif %}>
+              <label class="xps2-choice {{ 'is-locked' if locked else '' }}"
+                     for="xps2-{{ profile.id }}"
+                     data-initial-label="{{ initial_label }}">
+                <span class="xps2-choice-topline">{{ profile.transport }} · {{ profile.security }}{% if profile.flow %} · XTLS VISION{% endif %}</span>
+                <strong>{{ profile.title }}</strong>
+                <p>{{ profile.note }}</p>
+                <span class="xps2-choice-status {{ 'locked' if locked else ('active' if profile.enabled else '') }}" data-choice-status>
+                  {{ initial_label }}
+                </span>
+              </label>
+              {% endfor %}
+            </div>
+          </section>
+
+          <section class="xps2-parameters sg-ljd-nested sg-ui-nested sg-ui-rail">
+            <header class="xps2-section-head">
+              <div>
+                <div class="cnv1-card-kicker">ПАРАМЕТРЫ</div>
+                <h3>Параметры выбранных профилей</h3>
+                <p>Здесь только то, что можно изменить.</p>
+              </div>
+            </header>
+
+            <div class="xps2-parameter-list">
+              <article class="xps2-parameter-row is-visible" data-fingerprint-panel>
+                <div class="xps2-parameter-title">
+                  <strong>Client Fingerprint</strong>
+                  <span>Общий TLS/uTLS fingerprint для Xray-ссылок, QR и subscription</span>
+                </div>
+                <label class="xps2-field-mode">
+                  <span>Fingerprint</span>
+                  <select name="fingerprint" required>
+                    <optgroup label="Браузеры">
+                      <option value="chrome" {% if xray_profiles.fingerprint == 'chrome' %}selected{% endif %}>Google Chrome</option>
+                      <option value="brave" {% if xray_profiles.fingerprint == 'brave' %}selected{% endif %}>Brave (технически Chrome)</option>
+                      <option value="edge" {% if xray_profiles.fingerprint == 'edge' %}selected{% endif %}>Microsoft Edge</option>
+                      <option value="firefox" {% if xray_profiles.fingerprint == 'firefox' %}selected{% endif %}>Mozilla Firefox</option>
+                      <option value="safari" {% if xray_profiles.fingerprint == 'safari' %}selected{% endif %}>Apple Safari</option>
+                      <option value="ios" {% if xray_profiles.fingerprint == 'ios' %}selected{% endif %}>iPhone / iPad (iOS)</option>
+                      <option value="android" {% if xray_profiles.fingerprint == 'android' %}selected{% endif %}>Android</option>
+                      <option value="opera" {% if xray_profiles.fingerprint == 'opera' %}selected{% endif %}>Opera (технически Chrome)</option>
+                      <option value="vivaldi" {% if xray_profiles.fingerprint == 'vivaldi' %}selected{% endif %}>Vivaldi (технически Chrome)</option>
+                      <option value="360" {% if xray_profiles.fingerprint == '360' %}selected{% endif %}>360 Browser</option>
+                      <option value="qq" {% if xray_profiles.fingerprint == 'qq' %}selected{% endif %}>QQ Browser</option>
+                    </optgroup>
+                    <optgroup label="Автоматический выбор">
+                      <option value="random" {% if xray_profiles.fingerprint == 'random' %}selected{% endif %}>Random — случайный современный браузер</option>
+                      <option value="randomized" {% if xray_profiles.fingerprint == 'randomized' %}selected{% endif %}>Randomized — полностью случайный</option>
+                    </optgroup>
+                    <optgroup label="Расширенные">
+                      <option value="unsafe" {% if xray_profiles.fingerprint == 'unsafe' %}selected{% endif %}>Go TLS без эмуляции (unsafe)</option>
+                      {% if xray_profiles.fingerprint not in xray_profiles.fingerprint_values %}
+                      <option value="{{ xray_profiles.fingerprint }}" selected>Другое текущее значение: {{ xray_profiles.fingerprint }}</option>
+                      {% endif %}
+                    </optgroup>
+                  </select>
+                  <small>Тот же набор, что в SG-Panel. По умолчанию Mozilla Firefox. Brave, Opera и Vivaldi используют совместимый технический профиль Chrome.</small>
+                </label>
+              </article>
+
+              {% for profile in xray_profiles.profiles %}
+              {% set tls_locked = profile.tls_required and not xray_profiles.tls_ready %}
+              {% set encryption_locked = profile.encryption_required and not profile.encryption_ready %}
+              {% set locked = tls_locked or encryption_locked %}
+              {% if profile.id == 'xhttp_reality' %}
+              <input type="hidden" name="{{ profile.id }}_mode" value="stream-one">
+              {% endif %}
+              {% if profile.path %}
+              <input type="hidden" name="{{ profile.id }}_path" value="{{ profile.path }}">
+              {% endif %}
+              {% if profile.id in ['xhttp_tls', 'hysteria2'] %}
+              <article class="xps2-parameter-row {{ 'is-visible' if profile.enabled and not locked else '' }}"
+                       data-profile-panel="{{ profile.id }}">
+                <div class="xps2-parameter-title">
+                  <strong>{{ profile.title }}</strong>
+                  <span>{{ profile.transport }} · {{ profile.security }}</span>
+                </div>
+
+                {% if profile.id == 'xhttp_tls' %}
+                <label class="xps2-field-mode">
+                  <span>XHTTP mode клиента</span>
+                  <select name="{{ profile.id }}_mode" {% if locked %}disabled{% endif %}>
+                    {% for item in xray_profiles.xhttp_mode_options %}
+                    <option value="{{ item.value }}" {% if item.value == profile.mode %}selected{% endif %}>{{ item.title }} · {{ item.value }}</option>
+                    {% endfor %}
+                  </select>
+                  <small>Сервер остаётся в auto. Выбор меняет клиентские ссылки, QR и SG Client subscription.</small>
+                </label>
+      <section class="xps2-xmux">
+        <div class="xps2-xmux-main">
+          <div class="xps2-xmux-copy">
+            <span>Клиентский XMUX</span>
+            <strong>XMUX для РФ</strong>
+            <small>Постоянный клиентский профиль для XHTTP-ссылок, QR и SG Client subscription.</small>
+          </div>
+        </div>
+        <details class="xps2-xmux-details">
+          <summary>
+            <span class="xps2-xmux-show">Показать параметры</span>
+            <span class="xps2-xmux-hide">Скрыть параметры</span>
+          </summary>
+          <div class="xps2-xmux-grid">
+            <div><span>Максимальная параллельность</span><small>maxConcurrency</small><strong>{{ profile.xmux.maxConcurrency }}</strong></div>
+            <div><span>Максимум соединений</span><small>maxConnections</small><strong>{{ profile.xmux.maxConnections }}</strong></div>
+            <div><span>Повторное использование соединения</span><small>cMaxReuseTimes</small><strong>{{ profile.xmux.cMaxReuseTimes }}</strong></div>
+            <div><span>Запросов на HTTP-соединение</span><small>hMaxRequestTimes</small><strong>{{ profile.xmux.hMaxRequestTimes }}</strong></div>
+            <div><span>Время повторного использования, сек.</span><small>hMaxReusableSecs</small><strong>{{ profile.xmux.hMaxReusableSecs }}</strong></div>
+            <div><span>Интервал Keep-Alive</span><small>hKeepAlivePeriod</small><strong>{{ profile.xmux.hKeepAlivePeriod }}</strong></div>
+          </div>
+          <p>Рекомендуемый профиль для российских сетей. Серверный inbound не меняется.</p>
+        </details>
+      </section>
+                {% endif %}
+
+                {% if profile.id == 'hysteria2' %}
+                <section class="xps2-salamander" data-salamander-panel
+                         data-initial-mode="{{ xray_profiles.hysteria2_obfs.mode }}"
+                         data-password-configured="{{ '1' if xray_profiles.hysteria2_obfs.password_configured else '0' }}">
+                  <header>
+                    <div>
+                      <strong>Obfuscation</strong>
+                      <p>Off · Salamander · Gecko</p>
+                    </div>
+                  </header>
+
+                  <div class="xps2-salamander-modes" role="radiogroup" aria-label="Режим обфускации Hysteria2">
+                    <label>
+                      <input type="radio" name="hysteria2_obfs_mode" value="none"
+                             {% if xray_profiles.hysteria2_obfs.mode == 'none' %}checked{% endif %}>
+                      <span>Выключена</span>
+                    </label>
+                    <label>
+                      <input type="radio" name="hysteria2_obfs_mode" value="salamander"
+                             {% if xray_profiles.hysteria2_obfs.mode == 'salamander' %}checked{% endif %}>
+                      <span>Salamander</span>
+                    </label>
+                    <label>
+                      <input type="radio" name="hysteria2_obfs_mode" value="gecko"
+                             {% if xray_profiles.hysteria2_obfs.mode == 'gecko' %}checked{% endif %}
+                             {% if not xray_profiles.hysteria2_obfs.version_ready and xray_profiles.hysteria2_obfs.mode == 'gecko' %}disabled{% endif %}>
+                      <span>Gecko · рекомендуется</span>
+                    </label>
+                  </div>
+
+                  <div class="xps2-salamander-secret" data-salamander-secret>
+                    <label>
+                      <span>Пароль Hysteria2 obfs</span>
+                      <input id="hysteria2-obfs-password" type="password"
+                             name="hysteria2_obfs_password" value=""
+                             placeholder="{{ xray_profiles.hysteria2_obfs.password_mask or 'Будет создан при первом включении' }}"
+                             autocomplete="new-password">
+                    </label>
+                    <input type="hidden" name="hysteria2_obfs_rotate" value="0" data-salamander-rotate>
+                    <div class="xps2-salamander-buttons">
+                      <button class="button" type="button" data-salamander-show>Показать</button>
+                      <button class="button" type="button" data-salamander-copy>Копировать</button>
+                      <button class="button" type="button" data-salamander-generate>Новый пароль</button>
+                    </div>
+                  </div>
+                  <p class="xps2-salamander-status" data-salamander-status>
+                    {% if xray_profiles.hysteria2_obfs.password_configured %}Пароль настроен и не выводится в журналах.{% else %}Пароль ещё не создан.{% endif %}
+                  </p>
+                </section>
+                {% endif %}
+              </article>
+              {% endif %}
+              {% endfor %}
+            </div>
+            <p class="xps2-empty-note" data-xps2-empty>Выберите хотя бы одну карточку Xray.</p>
+          </section>
+
+          <footer class="xps2-actions">
+            <p>Проверка создаёт полный candidate и запускает <code>Xray {{ xray_profiles.minimum_version }} или новее: run -test</code>. База и live-конфигурация изменяются только после успешного применения.</p>
+            <div>
+              <button class="button" type="submit" name="action" value="test">Проверить конфигурацию</button>
+              <button id="xps2-apply-button" class="button primary sg-ljd-key-action" type="submit" name="action" value="apply">Сохранить и применить</button>
+            </div>
+          </footer>
+        </form>
+      </div>
+
+      <details class="cnv1-advanced sg-ljd-nested">
+        <summary>
+          <span>Reality-ключи и общий адрес</span>
+          <span>{{ 'Настроены' if xray_key_ready and xray_short_ready else 'Требуют настройки' }}</span>
+        </summary>
+        <div class="cnv1-advanced-body">
+          <form method="post" action="{{ url_for('update_xray') }}" class="cnv1-engine-form">
+            <div class="cnv1-form-grid">
+              <label><span>Reality SNI</span><input type="text" name="server_name" value="{{ xray_settings.config.get('server_name', 'bing.com') }}"></label>
+              <label><span>Reality public key</span><textarea name="public_key" rows="3">{{ xray_settings.config.get('public_key', '') }}</textarea></label>
+              <label><span>Short ID</span><input type="text" name="short_id" value="{{ xray_settings.config.get('short_id', '') }}"></label>
+            </div>
+            <footer class="cnv1-form-actions">
+              <span>Общие Reality-параметры используются двумя Reality-профилями.</span>
+              <button class="button primary" type="submit">Сохранить общие параметры</button>
+            </footer>
+          </form>
+        </div>
+      </details>
+    </article>
   </section>
+
+  {% include "_xray_xmux_settings.html" %}
+
+  <section class="cnv1-engine-pair sg-ui-grid">
+    <article class="cnv1-engine-card cnv1-engine-awg awgd-shell sg-ljd-card">
+      <header class="cnv1-engine-head">
+        <div class="cnv1-engine-title">
+          <div class="cnv1-engine-logo awg"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l2-7 4 14 2-7h6"/></svg></div>
+          <div>
+            <div class="cnv1-card-kicker">UDP VPN · ТРИ ПОКОЛЕНИЯ</div>
+            <h2>AmneziaWG</h2>
+            <p>AWG 2.0, 3.0 и 3.1 работают независимо: отдельные профили, ключи, адреса и runtime.</p>
+          </div>
+        </div>
+        <div class="awgd-footer"><span>AWG 2.0</span><span>AWG 3.0</span><span>AWG 3.1</span></div>
+      </header>
+
+      <div class="awgd-grid">
+        <section class="awgd-card awgd-card-v2">
+          <header class="awgd-head">
+            <div class="awgd-title"><span class="awgd-generation">AWG2</span><div><strong>AmneziaWG 2.0</strong><small>Проверенная kernel-линия 1.x · существующие профили не меняются.</small></div></div>
+            <span class="cnv1-engine-status {{ 'success' if awg_key_ready else 'warning' }}"><span></span>{{ 'Настроено' if awg_key_ready else 'Требует настройки' }}</span>
+          </header>
+          <section class="cnv1-endpoint-card sg-ljd-nested sg-ui-nested">
+            <div class="cnv1-endpoint-main"><img src="{{ country_flag_url(awg_country) }}" alt="{{ country_name(awg_country) }}" width="30" height="20"><div><span>ВНЕШНЯЯ ТОЧКА</span><strong>{{ awg_public_host }}:{{ awg_settings.port }} · DNS {{ awg_dns.dns }}</strong><small>{{ country_name(awg_country) }}</small></div></div>
+          </section>
+          <form method="post" action="{{ url_for('update_amneziawg') }}" class="cnv1-engine-form cnv1-engine-form-compact awgd-legacy-settings" hidden>
+            <input type="hidden" name="host" value="{{ awg_public_host }}"><input type="hidden" name="country_code" value="{{ awg_country }}">
+            <div class="cnv1-compact-fields"><label><span>UDP-порт</span><input type="number" name="port" min="585" max="585" value="{{ awg_settings.port }}" readonly required></label><label><span>DNS</span><input type="text" value="{{ awg_settings.config.get('dns', '1.1.1.1') }}" disabled></label></div>
+            <details class="cnv1-advanced sg-ljd-nested"><summary><span>Дополнительно · ключ сервера</span><span>{{ 'Настроен' if awg_key_ready else 'Требует настройки' }}</span></summary><div class="cnv1-advanced-body"><label><span>Server public key</span><textarea name="server_public_key" rows="3">{{ awg_settings.config.get('server_public_key', '') }}</textarea><small>Публичный ключ AWG2 для новых клиентских файлов.</small></div></details>
+            <footer class="cnv1-form-actions"><span>Адрес подключения: {{ awg_public_host }}:{{ awg_settings.port }}</span><button class="button primary" type="submit">Сохранить</button></footer>
+          </form>
+        </section>
+
+        <section class="awgd-card awgd-card-v3">
+          <header class="awgd-head">
+            <div class="awgd-title"><span class="awgd-generation">AWG3</span><div><strong>AmneziaWG 3.0</strong><small>Изолированный userspace runtime 3.0 · AWG2 kernel и tools не заменяются.</small></div></div>
+            <span class="cnv1-engine-status {{ 'success' if awg3_key_ready else 'warning' }}"><span></span>{{ 'Настроено' if awg3_key_ready else 'Готов к первому запуску' }}</span>
+          </header>
+          <section class="cnv1-endpoint-card sg-ljd-nested sg-ui-nested">
+            <div class="cnv1-endpoint-main"><img src="{{ country_flag_url(awg3_country) }}" alt="{{ country_name(awg3_country) }}" width="30" height="20"><div><span>ВНЕШНЯЯ ТОЧКА</span><strong>{{ awg3_public_host }}:{{ awg3_settings.port }} · DNS {{ awg_dns.dns }}</strong><small>{{ country_name(awg3_country) }}</small></div></div>
+          </section>
+          <form method="post" action="{{ url_for('update_amneziawg3') }}" class="cnv1-engine-form cnv1-engine-form-compact awgd-legacy-settings" hidden>
+            <input type="hidden" name="host" value="{{ awg3_public_host }}"><input type="hidden" name="country_code" value="{{ awg3_country }}">
+            <div class="cnv1-compact-fields"><label><span>UDP-порт</span><input type="number" name="port" min="586" max="586" value="{{ awg3_settings.port }}" readonly required></label><label><span>DNS</span><input type="text" value="{{ awg3_settings.config.get('dns', '1.1.1.1') }}" disabled></label></div>
+            <details class="cnv1-advanced sg-ljd-nested"><summary><span>Дополнительно · ключ сервера</span><span>{{ 'Настроен' if awg3_key_ready else 'Создастся автоматически' }}</span></summary><div class="cnv1-advanced-body"><label><span>Server public key</span><textarea name="server_public_key" rows="3">{{ awg3_settings.config.get('server_public_key', '') }}</textarea><small>AWG3 создаёт собственный ключ и синхронизирует его после успешного runtime apply.</small></div></details>
+            <footer class="cnv1-form-actions"><span>Адрес подключения: {{ awg3_public_host }}:{{ awg3_settings.port }}</span><button class="button primary" type="submit">Сохранить</button></footer>
+          </form>
+        </section>
+
+        {% include "_awg31_panel.html" %}
+      </div>
+
+      <section id="awg-dns" class="awgd-shared-dns sg-ljd-nested">
+        <div class="awgd-shared-dns-copy">
+          <span>ОБЩАЯ НАСТРОЙКА</span>
+          <strong>DNS клиентов AWG</strong>
+          <small>Используется устройствами при активном VPN. Сохранение обновит AWG 2.0, 3.0, 3.1 и существующие клиентские конфигурации.</small>
+        </div>
+        <form method="post" action="{{ url_for('update_awg_dns') }}" class="awgd-shared-dns-form">
+          <label><span>DNS</span><input type="text" name="dns" value="{{ awg_dns.dns }}" autocomplete="off" required></label>
+          <button class="button primary" type="submit">Сохранить DNS</button>
+        </form>
+        {% if not awg_dns.consistent %}<p class="awgd-shared-dns-warning">В профилях сохранены разные DNS. Нажмите «Сохранить DNS», чтобы синхронизировать их.</p>{% endif %}
+      </section>
+    </article>
+
+    {% include "_mihomo_panel.html" %}
+  </section>
+
+  <section class="cnv1-note-panel sg-ljd-card sg-ui-card">
+    <div class="cnv1-note-icon">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="12" r="9"/>
+        <path d="M12 11v5M12 8h.01"/>
+      </svg>
+    </div>
+    <div>
+      <strong>Что изменяют эти формы</strong>
+      <p>Параметры сохраняются в единой базе SG-Gateway и используются при создании новых клиентских профилей. Настройки существующих клиентов остаются доступными в разделе Clients.</p>
+    </div>
+    <a class="button" href="{{ url_for('clients') }}">Перейти к клиентам</a>
+  </section>
+
+  {% include "_naiveproxy_panel.html" %}
+
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='sg-xmux-settings-v1.js') }}"></script>
+<script>
+(() => {
+  const form = document.getElementById('xps2-form');
+  if (!form) return;
+  const selectors = [...form.querySelectorAll('.xps2-selector')];
+  const empty = form.querySelector('[data-xps2-empty]');
+  const applyButton = document.getElementById('xps2-apply-button');
+  const topApplyButton = form.querySelector('[data-xps2-top-apply]');
+  const salamander = form.querySelector('[data-salamander-panel]');
+  const passwordInput = document.getElementById('hysteria2-obfs-password');
+  const rotateInput = form.querySelector('[data-salamander-rotate]');
+  const secretArea = form.querySelector('[data-salamander-secret]');
+  const status = form.querySelector('[data-salamander-status]');
+  const modes = [...form.querySelectorAll('input[name="hysteria2_obfs_mode"]')];
+
+  const currentMode = () => modes.find(item => item.checked)?.value || 'none';
+  const modeLabel = mode => mode === 'gecko' ? 'Gecko' : (mode === 'salamander' ? 'Salamander' : 'Off');
+  const obfsEnabled = mode => mode === 'salamander' || mode === 'gecko';
+  const setStatus = (text, tone = '') => {
+    if (!status) return;
+    status.textContent = text;
+    status.dataset.tone = tone;
+  };
+
+  const syncConfirmation = () => {
+    if (!applyButton || !salamander) return;
+    const initialMode = salamander.dataset.initialMode || 'none';
+    const mode = currentMode();
+    const rotated = rotateInput?.value === '1';
+    const typed = Boolean(passwordInput?.value.trim());
+    delete applyButton.dataset.sgConfirm;
+    delete applyButton.dataset.sgConfirmTitle;
+    delete applyButton.dataset.sgConfirmButton;
+    delete applyButton.dataset.sgConfirmTone;
+    if (rotated || (obfsEnabled(mode) && typed && salamander.dataset.passwordConfigured === '1')) {
+      applyButton.dataset.sgConfirm = 'После замены пароля старые Hysteria2-профили перестанут подключаться. Обновите профиль или subscription на каждом устройстве.';
+      applyButton.dataset.sgConfirmTitle = 'Заменить пароль Hysteria2';
+      applyButton.dataset.sgConfirmButton = 'Заменить и применить';
+      applyButton.dataset.sgConfirmTone = 'danger';
+    } else if (initialMode !== mode && obfsEnabled(mode)) {
+      applyButton.dataset.sgConfirm = `Переключение Hysteria2 на ${modeLabel(mode)} изменит транспорт. SG-Gateway обновит ссылки, QR-коды и subscription после успешного применения.`;
+      applyButton.dataset.sgConfirmTitle = `Включить ${modeLabel(mode)}`;
+      applyButton.dataset.sgConfirmButton = 'Применить режим';
+    } else if (initialMode !== mode && mode === 'none') {
+      applyButton.dataset.sgConfirm = 'Отключение обфускации изменит транспорт Hysteria2. Старые профили с параметрами obfs перестанут подключаться.';
+      applyButton.dataset.sgConfirmTitle = 'Отключить обфускацию';
+      applyButton.dataset.sgConfirmButton = 'Отключить и применить';
+    }
+  };
+
+  const syncSalamander = () => {
+    const enabled = obfsEnabled(currentMode());
+    secretArea?.classList.toggle('is-disabled', !enabled);
+    if (passwordInput) passwordInput.disabled = !enabled;
+    secretArea?.querySelectorAll('button').forEach(button => { button.disabled = !enabled; });
+    syncConfirmation();
+  };
+
+  const loadSecret = async () => {
+    if (passwordInput?.value) return passwordInput.value;
+    const response = await fetch('{{ url_for("reveal_hysteria2_salamander_password") }}', {
+      method: 'POST', credentials: 'same-origin', headers: {'X-Requested-With': 'XMLHttpRequest'}
+    });
+    const payload = await response.json();
+    if (!response.ok || !payload.ok) throw new Error(payload.message || 'Пароль не настроен');
+    if (passwordInput) passwordInput.value = payload.password || '';
+    return payload.password || '';
+  };
+
+  form.querySelector('[data-salamander-show]')?.addEventListener('click', async () => {
+    try {
+      await loadSecret();
+      if (passwordInput) passwordInput.type = passwordInput.type === 'password' ? 'text' : 'password';
+      setStatus(passwordInput?.type === 'text' ? 'Пароль показан.' : 'Пароль скрыт.', 'ok');
+    } catch (error) {
+      setStatus(error.message || 'Пароль не настроен.', 'warning');
+    }
+  });
+
+  form.querySelector('[data-salamander-copy]')?.addEventListener('click', async () => {
+    try {
+      const secret = await loadSecret();
+      await navigator.clipboard.writeText(secret);
+      setStatus('Пароль скопирован.', 'ok');
+    } catch (error) {
+      setStatus(error.message || 'Не удалось скопировать пароль.', 'warning');
+    }
+  });
+
+  form.querySelector('[data-salamander-generate]')?.addEventListener('click', async () => {
+    try {
+      const response = await fetch('{{ url_for("generate_hysteria2_salamander_password") }}', {
+        method: 'POST', credentials: 'same-origin', headers: {'X-Requested-With': 'XMLHttpRequest'}
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) throw new Error(payload.message || 'Генерация не удалась');
+      if (passwordInput) {
+        passwordInput.disabled = false;
+        passwordInput.value = payload.password || '';
+        passwordInput.type = 'text';
+      }
+      if (rotateInput) rotateInput.value = salamander?.dataset.passwordConfigured === '1' ? '1' : '0';
+      setStatus('Новый пароль создан. Он будет применён только после проверки Xray.', 'ok');
+      syncConfirmation();
+    } catch (error) {
+      setStatus(error.message || 'Не удалось создать пароль.', 'warning');
+    }
+  });
+
+  passwordInput?.addEventListener('input', () => {
+    if (rotateInput && salamander?.dataset.passwordConfigured === '1') rotateInput.value = '1';
+    syncConfirmation();
+  });
+  modes.forEach(item => item.addEventListener('change', syncSalamander));
+  topApplyButton?.addEventListener('click', () => {
+    syncConfirmation();
+    applyButton?.click();
+  });
+
+  const sync = () => {
+    let selected = 0;
+    selectors.forEach(input => {
+      const panel = form.querySelector(`[data-profile-panel="${input.dataset.profile}"]`);
+      const label = form.querySelector(`label[for="${input.id}"]`);
+      const choiceStatus = label?.querySelector('[data-choice-status]');
+      const initial = input.dataset.initial === '1';
+      const locked = input.disabled;
+      if (input.checked && !locked) selected += 1;
+      panel?.classList.toggle('is-visible', input.checked && !locked);
+      label?.classList.toggle('is-selected', input.checked && !locked);
+      if (!choiceStatus || locked) return;
+      choiceStatus.classList.toggle('pending', input.checked !== initial);
+      choiceStatus.classList.toggle('active', input.checked === initial && initial);
+      if (input.checked !== initial) {
+        choiceStatus.textContent = input.checked ? 'Выбрано, ещё не применено' : 'Будет выключен';
+      } else {
+        choiceStatus.textContent = label.dataset.initialLabel || (input.checked ? 'Включён' : 'Выключен');
+      }
+    });
+    if (empty) empty.hidden = selected > 0;
+    syncSalamander();
+  };
+
+  selectors.forEach(input => input.addEventListener('change', sync));
+  sync();
+})();
+</script>
 {% endblock %}
