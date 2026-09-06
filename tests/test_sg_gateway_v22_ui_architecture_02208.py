@@ -123,3 +123,15 @@ def test_02208_new_page_css_cannot_take_back_outer_shell_geometry():
         assert not re.search(r"\.sg-ui-page\s*\{[^}]*(?:padding-inline|margin-inline)\s*:", source, re.S), (
             f"{path.name} must not introduce page outer horizontal compensation"
         )
+
+
+def test_02208_dev_02207_pr_workflow_installs_chromium_before_full_suite():
+    workflow = (ROOT / ".github" / "workflows" / "naiveproxy-02207.yml").read_text(encoding="utf-8")
+    dependencies = "python -m pip install -r requirements-dev.txt"
+    browser_install = "python -m playwright install --with-deps chromium"
+    full_suite = "python -m pytest -q tests"
+
+    assert dependencies in workflow
+    assert browser_install in workflow, "22.07 PR workflow must install Chromium for 22.08 geometry tests"
+    assert full_suite in workflow
+    assert workflow.index(dependencies) < workflow.index(browser_install) < workflow.index(full_suite)
