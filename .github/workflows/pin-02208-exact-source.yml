@@ -1,0 +1,38 @@
+name: Pin 022.08 exact source
+
+on:
+  push:
+    branches:
+      - automation/02208-pin-exact-source
+
+permissions:
+  contents: write
+
+jobs:
+  pin:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout release candidate
+        uses: actions/checkout@v4
+        with:
+          ref: release/02208-rc
+          fetch-depth: 0
+
+      - name: Checkout pin helper
+        uses: actions/checkout@v4
+        with:
+          ref: automation/02208-pin-exact-source
+          path: .automation
+          fetch-depth: 1
+
+      - name: Pin exact source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .automation/tools/pin_02208_exact_source.py
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add README.md PUBLICATION-02208.md deploy/GITHUB-COMMANDS.md deploy/full-uninstall-ubuntu.sh
+          git commit -m "release: pin 0.1.0-022.08 exact install source"
+          git push origin HEAD:release/02208-rc
