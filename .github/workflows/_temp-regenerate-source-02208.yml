@@ -1,0 +1,52 @@
+name: TEMP regenerate 22.08 source integrity
+
+on:
+  push:
+    branches:
+      - automation/regen-source-02208-20260906
+
+permissions:
+  contents: write
+
+jobs:
+  regenerate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout release branch
+        uses: actions/checkout@v4
+        with:
+          ref: release/02208-rc
+          fetch-depth: 0
+
+      - name: Regenerate SOURCE-SHA256SUMS from release HEAD
+        run: |
+          python3 -B - <<'PY'
+          import hashlib
+          import subprocess
+          from pathlib import Path
+
+          tracked = sorted(
+              path for path in subprocess.check_output(
+                  ["git", "ls-files"], text=True, encoding="utf-8"
+              ).splitlines()
+              if path != "SOURCE-SHA256SUMS"
+          )
+          rows = []
+          for path in tracked:
+              digest = hashlib.sha256(Path(path).read_bytes()).hexdigest()
+              rows.append(f"{digest}  {path}")
+          Path("SOURCE-SHA256SUMS").write_text("\n".join(rows) + "\n", encoding="utf-8")
+          print(f"regenerated {len(rows)} entries")
+          PY
+
+      - name: Commit integrity inventory to release branch
+        run: |
+          git config user.name "sg-gateway-integrity-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add SOURCE-SHA256SUMS
+          if git diff --cached --quiet; then
+            echo "SOURCE-SHA256SUMS already current"
+            exit 0
+          fi
+          git commit -m "chore: refresh 22.08 source integrity"
+          git push origin HEAD:release/02208-rc
