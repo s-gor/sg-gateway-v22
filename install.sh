@@ -3232,6 +3232,7 @@ stage_prepare_install_context() {
     fi
   elif detect_minimal_013_install; then
     printf '[SG-Gateway] Обнаружена рабочая база SG-Gateway 013; выполняется миграция.\n'
+    printf '[SG-Gateway] Логин и пароль SG-Gateway 013 сохраняются.\n'
   else
     if ! load_resume_state; then
       collect_automatic_parameters
@@ -3525,8 +3526,9 @@ main() {
   prepare_log
   export DEBIAN_FRONTEND=noninteractive LANG=C.UTF-8 LC_ALL=C.UTF-8
 
-  printf '\n%s[SG-Gateway]%s SG-Gateway 0.1.0-022.08 · единый мастер · 24 этапа\n' "$CYAN" "$RESET"
-  printf '[SG-Gateway] Технический журнал: %s\n\n' "$INSTALL_LOG"
+  printf '\n%s[SG-Gateway]%s Запускаю полный мастер SG-Gateway 0.1.0-022.08 · 24 этапа\n' "$CYAN" "$RESET"
+  printf '[SG-Gateway] Технический журнал: %s\n' "$INSTALL_LOG"
+  printf '[SG-Gateway] Повторный запуск выполняется на этом же EC2. Домен не обязателен.\n\n'
 
   run_stage 1 "Подготовка Ubuntu" bootstrap_packages
   run_interactive_stage 2 "Определение режима и параметров" stage_prepare_install_context
@@ -3580,10 +3582,24 @@ main() {
   printf '[SG-Gateway] Версия:       %s\n' "$VERSION"
   printf '[SG-Gateway] Xray:         %s\n' "$(xray_installed_version)"
   printf '[SG-Gateway] NaiveProxy:   %s · TCP %s\n' "$NAIVEPROXY_VERSION" "$NAIVEPROXY_PORT"
+  local final_https_domain=""
+  final_https_domain="$(saved_https_access)"
+  if [[ -n "$final_https_domain" ]]; then
+    printf '[SG-Gateway] Панель:       https://%s:%s\n' "$final_https_domain" "$PANEL_PORT"
+    printf '[SG-Gateway] Заглушка:     http://%s/ и https://%s/\n' "$final_https_domain" "$final_https_domain"
+  else
+    printf '[SG-Gateway] Панель:       http://%s:%s\n' "$PUBLIC_ADDRESS" "$PANEL_PORT"
+    printf '[SG-Gateway] Заглушка:     http://%s/\n' "$PUBLIC_ADDRESS"
+  fi
   printf '[SG-Gateway] Логин:        admin\n'
   printf '[SG-Gateway] Журнал:       %s\n' "$INSTALL_LOG"
   printf '[SG-Gateway] Backup:       %s\n' "$BACKUP_DIR"
   print_sg_admin_status
+  if [[ -s "$DATA_DIR/warp/wgcf.xray.json" || -s "$DATA_DIR/warp/wgcf-profile.conf" ]]; then
+    printf '[SG-Gateway] WARP:         существующий профиль сохранён\n'
+  else
+    printf '[SG-Gateway] WARP:         helper установлен; создаётся при необходимости в Outbounds\n'
+  fi
 }
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
   main "$@"

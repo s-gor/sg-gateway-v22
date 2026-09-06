@@ -260,14 +260,13 @@ def test_stage3a_cli_finalizes_seeded_awg3_before_awg31_migration() -> None:
         encoding="utf-8"
     )
 
-    units = 'run_stage 8 "Создание systemd-служб" stage_systemd_units'
-    awg31 = (
-        'run_quiet "Этап 10/10 · Подготовка независимого профиля AWG31" '
-        "run_awg31_stage3a_migration"
-    )
+    units = 'run_stage 15 "Systemd-службы и Nginx" stage_systemd_units_02208'
+    awg31 = 'run_stage 19 "Независимый профиль AWG31" run_awg31_stage3a_migration'
+    clients = 'run_stage 20 "Применение Xray и клиентов" stage9_apply_runtime'
     assert units in installer
     assert awg31 in installer
-    assert installer.index(units) < installer.index(awg31)
+    assert clients in installer
+    assert installer.index(units) < installer.index(awg31) < installer.index(clients)
 
     finalize = "seeded_awg3_created = ensure_seeded_admin_awg3(database=database)"
     migrate = "result = installer.migrate(database=database)"
