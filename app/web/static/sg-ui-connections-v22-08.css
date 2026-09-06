@@ -144,6 +144,22 @@ body.page-connections .cnv1-note-panel.sg-ui-card {
   padding: var(--sg-ui-card-pad, 18px);
 }
 
+body.page-connections .xps2-naiveproxy-card .cnv1-engine-head {
+  padding: 15px 18px 12px;
+}
+
+body.page-connections .xps2-naiveproxy-body {
+  gap: 0;
+  margin-top: 10px;
+  border-top: 0;
+  padding: 8px 18px 14px;
+}
+
+body.page-connections .xps2-naiveproxy-body .cnv1-form-actions {
+  border-top: 0;
+  padding-top: 0;
+}
+
 @media (max-width: 900px) {
   body.page-connections .cnv1-engine-pair.sg-ui-grid {
     grid-template-columns: minmax(0, 1fr);
