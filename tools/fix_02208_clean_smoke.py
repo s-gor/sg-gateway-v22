@@ -1,8 +1,9 @@
 from pathlib import Path
 
-# Production: provide the fail helper used by noninteractive/TTY validation paths.
 installer = Path("install.sh")
 text = installer.read_text(encoding="utf-8")
+
+# Production: provide the fail helper used by noninteractive/TTY validation paths.
 anchor = '''prepare_log() {
   install -d -m 0755 "$(dirname "$INSTALL_LOG")"
   : > "$INSTALL_LOG"
@@ -20,6 +21,26 @@ fail_block = '''fail() {
 '''
 if "fail() {" not in text:
     text = text.replace(anchor, anchor + fail_block, 1)
+
+# 22.08 must accept a resume file left by the immediately previous stable
+# installer. Move it to the current name before parsing, so successful install
+# never leaves two competing resume-state files behind.
+resume_anchor = '''load_resume_state() {
+  [[ -f "$RESUME_FILE" ]] || return 1
+'''
+resume_replacement = '''load_resume_state() {
+  local legacy_resume_file="/root/sg-gateway-02206-installer-resume.env"
+  if [[ ! -f "$RESUME_FILE" && -f "$legacy_resume_file" ]]; then
+    mv -f "$legacy_resume_file" "$RESUME_FILE"
+    chmod 0600 "$RESUME_FILE"
+    echo "[SG-Gateway] Параметры незавершённой установки 022.06 перенесены в формат 022.08."
+  fi
+  [[ -f "$RESUME_FILE" ]] || return 1
+'''
+if resume_replacement not in text:
+    if text.count(resume_anchor) != 1:
+        raise SystemExit(f"load_resume_state anchor count={text.count(resume_anchor)}")
+    text = text.replace(resume_anchor, resume_replacement, 1)
 installer.write_text(text, encoding="utf-8")
 
 # Current canonical reinstall command must point at the verified 22.08 exact source.
@@ -33,10 +54,28 @@ body = body.replace('"SG_GATEWAY_GITHUB_BRANCH=stable-02206 "', '"SG_GATEWAY_GIT
 body = body.replace('assert "stable-02206/deploy/install-from-github.sh" not in body', 'assert "stable-02208/deploy/install-from-github.sh" not in body')
 test.write_text(body, encoding="utf-8")
 
-# Release regression: current workflows and installer emergency path must match 22.08.
+# Release regression: Clean Install uses the current resume contract. Reinstall
+# deliberately retains the 022.06 seed to prove one-step migration into 22.08.
 release_test = Path("tests/test_sg_gateway_v22_release_02208.py")
 body = release_test.read_text(encoding="utf-8")
-extra = '''\n\ndef test_02208_installer_and_smoke_workflows_use_current_identity():\n    installer = (ROOT / "install.sh").read_text(encoding="utf-8")\n    clean = (ROOT / ".github" / "workflows" / "clean-install-awg3-smoke.yml").read_text(encoding="utf-8")\n    reinstall = (ROOT / ".github" / "workflows" / "reinstall-after-full-uninstall-smoke.yml").read_text(encoding="utf-8")\n\n    assert 'fail() {' in installer\n    assert 'VERSION="0.1.0-022.08"' in installer\n    assert '/root/sg-gateway-02208-installer-resume.env' in clean\n    assert '/root/sg-gateway-02206-installer-resume.env' not in clean\n    assert '/var/log/sg-gateway-installer-02208.log' in clean\n    assert '/root/sg-gateway-02208-installer-resume.env' in reinstall\n    assert '/root/sg-gateway-02206-installer-resume.env' not in reinstall\n    assert '/var/log/sg-gateway-installer-02208.log' in reinstall\n    assert '/var/log/sg-gateway-full-uninstall-02208.log' in reinstall\n'''
-if "test_02208_installer_and_smoke_workflows_use_current_identity" not in body:
-    body += extra
+start = body.find("\ndef test_02208_installer_and_smoke_workflows_use_current_identity():")
+if start >= 0:
+    body = body[:start].rstrip() + "\n"
+body += '''\n\ndef test_02208_installer_and_smoke_workflows_use_current_identity():
+    installer = (ROOT / "install.sh").read_text(encoding="utf-8")
+    clean = (ROOT / ".github" / "workflows" / "clean-install-awg3-smoke.yml").read_text(encoding="utf-8")
+    reinstall = (ROOT / ".github" / "workflows" / "reinstall-after-full-uninstall-smoke.yml").read_text(encoding="utf-8")
+
+    assert 'fail() {' in installer
+    assert 'VERSION="0.1.0-022.08"' in installer
+    assert 'legacy_resume_file="/root/sg-gateway-02206-installer-resume.env"' in installer
+    assert 'mv -f "$legacy_resume_file" "$RESUME_FILE"' in installer
+
+    assert '/root/sg-gateway-02208-installer-resume.env' in clean
+    assert '/root/sg-gateway-02206-installer-resume.env' not in clean
+    assert '/var/log/sg-gateway-installer-02208.log' in clean
+
+    # The reinstall smoke intentionally exercises legacy-state compatibility.
+    assert '/root/sg-gateway-02206-installer-resume.env' in reinstall
+'''
 release_test.write_text(body, encoding="utf-8")
