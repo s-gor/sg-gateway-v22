@@ -47,6 +47,25 @@ def test_naiveproxy_runtime_meta_row_is_not_rendered():
     assert "data-naive-runtime" not in panel
 
 
+def test_naiveproxy_has_no_internal_separators_and_is_compact():
+    css = (ROOT / "app/web/static/sg-ui-connections-v22-08.css").read_text(encoding="utf-8")
+    assert "body.page-connections .xps2-naiveproxy-card .cnv1-engine-head {" in css
+    assert "padding: 15px 18px 12px;" in css
+
+    body_selector = "body.page-connections .xps2-naiveproxy-body {"
+    assert body_selector in css
+    body = css.split(body_selector, 1)[1].split("}", 1)[0]
+    assert "margin-top: 10px;" in body
+    assert "border-top: 0;" in body
+    assert "padding: 8px 18px 14px;" in body
+
+    actions_selector = "body.page-connections .xps2-naiveproxy-body .cnv1-form-actions {"
+    assert actions_selector in css
+    actions = css.split(actions_selector, 1)[1].split("}", 1)[0]
+    assert "border-top: 0;" in actions
+    assert "padding-top: 0;" in actions
+
+
 def test_awg_header_has_no_visual_divider():
     css = (ROOT / "app/web/static/sg-awg-dual-v1.css").read_text(encoding="utf-8")
     assert ".awgd-shell > .cnv1-engine-head { border-bottom:" not in css
