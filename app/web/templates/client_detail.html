@@ -3,25 +3,26 @@
 
 {% block head %}
   {{ super() }}
-  <link rel="stylesheet" href="{{ url_for('static', filename='sg-client-detail-v10.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='sg-devices-v46.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='sg-client-qr-modal-v1.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='sg-subscription-verified-v1.css') }}?v={{ app_version }}">
-  <!-- SG_DEVICE_COLLAPSE_V1_CSS -->
-  <link rel="stylesheet" href="{{ url_for('static', filename='sg-device-collapse-v1.css') }}?v={{ app_version }}">
-  <!-- /SG_DEVICE_COLLAPSE_V1_CSS -->
-  <!-- SG_DEVICE_COLLAPSE_V1_JS -->
-  <script src="{{ url_for('static', filename='sg-device-collapse-v1.js') }}?v={{ app_version }}" defer></script>
-  <!-- /SG_DEVICE_COLLAPSE_V1_JS -->
-  <!-- SG_AWG_ONLY_NOTICE_V1_ASSETS -->
-  <link rel="stylesheet" href="{{ url_for('static', filename='sg-awg-only-notice-v1.css') }}?v={{ app_version }}">
-  <script src="{{ url_for('static', filename='sg-awg-only-notice-v1.js') }}?v={{ app_version }}" defer></script>
+  <script src="{{ static_asset('sg-device-collapse-v1.js') }}" defer></script>
+  <script src="{{ static_asset('sg-awg-only-notice-v1.js') }}" defer></script>
+{% endblock %}
+
+{% block page_styles %}
+  <link rel="stylesheet" href="{{ static_asset('sg-client-detail-v10.css') }}">
+  <link rel="stylesheet" href="{{ static_asset('sg-devices-v46.css') }}">
+  <link rel="stylesheet" href="{{ static_asset('sg-client-qr-modal-v1.css') }}">
+  <link rel="stylesheet" href="{{ static_asset('sg-subscription-verified-v1.css') }}">
+  <link rel="stylesheet" href="{{ static_asset('sg-device-collapse-v1.css') }}">
+  <link rel="stylesheet" href="{{ static_asset('sg-awg-only-notice-v1.css') }}">
+  <link rel="stylesheet" href="{{ static_asset('sg-device-collapse-v4.css') }}">
+  <link rel="stylesheet" href="{{ static_asset('sg-device-expanded-cleanup-v1.css') }}">
+  <link rel="stylesheet" href="{{ static_asset('sg-ui-clients-v22-08.css') }}">
 {% endblock %}
 
 {% block content %}
 {% set state_labels = {'creating':'Создаётся','checking':'Проверяется','applying':'Применяется','applied':'Готово','pending':'Ожидает применения','generated':'Ожидает применения','error':'Ошибка','disabled':'Отключено','locked':'Недоступно','missing':'Не создано'} %}
-<section class="dv16-page">
-  <header class="dv16-heading">
+<section class="dv16-page sg-ui-page" data-sg-ui-page="client-detail">
+  <header class="dv16-heading sg-ui-page-head">
     <div>
       <div class="cd10-kicker"><span></span> SG-GATEWAY / CLIENT</div>
       <h1>{{ client.name }}</h1>
@@ -34,7 +35,7 @@
         {% if client.expires_at %}<span>До {{ client.expires_at }}</span>{% endif %}
       </div>
     </div>
-    <div class="dv16-heading-actions">
+    <div class="dv16-heading-actions sg-ui-actions">
       <a class="button" href="{{ url_for('clients') }}">К списку</a>
       <button class="button" type="button" data-open-client-edit>Редактировать клиента</button>
       <button class="button primary" type="button" data-open-device-form>+ Добавить устройство</button>
@@ -64,7 +65,7 @@
   <!-- SG_SUBSCRIPTION_DUAL_UI_V1 -->
   {% include "_sg_subscription_dual.html" %}
 
-  <section class="dv16-devices" aria-label="Устройства клиента">
+  <section class="dv16-devices sg-ui-section" data-sg-section="devices" aria-label="Устройства клиента">
     {% for view in device_views %}
     {% set device = view.device %}
     {% set cards = view.access_cards %}
@@ -72,7 +73,7 @@
     {% set subscription = subscriptions[0] if subscriptions else none %}
     {% set profiles = cards|rejectattr('kind', 'equalto', 'subscription')|list %}
     {% set display_name = 'Основное устройство' if device.is_primary else device.name %}
-    <article class="dv16-device {{ 'is-disabled' if not device.enabled or not client.enabled else '' }}" id="device-{{ device.id }}">
+    <article class="dv16-device {{ 'is-disabled' if not device.enabled or not client.enabled else '' }} sg-ui-card" data-sg-device-card id="device-{{ device.id }}">
       <header class="dv16-device-head">
         <div class="dv16-device-title">
           <span class="dv16-state-dot {{ 'online' if client.enabled and device.enabled else 'offline' }}"></span>

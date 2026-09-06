@@ -55,8 +55,11 @@ def test_accepted_system_and_device_ui_are_native_source() -> None:
     assert "margin-top: -16px !important;" in system
     assert "margin-bottom: 6px !important;" in system
     assert "display: none !important;" in memory
-    assert "SG_DEVICE_COLLAPSE_V4_LAST_CSS" in base
-    assert base.index("SG_DEVICE_COLLAPSE_V4_LAST_CSS") > base.index("sg-mobile-sidebar-v1.css")
+    clients = source("app/web/templates/clients.html")
+    assert "SG_DEVICE_COLLAPSE_V4_LAST_CSS" not in base
+    assert "{{ static_asset('sg-device-collapse-v4.css') }}" in clients
+    assert "{{ static_asset('sg-device-expanded-cleanup-v1.css') }}" in clients
+    assert "{{ static_asset('sg-device-collapse-v4.css') }}" in detail
     assert "sg-device-collapse-v1.js" in detail
     assert "sg-device-collapsed" in collapse_js
     assert "collapsed device cards v4" in collapse_css.lower()

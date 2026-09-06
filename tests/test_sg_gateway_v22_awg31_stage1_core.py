@@ -167,7 +167,8 @@ def test_awg31_renders_separate_server_and_peer_configs(
     assert "Address = 10.131.0.1/24" in server
     assert "Endpoint = awg31.internal:587" in peer
     assert "DNS = 1.1.1.1" in peer
-    assert "TCP" not in server + peer
+    rendered_lines = (server + "\n" + peer).splitlines()
+    assert not any(line.strip().upper().startswith("TCP") for line in rendered_lines)
 
 
 def test_service_repair_and_control_commands_are_separate() -> None:

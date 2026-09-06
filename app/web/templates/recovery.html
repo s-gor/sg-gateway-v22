@@ -10,14 +10,14 @@
       } catch (_) {}
     </script>
     <title>SG-Gateway · Recovery</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='sg-luxury-jade-depth-v2.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='sg-readable-typography-v3.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='sg-recovery-restore-v1.css') }}?v={{ app_version }}-recovery-restore-v1">
+    <link rel="stylesheet" href="{{ static_asset('sg-ui-foundation-v22-08.css') }}">
+    <link rel="stylesheet" href="{{ static_asset('sg-ui-components-v22-08.css') }}">
+    <link rel="stylesheet" href="{{ static_asset('sg-ui-standalone-v22-08.css') }}">
+    <link rel="stylesheet" href="{{ static_asset('sg-recovery-restore-v1.css') }}">
   </head>
-  <body class="sg-body">
-    <main class="recovery-shell">
-      <header class="recovery-header">
+  <body class="sg-ui-standalone-body">
+    <main class="recovery-shell sg-ui-standalone sg-ui-standalone--recovery" data-sg-standalone-page="recovery">
+      <header class="recovery-header sg-ui-recovery-head">
         <div class="brand">
           <div class="brand-mark">SG</div>
           <div>
@@ -25,10 +25,10 @@
             <div class="brand-note">Минимальная аварийная страница</div>
           </div>
         </div>
-        <div class="topbar-actions">
-          <a class="button primary" href="/maintenance">Maintenance</a>
-          <a class="button" href="/maintenance/diagnostics.json">Скачать диагностику</a>
-          <a class="button" href="/">Открыть панель</a>
+        <div class="topbar-actions sg-ui-actions">
+          <a class="button primary sg-ui-button sg-ui-button--primary" href="/maintenance">Maintenance</a>
+          <a class="button sg-ui-button" href="/maintenance/diagnostics.json">Скачать диагностику</a>
+          <a class="button sg-ui-button" href="/">Открыть панель</a>
         </div>
       </header>
 
@@ -89,8 +89,8 @@
                   <td>{{ backup.created_at }}</td>
                   <td class="actions-cell">
                     <div class="recovery-backup-actions">
-                      <a class="button small" href="{{ url_for('download_backup_route', name=backup.name) }}">Скачать</a>
-                      <button class="button small recovery-restore-button"
+                      <a class="button small sg-ui-button sg-ui-button--small" href="{{ url_for('download_backup_route', name=backup.name) }}">Скачать</a>
+                      <button class="button small recovery-restore-button sg-ui-button sg-ui-button--small"
                               type="button"
                               data-recovery-restore
                               data-backup-name="{{ backup.name }}"
@@ -116,8 +116,8 @@
           <p>Перед заменой текущей базы будет автоматически создана страховочная копия.</p>
           <code id="recovery-confirm-backup"></code>
           <div class="recovery-confirm-actions">
-            <button class="button" type="button" id="recovery-confirm-cancel">Отмена</button>
-            <button class="button recovery-restore-button" type="submit">Восстановить</button>
+            <button class="button sg-ui-button" type="button" id="recovery-confirm-cancel">Отмена</button>
+            <button class="button recovery-restore-button sg-ui-button" type="submit">Восстановить</button>
           </div>
         </form>
       </dialog>

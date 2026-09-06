@@ -24,15 +24,15 @@ def test_connections_uses_compact_xmux_and_full_width_mihomo():
     assert "grid-template-columns: minmax(0, 1fr) !important" in layout_css
 
 
-def test_client_detail_uses_routing_frame_and_title_size():
-    css = (ROOT / "app/web/static/sg-page-frame-routing-v1.css").read_text(
-        encoding="utf-8"
-    )
+def test_client_detail_uses_02208_canonical_page_frame():
+    frame = (ROOT / "app/web/static/sg-page-frame-routing-v1.css").read_text(encoding="utf-8")
+    template = (ROOT / "app/web/templates/client_detail.html").read_text(encoding="utf-8")
+    clients_css = (ROOT / "app/web/static/sg-ui-clients-v22-08.css").read_text(encoding="utf-8")
 
-    assert "client detail uses the exact Routing page frame" in css
-    assert ".dv16-page" in css
-    assert ".dv16-heading h1" in css
-    assert "font-size: 27px !important" in css
+    assert ".dv16-page" not in frame
+    assert 'data-sg-ui-page="client-detail"' in template
+    assert 'class="dv16-heading sg-ui-page-head"' in template
+    assert '[data-sg-ui-page="client-detail"]' in clients_css
 
 
 def test_russian_publication_has_user_and_technical_roads():

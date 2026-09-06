@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-VERSION="0.1.0-022.06"
-INSTALLER_BUILD="02206-full-clean-dual-stack"
+VERSION="0.1.0-022.08"
+INSTALLER_BUILD="02208-full-clean-dual-stack"
 SOURCE_DIR="${SG_GATEWAY_SOURCE_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)}"
 PREFIX="/opt/sg-gateway"
 CONFIG_DIR="/etc/sg-gateway"
 DATA_DIR="/var/lib/sg-gateway"
 LOG_DIR="/var/log/sg-gateway"
-INSTALL_LOG="/var/log/sg-gateway-installer-02206.log"
+INSTALL_LOG="/var/log/sg-gateway-installer-02208.log"
 BACKUP_ROOT="/root/sg-gateway-backups"
-RESUME_FILE="/root/sg-gateway-02206-installer-resume.env"
+RESUME_FILE="/root/sg-gateway-02208-installer-resume.env"
 MIHOMO_VERSION="v1.19.29"
 SING_BOX_VERSION="1.13.14"
 WGCF_CLI_VERSION="v0.3.6"
@@ -21,8 +21,8 @@ AWG3_TOOLS_VERSION="3.0.20260805"
 AWG3_GO_VERSION="v3.0.0"
 PANEL_USER="sg-gateway"
 PANEL_GROUP="sg-gateway"
-XRAY_REQUIRED_VERSION="v26.6.27"
-XRAY_MINIMUM_VERSION="v26.6.27"
+XRAY_REQUIRED_VERSION="v26.7.28"
+XRAY_MINIMUM_VERSION="v26.7.28"
 
 # SG-Gateway V22 vendor bundle. Clean installation does not download these
 # runtimes from upstream projects. The files are committed with the source.
@@ -60,7 +60,7 @@ YELLOW=$'\033[1;33m'
 CYAN=$'\033[1;36m'
 RESET=$'\033[0m'
 
-TOTAL_STAGES=10
+TOTAL_STAGES=24
 CURRENT_STAGE="0"
 CURRENT_LABEL="Подготовка"
 PANEL_PORT=""
@@ -216,6 +216,11 @@ prepare_log() {
   install -d -m 0755 "$(dirname "$INSTALL_LOG")"
   : > "$INSTALL_LOG"
   chmod 0600 "$INSTALL_LOG"
+}
+
+fail() {
+  printf '[SG-Gateway] %s\n' "$1" >&2
+  return 1
 }
 
 
@@ -873,6 +878,12 @@ EOF
 }
 
 load_resume_state() {
+  local legacy_resume_file="/root/sg-gateway-02206-installer-resume.env"
+  if [[ ! -f "$RESUME_FILE" && -f "$legacy_resume_file" ]]; then
+    mv -f "$legacy_resume_file" "$RESUME_FILE"
+    chmod 0600 "$RESUME_FILE"
+    echo "[SG-Gateway] Параметры незавершённой установки 022.06 перенесены в формат 022.08."
+  fi
   [[ -f "$RESUME_FILE" ]] || return 1
   # shellcheck disable=SC1090
   source "$RESUME_FILE"
@@ -1141,32 +1152,6 @@ collect_automatic_parameters() {
 
   read_password
   SECRET_KEY="$(openssl rand -hex 32)"
-}
-
-create_backup() {
-  install -d -m 0700 "$BACKUP_ROOT"
-  [[ -n "$BACKUP_DIR" ]] || BACKUP_DIR="$BACKUP_ROOT/$(date +%Y%m%d-%H%M%S)-before-sg-gateway-02206"
-  install -d -m 0700 "$BACKUP_DIR"
-  local existing=()
-  local relative
-  for relative in "${MANAGED_PATHS[@]}"; do
-    [[ -e "/$relative" || -L "/$relative" ]] && existing+=("$relative")
-  done
-  printf '%s\n' "${existing[@]}" > "$BACKUP_DIR/existing-paths.txt"
-  if (( ${#existing[@]} > 0 )); then
-    tar -C / -cpf "$BACKUP_DIR/managed-paths.tar" "${existing[@]}"
-  fi
-  : > "$BACKUP_DIR/service-state.tsv"
-  local service active enabled
-  for service in sg-hostd.service xray.service mihomo.service \
-    sg-gateway-awg.service sg-gateway-awg3.service sg-gateway-singbox.service sg-gateway.service nginx.service; do
-    active=0; enabled=0
-    systemctl is-active --quiet "$service" && active=1 || true
-    systemctl is-enabled --quiet "$service" && enabled=1 || true
-    printf '%s\t%s\t%s\n' "$service" "$active" "$enabled" >> "$BACKUP_DIR/service-state.tsv"
-  done
-  printf '%s\n' "$VERSION" > "$BACKUP_DIR/new-version.txt"
-  echo "Backup: $BACKUP_DIR"
 }
 
 stage_backup_and_prepare() {
@@ -3088,80 +3073,487 @@ print_sg_admin_status() {
   printf '[SG-Gateway] Профили: Clients → sg-admin\n'
 }
 
-main() {
-  require_root
-  # Public wrapper performs the same check. Keep this guard here as well for
-  # direct/archive launches and fail before log creation or package changes.
-  require_supported_ubuntu
-  # Start from a known-safe installation mask. Secret files below are still
-  # created with explicit 0600/0640 modes or inside a scoped umask 077 block.
-  # This prevents any restrictive umask inherited through sudo/SSH from
-  # making application or virtualenv directories inaccessible to sg-gateway.
-  umask 022
-  prepare_log
-  export DEBIAN_FRONTEND=noninteractive LANG=C.UTF-8 LC_ALL=C.UTF-8
-  printf '\n%s[SG-Gateway]%s Запускаю полный мастер SG-Gateway 0.1.0-022.06\n' "$CYAN" "$RESET"
-  printf '%s[SG-Gateway] [OK]%s Мастер установки SG-Gateway 0.1.0-022.06 запущен (0 сек.)\n' "$GREEN" "$RESET"
-  printf '[SG-Gateway] Технический журнал: %s\n' "$INSTALL_LOG"
-  printf '[SG-Gateway] Повторный запуск выполняется на этом же EC2. Домен не обязателен.\n\n'
+NAIVEPROXY_VERSION="v2.11.2-naive"
+NAIVEPROXY_ARCHIVE_SHA256="19eccb7321dd877a5fb4a3dba6ef1b745185188b616c96cc6201f1a1fc0380a8"
+NAIVEPROXY_URL="https://github.com/klzgrad/forwardproxy/releases/download/${NAIVEPROXY_VERSION}/caddy-forwardproxy-naive.tar.xz"
+NAIVEPROXY_PORT="8447"
+NAIVEPROXY_PREFIX="/opt/sg-gateway/naiveproxy"
+NAIVEPROXY_CONFIG="/etc/sg-gateway/naiveproxy"
+NAIVEPROXY_STATE="/var/lib/sg-gateway/naiveproxy"
+NAIVEPROXY_SERVICE="sg-gateway-naiveproxy.service"
 
-  run_stage 1 "Подготовка Ubuntu" bootstrap_packages
-  # Fail before any server mutation if our own pinned installation media is
-  # missing or damaged. This is the key reproducibility guarantee of 021.
+# NaiveProxy is part of the same transaction as every other 22.08 runtime.
+MANAGED_PATHS+=(
+  etc/systemd/system/sg-gateway-naiveproxy.service
+  etc/sg-gateway/naiveproxy
+  var/lib/sg-gateway/naiveproxy
+  opt/sg-gateway/naiveproxy
+)
+
+create_backup() {
+  install -d -m 0700 "$BACKUP_ROOT"
+  [[ -n "$BACKUP_DIR" ]] || BACKUP_DIR="$BACKUP_ROOT/$(date +%Y%m%d-%H%M%S)-before-sg-gateway-02208"
+  install -d -m 0700 "$BACKUP_DIR"
+
+  local existing=()
+  local relative
+  for relative in "${MANAGED_PATHS[@]}"; do
+    [[ -e "/$relative" || -L "/$relative" ]] && existing+=("$relative")
+  done
+  printf '%s\n' "${existing[@]}" > "$BACKUP_DIR/existing-paths.txt"
+  if (( ${#existing[@]} > 0 )); then
+    tar -C / -cpf "$BACKUP_DIR/managed-paths.tar" "${existing[@]}"
+  fi
+
+  : > "$BACKUP_DIR/service-state.tsv"
+  local service active enabled
+  for service in \
+    sg-hostd.service xray.service mihomo.service \
+    sg-gateway-awg.service sg-gateway-awg3.service sg-gateway-awg31.service \
+    sg-gateway-singbox.service sg-gateway-naiveproxy.service \
+    sg-gateway.service nginx.service; do
+    active=0
+    enabled=0
+    systemctl is-active --quiet "$service" && active=1 || true
+    systemctl is-enabled --quiet "$service" && enabled=1 || true
+    printf '%s\t%s\t%s\n' "$service" "$active" "$enabled" >> "$BACKUP_DIR/service-state.tsv"
+  done
+
+  printf '%s\n' "$VERSION" > "$BACKUP_DIR/new-version.txt"
+  if (( UPDATE_MODE == 1 )) && [[ -f "$DATA_DIR/sg-gateway.sqlite" ]]; then
+    fingerprint_clients "$DATA_DIR/sg-gateway.sqlite" "$BACKUP_DIR/client-identities-before.sha256"
+  fi
+  echo "Backup: $BACKUP_DIR"
+}
+
+restore_backup() {
+  [[ -n "$BACKUP_DIR" && -d "$BACKUP_DIR" ]] || return 0
+  printf '\n%s[SG-Gateway] [ОТКАТ]%s Восстанавливаю предыдущую установку SG-Gateway.\n' "$YELLOW" "$RESET"
+
+  systemctl stop \
+    sg-gateway.service sg-hostd.service xray.service mihomo.service \
+    sg-gateway-awg.service sg-gateway-awg3.service sg-gateway-awg31.service \
+    sg-gateway-singbox.service sg-gateway-naiveproxy.service nginx.service \
+    >/dev/null 2>&1 || true
+
+  rollback_remove_managed_paths /
+
+  if [[ -f "$BACKUP_DIR/managed-paths.tar" ]]; then
+    tar -C / -xpf "$BACKUP_DIR/managed-paths.tar"
+  fi
+  if [[ -f "$BACKUP_DIR/nginx-after-packages.tar" ]]; then
+    tar -C / -xpf "$BACKUP_DIR/nginx-after-packages.tar"
+  fi
+  systemctl daemon-reload || true
+
+  local state_file="$BACKUP_DIR/service-state.tsv"
+  local service active enabled failures=0
+  declare -A was_active=()
+  declare -A was_enabled=()
+
+  if [[ -f "$state_file" ]]; then
+    while IFS=$'\t' read -r service active enabled; do
+      [[ -n "$service" ]] || continue
+      was_active["$service"]="$active"
+      was_enabled["$service"]="$enabled"
+    done < "$state_file"
+  fi
+
+  local services=(
+    sg-hostd.service xray.service mihomo.service
+    sg-gateway-awg.service sg-gateway-awg3.service sg-gateway-awg31.service
+    sg-gateway-singbox.service sg-gateway-naiveproxy.service
+    sg-gateway.service nginx.service
+  )
+
+  for service in "${services[@]}"; do
+    if [[ "${was_enabled[$service]:-0}" == "1" ]]; then
+      systemctl enable "$service" >/dev/null 2>&1 || true
+    elif [[ -n "${was_enabled[$service]+x}" ]]; then
+      systemctl disable "$service" >/dev/null 2>&1 || true
+    fi
+  done
+
+  for service in "${services[@]}"; do
+    if [[ "${was_active[$service]:-0}" == "1" ]]; then
+      if ! systemctl restart "$service" >>"$INSTALL_LOG" 2>&1; then
+        echo "ROLLBACK SERVICE FAILED: $service" >>"$INSTALL_LOG"
+        failures=$((failures + 1))
+      fi
+    elif [[ -n "${was_active[$service]+x}" ]]; then
+      systemctl stop "$service" >/dev/null 2>&1 || true
+    fi
+  done
+
+  if [[ ! -f "$state_file" ]]; then
+    for service in sg-hostd.service sg-gateway.service nginx.service; do
+      [[ -f "/etc/systemd/system/$service" || "$service" == "nginx.service" ]] || continue
+      systemctl enable --now "$service" >>"$INSTALL_LOG" 2>&1 || failures=$((failures + 1))
+    done
+    [[ ! -f /usr/local/etc/xray/config.json ]] || \
+      systemctl enable --now xray.service >>"$INSTALL_LOG" 2>&1 || failures=$((failures + 1))
+    [[ ! -f /etc/mihomo/config.yaml ]] || \
+      systemctl enable --now mihomo.service >>"$INSTALL_LOG" 2>&1 || failures=$((failures + 1))
+    if [[ -f "$NAIVEPROXY_CONFIG/Caddyfile" ]]; then
+      systemctl enable --now "$NAIVEPROXY_SERVICE" >>"$INSTALL_LOG" 2>&1 || failures=$((failures + 1))
+    fi
+  fi
+
+  if [[ -f "$state_file" ]]; then
+    while IFS=$'\t' read -r service active enabled; do
+      [[ "$active" == "1" ]] || continue
+      if ! systemctl is-active --quiet "$service"; then
+        echo "ROLLBACK VERIFY FAILED: $service is not active" >>"$INSTALL_LOG"
+        failures=$((failures + 1))
+      fi
+    done < "$state_file"
+  fi
+
+  if (( failures > 0 )); then
+    printf '%s[SG-Gateway] [ОТКАТ НЕПОЛНЫЙ]%s Файлы восстановлены, но не все прежние службы запустились.\n' "$RED" "$RESET"
+    printf '[SG-Gateway] Резервная копия: %s\n' "$BACKUP_DIR"
+    return 1
+  fi
+  printf '%s[SG-Gateway] [ОТКАТ OK]%s Предыдущая установка и активные службы восстановлены.\n' "$GREEN" "$RESET"
+  printf '[SG-Gateway] Резервная копия: %s\n' "$BACKUP_DIR"
+}
+
+stage_prepare_install_context() {
   verify_vendor_core_set
+
   if detect_existing_install; then
-    printf '[SG-Gateway] Обнаружена установленная полная панель %s. Выполняется безопасное обновление.\n\n' \
+    printf '[SG-Gateway] Обнаружена установленная полная панель %s. Выполняется безопасное обновление.\n' \
       "${EXISTING_VERSION:-неизвестной версии}"
     if (( SERVER_NAME_MIGRATION_REQUIRED == 1 )); then
       SERVER_NAME="sg-gateway"
       [[ "$COUNTRY_CODE" != "unknown" ]] && SERVER_NAME="sg-gateway-${COUNTRY_CODE}"
       SERVER_NAME="$(normalize_hostname "$SERVER_NAME")"
       valid_hostname "$SERVER_NAME" || SERVER_NAME="sg-gateway"
-      printf '[SG-Gateway] Имя сервера автоматически нормализовано: %s
-' "$SERVER_NAME"
     fi
-    printf '[SG-Gateway] Все параметры приняты. Дальнейшее обновление не потребует ввода.\n\n'
   elif detect_minimal_013_install; then
-    printf '[SG-Gateway] Обнаружена рабочая база SG-Gateway 013.\n'
-    printf '[SG-Gateway] Восстанавливаю полный активный UI и сохраняю подтверждённые Xray Reality/ML-KEM ключи.\n'
-    printf '[SG-Gateway] Панель будет доступна на TCP %s. Логин и пароль SG-Gateway 013 сохраняются.\n\n' "$PANEL_PORT"
-    printf '[SG-Gateway] Все параметры приняты. Дополнительных вопросов не будет.\n\n'
+    printf '[SG-Gateway] Обнаружена рабочая база SG-Gateway 013; выполняется миграция.\n'
+    printf '[SG-Gateway] Логин и пароль SG-Gateway 013 сохраняются.\n'
   else
-    if [[ -f "$RESUME_FILE" ]]; then
-      printf '[SG-Gateway] Повторный запуск выполняется на этом же EC2; использую сохранённые автоматические параметры.
-'
-    fi
     if ! load_resume_state; then
       collect_automatic_parameters
       save_resume_state
     fi
-    printf '\n[SG-Gateway] Основная установка начинается. Дополнительных вопросов не будет.\n\n'
   fi
 
-  # AmneziaWG has one canonical SG-Gateway transport port.
   AWG_PORT="$DEFAULT_AWG_PORT"
   AWG3_PORT="$DEFAULT_AWG3_PORT"
+  BACKUP_DIR="$BACKUP_ROOT/$(date +%Y%m%d-%H%M%S)-before-sg-gateway-02208"
+}
 
-  BACKUP_DIR="$BACKUP_ROOT/$(date +%Y%m%d-%H%M%S)-before-sg-gateway-02206"
+stage_vendor_media_contract() {
+  verify_vendor_core_set
+}
+
+stage_backup_and_prepare() {
+  create_backup
   MUTATION_STARTED=1
-  run_stage 2 "Резервная копия и подготовка исходника" stage_backup_and_prepare
-  run_stage 3 "Системные пакеты, Nginx и Certbot" stage_system_packages
-  run_stage 4 "Xray, AmneziaWG, Mihomo, sing-box и WARP helper" stage_engine_runtimes
-  run_stage 5 "Python-окружение и проверка исходника" stage_python_and_source_check
-  run_stage 6 "Полный UI, база и сохранение Xray 013" stage_configuration_and_database
-  run_stage 7 "Локальная проверка страниц" stage_local_application_smoke_test
-  run_stage 8 "Создание systemd-служб" stage_systemd_units
-  run_stage 9 "Firewall и сетевые порты" stage_firewall_and_network
+  systemctl stop \
+    sg-gateway.service sg-hostd.service xray.service mihomo.service \
+    sg-gateway-awg.service sg-gateway-awg3.service sg-gateway-awg31.service \
+    sg-gateway-singbox.service sg-gateway-naiveproxy.service \
+    >/dev/null 2>&1 || true
 
-  CURRENT_STAGE="10"
-  CURRENT_LABEL="Запуск и финальная проверка"
-  run_quiet "Этап 10/10 · Запуск sg-hostd" stage9_start_hostd
-  run_quiet "Этап 10/10 · Проверка команд hostd" stage9_verify_hostd
-  run_quiet "Этап 10/10 · Подготовка независимого профиля AWG31" run_awg31_stage3a_migration
-  run_quiet "Этап 10/10 · Применение подтверждённого Xray и клиентов" stage9_apply_runtime
-  run_quiet "Этап 10/10 · Запуск панели" stage9_start_panel
-  run_quiet "Этап 10/10 · Проверка Nginx и служб" stage9_verify_nginx
-  run_quiet "Этап 10/10 · Контроль неизменности Clients" verify_client_identities_after_update
+  rm -rf "$PREFIX.new" "$PREFIX"
+  install -d -m 0755 "$PREFIX.new"
+  cp -a "$SOURCE_DIR/." "$PREFIX.new/"
+  rm -rf "$PREFIX.new/vendor/cores"
+  rm -f "$PREFIX.new/install.sh"
+  mv "$PREFIX.new" "$PREFIX"
+
+  verify_installed_connections_ui_contract "$PREFIX"
+  chown -R root:root "$PREFIX"
+  chmod -R a+rX "$PREFIX"
+  chmod -R go-w "$PREFIX"
+  chmod 0755 "$PREFIX"
+  chmod 0755 "$PREFIX/deploy/configure-panel-access.sh"
+  chmod 0755 "$PREFIX/deploy/sg-gateway-awg3-userspace.sh"
+}
+
+stage_system_packages_02208() {
+  stage_system_packages
+  apt_get install -y xz-utils
+}
+
+stage_awg2_runtime() {
+  verify_vendor_core_set
+  install_amneziawg_from_vendor
+}
+
+stage_awg3_runtime() {
+  verify_vendor_core_set
+  install_amneziawg3_userspace_from_vendor
+}
+
+stage_xray_runtime() {
+  verify_vendor_core_set
+  local installed_xray=""
+  if [[ -x /usr/local/bin/xray ]]; then
+    installed_xray="$(xray_installed_version)"
+  fi
+  if (( UPDATE_MODE == 1 )) && [[ -n "$installed_xray" && "$installed_xray" != "v" ]] \
+    && dpkg --compare-versions "${installed_xray#v}" ge "${XRAY_MINIMUM_VERSION#v}"; then
+    echo "[SG-Gateway] Xray $installed_xray сохранён при обновлении."
+  else
+    install_xray_from_vendor
+  fi
+  verify_xray_version
+  systemctl disable --now xray.service >/dev/null 2>&1 || true
+}
+
+stage_mihomo_runtime() {
+  verify_vendor_core_set
+  install_mihomo_from_vendor
+}
+
+stage_singbox_and_warp_runtime() {
+  verify_vendor_core_set
+  install_sing_box_from_vendor
+  install_wgcf_from_vendor
+}
+
+stage_naiveproxy_runtime() {
+  local work archive candidate binary_sha256 candidate_modules
+  [[ "$(uname -m)" == "x86_64" ]] || {
+    echo "NaiveProxy pinned runtime supports linux/amd64 only" >&2
+    return 1
+  }
+
+  for tool in curl tar sha256sum systemctl; do
+    command -v "$tool" >/dev/null 2>&1 || {
+      echo "NaiveProxy requires $tool" >&2
+      return 1
+    }
+  done
+
+  systemctl stop "$NAIVEPROXY_SERVICE" >/dev/null 2>&1 || true
+
+  if ! getent group sg-naiveproxy >/dev/null; then
+    groupadd --system sg-naiveproxy
+  fi
+  if ! id -u sg-naiveproxy >/dev/null 2>&1; then
+    useradd --system --gid sg-naiveproxy --home-dir "$NAIVEPROXY_STATE" --shell /usr/sbin/nologin sg-naiveproxy
+  fi
+
+  install -d -m 0755 "$NAIVEPROXY_PREFIX/bin"
+  install -d -o sg-naiveproxy -g sg-naiveproxy -m 0700 "$NAIVEPROXY_STATE"
+  install -d -o sg-naiveproxy -g sg-naiveproxy -m 0750 "$NAIVEPROXY_STATE/site"
+  install -d -o sg-naiveproxy -g sg-naiveproxy -m 0700 \
+    "$NAIVEPROXY_STATE/xdg-data" "$NAIVEPROXY_STATE/xdg-config"
+
+  work="$(mktemp -d /tmp/sg-gateway-naiveproxy.XXXXXX)"
+  archive="$work/caddy-forwardproxy-naive.tar.xz"
+  curl -fsSL --retry 3 --connect-timeout 15 -o "$archive" "$NAIVEPROXY_URL"
+  printf '%s  %s\n' "$NAIVEPROXY_ARCHIVE_SHA256" "$archive" | sha256sum -c - >/dev/null
+  tar -xJf "$archive" -C "$work"
+  candidate="$work/caddy-forwardproxy-naive/caddy"
+  [[ -x "$candidate" ]] || {
+    rm -rf "$work"
+    echo "Pinned NaiveProxy archive does not contain executable caddy" >&2
+    return 1
+  }
+  candidate_modules="$("$candidate" list-modules)"
+  grep -Fx 'http.handlers.forward_proxy' <<<"$candidate_modules" >/dev/null
+
+  install -m 0755 "$candidate" "$NAIVEPROXY_PREFIX/bin/caddy.new"
+  mv -f "$NAIVEPROXY_PREFIX/bin/caddy.new" "$NAIVEPROXY_PREFIX/bin/caddy"
+  binary_sha256="$(sha256sum "$NAIVEPROXY_PREFIX/bin/caddy" | awk '{print $1}')"
+  printf '%s  %s\n' "$binary_sha256" "$NAIVEPROXY_PREFIX/bin/caddy" > "$NAIVEPROXY_PREFIX/CADDY-SHA256"
+  cat > "$NAIVEPROXY_PREFIX/VERSIONS.env" <<EOF
+RUNTIME_VERSION=$NAIVEPROXY_VERSION
+RUNTIME_ARCHIVE_SHA256=$NAIVEPROXY_ARCHIVE_SHA256
+RUNTIME_BINARY_SHA256=$binary_sha256
+RUNTIME_URL=$NAIVEPROXY_URL
+EOF
+  rm -rf "$work"
+}
+
+stage_configuration_and_database_02208() {
+  stage_configuration_and_database
+
+  chmod o+x "$CONFIG_DIR"
+  install -d -o root -g sg-naiveproxy -m 0750 "$NAIVEPROXY_CONFIG"
+
+  cat >> "$CONFIG_DIR/runtime.env" <<EOF
+SG_GATEWAY_NAIVEPROXY_INSTALLED_BY_SG=1
+SG_GATEWAY_NAIVEPROXY_VERSION=${NAIVEPROXY_VERSION}
+SG_GATEWAY_NAIVEPROXY_PORT=${NAIVEPROXY_PORT}
+EOF
+
+  runuser -u "$PANEL_USER" -- env \
+    PYTHONPATH="$PREFIX" \
+    SG_GATEWAY_ENV=production \
+    SG_GATEWAY_HOST=127.0.0.1 \
+    SG_GATEWAY_PORT="$BACKEND_PORT" \
+    SG_GATEWAY_PUBLIC_PORT="$PANEL_PORT" \
+    SG_GATEWAY_PUBLIC_ADDRESS="$PUBLIC_ADDRESS" \
+    SG_GATEWAY_SERVER_NAME="$SERVER_NAME" \
+    SG_GATEWAY_COUNTRY_CODE="$COUNTRY_CODE" \
+    SG_GATEWAY_DATA_DIR="$DATA_DIR" \
+    SG_GATEWAY_LOG_DIR="$LOG_DIR" \
+    SG_GATEWAY_SECRET_KEY="$SECRET_KEY" \
+    SG_GATEWAY_ADMIN_PASSWORD="$ADMIN_PASSWORD" \
+    SG_GATEWAY_ADMIN_PASSWORD_HASH="$ADMIN_PASSWORD_HASH" \
+    "$PREFIX/.venv/bin/python" - <<'PYNAIVEDB'
+from app.naiveproxy.integration import install
+from app.db import connect
+
+install()
+with connect() as connection:
+    row = connection.execute(
+        "SELECT port FROM connection_settings WHERE engine='naiveproxy'"
+    ).fetchone()
+assert row is not None, "NaiveProxy connection settings are missing"
+assert int(row["port"]) == 8447, row["port"]
+print("NaiveProxy database seed: OK")
+PYNAIVEDB
+}
+
+stage_systemd_units_02208() {
+  stage_systemd_units
+  install -m 0644 "$PREFIX/deploy/$NAIVEPROXY_SERVICE" "/etc/systemd/system/$NAIVEPROXY_SERVICE"
+  systemctl daemon-reload
+}
+
+stage_firewall_and_network_02208() {
+  stage_firewall_and_network
+  local ufw_state=""
+  ufw_state="$(ufw status 2>/dev/null || true)"
+  if grep -q '^Status: active' <<<"$ufw_state"; then
+    ufw allow "${NAIVEPROXY_PORT}/tcp"
+  fi
+}
+
+restore_update_runtime_services() {
+  (( UPDATE_MODE == 1 )) || return 0
+  local service
+  for service in \
+    mihomo.service sg-gateway-awg.service sg-gateway-awg3.service \
+    sg-gateway-awg31.service sg-gateway-singbox.service sg-gateway-naiveproxy.service; do
+    if service_was_enabled_before_update "$service"; then
+      systemctl_with_retry enable "$service"
+    fi
+    if service_was_active_before_update "$service"; then
+      systemctl_with_retry restart "$service"
+      systemctl is-active --quiet "$service"
+      echo "Update runtime restored: $service"
+    fi
+  done
+}
+
+verify_naiveproxy_install_contract() {
+  [[ -x "$NAIVEPROXY_PREFIX/bin/caddy" ]]
+  [[ -f "$NAIVEPROXY_PREFIX/VERSIONS.env" ]]
+  [[ -f "/etc/systemd/system/$NAIVEPROXY_SERVICE" ]]
+  [[ -d "$NAIVEPROXY_CONFIG" ]]
+  [[ -d "$NAIVEPROXY_STATE" ]]
+  id -u sg-naiveproxy >/dev/null 2>&1
+  getent group sg-naiveproxy >/dev/null
+
+  local installed_modules=""
+  installed_modules="$("$NAIVEPROXY_PREFIX/bin/caddy" list-modules)"
+  grep -Fx 'http.handlers.forward_proxy' <<<"$installed_modules" >/dev/null
+  grep -Fq "ConditionPathExists=/etc/sg-gateway/naiveproxy/Caddyfile" \
+    "/etc/systemd/system/$NAIVEPROXY_SERVICE"
+
+  PYTHONPATH="$PREFIX" SG_GATEWAY_DATA_DIR="$DATA_DIR" "$PREFIX/.venv/bin/python" - <<'PYNAIVEVERIFY'
+from app.db import connect
+with connect() as connection:
+    row = connection.execute(
+        "SELECT host, port FROM connection_settings WHERE engine='naiveproxy'"
+    ).fetchone()
+assert row is not None, "NaiveProxy DB row missing"
+assert int(row["port"]) == 8447, row["port"]
+print("NaiveProxy DB contract: OK")
+PYNAIVEVERIFY
+
+  local body
+  body="$(curl -fsS --max-time 10 "http://127.0.0.1:${HOSTD_PORT}/commands")"
+  python3 - "$body" <<'PYNAIVECOMMANDS'
+import json, sys
+value = json.loads(sys.argv[1])
+commands = set(value.get("commands", []))
+required = {"naiveproxy.status", "naiveproxy.sync"}
+missing = sorted(required - commands)
+assert not missing, f"Missing NaiveProxy hostd commands: {missing}"
+print("NaiveProxy hostd commands: OK")
+PYNAIVECOMMANDS
+  if [[ -f "$NAIVEPROXY_CONFIG/Caddyfile" ]]; then
+    systemctl_with_retry enable "$NAIVEPROXY_SERVICE"
+    systemctl_with_retry restart "$NAIVEPROXY_SERVICE"
+    systemctl is-active --quiet "$NAIVEPROXY_SERVICE"
+  fi
+}
+
+stage_final_contract() {
+  verify_client_identities_after_update
+  verify_installed_connections_ui_contract "$PREFIX"
+  verify_xray_version
+  systemctl is-active --quiet sg-hostd.service
+  systemctl is-active --quiet sg-gateway.service
+  systemctl is-active --quiet nginx.service
+}
+
+run_interactive_stage() {
+  local number="$1"
+  local label="$2"
+  local function_name="$3"
+  local started=$SECONDS
+  local elapsed=0
+
+  CURRENT_STAGE="$number"
+  CURRENT_LABEL="Этап ${number}/${TOTAL_STAGES} · ${label}"
+  printf '%s[SG-Gateway] [..]%s %s\n' "$GREEN" "$RESET" "$CURRENT_LABEL"
+
+  # This stage must stay in the foreground: it reads the administrator
+  # password from /dev/tty. run_stage/run_quiet execute their functions in a
+  # background process, which makes terminal input stop with SIGTTIN.
+  "$function_name"
+
+  elapsed=$((SECONDS - started))
+  printf '%s[SG-Gateway] [OK]%s %s (%s сек.)\n' \
+    "$GREEN" "$RESET" "$CURRENT_LABEL" "$elapsed"
+}
+
+main() {
+  require_root
+  require_supported_ubuntu
+  umask 022
+  prepare_log
+  export DEBIAN_FRONTEND=noninteractive LANG=C.UTF-8 LC_ALL=C.UTF-8
+
+  printf '\n%s[SG-Gateway]%s Запускаю полный мастер SG-Gateway 0.1.0-022.08 · 24 этапа\n' "$CYAN" "$RESET"
+  printf '[SG-Gateway] Технический журнал: %s\n' "$INSTALL_LOG"
+  printf '[SG-Gateway] Повторный запуск выполняется на этом же EC2. Домен не обязателен.\n\n'
+
+  run_stage 1 "Подготовка Ubuntu" bootstrap_packages
+  run_interactive_stage 2 "Определение режима и параметров" stage_prepare_install_context
+  run_stage 3 "Проверка установочного комплекта" stage_vendor_media_contract
+  run_stage 4 "Резервная копия и исходник" stage_backup_and_prepare
+  run_stage 5 "Системные пакеты, Nginx и Certbot" stage_system_packages_02208
+  run_stage 6 "AmneziaWG 2 runtime" stage_awg2_runtime
+  run_stage 7 "AmneziaWG 3 runtime" stage_awg3_runtime
+  run_stage 8 "Xray runtime" stage_xray_runtime
+  run_stage 9 "Mihomo runtime" stage_mihomo_runtime
+  run_stage 10 "sing-box и WARP runtime" stage_singbox_and_warp_runtime
+  run_stage 11 "NaiveProxy runtime" stage_naiveproxy_runtime
+  run_stage 12 "Python-окружение и исходник" stage_python_and_source_check
+  run_stage 13 "Конфигурация и база" stage_configuration_and_database_02208
+  run_stage 14 "Локальная проверка страниц" stage_local_application_smoke_test
+  run_stage 15 "Systemd-службы и Nginx" stage_systemd_units_02208
+  run_stage 16 "Firewall и сетевые порты" stage_firewall_and_network_02208
+  run_stage 17 "Запуск sg-hostd" stage9_start_hostd
+  run_stage 18 "Проверка команд hostd" stage9_verify_hostd
+  run_stage 19 "Независимый профиль AWG31" run_awg31_stage3a_migration
+  run_stage 20 "Применение Xray и клиентов" stage9_apply_runtime
+  run_stage 21 "Запуск панели" stage9_start_panel
+  run_stage 22 "Проверка Nginx и служб" stage9_verify_nginx
+  run_stage 23 "Проверка NaiveProxy" verify_naiveproxy_install_contract
+  run_stage 24 "Финальный контракт 22.08" stage_final_contract
 
   INSTALL_SUCCESS=1
   sanitize_installer_log_file
@@ -3175,18 +3567,21 @@ main() {
     /root/sg-gateway-019-installer-resume.env \
     /root/sg-gateway-020-installer-resume.env
   trap - ERR INT TERM
+
   printf '\n%s[SG-Gateway] ============================================================%s\n' "$GREEN" "$RESET"
   if (( UPDATE_MODE == 1 )); then
     printf '%s[SG-Gateway] SG-Gateway успешно обновлён%s\n' "$GREEN" "$RESET"
   else
     printf '%s[SG-Gateway] SG-Gateway успешно установлен%s\n' "$GREEN" "$RESET"
   fi
+  printf '%s[SG-Gateway] 24/24 · NaiveProxy включён в основной мастер%s\n' "$GREEN" "$RESET"
   printf '%s[SG-Gateway] ============================================================%s\n' "$GREEN" "$RESET"
   printf '[SG-Gateway] Имя сервера:  %s\n' "$SERVER_NAME"
   printf '[SG-Gateway] Страна:       %s\n' "${COUNTRY_CODE^^}"
   printf '[SG-Gateway] Публичный IP: %s\n' "$PUBLIC_ADDRESS"
   printf '[SG-Gateway] Версия:       %s\n' "$VERSION"
   printf '[SG-Gateway] Xray:         %s\n' "$(xray_installed_version)"
+  printf '[SG-Gateway] NaiveProxy:   %s · TCP %s\n' "$NAIVEPROXY_VERSION" "$NAIVEPROXY_PORT"
   local final_https_domain=""
   final_https_domain="$(saved_https_access)"
   if [[ -n "$final_https_domain" ]]; then
@@ -3196,20 +3591,16 @@ main() {
     printf '[SG-Gateway] Панель:       http://%s:%s\n' "$PUBLIC_ADDRESS" "$PANEL_PORT"
     printf '[SG-Gateway] Заглушка:     http://%s/\n' "$PUBLIC_ADDRESS"
   fi
-  printf '[SG-Gateway] Reality TCP:  %s:%s -> 127.0.0.1:%s\n' "$PUBLIC_ADDRESS" "$XRAY_PORT" "$REALITY_INTERNAL_PORT"
   printf '[SG-Gateway] Логин:        admin\n'
   printf '[SG-Gateway] Журнал:       %s\n' "$INSTALL_LOG"
   printf '[SG-Gateway] Backup:       %s\n' "$BACKUP_DIR"
-  printf '[SG-Gateway] SSH hostname станет виден после нового подключения: %s\n' "$SERVER_NAME"
   print_sg_admin_status
   if [[ -s "$DATA_DIR/warp/wgcf.xray.json" || -s "$DATA_DIR/warp/wgcf-profile.conf" ]]; then
     printf '[SG-Gateway] WARP:         существующий профиль сохранён\n'
   else
     printf '[SG-Gateway] WARP:         helper установлен; создаётся при необходимости в Outbounds\n'
   fi
-
 }
-
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
   main "$@"
 fi

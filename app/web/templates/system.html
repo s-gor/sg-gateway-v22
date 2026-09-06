@@ -1,17 +1,23 @@
 {% extends "base.html" %}
 {% block title %}SG-Gateway · System{% endblock %}
 
-{% block head %}
-  {{ super() }}
-  <link rel="stylesheet" href="{{ url_for('static', filename='sg-system-visual-v1.css') }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='sg-system-top-bars-v2.css') }}?v={{ app_version }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='sg-cpu-breakdown-v1.css') }}?v={{ app_version }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='sg-cpu-dial-layout-v3.css') }}?v={{ app_version }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='sg-refresh-buttons-unify-v2.css') }}?v={{ app_version }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='sg-refresh-buttons-unify-v5.css') }}?v={{ app_version }}">
-<script src="{{ url_for('static', filename='sg-cpu-breakdown-v1.js') }}?v={{ app_version }}" defer></script>
-<link rel="stylesheet" href="{{ url_for('static', filename='sg-disk-breakdown-v1.css') }}?v={{ app_version }}">
-<script src="{{ url_for('static', filename='sg-disk-breakdown-v2.js') }}?v={{ app_version }}" defer></script>
+{% block page_styles %}
+  <link rel="stylesheet" href="{{ static_asset('sg-system-visual-v1.css') }}">
+  <link rel="stylesheet" href="{{ static_asset('sg-system-top-bars-v2.css') }}">
+  <link rel="stylesheet" href="{{ static_asset('sg-cpu-breakdown-v1.css') }}">
+  <link rel="stylesheet" href="{{ static_asset('sg-cpu-dial-layout-v3.css') }}">
+  <link rel="stylesheet" href="{{ static_asset('sg-refresh-buttons-unify-v2.css') }}">
+  <link rel="stylesheet" href="{{ static_asset('sg-refresh-buttons-unify-v5.css') }}">
+  <link rel="stylesheet" href="{{ static_asset('sg-disk-breakdown-v1.css') }}">
+  <link rel="stylesheet" href="{{ static_asset('sg-system-unified-free-color-v2.css') }}">
+  <link rel="stylesheet" href="{{ static_asset('sg-system-cpu-summary-header-v1.css') }}">
+  <link rel="stylesheet" href="{{ static_asset('sg-system-memory-row-bars-v1.css') }}">
+  <link rel="stylesheet" href="{{ static_asset('sg-system-top-dividers-remove-v2.css') }}">
+  <link rel="stylesheet" href="{{ static_asset('sg-system-memory-legend-divider-remove-v1.css') }}">
+  <link rel="stylesheet" href="{{ static_asset('sg-system-light-theme-v3.css') }}">
+  <link rel="stylesheet" href="{{ static_asset('sg-system-simple-dials-v1.css') }}">
+  <link rel="stylesheet" href="{{ static_asset('sg-system-activity-v3.css') }}">
+  <link rel="stylesheet" href="{{ static_asset('sg-ui-system-v22-08.css') }}">
 {% endblock %}
 
 {% block content %}
@@ -24,15 +30,15 @@
 {% set disk_state = 'critical' if resources.disk.percent >= 95 else 'high' if resources.disk.percent >= 90 else 'warning' if resources.disk.percent >= 80 else 'normal' %}
 {% set disk_label = 'Критично' if resources.disk.percent >= 95 else 'Мало свободного места' if resources.disk.percent >= 90 else 'Предупреждение' if resources.disk.percent >= 80 else 'Норма' %}
 
-<section class="sv1-page">
-  <header class="sv1-heading">
+<section class="sv1-page sg-ui-page sg-ui-system" data-sg-ui-page="system">
+  <header class="sv1-heading sg-ui-page-head sg-ui-system-head" data-sg-section="system-head">
     <div>
       <div class="sv1-kicker"><span></span> SG-GATEWAY / SYSTEM</div>
       <h1>System</h1>
       <p>Ресурсы, службы и состояние собственного сервера SG-Gateway.</p>
     </div>
 
-    <div class="sv1-heading-actions">
+    <div class="sv1-heading-actions sg-ui-actions">
       <a class="button primary sg-ljd-key-action" href="{{ url_for('download_diagnostics') }}">
         Скачать диагностику
       </a>
@@ -40,7 +46,7 @@
     </div>
   </header>
 
-  <section class="sv1-summary sg-ljd-system-summary">
+  <section class="sv1-summary sg-ljd-system-summary" data-sg-section="system-summary">
     <article class="sv1-summary-card sv1-summary-health sg-ljd-card">
       <div class="sv1-summary-icon">
         <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -97,7 +103,7 @@
     </article>
   </section>
 
-  <section class="sv1-resource-grid">
+  <section class="sv1-resource-grid" data-sg-section="system-resources">
     <article class="sv1-resource-card sg-ljd-card" data-sg-memory-card="1">
       <header class="sv1-card-head">
         <div>
@@ -309,8 +315,7 @@
 </article>
   </section>
 
-  <section class="sv1-two-column sv1-primary-lower-grid">
-    <link rel="stylesheet" href="{{ url_for('static', filename='sg-system-activity-v3.css') }}?v={{ app_version }}">
+  <section class="sv1-two-column sv1-primary-lower-grid" data-sg-section="system-lower">
     <article class="sv1-panel sv1-actions-panel sg-ljd-card-large sa2-panel"
              data-system-activity
              data-activity-url="{{ url_for('system_activity_api') }}">
@@ -347,7 +352,6 @@
         </div>
       </section>
     </article>
-    <script src="{{ url_for('static', filename='sg-system-activity-v3.js') }}?v={{ app_version }}" defer></script>
 
 <article class="sv1-panel sv1-health-panel sg-ljd-card-large">
       <header class="sv1-panel-head">
@@ -376,11 +380,20 @@
     </article>
   </section>
 
-  <footer class="sv1-page-footer">
+  <footer class="sv1-page-footer" data-sg-section="system-footer">
     <span>Отчёт сформирован: {{ report.generated_at }}</span>
     <span>SG-Gateway v{{ report.version }} · native systemd runtime</span>
   </footer>
 </section>
-<script src="{{ url_for('static', filename='sg-system-resource-labels-v2.js') }}?v={{ app_version }}" defer></script>
-<script src="{{ url_for('static', filename='sg-memory-card-refresh-v1.js') }}?v={{ app_version }}" defer></script>
+{% endblock %}
+{% block scripts %}
+{{ super() }}
+<script src="{{ static_asset('sg-cpu-breakdown-v1.js') }}" defer></script>
+<script src="{{ static_asset('sg-disk-breakdown-v2.js') }}" defer></script>
+<script src="{{ static_asset('sg-system-unified-free-color-v2.js') }}" defer></script>
+<script src="{{ static_asset('sg-system-cpu-summary-header-v1.js') }}" defer></script>
+<script src="{{ static_asset('sg-system-memory-row-bars-v1.js') }}" defer></script>
+<script src="{{ static_asset('sg-system-activity-v3.js') }}" defer></script>
+<script src="{{ static_asset('sg-system-resource-labels-v2.js') }}" defer></script>
+<script src="{{ static_asset('sg-memory-card-refresh-v1.js') }}" defer></script>
 {% endblock %}

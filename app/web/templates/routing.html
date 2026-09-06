@@ -1,6 +1,11 @@
 {% extends "base.html" %}
 {% block title %}SG-Gateway · Routing{% endblock %}
 
+{% block page_styles %}
+  <link rel="stylesheet" href="{{ static_asset('sg-routing-client096.css') }}">
+  <link rel="stylesheet" href="{{ static_asset('sg-ui-routing-v22-08.css') }}">
+{% endblock %}
+
 {% block content %}
 {% set candidate = routing_templates.candidate or {} %}
 {% set active = routing_templates.active or {} %}
@@ -12,8 +17,8 @@
 {% set selected_title = shown.get('title', 'Обычный доступ · SG-Gateway · IPv4') %}
 {% set selected_message = shown.get('message', 'Выберите базовую схему и выполните проверку.') %}
 
-<section class="r096-page">
-  <header class="r096-heading">
+<section class="r096-page sg-ui-page sg-ui-routing" data-sg-ui-page="routing">
+  <header class="r096-heading sg-ui-page-head sg-ui-routing-head">
     <div>
       <div class="r096-kicker"><span></span> SG-GATEWAY / ROUTING</div>
       <h1>Routing</h1>
@@ -22,12 +27,12 @@
     <a class="r096-header-button" href="{{ url_for('help_index') }}">Справка</a>
   </header>
 
-  <nav class="r096-tabs" aria-label="Разделы Routing">
-    <button type="button" data-r096-tab="routing" class="active">Routing</button>
-    <button type="button" data-r096-tab="geofiles">GeoFiles</button>
+  <nav class="r096-tabs sg-ui-tabs sg-ui-routing-tabs" data-sg-section="routing-tabs" aria-label="Разделы Routing">
+    <button type="button" data-r096-tab="routing" class="sg-ui-tab active">Routing</button>
+    <button type="button" data-r096-tab="geofiles" class="sg-ui-tab">GeoFiles</button>
   </nav>
 
-  <section class="r096-panel" data-r096-panel="routing">
+  <section class="r096-panel sg-ui-section sg-ui-routing-panel" data-sg-section="routing-main" data-r096-panel="routing">
     <form id="r096-smart-form" method="post" action="{{ url_for('routing_smart_preview') }}">
       <article class="r096-selected-card">
         <div class="r096-selected-head">
@@ -212,7 +217,7 @@
     </footer>
   </section>
 
-  <section class="r096-panel" data-r096-panel="geofiles" hidden>
+  <section class="r096-panel sg-ui-section sg-ui-routing-panel" data-sg-section="routing-geofiles" data-r096-panel="geofiles" hidden>
     {% include "_geofiles_panel.html" %}
   </section>
 

@@ -5,7 +5,7 @@ PREFIX="/opt/sg-gateway"
 CONFIG_DIR="/etc/sg-gateway"
 DATA_DIR="/var/lib/sg-gateway"
 LOG_DIR="/var/log/sg-gateway"
-UNINSTALL_LOG="/var/log/sg-gateway-full-uninstall-02206.log"
+UNINSTALL_LOG="/var/log/sg-gateway-full-uninstall-02208.log"
 
 PANEL_PORT="63443"
 XRAY_PORT="443"
@@ -64,7 +64,7 @@ if [[ ! "$TLS_DOMAIN" =~ ^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$ ]]
   TLS_DOMAIN=""
 fi
 
-printf '\n%sSG-Gateway 0.1.0-022.06 · ПОЛНОЕ УДАЛЕНИЕ%s\n' "$CYAN" "$RESET"
+printf '\n%sSG-Gateway 0.1.0-022.08 · ПОЛНОЕ УДАЛЕНИЕ%s\n' "$CYAN" "$RESET"
 printf 'Будут удалены приложение, база, настройки, backups, SG-службы и установленные SG runtime.\n'
 printf 'Системные пакеты Ubuntu (nginx, certbot, ufw, Python и т.п.) останутся установленными.\n'
 if [[ -n "$TLS_DOMAIN" ]]; then
@@ -237,6 +237,7 @@ remove_application_and_state(){
     /root/sg-gateway-02111-installer-resume.env \
     /root/sg-gateway-02112-installer-resume.env \
     /root/sg-gateway-02206-installer-resume.env \
+    /root/sg-gateway-02208-installer-resume.env \
     /root/sg-gateway-preview48-installer-resume.env \
     /root/sg-gateway-preview50-installer-resume.env \
     /root/sg-gateway-preview51-installer-resume.env \
@@ -248,6 +249,8 @@ remove_application_and_state(){
     /var/log/sg-gateway-installer-02110.log \
     /var/log/sg-gateway-installer-02111.log \
     /var/log/sg-gateway-installer-02112.log \
+    /var/log/sg-gateway-installer-02206.log \
+    /var/log/sg-gateway-installer-02208.log \
     /var/log/sg-gateway-full-uninstall-02111.log
   rm -f /tmp/sg-gateway-installer-output.* /tmp/sg-gateway-installer-log.* >/dev/null 2>&1 || true
 }
@@ -362,6 +365,10 @@ remove_account_and_verify(){
     echo "Остаток после удаления: /root/sg-gateway-02206-installer-resume.env" >&2
     bad=1
   fi
+  if [[ -e /root/sg-gateway-02208-installer-resume.env ]]; then
+    echo "Остаток после удаления: /root/sg-gateway-02208-installer-resume.env" >&2
+    bad=1
+  fi
   (( bad == 0 )) || return 1
 }
 
@@ -378,4 +385,4 @@ printf '[SG-Gateway] EC2 готов к чистой установке SG-Gatewa
 printf '[SG-Gateway] Системные пакеты Ubuntu не удалялись.\n'
 printf '[SG-Gateway] Журнал: %s\n' "$UNINSTALL_LOG"
 printf '\n[SG-Gateway] Для повторной установки SG-Gateway выполните:\n'
-printf '%s\n' 'curl -4 -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/stable-02206/deploy/install-from-github.sh | sudo env SG_GATEWAY_GITHUB_BRANCH=stable-02206 bash'
+printf '%s\n' 'curl -4 -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/889206dd3ddb7d10ef7480f3b5b23694f0b90b7e/deploy/install-from-github.sh | sudo env SG_GATEWAY_GITHUB_BRANCH=stable-02208 SG_GATEWAY_SOURCE_COMMIT=889206dd3ddb7d10ef7480f3b5b23694f0b90b7e bash'

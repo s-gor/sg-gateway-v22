@@ -1,0 +1,107 @@
+/* SG-Gateway 22.08 canonical layout. One page rail, no page-specific geometry. */
+.sg-content {
+  min-width: 0;
+  padding-inline: var(--sg-ui-page-pad-x, 30px);
+  padding-top: var(--sg-ui-page-pad-top, 28px);
+  padding-bottom: var(--sg-ui-page-pad-bottom, 46px);
+}
+
+.sg-ui-page {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--sg-ui-page-gap, 18px);
+}
+
+.sg-ui-page-head {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sg-ui-grid-gap, 12px);
+}
+
+.sg-ui-section {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--sg-ui-section-gap, 16px);
+}
+
+.sg-ui-section-head {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sg-ui-grid-gap, 12px);
+}
+
+.sg-ui-section-body {
+  min-width: 0;
+}
+
+.sg-ui-rail {
+  min-width: 0;
+  padding-inline: var(--sg-ui-rail-inset, 18px);
+}
+
+.sg-ui-rail-deep {
+  min-width: 0;
+  padding-inline: var(--sg-ui-rail-deep-inset, 30px);
+}
+
+.sg-ui-grid {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: var(--sg-ui-grid-gap, 12px);
+}
+
+.sg-ui-nested {
+  min-width: 0;
+  border-radius: var(--sg-ui-nested-radius, 10px);
+}
+
+.sg-ui-form-row {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+  gap: var(--sg-ui-grid-gap, 12px);
+  align-items: end;
+}
+
+.sg-ui-field {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.sg-ui-actions {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+@media (max-width: 760px) {
+  .sg-ui-page-head,
+  .sg-ui-section-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .sg-ui-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sg-ui-rail-deep {
+    padding-inline: var(--sg-ui-rail-deep-inset, 14px);
+  }
+
+  .sg-ui-actions {
+    justify-content: stretch;
+  }
+}

@@ -1,0 +1,276 @@
+from __future__ import annotations
+
+import json
+
+from app.naiveproxy.runtime import DEFAULT_PORT, NaiveProxySettings, NaiveProxyUser, build_client_uri, generate_user
+
+DEFAULT_CONNECTION = {
+    "host": "",
+    "port": DEFAULT_PORT,
+    "config_json": json.dumps(
+        {
+            "domain": "",
+            "certificate_path": "",
+            "private_key_path": "",
+            "country_code": "unknown",
+        },
+        ensure_ascii=False,
+        sort_keys=True,
+    ),
+}
+
+
+def _restore_connection_settings(previous) -> bool:
+    from app.connections.settings import update_connection_settings
+
+    host = str(previous.host or "")
+    if host.strip():
+        return update_connection_settings(
+            "naiveproxy",
+            host,
+            previous.port,
+            dict(previous.config),
+        )
+
+    from app.db import connect
+
+    try:
+        port = int(previous.port)
+    except (TypeError, ValueError):
+        return False
+    if not 1 <= port <= 65535:
+        return False
+    try:
+        config_json = json.dumps(
+            dict(previous.config),
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+    except (TypeError, ValueError):
+        return False
+
+    try:
+        with connect() as connection:
+            cursor = connection.execute(
+                """
+                UPDATE connection_settings
+                SET host = ?,
+                    port = ?,
+                    config_json = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE engine = 'naiveproxy'
+                """,
+                (host, port, config_json),
+            )
+    except Exception:
+        return False
+    return cursor.rowcount > 0
+
+
+def _prepare_runtime_settings():
+    from app.db import connect
+
+    with connect() as connection:
+        setting = connection.execute(
+            "SELECT host FROM connection_settings WHERE engine = 'naiveproxy'"
+        ).fetchone()
+        assigned = connection.execute(
+            "SELECT COUNT(*) AS total FROM device_credentials WHERE engine = 'naiveproxy'"
+        ).fetchone()
+    assigned_total = int(assigned["total"] or 0)
+    configured_host = str(setting["host"] or "").strip() if setting else ""
+    if configured_host or assigned_total == 0:
+        return None
+
+    from app.security.tls import overview as tls_overview
+    from app.connections.settings import (
+        get_connection_settings,
+        update_connection_settings,
+    )
+
+    tls = tls_overview()
+    domain = str(tls.get("domain") or "").strip()
+    if not tls.get("https_ready") or not domain:
+        raise RuntimeError("NaiveProxy требует настроенный HTTPS в Security")
+
+    previous = get_connection_settings("naiveproxy")
+    updated = update_connection_settings(
+        "naiveproxy",
+        domain,
+        DEFAULT_PORT,
+        {
+            "domain": domain,
+            "certificate_path": str(tls.get("certificate_path") or ""),
+            "private_key_path": f"/etc/letsencrypt/live/{domain}/privkey.pem",
+        },
+    )
+    if not updated:
+        raise RuntimeError("Не удалось сохранить настройки NaiveProxy")
+    return previous
+
+
+def _patch_client_runtime() -> None:
+    from app.clients import runtime as client_runtime
+
+    original = client_runtime.apply_clients_runtime
+    if getattr(original, "_naiveproxy_transaction_wrapper", False):
+        return
+
+    def apply_clients_runtime() -> dict:
+        previous = None
+        try:
+            previous = _prepare_runtime_settings()
+            return original()
+        except Exception as exc:
+            rollback_note = ""
+            if previous is not None:
+                try:
+                    restored = _restore_connection_settings(previous)
+                except Exception:
+                    restored = False
+                rollback_note = (
+                    "; bootstrap-настройки восстановлены"
+                    if restored
+                    else "; восстановить bootstrap-настройки не удалось"
+                )
+            message = str(exc) + rollback_note
+            if isinstance(exc, client_runtime.ClientWorkflowError) and not rollback_note:
+                raise
+            raise client_runtime.ClientWorkflowError(message) from exc
+
+    apply_clients_runtime._naiveproxy_transaction_wrapper = True
+    client_runtime.apply_clients_runtime = apply_clients_runtime
+
+
+def reserved_ports() -> dict[int, str]:
+    from app.db import connect
+
+    result: dict[int, str] = {}
+    with connect() as connection:
+        rows = connection.execute(
+            "SELECT engine, port, config_json FROM connection_settings WHERE engine != 'naiveproxy'"
+        ).fetchall()
+    for row in rows:
+        engine = str(row["engine"])
+        try:
+            port = int(row["port"])
+        except (TypeError, ValueError):
+            port = 0
+        if 1 <= port <= 65535:
+            result[port] = engine
+        try:
+            config = json.loads(row["config_json"] or "{}")
+        except (TypeError, ValueError, json.JSONDecodeError):
+            config = {}
+        if isinstance(config, dict):
+            for key, value in config.items():
+                if not str(key).endswith("_port"):
+                    continue
+                try:
+                    candidate = int(value)
+                except (TypeError, ValueError):
+                    continue
+                if 1 <= candidate <= 65535:
+                    result[candidate] = f"{engine}.{key}"
+    return result
+
+
+def install() -> None:
+    if getattr(install, "_installed", False):
+        return
+
+    from app import db
+    from app.engines import provisioning
+
+    db.DEFAULT_CONNECTIONS.setdefault("naiveproxy", dict(DEFAULT_CONNECTION))
+    original_builder = provisioning.build_engine_config
+
+    def build_engine_config(engine: str, access_id: int, access_name: str):
+        if engine != "naiveproxy":
+            return original_builder(engine, access_id, access_name)
+        settings = provisioning.get_connection_settings("naiveproxy")
+        user = generate_user(f"sg-{access_id}", client_id=str(access_id))
+        domain = str(settings.host or settings.config.get("domain") or "").strip()
+        payload = {
+            "client_name": access_name,
+            "device_id": access_id,
+            "username": user.username,
+            "password": user.password,
+            "host": domain,
+            "port": int(settings.port or DEFAULT_PORT),
+            "scheme": "naive+https",
+        }
+        return user.username, json.dumps(payload, ensure_ascii=False, sort_keys=True)
+
+    provisioning.build_engine_config = build_engine_config
+
+    from app.clients import repository
+
+    repository.build_engine_config = build_engine_config
+    if "naiveproxy" not in repository.SUPPORTED_ENGINES:
+        repository.SUPPORTED_ENGINES += ("naiveproxy",)
+    if "naiveproxy" not in repository.RUNTIME_ENGINES:
+        repository.RUNTIME_ENGINES += ("naiveproxy",)
+    repository.TLS_PROTOCOL_TOKENS.add("naiveproxy")
+    _patch_client_runtime()
+
+    from app.clients import exports
+
+    original_protocol_engine = exports.protocol_engine
+    original_build_export = exports.build_protocol_export
+    original_protocol_ready = exports.protocol_ready
+
+    def build_naiveproxy_link(client, device=None):
+        config = exports._deployment_config(client, "naiveproxy", device)
+        settings = provisioning.get_connection_settings("naiveproxy")
+        domain = str(settings.host or settings.config.get("domain") or config.get("host") or "").strip()
+        user = NaiveProxyUser(
+            username=str(config.get("username") or ""),
+            password=str(config.get("password") or ""),
+            enabled=True,
+            client_id=str(config.get("device_id") or ""),
+        )
+        body = build_client_uri(
+            NaiveProxySettings(domain=domain, port=int(settings.port or DEFAULT_PORT)),
+            user,
+            f"{exports._label(client, device)} · NaiveProxy",
+        )
+        return exports.ClientExport(
+            filename=f"sg-gateway-{exports._slug(client, device)}-naiveproxy.txt",
+            media_type="text/plain; charset=utf-8",
+            body=body,
+        )
+
+    def protocol_engine(kind: str) -> str:
+        return "naiveproxy" if kind == "naiveproxy" else original_protocol_engine(kind)
+
+    def build_protocol_export(client, kind: str, device=None):
+        if kind == "naiveproxy":
+            return build_naiveproxy_link(client, device)
+        return original_build_export(client, kind, device)
+
+    def protocol_ready(client, kind: str, device=None) -> bool:
+        if kind != "naiveproxy":
+            return original_protocol_ready(client, kind, device)
+        try:
+            return bool(
+                exports.is_export_ready(client, "naiveproxy", device)
+                and exports.tls_overview().get("https_ready")
+                and build_naiveproxy_link(client, device).body
+            )
+        except Exception:
+            return False
+
+    exports.build_naiveproxy_link = build_naiveproxy_link
+    exports.protocol_engine = protocol_engine
+    exports.build_protocol_export = build_protocol_export
+    exports.protocol_ready = protocol_ready
+
+    from app.clients import sg_subscription
+
+    spec = ("naiveproxy", "naiveproxy", "naiveproxy", "NaiveProxy", "naiveproxy", "uri")
+    if spec not in sg_subscription._PROFILE_SPECS:
+        sg_subscription._PROFILE_SPECS += (spec,)
+
+    db.init_db()
+    install._installed = True

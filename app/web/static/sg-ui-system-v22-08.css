@@ -1,0 +1,46 @@
+/* SG-Gateway 22.08 System page ownership. Shared layout owns horizontal rails. */
+[data-sg-ui-page="system"] {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+}
+
+[data-sg-ui-page="system"] > .sg-ui-page-head,
+[data-sg-ui-page="system"] > [data-sg-section] {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  margin-inline: 0;
+}
+
+.sg-ui-system-head {
+  min-height: 68px;
+  padding-block: 4px 10px;
+  border-bottom: 1px solid var(--sg-ui-border);
+}
+
+.sg-ui-system-head > div:first-child {
+  min-width: 0;
+}
+
+.sg-ui-system-head h1 {
+  font-size: 27px;
+  line-height: 1.05;
+}
+
+.sg-ui-system-head .sg-ui-actions {
+  min-width: 0;
+}
+
+@media (max-width: 760px) {
+  .sg-ui-system-head {
+    min-height: 0;
+  }
+
+  .sg-ui-system-head .sg-ui-actions {
+    width: 100%;
+  }
+}

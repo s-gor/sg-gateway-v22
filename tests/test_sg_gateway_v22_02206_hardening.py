@@ -15,18 +15,18 @@ from app.security.operation_jobs import _panel_update_result, _panel_update_runt
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_stable_02206_identity_is_consistent() -> None:
+def test_current_stable_identity_is_consistent() -> None:
     version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
     build_id = (ROOT / "BUILD-ID").read_text(encoding="utf-8").strip()
     manifest = json.loads((ROOT / "release-manifest.json").read_text(encoding="utf-8"))
-    assert version == "0.1.0-022.06"
-    assert build_id == "MAIN-02206-STABLE"
+    assert version == "0.1.0-022.08"
+    assert build_id == "MAIN-02208-STABLE"
     assert manifest["version"] == version
     assert manifest["build"] == build_id
-    assert manifest["channel"] == "stable-02206"
+    assert manifest["channel"] == "stable-02208"
     assert manifest["status"] == "STABLE"
-    assert manifest["maintenance_updates"]["panel"]["channel"] == "stable-02206"
-    assert manifest["next_development_line"] == "0.1.0-022.07"
+    assert manifest["maintenance_updates"]["panel"]["channel"] == "stable-02208"
+    assert manifest["next_development_line"] == "0.1.0-022.09"
 
 
 def test_dev_deploy_identity_matches_version() -> None:
@@ -39,8 +39,7 @@ def test_dev_deploy_identity_matches_version() -> None:
     assert f'INSTALLER_BUILD="{token}-full-clean-dual-stack"' in installer
     assert f'INSTALL_LOG="/var/log/sg-gateway-installer-{token}.log"' in installer
     assert f'RESUME_FILE="/root/sg-gateway-{token}-installer-resume.env"' in installer
-    assert f'Запускаю полный мастер SG-Gateway {version}' in installer
-    assert f'Мастер установки SG-Gateway {version} запущен' in installer
+    assert f'Запускаю полный мастер SG-Gateway {version} · 24 этапа' in installer
     assert installer.count(f'before-sg-gateway-{token}') == 2
     assert "SG-Gateway V22 vendor bundle:" in installer
 

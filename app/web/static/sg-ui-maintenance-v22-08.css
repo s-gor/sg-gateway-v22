@@ -1,0 +1,9 @@
+/* SG-Gateway 22.08 Maintenance page internals. Outer rail belongs to sg-ui-layout-v22-08.css. */
+[data-sg-ui-page="maintenance"] { --sg-ui-page-gap: 18px; }
+.sg-ui-maintenance-head { margin-inline: 0; padding-inline: 0; }
+.sg-ui-maintenance-tabs { width: 100%; min-width: 0; margin: 0; }
+[data-sg-ui-page="maintenance"] > .sg-ui-section { width: 100%; margin-inline: 0; }
+[data-sg-ui-page="maintenance"] .sg-ui-section-head { width: 100%; margin-inline: 0; }
+@media (max-width: 760px) {
+  .sg-ui-maintenance-tabs { overflow-x: auto; overscroll-behavior-inline: contain; }
+}

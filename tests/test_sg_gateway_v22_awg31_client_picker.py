@@ -164,5 +164,8 @@ def test_new_client_picker_uses_one_external_responsive_grid_contract() -> None:
     assert "@media (max-width: 720px)" in css
     assert "grid-template-columns: 1fr !important;" in css
     assert "height: 100% !important;" in css
-    assert "devices-collapse-v4-dialog-layout-v2" in clients
-    assert "devices-collapse-v4-dialog-layout-v2" in (ROOT / "app/web/templates/_client_edit_dialogs.html").read_text(encoding="utf-8")
+    dialogs = (ROOT / "app/web/templates/_client_edit_dialogs.html").read_text(encoding="utf-8")
+    assert "devices-collapse-v4-dialog-layout-v2" not in clients
+    assert "devices-collapse-v4-dialog-layout-v2" not in dialogs
+    assert "{{ static_asset('sg-device-collapse-v4.css') }}" in clients
+    assert "<link rel=\"stylesheet\"" not in dialogs

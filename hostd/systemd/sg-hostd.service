@@ -7,6 +7,10 @@ Wants=network-online.target
 Type=simple
 User=root
 WorkingDirectory=/opt/sg-gateway/hostd
+EnvironmentFile=/etc/sg-gateway/sg-gateway.env
+EnvironmentFile=/etc/sg-gateway/runtime.env
+EnvironmentFile=/etc/sg-gateway/engine-secrets.env
+Environment=PYTHONPATH=/opt/sg-gateway:/opt/sg-gateway/hostd
 ExecStart=/opt/sg-gateway/.venv/bin/waitress-serve --host=127.0.0.1 --port=8090 sg_hostd.app:app
 Restart=on-failure
 RestartSec=3
@@ -16,7 +20,8 @@ ProtectHome=true
 ProtectSystem=strict
 RuntimeDirectory=sg-gateway
 RuntimeDirectoryMode=0755
-ReadWritePaths=-/run/sg-gateway -/usr/local/share/xray
+LogsDirectory=sg-gateway
+ReadWritePaths=-/run/sg-gateway -/usr/local/share/xray -/usr/local/etc/xray -/etc/amnezia/amneziawg -/etc/sysctl.d -/etc/mihomo -/etc/sing-box -/etc/sg-gateway/naiveproxy -/var/lib/sg-gateway -/var/lib/mihomo
 
 [Install]
 WantedBy=multi-user.target

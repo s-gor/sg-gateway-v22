@@ -1,4 +1,3 @@
-<link rel="stylesheet" href="{{ url_for('static', filename='sg-device-collapse-v4.css') }}?v={{ app_version }}-devices-collapse-v4-dialog-layout-v2">
 {% macro edit_xray_protocol_card(profiles, profile_id, selected_tokens, unavailable_note) -%}
   {% set matches = profiles | selectattr('id', 'equalto', profile_id) | list %}
   {% if matches %}

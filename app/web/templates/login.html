@@ -10,13 +10,13 @@
       } catch (_) {}
     </script>
     <title>SG-Gateway · Вход</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='sg-luxury-jade-depth-v2.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='sg-readable-typography-v3.css') }}">
+    <link rel="stylesheet" href="{{ static_asset('sg-ui-foundation-v22-08.css') }}">
+    <link rel="stylesheet" href="{{ static_asset('sg-ui-components-v22-08.css') }}">
+    <link rel="stylesheet" href="{{ static_asset('sg-ui-standalone-v22-08.css') }}">
   </head>
-  <body class="sg-body">
-    <main class="login-shell">
-      <section class="login-panel sg-ljd-card">
+  <body class="sg-ui-standalone-body">
+    <main class="login-shell sg-ui-standalone sg-ui-standalone--login" data-sg-standalone-page="login">
+      <section class="login-panel sg-ui-card sg-ui-login-card">
         <div class="brand">
           <div class="brand-mark">SG</div>
           <div>
@@ -25,7 +25,7 @@
           </div>
         </div>
 
-        <form class="settings-form" method="post" action="/login">
+        <form class="settings-form sg-ui-standalone-form" method="post" action="/login">
           <input type="hidden" name="next" value="{{ next_url }}">
           <label>
             Пароль администратора
@@ -36,7 +36,7 @@
             <p class="error-text">Неверный пароль.</p>
           {% endif %}
 
-          <button class="button primary sg-ljd-key-action" type="submit">Войти</button>
+          <button class="button primary sg-ljd-key-action sg-ui-button sg-ui-button--primary" type="submit">Войти</button>
         </form>
       </section>
     </main>

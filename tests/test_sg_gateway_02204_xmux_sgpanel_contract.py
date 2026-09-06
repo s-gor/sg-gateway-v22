@@ -16,22 +16,23 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_standard_preset_matches_current_sg_panel_contract() -> None:
     extra = xmux.effective_client_extra({"xhttp_xmux_mode": "auto"})
     assert extra["xmux"] == {
-        "maxConnections": "2-4",
-        "cMaxReuseTimes": "300-600",
-        "hMaxRequestTimes": "1000-2000",
-        "hMaxReusableSecs": "1200-2400",
-        "hKeepAlivePeriod": 600,
+        "maxConcurrency": 0,
+        "maxConnections": 3,
+        "cMaxReuseTimes": 0,
+        "hMaxRequestTimes": "600-900",
+        "hMaxReusableSecs": "1800-3000",
+        "hKeepAlivePeriod": 0,
     }
 
 
 def test_reduced_preset_matches_current_sg_panel_contract() -> None:
     extra = xmux.effective_client_extra({"xhttp_xmux_mode": "reduced"})
     assert extra["xmux"] == {
-        "maxConcurrency": 0,
-        "maxConnections": "6",
+        "maxConcurrency": 5,
+        "maxConnections": 0,
         "cMaxReuseTimes": 0,
-        "hMaxRequestTimes": "600-900",
-        "hMaxReusableSecs": "1800-3000",
+        "hMaxRequestTimes": "300-600",
+        "hMaxReusableSecs": "900-1800",
         "hKeepAlivePeriod": 0,
     }
     xmux.validate_xmux_conflicts(extra)
@@ -142,7 +143,11 @@ def test_save_normalises_reality_mode_without_touching_server_runtime(monkeypatc
     config = captured["config"]
     assert config["xhttp_reality_mode"] == "stream-one"
     assert config["unrelated"] == {"keep": True}
-    assert config["xhttp_extra_client_json"] == {"headers": {"X-Test": "kept"}}
+    assert config["xhttp_extra_client_json"] == {
+        "headers": {"X-Test": "kept"},
+        "xmux": xmux.XMUX_STANDARD_PRESET,
+    }
+    assert config["xhttp_xmux_preset_revision"] == "xray-26.7.28"
 
 
 def test_connections_ui_exposes_exact_sg_panel_modes_in_full_02204_template() -> None:
@@ -159,9 +164,9 @@ def test_connections_ui_exposes_exact_sg_panel_modes_in_full_02204_template() ->
     assert "xps2-xmux" in template
     assert "XMUX для XHTTP" in partial
     assert "Стандартный" in partial
-    assert "Для РФ — уменьшенный" in partial
+    assert "Для РФ — быстрая ротация" in partial
     assert "Ручной" in partial
-    assert "maxConnections 2-4" in partial
+    assert "maxConnections 3" in partial
     assert "maxConcurrency 0" in partial
     assert ".xps2-xmux" in css and "display: none" in css
     assert '<input type="hidden" name="{{ profile.id }}_mode" value="stream-one">' in template
@@ -178,7 +183,7 @@ def test_compact_xmux_uses_mode_dialog_instead_of_permanent_contract_row() -> No
     assert 'data-xmux-dialog-panel="auto"' in partial
     assert 'data-xmux-dialog-panel="reduced"' in partial
     assert 'data-xmux-dialog-panel="expert"' in partial
-    assert '<code>maxConnections</code><strong>2-4</strong>' in partial
+    assert '<code>maxConnections</code><strong>3</strong>' in partial
     assert '<code>maxConcurrency</code><strong>0</strong>' in partial
     assert 'Параметры сохранятся только по кнопке «Сохранить XMUX»' in partial
     assert "showModeDetails" in js

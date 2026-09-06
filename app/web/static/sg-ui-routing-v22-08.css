@@ -1,0 +1,43 @@
+/* SG-Gateway 22.08 Routing. Shared layout owns horizontal page rails. */
+.sg-ui-routing {
+  color: var(--r096-text, var(--sg-ui-text));
+}
+
+.sg-ui-routing-head {
+  min-height: 68px;
+  padding-block: 4px 10px;
+  border-bottom: 1px solid var(--r096-line, var(--sg-ui-border));
+}
+
+.sg-ui-routing-head > div:first-child {
+  min-width: 0;
+}
+
+.sg-ui-routing-head h1 {
+  font-size: 27px;
+  line-height: 1.05;
+}
+
+.sg-ui-routing-tabs {
+  padding-block: 0 10px;
+  border-bottom: 1px solid var(--r096-line, var(--sg-ui-border));
+}
+
+.sg-ui-routing-panel {
+  gap: 12px;
+  padding-block: 0 4px;
+}
+
+.sg-ui-routing-panel[hidden] {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .sg-ui-routing-head {
+    min-height: 0;
+  }
+
+  .sg-ui-routing-tabs .sg-ui-tab {
+    flex: 1 1 140px;
+  }
+}

@@ -13,6 +13,7 @@ dependencies = [
 dev = [
     "pytest>=8.0,<9",
     "ruff>=0.5,<1",
+    "playwright>=1.50,<2",
 ]
 
 [tool.ruff]

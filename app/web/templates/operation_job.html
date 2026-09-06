@@ -1,18 +1,18 @@
 {% extends "base.html" %}
 {% block title %}{{ job.title }} · SG-Gateway{% endblock %}
-{% block head %}
-  <link rel="stylesheet" href="{{ url_for('static', filename='sg-operation-job-v13.css') }}">
+{% block page_styles %}
+  <link rel="stylesheet" href="{{ static_asset('sg-ui-operation-job-v22-08.css') }}">
 {% endblock %}
 {% block content %}
 {% set is_panel_update = job.kind == 'panel_update_channel' %}
 {% set update = job.update_result if is_panel_update and job.update_result else {} %}
 {% set attention = update.runtime_attention if update and update.runtime_attention else {} %}
-<section class="opjob-page"
+<section class="opjob-page sg-ui-page sg-ui-operation-job" data-sg-ui-page="operation-job"
          data-kind="{{ job.kind }}"
          data-restart-expected="{{ '1' if job.restart_expected else '0' }}"
          data-target-url="{{ job.target_url or '' }}"
          data-status-url="{{ url_for('operation_job_status', job_id=job.job_id) }}">
-  <header class="opjob-head">
+  <header class="opjob-head sg-ui-page-head" data-sg-section="operation-head">
     <div>
       <div class="opjob-kicker">ЖИВОЙ ТЕРМИНАЛ</div>
       <h1>{{ job.title }}</h1>
@@ -50,12 +50,12 @@
   </article>
   {% endif %}
 
-  <article class="opjob-terminal">
+  <article class="opjob-terminal" data-sg-section="operation-terminal">
     <div class="opjob-terminal-bar"><span></span><span></span><span></span><strong>SG-Gateway task · {{ job.job_id }}</strong></div>
     <pre id="opjob-log">{{ job.log }}</pre>
   </article>
 
-  <footer class="opjob-actions">
+  <footer class="opjob-actions sg-ui-actions" data-sg-section="operation-actions">
     <a id="opjob-back" class="button" href="{{ job.back_url or url_for('security') }}">Вернуться</a>
     <a id="opjob-target" class="button primary{% if job.status != 'success' %} is-hidden{% endif %}" href="{{ job.target_url or '#' }}">Открыть результат</a>
     <button id="opjob-refresh" class="button primary is-hidden" type="button">Открыть панель заново</button>

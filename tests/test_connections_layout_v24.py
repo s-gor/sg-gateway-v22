@@ -10,19 +10,65 @@ def test_decorative_map_is_removed():
     assert "Интернет → SG-Gateway → клиентский профиль" not in template
 
 
-def test_xray_is_full_width_before_equal_awg_mihomo_pair():
+def test_connections_keeps_restored_order_with_naiveproxy_before_note():
     template = (ROOT / "app/web/templates/connections.html").read_text(encoding="utf-8")
-    xray = template.index('class="cnv1-engines cnv1-xray-row"')
-    xray_card = template.index("cnv1-engine-xray", xray)
-    pair = template.index('class="cnv1-engine-pair"', xray_card)
-    awg = template.index("cnv1-engine-awg", pair)
+    xray = template.index("cnv1-engine-xray")
+    xmux = template.index('_xray_xmux_settings.html', xray)
+    awg = template.index("cnv1-engine-awg", xmux)
     mihomo = template.index('_mihomo_panel.html', awg)
-    pair_end = template.index("</section>", mihomo)
-    assert xray < xray_card < pair < awg < mihomo < pair_end
+    naive = template.index('_naiveproxy_panel.html', mihomo)
+    note = template.index("cnv1-note-panel", naive)
+    assert xray < xmux < awg < mihomo < naive < note
 
-    css = (ROOT / "app/web/static/sg-preview28-final.css").read_text(encoding="utf-8")
-    assert "grid-template-columns: minmax(0, 1fr) minmax(0, 1fr)" in css
-    assert ".cnv1-xray-row" in css
+    assert 'class="cnv1-engine-pair sg-ui-grid"' in template
+    assert 'class="cnv1-engines cnv1-xray-row"' in template
+    assert "cnv1-engine-grid" not in template
+    assert "cnv1-grid-cell" not in template
+
+
+def test_connections_has_native_naiveproxy_panel_without_html_injection():
+    template = (ROOT / "app/web/templates/connections.html").read_text(encoding="utf-8")
+    panel = (ROOT / "app/web/templates/_naiveproxy_panel.html").read_text(encoding="utf-8")
+    http = (ROOT / "app/naiveproxy/http.py").read_text(encoding="utf-8")
+
+    assert template.count('{% include "_naiveproxy_panel.html" %}') == 1
+    assert 'id="sg-naiveproxy-settings"' in panel
+    assert 'data-naiveproxy-panel' in panel
+    assert "/api/naiveproxy/status" in panel
+    assert "/api/naiveproxy/settings" in panel
+    assert "_SETTINGS_PANEL" not in http
+    assert 'request.endpoint == "connections"' not in http
+
+
+def test_naiveproxy_runtime_meta_row_is_not_rendered():
+    panel = (ROOT / "app/web/templates/_naiveproxy_panel.html").read_text(encoding="utf-8")
+    assert "xps2-naiveproxy-meta" not in panel
+    assert "Состояние runtime" not in panel
+    assert "data-naive-runtime" not in panel
+
+
+def test_naiveproxy_has_no_internal_separators_and_is_compact():
+    css = (ROOT / "app/web/static/sg-ui-connections-v22-08.css").read_text(encoding="utf-8")
+    assert "body.page-connections .xps2-naiveproxy-card .cnv1-engine-head {" in css
+    assert "padding: 15px 18px 12px;" in css
+
+    body_selector = "body.page-connections .xps2-naiveproxy-body {"
+    assert body_selector in css
+    body = css.split(body_selector, 1)[1].split("}", 1)[0]
+    assert "margin-top: 10px;" in body
+    assert "border-top: 0;" in body
+    assert "padding: 8px 18px 14px;" in body
+
+    actions_selector = "body.page-connections .xps2-naiveproxy-body .cnv1-form-actions {"
+    assert actions_selector in css
+    actions = css.split(actions_selector, 1)[1].split("}", 1)[0]
+    assert "border-top: 0;" in actions
+    assert "padding-top: 0;" in actions
+
+
+def test_awg_header_has_no_visual_divider():
+    css = (ROOT / "app/web/static/sg-awg-dual-v1.css").read_text(encoding="utf-8")
+    assert ".awgd-shell > .cnv1-engine-head { border-bottom:" not in css
 
 
 def test_awg_is_compact_but_keeps_required_post_fields():
@@ -43,8 +89,7 @@ def test_mihomo_is_compact_and_keeps_three_protocols():
         assert protocol in panel
     for field in (
         'name="mieru_enabled"', 'name="mieru_transport"',
-        'name="anytls_enabled"',
-        'name="tuic_enabled"',
+        'name="anytls_enabled"', 'name="tuic_enabled"',
     ):
         assert field in panel
     for field in ("mieru_port", "anytls_port", "tuic_port"):
@@ -75,14 +120,21 @@ def test_connections_summary_cards_are_removed():
     assert "cnv1-summary-card" not in template
 
 
-def test_awg_and_mihomo_are_equal_height_on_desktop():
+def test_awg_and_mihomo_keep_equal_height_contract():
     css = (ROOT / "app/web/static/sg-preview28-final.css").read_text(encoding="utf-8")
-    assert ".cnv1-engine-pair { align-items: stretch; }" in css
     assert "height: auto; align-self: stretch;" in css
     assert ".cnv1-engine-awg .cnv1-engine-form-compact { flex: 1 1 auto; }" in css
     assert ".cnv1-engine-awg .cnv1-form-actions { margin-top: auto; }" in css
 
 
-def test_preview28_connections_order_is_xray_then_awg_mihomo():
+def test_awg_and_mihomo_inner_rails_match_naiveproxy_without_magic_offsets():
     template = (ROOT / "app/web/templates/connections.html").read_text(encoding="utf-8")
-    assert template.index('class="cnv1-engines cnv1-xray-row"') < template.index('class="cnv1-engine-pair"')
+    mihomo = (ROOT / "app/web/templates/_mihomo_panel.html").read_text(encoding="utf-8")
+    css = (ROOT / "app/web/static/sg-ui-connections-v22-08.css").read_text(encoding="utf-8")
+
+    assert '<div class="awgd-inner-rail sg-ui-rail">' in template
+    assert '<div class="mhv2-inner-rail sg-ui-rail">' in mihomo
+    assert "calc(" not in css
+    assert "margin-inline" not in css
+    assert "body.page-connections .awgd-shell {" not in css
+    assert "body.page-connections .mhv2-panel {" not in css
