@@ -23,6 +23,7 @@ on:
     branches:
       - release/0.1.0-022.06
       - stable-02206
+      - stable-02208
       - main
     paths:
       - install.sh
@@ -66,8 +67,8 @@ jobs:
           ip = ipaddress.ip_address(sys.argv[1])
           assert ip.version == 4 and ip.is_global, ip
           PY
-          sudo install -m 0600 /dev/null /root/sg-gateway-02206-installer-resume.env
-          sudo tee /root/sg-gateway-02206-installer-resume.env >/dev/null <<EOF
+          sudo install -m 0600 /dev/null /root/sg-gateway-02208-installer-resume.env
+          sudo tee /root/sg-gateway-02208-installer-resume.env >/dev/null <<EOF
           PANEL_PORT=63443
           XRAY_PORT=443
           AWG_PORT=585
@@ -247,4 +248,4 @@ jobs:
         run: |
           sudo systemctl status sg-gateway-awg3.service sg-gateway-awg31.service --no-pager || true
           sudo journalctl -b -u sg-gateway-awg3.service -u sg-gateway-awg31.service -n 150 --no-pager || true
-          sudo tail -n 150 /var/log/sg-gateway-installer-02206.log || true
+          sudo tail -n 150 /var/log/sg-gateway-installer-02208.log || true
