@@ -38,3 +38,5 @@ jobs:
           git add SOURCE-SHA256SUMS
           git commit -m "build: refresh 022.08 RC source snapshot"
           git push origin HEAD:release/02208-rc
+
+# Trigger: final test-contract refresh for 022.08 RC.
