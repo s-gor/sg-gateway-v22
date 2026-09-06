@@ -30,6 +30,9 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements-dev.txt
 
+      - name: Install Chromium for browser UI tests
+        run: python -m playwright install --with-deps chromium
+
       - name: Compile Python sources
         run: |
           python -B - <<'PY'
