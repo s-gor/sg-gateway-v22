@@ -1,0 +1,145 @@
+name: "022.08 final live main contracts"
+
+on:
+  push:
+    branches:
+      - release/02208-rc
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout release branch
+        uses: actions/checkout@v4
+        with:
+          ref: release/02208-rc
+          fetch-depth: 0
+
+      - name: Restore live 24-stage contracts and refresh source inventory
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 -B - <<'PY'
+          from pathlib import Path
+
+          installer_path = Path("install.sh")
+          s = installer_path.read_text(encoding="utf-8")
+
+          old_start = '''  printf '\\n%s[SG-Gateway]%s SG-Gateway 0.1.0-022.08 · единый мастер · 24 этапа\\n' "$CYAN" "$RESET"
+            printf '[SG-Gateway] Технический журнал: %s\\n\\n' "$INSTALL_LOG"
+          '''
+          new_start = '''  printf '\\n%s[SG-Gateway]%s Запускаю полный мастер SG-Gateway 0.1.0-022.08 · 24 этапа\\n' "$CYAN" "$RESET"
+            printf '[SG-Gateway] Технический журнал: %s\\n' "$INSTALL_LOG"
+            printf '[SG-Gateway] Повторный запуск выполняется на этом же EC2. Домен не обязателен.\\n\\n'
+          '''
+          assert s.count(old_start) == 1, s.count(old_start)
+          s = s.replace(old_start, new_start, 1)
+
+          old_013 = '''  elif detect_minimal_013_install; then
+            printf '[SG-Gateway] Обнаружена рабочая база SG-Gateway 013; выполняется миграция.\\n'
+          '''
+          new_013 = '''  elif detect_minimal_013_install; then
+            printf '[SG-Gateway] Обнаружена рабочая база SG-Gateway 013; выполняется миграция.\\n'
+            printf '[SG-Gateway] Логин и пароль SG-Gateway 013 сохраняются.\\n'
+          '''
+          assert s.count(old_013) == 1, s.count(old_013)
+          s = s.replace(old_013, new_013, 1)
+
+          old_final = '''  printf '[SG-Gateway] Xray:         %s\\n' "$(xray_installed_version)"
+            printf '[SG-Gateway] NaiveProxy:   %s · TCP %s\\n' "$NAIVEPROXY_VERSION" "$NAIVEPROXY_PORT"
+            printf '[SG-Gateway] Логин:        admin\\n'
+            printf '[SG-Gateway] Журнал:       %s\\n' "$INSTALL_LOG"
+            printf '[SG-Gateway] Backup:       %s\\n' "$BACKUP_DIR"
+            print_sg_admin_status
+          '''
+          new_final = '''  printf '[SG-Gateway] Xray:         %s\\n' "$(xray_installed_version)"
+            printf '[SG-Gateway] NaiveProxy:   %s · TCP %s\\n' "$NAIVEPROXY_VERSION" "$NAIVEPROXY_PORT"
+            local final_https_domain=""
+            final_https_domain="$(saved_https_access)"
+            if [[ -n "$final_https_domain" ]]; then
+              printf '[SG-Gateway] Панель:       https://%s:%s\\n' "$final_https_domain" "$PANEL_PORT"
+              printf '[SG-Gateway] Заглушка:     http://%s/ и https://%s/\\n' "$final_https_domain" "$final_https_domain"
+            else
+              printf '[SG-Gateway] Панель:       http://%s:%s\\n' "$PUBLIC_ADDRESS" "$PANEL_PORT"
+              printf '[SG-Gateway] Заглушка:     http://%s/\\n' "$PUBLIC_ADDRESS"
+            fi
+            printf '[SG-Gateway] Логин:        admin\\n'
+            printf '[SG-Gateway] Журнал:       %s\\n' "$INSTALL_LOG"
+            printf '[SG-Gateway] Backup:       %s\\n' "$BACKUP_DIR"
+            print_sg_admin_status
+            if [[ -s "$DATA_DIR/warp/wgcf.xray.json" || -s "$DATA_DIR/warp/wgcf-profile.conf" ]]; then
+              printf '[SG-Gateway] WARP:         существующий профиль сохранён\\n'
+            else
+              printf '[SG-Gateway] WARP:         helper установлен; создаётся при необходимости в Outbounds\\n'
+            fi
+          '''
+          assert s.count(old_final) == 1, s.count(old_final)
+          s = s.replace(old_final, new_final, 1)
+
+          assert s.count("main() {") == 1
+          assert "legacy_main_02208()" not in s
+          assert s.count("create_backup() {") == 1
+          assert "Запускаю полный мастер SG-Gateway 0.1.0-022.08" in s
+          assert "Повторный запуск выполняется на этом же EC2" in s
+          assert "Логин и пароль SG-Gateway 013 сохраняются" in s
+          assert "final_https_domain" in s
+          assert "Панель:       http://%s:%s" in s
+          assert "helper установлен; создаётся при необходимости в Outbounds" in s
+          installer_path.write_text(s, encoding="utf-8", newline="\n")
+
+          test_path = Path("tests/test_sg_gateway_v22_awg30_idle_bootstrap.py")
+          t = test_path.read_text(encoding="utf-8")
+          old_test = '''    units = 'run_stage 8 "Создание systemd-служб" stage_systemd_units'
+              awg31 = (
+                  'run_quiet "Этап 10/10 · Подготовка независимого профиля AWG31" '
+                  "run_awg31_stage3a_migration"
+              )
+              assert units in installer
+              assert awg31 in installer
+              assert installer.index(units) < installer.index(awg31)
+          '''
+          new_test = '''    units = 'run_stage 15 "Systemd-службы и Nginx" stage_systemd_units_02208'
+              awg31 = 'run_stage 19 "Независимый профиль AWG31" run_awg31_stage3a_migration'
+              clients = 'run_stage 20 "Применение Xray и клиентов" stage9_apply_runtime'
+              assert units in installer
+              assert awg31 in installer
+              assert clients in installer
+              assert installer.index(units) < installer.index(awg31) < installer.index(clients)
+          '''
+          assert t.count(old_test) == 1, t.count(old_test)
+          t = t.replace(old_test, new_test, 1)
+          test_path.write_text(t, encoding="utf-8", newline="\n")
+          PY
+
+          git rm .github/workflows/02208-final-live-main-contracts.yml
+          bash -n install.sh
+          python3 -B -m py_compile tests/test_sg_gateway_v22_awg30_idle_bootstrap.py
+
+          python3 -B - <<'PY'
+          import hashlib
+          import subprocess
+          from pathlib import Path
+
+          tracked = sorted(
+              p for p in subprocess.check_output(
+                  ["git", "ls-files"], text=True, encoding="utf-8"
+              ).splitlines()
+              if p != "SOURCE-SHA256SUMS"
+          )
+          rows = [
+              f"{hashlib.sha256(Path(p).read_bytes()).hexdigest()}  {p}"
+              for p in tracked
+          ]
+          Path("SOURCE-SHA256SUMS").write_text("\n".join(rows) + "\n", encoding="utf-8")
+          print(f"regenerated SOURCE-SHA256SUMS: {len(rows)} tracked files")
+          PY
+
+          git add install.sh tests/test_sg_gateway_v22_awg30_idle_bootstrap.py SOURCE-SHA256SUMS
+          git diff --cached --check
+          git config user.name "SG-Gateway CI"
+          git config user.email "actions@users.noreply.github.com"
+          git commit -m "fix: restore live 24-stage installer contracts"
+          git push origin HEAD:release/02208-rc
