@@ -21,19 +21,46 @@ def test_decorative_map_is_removed():
     assert "Интернет → SG-Gateway → клиентский профиль" not in template
 
 
-def test_xray_is_full_width_before_equal_awg_mihomo_pair():
+def test_connections_uses_one_canonical_engine_grid():
     template = (ROOT / "app/web/templates/connections.html").read_text(encoding="utf-8")
-    xray = template.index('class="cnv1-engines cnv1-xray-row"')
-    xray_card = template.index("cnv1-engine-xray", xray)
-    pair = _class_tag_index(template, "section", "cnv1-engine-pair", xray_card)
-    awg = template.index("cnv1-engine-awg", pair)
-    mihomo = template.index('_mihomo_panel.html', awg)
-    pair_end = template.index("</section>", mihomo)
-    assert xray < xray_card < pair < awg < mihomo < pair_end
+    assert template.count('class="cnv1-engine-grid sg-ui-grid"') == 1
+    assert "cnv1-engine-pair" not in template
+    assert "cnv1-engines cnv1-xray-row" not in template
 
-    css = (ROOT / "app/web/static/sg-preview28-final.css").read_text(encoding="utf-8")
-    assert "grid-template-columns: minmax(0, 1fr) minmax(0, 1fr)" in css
-    assert ".cnv1-xray-row" in css
+    xray = template.index("cnv1-engine-xray")
+    xmux = template.index('_xray_xmux_settings.html', xray)
+    naive = template.index('_naiveproxy_panel.html', xmux)
+    awg = template.index("cnv1-engine-awg", naive)
+    mihomo = template.index('_mihomo_panel.html', awg)
+    assert xray < xmux < naive < awg < mihomo
+
+    css = (ROOT / "app/web/static/sg-ui-connections-v22-08.css").read_text(encoding="utf-8")
+    assert ".cnv1-engine-grid.sg-ui-grid" in css
+    assert "grid-template-columns: repeat(2, minmax(0, 1fr));" in css
+    assert ".cnv1-grid-span-2" in css
+    assert "grid-column: 1 / -1;" in css
+
+
+def test_connections_has_native_naiveproxy_panel():
+    template = (ROOT / "app/web/templates/connections.html").read_text(encoding="utf-8")
+    panel = (ROOT / "app/web/templates/_naiveproxy_panel.html").read_text(encoding="utf-8")
+    http = (ROOT / "app/naiveproxy/http.py").read_text(encoding="utf-8")
+
+    assert '{% include "_naiveproxy_panel.html" %}' in template
+    assert 'id="sg-naiveproxy-settings"' in panel
+    assert 'data-naiveproxy-panel' in panel
+    assert "/api/naiveproxy/status" in panel
+    assert "/api/naiveproxy/settings" in panel
+    assert "_SETTINGS_PANEL" not in http
+    assert 'request.endpoint == "connections"' not in http
+
+
+def test_connections_grid_cards_share_equal_row_geometry():
+    css = (ROOT / "app/web/static/sg-ui-connections-v22-08.css").read_text(encoding="utf-8")
+    assert ".cnv1-grid-cell" in css
+    assert "align-self: stretch;" in css
+    assert ".cnv1-grid-cell > :first-child" in css
+    assert "height: 100%;" in css
 
 
 def test_awg_is_compact_but_keeps_required_post_fields():
@@ -54,8 +81,7 @@ def test_mihomo_is_compact_and_keeps_three_protocols():
         assert protocol in panel
     for field in (
         'name="mieru_enabled"', 'name="mieru_transport"',
-        'name="anytls_enabled"',
-        'name="tuic_enabled"',
+        'name="anytls_enabled"', 'name="tuic_enabled"',
     ):
         assert field in panel
     for field in ("mieru_port", "anytls_port", "tuic_port"):
@@ -86,16 +112,8 @@ def test_connections_summary_cards_are_removed():
     assert "cnv1-summary-card" not in template
 
 
-def test_awg_and_mihomo_are_equal_height_on_desktop():
+def test_awg_and_mihomo_keep_equal_height_contract():
     css = (ROOT / "app/web/static/sg-preview28-final.css").read_text(encoding="utf-8")
-    assert ".cnv1-engine-pair { align-items: stretch; }" in css
     assert "height: auto; align-self: stretch;" in css
     assert ".cnv1-engine-awg .cnv1-engine-form-compact { flex: 1 1 auto; }" in css
     assert ".cnv1-engine-awg .cnv1-form-actions { margin-top: auto; }" in css
-
-
-def test_preview28_connections_order_is_xray_then_awg_mihomo():
-    template = (ROOT / "app/web/templates/connections.html").read_text(encoding="utf-8")
-    assert template.index('class="cnv1-engines cnv1-xray-row"') < _class_tag_index(
-        template, "section", "cnv1-engine-pair"
-    )
