@@ -218,6 +218,11 @@ prepare_log() {
   chmod 0600 "$INSTALL_LOG"
 }
 
+fail() {
+  printf '[SG-Gateway] %s\n' "$1" >&2
+  return 1
+}
+
 
 sanitize_installer_stream() {
   # Keep the permanent installer log useful without retaining exported

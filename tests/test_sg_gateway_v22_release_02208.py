@@ -38,3 +38,19 @@ def test_02208_release_publication_contract_exists_and_is_pinned():
 
     assert "0.1.0-022.08" in publication
     assert "22.08" in publication
+
+
+def test_02208_installer_and_smoke_workflows_use_current_identity():
+    installer = (ROOT / "install.sh").read_text(encoding="utf-8")
+    clean = (ROOT / ".github" / "workflows" / "clean-install-awg3-smoke.yml").read_text(encoding="utf-8")
+    reinstall = (ROOT / ".github" / "workflows" / "reinstall-after-full-uninstall-smoke.yml").read_text(encoding="utf-8")
+
+    assert 'fail() {' in installer
+    assert 'VERSION="0.1.0-022.08"' in installer
+    assert '/root/sg-gateway-02208-installer-resume.env' in clean
+    assert '/root/sg-gateway-02206-installer-resume.env' not in clean
+    assert '/var/log/sg-gateway-installer-02208.log' in clean
+    assert '/root/sg-gateway-02208-installer-resume.env' in reinstall
+    assert '/root/sg-gateway-02206-installer-resume.env' not in reinstall
+    assert '/var/log/sg-gateway-installer-02208.log' in reinstall
+    assert '/var/log/sg-gateway-full-uninstall-02208.log' in reinstall
