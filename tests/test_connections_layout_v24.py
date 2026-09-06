@@ -10,15 +10,15 @@ def test_decorative_map_is_removed():
     assert "Интернет → SG-Gateway → клиентский профиль" not in template
 
 
-def test_connections_keeps_restored_order_and_appends_naiveproxy_last():
+def test_connections_keeps_restored_order_with_naiveproxy_before_note():
     template = (ROOT / "app/web/templates/connections.html").read_text(encoding="utf-8")
     xray = template.index("cnv1-engine-xray")
     xmux = template.index('_xray_xmux_settings.html', xray)
     awg = template.index("cnv1-engine-awg", xmux)
     mihomo = template.index('_mihomo_panel.html', awg)
-    note = template.index("cnv1-note-panel", mihomo)
-    naive = template.index('_naiveproxy_panel.html', note)
-    assert xray < xmux < awg < mihomo < note < naive
+    naive = template.index('_naiveproxy_panel.html', mihomo)
+    note = template.index("cnv1-note-panel", naive)
+    assert xray < xmux < awg < mihomo < naive < note
 
     assert 'class="cnv1-engine-pair sg-ui-grid"' in template
     assert 'class="cnv1-engines cnv1-xray-row"' in template
