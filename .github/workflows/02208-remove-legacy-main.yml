@@ -61,7 +61,9 @@ jobs:
           clients = 'run_stage 20 "Применение Xray и клиентов" stage9_apply_runtime'
           assert main.index(awg31) < main.index(clients)
 
-          canonical_backup = s[s.index("create_backup() {"):s.index("\n\nrestore_backup() {")]
+          backup_start = s.index("create_backup() {")
+          backup_end = s.index("\n\nrestore_backup() {", backup_start)
+          canonical_backup = s[backup_start:backup_end]
           assert "sg-gateway-naiveproxy.service" in canonical_backup
           assert "sg-gateway-awg31.service" in canonical_backup
           assert "client-identities-before.sha256" in canonical_backup
