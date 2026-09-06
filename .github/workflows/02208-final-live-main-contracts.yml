@@ -38,15 +38,10 @@ jobs:
           assert s.count(old_start) == 1, s.count(old_start)
           s = s.replace(old_start, new_start, 1)
 
-          old_013 = '''  elif detect_minimal_013_install; then
-            printf '[SG-Gateway] Обнаружена рабочая база SG-Gateway 013; выполняется миграция.\\n'
-          '''
-          new_013 = '''  elif detect_minimal_013_install; then
-            printf '[SG-Gateway] Обнаружена рабочая база SG-Gateway 013; выполняется миграция.\\n'
-            printf '[SG-Gateway] Логин и пароль SG-Gateway 013 сохраняются.\\n'
-          '''
-          assert s.count(old_013) == 1, s.count(old_013)
-          s = s.replace(old_013, new_013, 1)
+          old_013_line = "    printf '[SG-Gateway] Обнаружена рабочая база SG-Gateway 013; выполняется миграция.\\n'\n"
+          new_013_lines = old_013_line + "    printf '[SG-Gateway] Логин и пароль SG-Gateway 013 сохраняются.\\n'\n"
+          assert s.count(old_013_line) == 1, s.count(old_013_line)
+          s = s.replace(old_013_line, new_013_lines, 1)
 
           old_final = '''  printf '[SG-Gateway] Xray:         %s\\n' "$(xray_installed_version)"
             printf '[SG-Gateway] NaiveProxy:   %s · TCP %s\\n' "$NAIVEPROXY_VERSION" "$NAIVEPROXY_PORT"
