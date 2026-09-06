@@ -416,7 +416,6 @@ missing = sorted(required - commands)
 assert not missing, f"Missing NaiveProxy hostd commands: {missing}"
 print("NaiveProxy hostd commands: OK")
 PYNAIVECOMMANDS
-
   if [[ -f "$NAIVEPROXY_CONFIG/Caddyfile" ]]; then
     systemctl_with_retry enable "$NAIVEPROXY_SERVICE"
     systemctl_with_retry restart "$NAIVEPROXY_SERVICE"
@@ -433,6 +432,27 @@ stage_final_contract() {
   systemctl is-active --quiet nginx.service
 }
 
+run_interactive_stage() {
+  local number="$1"
+  local label="$2"
+  local function_name="$3"
+  local started=$SECONDS
+  local elapsed=0
+
+  CURRENT_STAGE="$number"
+  CURRENT_LABEL="Этап ${number}/${TOTAL_STAGES} · ${label}"
+  printf '%s[SG-Gateway] [..]%s %s\n' "$GREEN" "$RESET" "$CURRENT_LABEL"
+
+  # This stage must stay in the foreground: it reads the administrator
+  # password from /dev/tty. run_stage/run_quiet execute their functions in a
+  # background process, which makes terminal input stop with SIGTTIN.
+  "$function_name"
+
+  elapsed=$((SECONDS - started))
+  printf '%s[SG-Gateway] [OK]%s %s (%s сек.)\n' \
+    "$GREEN" "$RESET" "$CURRENT_LABEL" "$elapsed"
+}
+
 main() {
   require_root
   require_supported_ubuntu
@@ -444,7 +464,7 @@ main() {
   printf '[SG-Gateway] Технический журнал: %s\n\n' "$INSTALL_LOG"
 
   run_stage 1 "Подготовка Ubuntu" bootstrap_packages
-  run_stage 2 "Определение режима и параметров" stage_prepare_install_context
+  run_interactive_stage 2 "Определение режима и параметров" stage_prepare_install_context
   run_stage 3 "Проверка установочного комплекта" stage_vendor_media_contract
   run_stage 4 "Резервная копия и исходник" stage_backup_and_prepare
   run_stage 5 "Системные пакеты, Nginx и Certbot" stage_system_packages_02208
