@@ -1,0 +1,71 @@
+name: Prepare 022.08 RC release identity v2
+
+on:
+  push:
+    branches:
+      - automation/02208-rc-release-identity-v2
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: release/02208-rc
+          fetch-depth: 0
+
+      - name: Apply non-workflow 022.08 release identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          def replace_exact(path, old, new):
+              p = Path(path)
+              text = p.read_text(encoding="utf-8")
+              count = text.count(old)
+              if count == 0:
+                  raise SystemExit(f"missing replacement anchor in {path}: {old!r}")
+              p.write_text(text.replace(old, new), encoding="utf-8")
+              print(f"{path}: replaced {count} occurrence(s)")
+
+          Path("VERSION").write_text("0.1.0-022.08\n", encoding="utf-8")
+          Path("BUILD-ID").write_text("MAIN-02208-STABLE\n", encoding="utf-8")
+          Path("DEVELOPMENT-VERSION").write_text("0.1.0-022.09-dev\n", encoding="utf-8")
+
+          manifest_path = Path("release-manifest.json")
+          manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+          manifest["version"] = "0.1.0-022.08"
+          manifest["build"] = "MAIN-02208-STABLE"
+          manifest["status"] = "STABLE"
+          manifest["channel"] = "stable-02208"
+          manifest["rebuild_target"] = "0.1.0-022.08"
+          manifest["next_development_line"] = "0.1.0-022.09"
+          manifest["maintenance_updates"]["panel"]["channel"] = "stable-02208"
+          manifest["maintenance_updates"]["panel"]["source"] = "github-stable-02208-exact-commit"
+          manifest["installer_update"]["version"] = "02208-stable"
+          manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+          replace_exact("deploy/install-from-github.sh", "stable-02206", "stable-02208")
+          replace_exact("deploy/install-from-github.sh", "bootstrap-02206", "bootstrap-02208")
+          replace_exact("deploy/update-from-github.sh", "stable-02206", "stable-02208")
+          replace_exact("deploy/uninstall-from-github.sh", "stable-02206", "stable-02208")
+
+          Path("tests/test_sg_gateway_v22_02206_stable_release.py").write_text('''from pathlib import Path\n\nROOT = Path(__file__).resolve().parents[1]\n\n\ndef test_02206_historical_release_artifacts_remain_intact():\n    publication = (ROOT / "PUBLICATION-02206.md").read_text(encoding="utf-8")\n    workflow = (ROOT / ".github" / "workflows" / "release-02206-stable.yml").read_text(encoding="utf-8")\n    for marker in (\n        "AWG 2.0",\n        "AWG 3.0",\n        "AWG 3.1",\n        "Full Backup/Restore",\n        "Clean Install",\n        "Full Uninstall",\n        "stable-02206",\n        "v0.1.0-022.06-final",\n    ):\n        assert marker in publication\n    assert "TAG: v0.1.0-022.06-final" in workflow\n    assert "TITLE: SG-Gateway 0.1.0-022.06 Final" in workflow\n    assert "SG-Gateway-0.1.0-022.06-FULL.run" in workflow\n    assert "PUBLICATION-02206.md" in workflow\n    assert "python -m pytest tests" in workflow\n    assert "--verify-only" in workflow\n    assert "--latest" in workflow\n\n\ndef test_02206_history_stays_linked_from_readme():\n    readme = (ROOT / "README.md").read_text(encoding="utf-8")\n    assert "PUBLICATION-02206.md" in readme\n''', encoding="utf-8")
+
+          Path("PUBLICATION-02208.md").write_text('''# SG-Gateway 0.1.0-022.08 — финальный стабильный выпуск\n\nСтатус: **FINAL / STABLE**. Стабильный канал: `stable-02208`. Финальный тег: `v0.1.0-022.08-final`.\n\nВерсия 22.08 переносит интерфейс SG-Gateway на единый UI-контракт без изменения проверенных протокольных и backup/runtime гарантий предыдущей линии.\n\n## Главное\n\n- единая система UI primitives и layout для основных страниц панели;\n- согласованная геометрия Connections, Clients, Routing, Security, System, Maintenance и Outbounds;\n- единый standalone-frame для Login и Recovery;\n- Help и Operation Job переведены на тот же 22.08 UI-контракт;\n- real-browser проверки Chromium на desktop, tablet и mobile widths в dark/light;\n- сохранены AWG 2.0, AWG 3.0, AWG 3.1, Xray, NaiveProxy, backup/restore, update rollback и clean-install/reinstall contracts.\n\n## Проверка выпуска\n\nПеред публикацией обязательны source integrity, полный pytest с browser geometry, сборка и `--verify-only` FULL-пакета, Clean Install и Full Uninstall → Reinstall на Ubuntu 24.04.\n\nПубличные команды после promotion публикуются в `deploy/GITHUB-COMMANDS.md`; Clean Install закрепляется на проверенный exact source commit, Update и Full Uninstall — на `stable-02208`.\n''', encoding="utf-8")
+          PY
+
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add VERSION BUILD-ID DEVELOPMENT-VERSION release-manifest.json \
+            PUBLICATION-02208.md deploy/install-from-github.sh deploy/update-from-github.sh \
+            deploy/uninstall-from-github.sh tests/test_sg_gateway_v22_02206_stable_release.py
+          git commit -m "release: prepare SG-Gateway 0.1.0-022.08 identity"
+          git push origin HEAD:release/02208-rc
