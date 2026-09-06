@@ -1,19 +1,23 @@
 {% extends "base.html" %}
 {% block title %}SG-Gateway · Outbounds{% endblock %}
 
+{% block page_styles %}
+  <link rel="stylesheet" href="{{ static_asset('sg-ui-outbounds-v22-08.css') }}">
+{% endblock %}
+
 {% block content %}
-<section class="ob49-page">
-  <header class="ob49-heading">
+<section class="ob49-page sg-ui-page sg-ui-outbounds" data-sg-ui-page="outbounds">
+  <header class="ob49-heading sg-ui-page-head" data-sg-section="outbounds-head">
     <div>
       <div class="ob49-kicker"><span></span> SG-GATEWAY / OUTBOUNDS</div>
       <h1>Outbounds</h1>
       <p>Выходы Xray создаются здесь. Правила использования настраиваются отдельно в Routing.</p>
     </div>
-    <a class="ob49-help" href="{{ url_for('help_topic', slug='routing') }}">Справка</a>
+    <a class="ob49-help sg-ui-button" href="{{ url_for('help_topic', slug='routing') }}">Справка</a>
   </header>
 
-  <section class="ob49-system-card">
-    <header>
+  <section class="ob49-system-card sg-ui-section" data-sg-section="outbounds-system">
+    <header class="sg-ui-section-head">
       <h2>System outbounds</h2>
       <p>Встроенные маршруты Xray: прямой доступ и блокировка трафика.</p>
     </header>
@@ -37,8 +41,8 @@
     </div>
   </section>
 
-  <section class="ob49-warp-card" id="warp">
-    <header class="ob49-warp-head">
+  <section class="ob49-warp-card sg-ui-section" id="warp" data-sg-section="outbounds-warp">
+    <header class="ob49-warp-head sg-ui-section-head">
       <div>
         <div class="ob49-kicker"><span></span> CLOUDFLARE</div>
         <h2>WARP Outbound</h2>
@@ -55,7 +59,7 @@
         <h3>Создать выход <code>warp</code></h3>
         <p>Одна операция создаст WARP, проверит полный Xray candidate и сразу активирует native WireGuard outbound.</p>
       </div>
-      <div class="ob49-warp-buttons">
+      <div class="ob49-warp-buttons sg-ui-actions">
         <form method="post" action="{{ url_for('outbounds_warp_create') }}">
           <button class="ob49-primary" type="submit">Создать WARP</button>
         </form>
@@ -75,7 +79,7 @@
     {% if warp.last_test and warp.last_test.checked_at %}<span>Проверено: {{ warp.last_test.checked_at }}</span>{% else %}<span>Последняя проверка ещё не выполнялась</span>{% endif %}
   </div>
       </div>
-      <div class="ob49-warp-buttons ob49-warp-buttons-full">
+      <div class="ob49-warp-buttons sg-ui-actions ob49-warp-buttons-full">
         <a class="ob49-secondary" href="{{ url_for('outbounds_warp_json') }}">{ } WARP JSON</a>
         <form method="post" action="{{ url_for('outbounds_warp_test') }}">
           <button class="ob49-secondary" type="submit">Проверить WARP</button>
@@ -120,8 +124,8 @@
     </div>
   </section>
 
-  <section class="ob49-custom-card">
-    <header>
+  <section class="ob49-custom-card sg-ui-section" data-sg-section="outbounds-custom">
+    <header class="sg-ui-section-head">
       <div>
         <div class="ob49-kicker"><span></span> ВЫХОДЫ</div>
         <h2>Custom outbounds</h2>

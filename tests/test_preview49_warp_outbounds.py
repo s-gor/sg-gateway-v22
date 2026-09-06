@@ -127,7 +127,8 @@ def test_warp_management_is_on_outbounds_and_routing_only_assigns_it():
     assert "fake" not in outbounds_source.lower()
 
     assert "url_for('outbounds')" in base_source
-    assert "sg-outbounds-v49.css" in base_source
+    assert "sg-outbounds-v49.css" not in base_source
+    assert "static_asset('sg-ui-outbounds-v22-08.css')" in outbounds_source
     for source in (routing_source, outbounds_source):
         assert "confirm(" not in source
         assert "alert(" not in source
