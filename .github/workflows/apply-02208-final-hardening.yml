@@ -1,0 +1,45 @@
+name: Apply 022.08 final hardening
+
+on:
+  push:
+    branches:
+      - automation/02208-final-hardening
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout release candidate
+        uses: actions/checkout@v4
+        with:
+          ref: release/02208-rc
+          fetch-depth: 0
+
+      - name: Checkout hardening helper
+        uses: actions/checkout@v4
+        with:
+          ref: automation/02208-final-hardening
+          path: .automation
+          fetch-depth: 1
+
+      - name: Apply final hardening
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .automation/tools/finalize_02208_identity.py
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add install.sh deploy/full-uninstall-ubuntu.sh app/maintenance/panel_updates.py \
+            tests/test_naiveproxy_development_identity_02207.py \
+            tests/test_sg_gateway_v22_02206_hardening.py \
+            tests/test_sg_gateway_v22_clean_install_os_preflight.py \
+            tests/test_sg_gateway_v22_panel_update_channel.py \
+            tests/test_sg_gateway_v22_panel_update_state_binding.py \
+            tests/test_sg_gateway_v22_clean_install_awg_label_contract.py \
+            README.md PUBLICATION-02208.md
+          git commit -m "release: finish 0.1.0-022.08 identity migration"
+          git push origin HEAD:release/02208-rc
