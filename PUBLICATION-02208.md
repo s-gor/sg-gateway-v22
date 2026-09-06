@@ -18,3 +18,28 @@
 Перед публикацией обязательны source integrity, полный pytest с browser geometry, сборка и `--verify-only` FULL-пакета, Clean Install и Full Uninstall → Reinstall на Ubuntu 24.04.
 
 Публичные команды после promotion публикуются в `deploy/GITHUB-COMMANDS.md`; Clean Install закрепляется на проверенный exact source commit, Update и Full Uninstall — на `stable-02208`.
+
+## Команды
+
+### Clean Install
+
+```bash
+curl -4 -fsSL \
+  https://raw.githubusercontent.com/s-gor/sg-gateway-v22/cde152df4b957c254950e3b4a2276b76561653c9/deploy/install-from-github.sh \
+| sudo env \
+  SG_GATEWAY_GITHUB_BRANCH=stable-02208 \
+  SG_GATEWAY_SOURCE_COMMIT=cde152df4b957c254950e3b4a2276b76561653c9 \
+  bash
+```
+
+### Update
+
+```bash
+curl -4 -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/stable-02208/deploy/update-from-github.sh | sudo env SG_GATEWAY_GITHUB_BRANCH=stable-02208 bash
+```
+
+### Full Uninstall
+
+```bash
+curl -4 -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/stable-02208/deploy/uninstall-from-github.sh | sudo env SG_GATEWAY_GITHUB_BRANCH=stable-02208 bash
+```
