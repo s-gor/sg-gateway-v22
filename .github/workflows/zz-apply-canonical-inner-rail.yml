@@ -1,0 +1,111 @@
+name: Apply canonical Connections inner rail
+
+on:
+  push:
+    branches:
+      - release/02208-rc
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply canonical rail wrappers and remove magic offsets
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          connections = Path('app/web/templates/connections.html')
+          text = connections.read_text(encoding='utf-8')
+          old = '      <div class="awgd-grid">\n'
+          new = '      <div class="awgd-inner-rail sg-ui-rail">\n      <div class="awgd-grid">\n'
+          assert text.count(old) == 1
+          text = text.replace(old, new, 1)
+          old = '      </section>\n    </article>\n\n    {% include "_mihomo_panel.html" %}'
+          new = '      </section>\n      </div>\n    </article>\n\n    {% include "_mihomo_panel.html" %}'
+          assert text.count(old) == 1
+          text = text.replace(old, new, 1)
+          connections.write_text(text, encoding='utf-8')
+
+          mihomo = Path('app/web/templates/_mihomo_panel.html')
+          text = mihomo.read_text(encoding='utf-8')
+          old = '  <div class="mhv2-compact-meta">\n'
+          new = '  <div class="mhv2-inner-rail sg-ui-rail">\n  <div class="mhv2-compact-meta">\n'
+          assert text.count(old) == 1
+          text = text.replace(old, new, 1)
+          old = '  </p>\n</section>\n\n<style>'
+          new = '  </p>\n  </div>\n</section>\n\n<style>'
+          assert text.count(old) == 1
+          text = text.replace(old, new, 1)
+          mihomo.write_text(text, encoding='utf-8')
+
+          css = Path('app/web/static/sg-ui-connections-v22-08.css')
+          text = css.read_text(encoding='utf-8')
+          bad = '''/* Match the lower NaiveProxy content rail without widening NaiveProxy itself. */
+body.page-connections .awgd-shell {
+  padding-inline: var(--sg-ui-card-pad, 18px);
+}
+
+body.page-connections .mhv2-panel {
+  padding-inline: calc(var(--sg-ui-card-pad, 18px) + 18px);
+}
+
+'''
+          assert bad in text
+          text = text.replace(bad, '', 1)
+          bad_mobile = '''
+@media (max-width: 620px) {
+  body.page-connections .awgd-grid {
+    padding-inline: 18px;
+  }
+
+  body.page-connections .awgd-shared-dns {
+    margin-inline: 18px;
+  }
+}
+'''
+          assert bad_mobile in text
+          text = text.replace(bad_mobile, '\n', 1)
+          assert 'calc(' not in text
+          assert 'margin-inline' not in text
+          css.write_text(text, encoding='utf-8')
+          PY
+      - name: Run focused and established Connections layout contracts
+        run: |
+          python -m pip install -q pytest
+          python -m pytest -q \
+            tests/test_connections_layout_v24.py \
+            tests/test_sg_gateway_v22_connections_density_polish.py \
+            tests/test_sg_gateway_v22_connections_final_grid_align.py \
+            tests/test_sg_gateway_v22_connections_semantic_layout_02208.py \
+            tests/test_sg_gateway_v22_connections_shell_tail_polish.py \
+            tests/test_sg_gateway_v22_connections_unified_ui.py \
+            tests/test_sg_gateway_v22_connections_visual_unification_v2.py \
+            tests/test_sg_gateway_v22_layout_contract_connections.py \
+            tests/test_sg_gateway_v22_xmux_inner_alignment.py
+      - name: Refresh manifest, remove temporary workflows, commit
+        run: |
+          git rm .github/workflows/zz-red-canonical-inner-rail.yml
+          git rm .github/workflows/zz-apply-canonical-inner-rail.yml
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib, subprocess
+          root = Path('.')
+          paths = subprocess.check_output(['git', 'ls-files'], text=True).splitlines()
+          paths = [p for p in paths if p != 'SOURCE-SHA256SUMS']
+          lines = [f"{hashlib.sha256((root / p).read_bytes()).hexdigest()}  {p}" for p in paths]
+          (root / 'SOURCE-SHA256SUMS').write_text('\n'.join(lines) + '\n', encoding='utf-8')
+          PY
+          git add app/web/templates/connections.html app/web/templates/_mihomo_panel.html app/web/static/sg-ui-connections-v22-08.css tests/test_connections_layout_v24.py SOURCE-SHA256SUMS
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'fix: use canonical rails for AWG and Mihomo'
+          git push
