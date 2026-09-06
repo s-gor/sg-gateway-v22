@@ -13,8 +13,24 @@ def test_master_exposes_exactly_24_numbered_stages():
     source = _master()
     assert "TOTAL_STAGES=24" in source
     main = source[source.index("main() {") :]
-    numbers = [int(value) for value in re.findall(r"\brun_stage\s+(\d+)\s+", main)]
+    numbers = [
+        int(value)
+        for value in re.findall(r"\b(?:run_stage|run_interactive_stage)\s+(\d+)\s+", main)
+    ]
     assert numbers == list(range(1, 25)), numbers
+
+
+def test_interactive_parameter_stage_runs_in_foreground():
+    source = _master()
+    assert "run_interactive_stage()" in source
+    assert (
+        'run_interactive_stage 2 "Определение режима и параметров" '
+        "stage_prepare_install_context"
+    ) in source
+    assert (
+        'run_stage 2 "Определение режима и параметров" stage_prepare_install_context'
+        not in source
+    )
 
 
 def test_naiveproxy_is_a_native_master_stage_not_a_wrapper_injection():
