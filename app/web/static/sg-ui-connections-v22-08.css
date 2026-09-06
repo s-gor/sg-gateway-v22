@@ -73,6 +73,15 @@ body.page-connections .cnv1-engine-pair.sg-ui-grid > * {
   min-width: 0;
 }
 
+/* Match the lower NaiveProxy content rail without widening NaiveProxy itself. */
+body.page-connections .awgd-shell {
+  padding-inline: var(--sg-ui-card-pad, 18px);
+}
+
+body.page-connections .mhv2-panel {
+  padding-inline: calc(var(--sg-ui-card-pad, 18px) + 18px);
+}
+
 body.page-connections :is(
   .xps2-parameter-list,
   .xps2-choice-grid,
@@ -173,5 +182,15 @@ body.page-connections .xps2-naiveproxy-body .cnv1-form-actions {
 
   body.page-connections .cnv1-engine-xray .sg-ui-rail {
     padding-inline: var(--sg-ui-rail-inset, 14px);
+  }
+}
+
+@media (max-width: 620px) {
+  body.page-connections .awgd-grid {
+    padding-inline: 18px;
+  }
+
+  body.page-connections .awgd-shared-dns {
+    margin-inline: 18px;
   }
 }
