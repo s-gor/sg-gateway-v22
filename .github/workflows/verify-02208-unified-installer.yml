@@ -1,0 +1,20 @@
+name: Verify 22.08 unified installer
+
+on:
+  push:
+    branches:
+      - feature/02208-unified-installer-24stage
+  workflow_dispatch:
+
+jobs:
+  installer-contract:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pytest
+        run: python -m pip install 'pytest>=8,<9'
+      - name: Run unified installer contract
+        run: python -m pytest -q tests/test_sg_gateway_v22_unified_installer_02208.py
