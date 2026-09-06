@@ -47,10 +47,10 @@ SG-Gateway намеренно не превращён в биллинговую 
 
 ```bash
 curl -4 -fsSL \
-  https://raw.githubusercontent.com/s-gor/sg-gateway-v22/cde152df4b957c254950e3b4a2276b76561653c9/deploy/install-from-github.sh \
+  https://raw.githubusercontent.com/s-gor/sg-gateway-v22/889206dd3ddb7d10ef7480f3b5b23694f0b90b7e/deploy/install-from-github.sh \
 | sudo env \
   SG_GATEWAY_GITHUB_BRANCH=stable-02208 \
-  SG_GATEWAY_SOURCE_COMMIT=cde152df4b957c254950e3b4a2276b76561653c9 \
+  SG_GATEWAY_SOURCE_COMMIT=889206dd3ddb7d10ef7480f3b5b23694f0b90b7e \
   bash
 ```
 
