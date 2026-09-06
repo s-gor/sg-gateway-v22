@@ -127,21 +127,14 @@ def test_awg_and_mihomo_keep_equal_height_contract():
     assert ".cnv1-engine-awg .cnv1-form-actions { margin-top: auto; }" in css
 
 
-def test_awg_and_mihomo_inner_rails_match_naiveproxy():
+def test_awg_and_mihomo_inner_rails_match_naiveproxy_without_magic_offsets():
+    template = (ROOT / "app/web/templates/connections.html").read_text(encoding="utf-8")
+    mihomo = (ROOT / "app/web/templates/_mihomo_panel.html").read_text(encoding="utf-8")
     css = (ROOT / "app/web/static/sg-ui-connections-v22-08.css").read_text(encoding="utf-8")
 
-    awg_selector = "body.page-connections .awgd-shell {"
-    assert awg_selector in css
-    awg = css.split(awg_selector, 1)[1].split("}", 1)[0]
-    assert "padding-inline: var(--sg-ui-card-pad, 18px);" in awg
-
-    mihomo_selector = "body.page-connections .mhv2-panel {"
-    assert mihomo_selector in css
-    mihomo = css.split(mihomo_selector, 1)[1].split("}", 1)[0]
-    assert "padding-inline: calc(var(--sg-ui-card-pad, 18px) + 18px);" in mihomo
-
-    mobile_selector = "@media (max-width: 620px) {"
-    assert mobile_selector in css
-    mobile = css.split(mobile_selector, 1)[1].split("}", 2)[0] + "}"
-    assert "body.page-connections .awgd-grid" in mobile
-    assert "padding-inline: 18px;" in mobile
+    assert '<div class="awgd-inner-rail sg-ui-rail">' in template
+    assert '<div class="mhv2-inner-rail sg-ui-rail">' in mihomo
+    assert "calc(" not in css
+    assert "margin-inline" not in css
+    assert "body.page-connections .awgd-shell {" not in css
+    assert "body.page-connections .mhv2-panel {" not in css
