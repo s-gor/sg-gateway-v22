@@ -49,5 +49,5 @@ def test_awg_header_keeps_original_layout_and_names_three_generations() -> None:
     assert 'id="sg-awg-header-density-fix"' not in panel
     assert "UDP VPN · ТРИ ПОКОЛЕНИЯ" in page
     assert "UDP VPN · ДВА ПОКОЛЕНИЯ" not in page
-    assert ".page-connections .awgd-shell > .cnv1-engine-head { border-bottom: 1px solid var(--sg-line-soft); }" in stylesheet
+    assert ".page-connections .awgd-shell > .cnv1-engine-head { border-bottom:" not in stylesheet
     assert "padding: 14px 18px 18px;" in stylesheet

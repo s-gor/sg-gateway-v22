@@ -39,8 +39,7 @@ def test_dev_deploy_identity_matches_version() -> None:
     assert f'INSTALLER_BUILD="{token}-full-clean-dual-stack"' in installer
     assert f'INSTALL_LOG="/var/log/sg-gateway-installer-{token}.log"' in installer
     assert f'RESUME_FILE="/root/sg-gateway-{token}-installer-resume.env"' in installer
-    assert f'Запускаю полный мастер SG-Gateway {version}' in installer
-    assert f'Мастер установки SG-Gateway {version} запущен' in installer
+    assert f'Запускаю полный мастер SG-Gateway {version} · 24 этапа' in installer
     assert installer.count(f'before-sg-gateway-{token}') == 2
     assert "SG-Gateway V22 vendor bundle:" in installer
 

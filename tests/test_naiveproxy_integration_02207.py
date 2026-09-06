@@ -65,7 +65,7 @@ def test_ui_uses_clients_protocol_hook_and_native_connections_panel():
     assert "app.after_request(_inject_naiveproxy_protocol_option)" in source
     assert "_inject_naiveproxy_ui" not in source
     assert template.count('{% include "_naiveproxy_panel.html" %}') == 1
-    assert template.index("cnv1-note-panel") < template.index('_naiveproxy_panel.html')
+    assert template.index('_naiveproxy_panel.html') < template.index("cnv1-note-panel")
     assert 'id="sg-naiveproxy-settings"' in panel
     assert "data-naive-host" in panel
     assert "data-naive-submit" in panel

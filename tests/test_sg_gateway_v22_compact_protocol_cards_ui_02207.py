@@ -20,14 +20,14 @@ def test_naiveproxy_is_native_bottom_engine_card() -> None:
     assert "HTTPS FORWARD PROXY · TLS" in naive
     assert "data-naive-host" in naive
     assert "data-naive-port" in naive
-    assert "data-naive-runtime" in naive
+    assert "data-naive-runtime" not in naive
     assert "data-naive-submit" in naive
     assert "let activePort = 8447;" in naive
     assert "activePort = Number(payload.port || payload.default_port || 8447);" in naive
     assert "body: JSON.stringify({port: Number(activePort)})" in naive
     assert "healthy ? 'Работает' : 'Не настроен'" in naive
     assert connections.count('{% include "_naiveproxy_panel.html" %}') == 1
-    assert connections.index("cnv1-note-panel") < connections.index('_naiveproxy_panel.html')
+    assert connections.index('_naiveproxy_panel.html') < connections.index("cnv1-note-panel")
 
 
 def test_hysteria2_has_effective_compact_overrides() -> None:

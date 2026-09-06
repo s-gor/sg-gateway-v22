@@ -133,11 +133,11 @@ def test_connections_uses_native_naiveproxy_panel_after_legacy_content(monkeypat
     template = (root / "app/web/templates/connections.html").read_text(encoding="utf-8")
     panel = (root / "app/web/templates/_naiveproxy_panel.html").read_text(encoding="utf-8")
     assert template.count('{% include "_naiveproxy_panel.html" %}') == 1
-    assert template.index("cnv1-note-panel") < template.index('_naiveproxy_panel.html')
+    assert template.index('_naiveproxy_panel.html') < template.index("cnv1-note-panel")
     assert panel.count('id="sg-naiveproxy-settings"') == 1
     assert "data-naive-host" in panel
     assert "data-naive-port" in panel
-    assert "data-naive-runtime" in panel
+    assert "data-naive-runtime" not in panel
     assert "'/api/naiveproxy/status'" in panel
     assert "'/api/naiveproxy/settings'" in panel
 

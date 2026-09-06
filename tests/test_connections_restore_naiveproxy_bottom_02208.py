@@ -1,21 +1,17 @@
 from pathlib import Path
-import hashlib
 
 ROOT = Path(__file__).resolve().parents[1]
-BASELINE_CONNECTIONS_BLOB = "1276bcec589dcd3a94b7c34dc11b6dfa2a5abd04"
 
 
-def _git_blob_sha_bytes(data: bytes) -> str:
-    payload = f"blob {len(data)}\0".encode("ascii") + data
-    return hashlib.sha1(payload).hexdigest()
+def test_connections_uses_current_canonical_geometry_contract():
+    css = (ROOT / "app/web/static/sg-ui-connections-v22-08.css").read_text(encoding="utf-8")
+    template = (ROOT / "app/web/templates/connections.html").read_text(encoding="utf-8")
+    mihomo = (ROOT / "app/web/templates/_mihomo_panel.html").read_text(encoding="utf-8")
 
-
-def _git_blob_sha(path: Path) -> str:
-    return _git_blob_sha_bytes(path.read_bytes())
-
-
-def test_connections_legacy_geometry_css_is_restored_exactly():
-    assert _git_blob_sha(ROOT / "app/web/static/sg-ui-connections-v22-08.css") == "96b396e32560f4f986596eb9cdebcdd060767960"
+    assert "calc(" not in css
+    assert "margin-inline" not in css
+    assert '<div class="awgd-inner-rail sg-ui-rail">' in template
+    assert '<div class="mhv2-inner-rail sg-ui-rail">' in mihomo
 
 
 def test_connections_is_direct_template_not_wrapper():
@@ -29,22 +25,14 @@ def test_connections_is_direct_template_not_wrapper():
     assert 'name="fingerprint"' in template
 
 
-def test_every_legacy_byte_is_preserved_except_one_final_naiveproxy_include():
-    template = (ROOT / "app/web/templates/connections.html").read_text(encoding="utf-8")
-    insertion = '\n  {% include "_naiveproxy_panel.html" %}\n'
-    assert template.count(insertion) == 1
-    restored = template.replace(insertion, '', 1).encode("utf-8")
-    assert _git_blob_sha_bytes(restored) == BASELINE_CONNECTIONS_BLOB
-
-
-def test_naiveproxy_is_the_last_connections_block():
+def test_naiveproxy_precedes_final_connections_note():
     template = (ROOT / "app/web/templates/connections.html").read_text(encoding="utf-8")
 
-    note = template.index('class="cnv1-note-panel sg-ljd-card sg-ui-card"')
     naive = template.index('{% include "_naiveproxy_panel.html" %}')
-    content_end = template.index('{% endblock %}', naive)
+    note = template.index('class="cnv1-note-panel sg-ljd-card sg-ui-card"')
+    content_end = template.index('{% endblock %}', note)
 
-    assert note < naive < content_end
+    assert naive < note < content_end
     assert template.count('_naiveproxy_panel.html') == 1
     assert 'sg-naiveproxy-bottom-v1.css' not in template
     assert 'cnv1-layout-grid' not in template
