@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 {% block title %}SG-Gateway · Maintenance{% endblock %}
 
-{% block head %}
-  {{ super() }}
-  <link rel="stylesheet" href="{{ url_for('static', filename='sg-maintenance-v2.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='sg-maintenance-updates-v31.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='sg-maintenance-updates-v32.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='sg-full-backup-v1.css') }}">
+{% block page_styles %}
+  <link rel="stylesheet" href="{{ static_asset('sg-maintenance-v2.css') }}">
+  <link rel="stylesheet" href="{{ static_asset('sg-maintenance-updates-v31.css') }}">
+  <link rel="stylesheet" href="{{ static_asset('sg-maintenance-updates-v32.css') }}">
+  <link rel="stylesheet" href="{{ static_asset('sg-full-backup-v1.css') }}">
+  <link rel="stylesheet" href="{{ static_asset('sg-ui-maintenance-v22-08.css') }}">
 {% endblock %}
 
 {% block content %}
@@ -46,8 +46,8 @@
   'GeoFiles Xray': 'GeoFiles Xray'
 } %}
 
-<section class="mtv2-page">
-  <header class="mtv2-heading">
+<section class="mtv2-page sg-ui-page sg-ui-maintenance" data-sg-ui-page="maintenance">
+  <header class="mtv2-heading sg-ui-page-head sg-ui-maintenance-head" data-sg-section="maintenance-head">
     <div>
       <div class="mtv2-kicker"><span></span> SG-GATEWAY / MAINTENANCE</div>
       <h1>Maintenance</h1>
@@ -55,7 +55,7 @@
     </div>
 
     {% if active_tab == 'backups' %}
-    <div class="mtv2-heading-actions">
+    <div class="mtv2-heading-actions sg-ui-actions">
       <form method="post" action="{{ url_for('create_backup_route') }}">
         <button class="button primary sg-ljd-key-action" type="submit">
           <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -68,20 +68,20 @@
       <a class="button" href="{{ url_for('download_diagnostics') }}">Скачать диагностику</a>
     </div>
     {% else %}
-    <div class="mtv2-heading-actions">
+    <div class="mtv2-heading-actions sg-ui-actions">
       <a class="button primary sg-ljd-key-action" href="{{ url_for('maintenance', tab='updates', refresh=1) }}">Проверить обновления</a>
     </div>
     {% endif %}
   </header>
 
-  <nav class="mtv31-tabs" aria-label="Разделы Maintenance">
+  <nav class="mtv31-tabs sg-ui-maintenance-tabs" data-sg-section="maintenance-tabs" aria-label="Разделы Maintenance">
     <a class="{{ 'is-active' if active_tab == 'backups' else '' }}" href="{{ url_for('maintenance', tab='backups') }}">Backups</a>
     <a class="{{ 'is-active' if active_tab == 'updates' else '' }}" href="{{ url_for('maintenance', tab='updates') }}">Updates</a>
   </nav>
 
   {% if active_tab == 'updates' %}
-  <article class="mtv2-panel mtv32-update-panel sg-ljd-card-large">
-    <header class="mtv2-panel-head">
+  <article class="mtv2-panel sg-ui-section mtv32-update-panel sg-ljd-card-large">
+    <header class="mtv2-panel-head sg-ui-section-head">
       <div>
         <div class="mtv2-card-kicker">SG-GATEWAY UPDATE</div>
         <h2>Обновление самой панели</h2>
@@ -109,8 +109,8 @@
     <div class="mtv31-safety-note sg-ljd-nested"><strong>Защита</strong><span>Если изменился <code>requirements.txt</code>, panel-only update блокируется: такую версию можно ставить только новым полным installer. Это не даёт обновлению зависимостей сломать рабочую систему.</span></div>
   </article>
 
-  <article class="mtv2-panel mtv31-xray-update-panel sg-ljd-card-large">
-    <header class="mtv2-panel-head">
+  <article class="mtv2-panel sg-ui-section mtv31-xray-update-panel sg-ljd-card-large">
+    <header class="mtv2-panel-head sg-ui-section-head">
       <div>
         <div class="mtv2-card-kicker">XRAY CORE</div>
         <h2>Обновление серверного Xray</h2>
@@ -192,8 +192,8 @@
       {% if check.get('engine') == 'amneziawg3' %}{% set awg3_state.item = check %}{% endif %}
     {% endfor %}
   {% endif %}
-  <article class="mtv2-panel sg-ljd-card-large">
-    <header class="mtv2-panel-head">
+  <article class="mtv2-panel sg-ui-section sg-ljd-card-large">
+    <header class="mtv2-panel-head sg-ui-section-head">
       <div>
         <div class="mtv2-card-kicker">RUNTIME CONTRACT</div>
         <h2>AWG3 Runtime</h2>
@@ -226,8 +226,8 @@
     </div>
   </article>
 
-  <article class="mtv2-panel mtv32-update-panel sg-ljd-card-large">
-    <header class="mtv2-panel-head">
+  <article class="mtv2-panel sg-ui-section mtv32-update-panel sg-ljd-card-large">
+    <header class="mtv2-panel-head sg-ui-section-head">
       <div>
         <div class="mtv2-card-kicker">OTHER CORES</div>
         <h2>Mihomo, sing-box, WARP и AmneziaWG</h2>
@@ -256,8 +256,8 @@
     <div class="mtv31-safety-note sg-ljd-nested"><strong>AmneziaWG</strong><span>Tools и kernel module нельзя обновлять независимо. «latest» для AWG специально не применяется автоматически: только заранее совместимая пара с DKMS-проверкой.</span></div>
   </article>
 
-  <article class="mtv2-panel mtv32-update-panel sg-ljd-card-large">
-    <header class="mtv2-panel-head">
+  <article class="mtv2-panel sg-ui-section mtv32-update-panel sg-ljd-card-large">
+    <header class="mtv2-panel-head sg-ui-section-head">
       <div>
         <div class="mtv2-card-kicker">GEOFILES UPDATE</div>
         <h2>GeoIP / GeoSite</h2>
@@ -332,8 +332,8 @@
   </section>
 
   {# SG_GATEWAY_02206_DATA_BACKUP_CARD_V1 #}
-  <article class="mtv2-panel sg-ljd-card-large sg-full-backup-card sg-data-backup-card">
-    <header class="mtv2-panel-head sg-full-backup-head">
+  <article class="mtv2-panel sg-ui-section sg-ljd-card-large sg-full-backup-card sg-data-backup-card">
+    <header class="mtv2-panel-head sg-ui-section-head sg-full-backup-head">
       <div>
         <div class="mtv2-card-kicker">CLIENTS, KEYS & HTTPS</div>
         <h2>Клиенты, ключи и HTTPS</h2>
@@ -411,8 +411,8 @@
     {% endif %}
   </article>
 
-  <article class="mtv2-panel sg-ljd-card-large sg-full-backup-card">
-    <header class="mtv2-panel-head sg-full-backup-head">
+  <article class="mtv2-panel sg-ui-section sg-ljd-card-large sg-full-backup-card">
+    <header class="mtv2-panel-head sg-ui-section-head sg-full-backup-head">
       <div>
         <div class="mtv2-card-kicker">FULL SERVER BACKUP</div>
         <h2>Полный backup SG-Gateway</h2>
@@ -507,8 +507,8 @@
     {% endif %}
   </article>
 
-  <article class="mtv2-panel mtv2-backup-panel sg-ljd-card-large">
-    <header class="mtv2-panel-head">
+  <article class="mtv2-panel sg-ui-section mtv2-backup-panel sg-ljd-card-large">
+    <header class="mtv2-panel-head sg-ui-section-head">
       <div>
         <div class="mtv2-card-kicker">РЕЗЕРВНЫЕ КОПИИ</div>
         <h2>Последняя копия базы данных</h2>
@@ -602,8 +602,8 @@
   </article>
 
   <section class="mtv2-main-grid">
-    <article class="mtv2-panel mtv2-health-panel sg-ljd-card-large">
-      <header class="mtv2-panel-head">
+    <article class="mtv2-panel sg-ui-section mtv2-health-panel sg-ljd-card-large">
+      <header class="mtv2-panel-head sg-ui-section-head">
         <div>
           <div class="mtv2-card-kicker">ПРОВЕРКИ СОСТОЯНИЯ</div>
           <h2>{{ issues }} требуют внимания</h2>
@@ -665,8 +665,8 @@
       {% endif %}
     </article>
 
-    <article class="mtv2-panel mtv2-recovery-panel sg-ljd-card-large">
-      <header class="mtv2-panel-head">
+    <article class="mtv2-panel sg-ui-section mtv2-recovery-panel sg-ljd-card-large">
+      <header class="mtv2-panel-head sg-ui-section-head">
         <div>
           <div class="mtv2-card-kicker">ВОССТАНОВЛЕНИЕ</div>
           <h2>Инструменты восстановления</h2>
@@ -725,8 +725,8 @@
   </div>
 </details>
 
-<article class="mtv2-panel mtv2-operations-panel sg-ljd-card-large">
-    <header class="mtv2-panel-head">
+<article class="mtv2-panel sg-ui-section mtv2-operations-panel sg-ljd-card-large">
+    <header class="mtv2-panel-head sg-ui-section-head">
       <div>
         <div class="mtv2-card-kicker">ИСТОРИЯ ОПЕРАЦИЙ</div>
         <h2>Последние действия</h2>

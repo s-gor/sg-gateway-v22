@@ -1,19 +1,5 @@
 /* SG-Gateway Maintenance UX Fix 1 */
 
-.mtv2-page {
-  display: grid;
-  gap: 16px;
-  min-width: 0;
-}
-
-.mtv2-heading {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 22px;
-  padding: 0 4px 2px;
-}
-
 .mtv2-kicker {
   display: flex;
   align-items: center;
