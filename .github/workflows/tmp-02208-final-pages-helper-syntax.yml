@@ -1,0 +1,14 @@
+name: TEMP 22.08 final pages helper syntax
+on:
+  push:
+    branches: [tmp/02208-final-pages-stage8-run]
+    paths: [.github/workflows/tmp-02208-final-pages-helper-syntax.yml]
+jobs:
+  syntax:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m py_compile tools/tmp_02208_final_pages_stage8.py
