@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -5,11 +6,9 @@ INSTALL_WRAPPER = ROOT / "deploy" / "install-from-github.sh"
 UPDATE_WRAPPER = ROOT / "deploy" / "update-from-github.sh"
 UNINSTALL_WRAPPER = ROOT / "deploy" / "uninstall-from-github.sh"
 COMMANDS = ROOT / "deploy" / "GITHUB-COMMANDS.md"
-INSTALL_SOURCE_COMMIT = "cde152df4b957c254950e3b4a2276b76561653c9"
-
-INSTALL_URL = (
-    "https://raw.githubusercontent.com/s-gor/sg-gateway-v22/"
-    f"{INSTALL_SOURCE_COMMIT}/deploy/install-from-github.sh"
+INSTALL_URL_RE = re.compile(
+    r"https://raw\.githubusercontent\.com/s-gor/sg-gateway-v22/"
+    r"(?P<commit>[0-9a-f]{40})/deploy/install-from-github\.sh"
 )
 UPDATE_COMMAND = (
     "curl -4 -fsSL "
@@ -27,9 +26,12 @@ UNINSTALL_COMMAND = (
 
 def test_public_github_commands_are_published():
     body = COMMANDS.read_text(encoding="utf-8")
-    assert INSTALL_URL in body
+    match = INSTALL_URL_RE.search(body)
+    assert match is not None
+    source_commit = match.group("commit")
     assert "SG_GATEWAY_GITHUB_BRANCH=stable-02208" in body
-    assert f"SG_GATEWAY_SOURCE_COMMIT={INSTALL_SOURCE_COMMIT}" in body
+    assert f"SG_GATEWAY_SOURCE_COMMIT={source_commit}" in body
+    assert body.count(source_commit) >= 3
     assert UPDATE_COMMAND in body
     assert UNINSTALL_COMMAND in body
 
