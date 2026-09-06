@@ -1,0 +1,90 @@
+name: Release 0.1.0-022.08 Final
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/release-02208-stable.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  TAG: v0.1.0-022.08-final
+  TITLE: SG-Gateway 0.1.0-022.08 Final
+  RUN_NAME: SG-Gateway-0.1.0-022.08-FULL.run
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify release identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(cat VERSION)" = "0.1.0-022.08"
+          test "$(cat BUILD-ID)" = "MAIN-02208-STABLE"
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          manifest=json.loads(Path("release-manifest.json").read_text(encoding="utf-8"))
+          assert manifest["version"] == "0.1.0-022.08"
+          assert manifest["build"] == "MAIN-02208-STABLE"
+          assert manifest["status"] == "STABLE"
+          assert manifest["channel"] == "stable-02208"
+          assert manifest["rebuild_target"] == "0.1.0-022.08"
+          assert manifest["next_development_line"] == "0.1.0-022.09"
+          PY
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+
+      - name: Install Chromium for browser UI tests
+        run: python -m playwright install --with-deps chromium
+
+      - name: Run full test suite
+        run: python -m pytest tests
+
+      - name: Verify source integrity
+        shell: bash
+        run: |
+          set -euo pipefail
+          tmp="$(mktemp)"
+          git ls-files -z | while IFS= read -r -d '' f; do
+            [ "$f" = "SOURCE-SHA256SUMS" ] && continue
+            sha256sum "$f"
+          done | LC_ALL=C sort -k2 > "$tmp"
+          diff -u SOURCE-SHA256SUMS "$tmp"
+
+      - name: Build and verify FULL package
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash build-run.sh "$RUN_NAME"
+          bash "$RUN_NAME" --verify-only
+          sha256sum "$RUN_NAME" > "${RUN_NAME%.run}-SHA256.txt"
+
+      - name: Publish final GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release view "$TAG" >/dev/null 2>&1 && gh release delete "$TAG" --yes --cleanup-tag || true
+          gh release create "$TAG" \
+            "$RUN_NAME" \
+            "${RUN_NAME%.run}-SHA256.txt" \
+            --title "$TITLE" \
+            --notes-file PUBLICATION-02208.md \
+            --latest
