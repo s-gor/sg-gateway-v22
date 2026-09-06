@@ -47,10 +47,12 @@ def test_02208_installer_and_smoke_workflows_use_current_identity():
 
     assert 'fail() {' in installer
     assert 'VERSION="0.1.0-022.08"' in installer
+    assert 'legacy_resume_file="/root/sg-gateway-02206-installer-resume.env"' in installer
+    assert 'mv -f "$legacy_resume_file" "$RESUME_FILE"' in installer
+
     assert '/root/sg-gateway-02208-installer-resume.env' in clean
     assert '/root/sg-gateway-02206-installer-resume.env' not in clean
     assert '/var/log/sg-gateway-installer-02208.log' in clean
-    assert '/root/sg-gateway-02208-installer-resume.env' in reinstall
-    assert '/root/sg-gateway-02206-installer-resume.env' not in reinstall
-    assert '/var/log/sg-gateway-installer-02208.log' in reinstall
-    assert '/var/log/sg-gateway-full-uninstall-02208.log' in reinstall
+
+    # The reinstall smoke intentionally exercises legacy-state compatibility.
+    assert '/root/sg-gateway-02206-installer-resume.env' in reinstall

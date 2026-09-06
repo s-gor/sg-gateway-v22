@@ -878,6 +878,12 @@ EOF
 }
 
 load_resume_state() {
+  local legacy_resume_file="/root/sg-gateway-02206-installer-resume.env"
+  if [[ ! -f "$RESUME_FILE" && -f "$legacy_resume_file" ]]; then
+    mv -f "$legacy_resume_file" "$RESUME_FILE"
+    chmod 0600 "$RESUME_FILE"
+    echo "[SG-Gateway] Параметры незавершённой установки 022.06 перенесены в формат 022.08."
+  fi
   [[ -f "$RESUME_FILE" ]] || return 1
   # shellcheck disable=SC1090
   source "$RESUME_FILE"
