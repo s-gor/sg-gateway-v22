@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from types import SimpleNamespace
 
 from flask import Flask, Response, redirect, request, session, url_for
@@ -120,24 +121,25 @@ def test_naiveproxy_api_is_not_public(monkeypatch):
     assert commands == []
 
 
-def test_connections_renders_compact_card_without_visible_port_control_after_auth(monkeypatch):
+def test_connections_uses_native_naiveproxy_panel_after_legacy_content(monkeypatch):
     app, _, _, _ = _build_app(monkeypatch)
     client = app.test_client()
     _authenticate(client)
 
     response = client.get("/connections")
-    body = response.get_data(as_text=True)
-
     assert response.status_code == 200
-    assert body.count('id="sg-naiveproxy-settings"') == 1
-    assert "data-naive-port" not in body
-    assert "TCP-порт NaiveProxy" not in body
-    assert "let activePort = 8447;" in body
-    assert "'/api/naiveproxy/status'" in body
-    assert "'/api/naiveproxy/settings'" in body
-    assert body.index('id="sg-naiveproxy-settings"') < body.index(
-        '<section class="cnv1-note-panel sg-ljd-card">'
-    )
+
+    root = Path(__file__).resolve().parents[1]
+    template = (root / "app/web/templates/connections.html").read_text(encoding="utf-8")
+    panel = (root / "app/web/templates/_naiveproxy_panel.html").read_text(encoding="utf-8")
+    assert template.count('{% include "_naiveproxy_panel.html" %}') == 1
+    assert template.index("cnv1-note-panel") < template.index('_naiveproxy_panel.html')
+    assert panel.count('id="sg-naiveproxy-settings"') == 1
+    assert "data-naive-host" in panel
+    assert "data-naive-port" in panel
+    assert "data-naive-runtime" in panel
+    assert "'/api/naiveproxy/status'" in panel
+    assert "'/api/naiveproxy/settings'" in panel
 
 
 def test_protocol_picker_hides_the_configured_port(monkeypatch):

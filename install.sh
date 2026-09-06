@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 VERSION="0.1.0-022.08"
-INSTALLER_BUILD="02208-unified-24stage"
+INSTALLER_BUILD="02208-full-clean-dual-stack"
 SOURCE_DIR="${SG_GATEWAY_SOURCE_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)}"
 PREFIX="/opt/sg-gateway"
 CONFIG_DIR="/etc/sg-gateway"
@@ -3099,7 +3099,7 @@ print_sg_admin_status() {
   printf '[SG-Gateway] Профили: Clients → sg-admin\n'
 }
 
-main() {
+legacy_main_02208() {
   require_root
   # Public wrapper performs the same check. Keep this guard here as well for
   # direct/archive launches and fail before log creation or package changes.

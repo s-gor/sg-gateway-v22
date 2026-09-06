@@ -54,23 +54,26 @@ def test_first_failed_start_restores_absent_first_install_without_previous_files
     assert "active.unlink(missing_ok=True)" in source
 
 
-def test_ui_injects_protocol_and_compact_connections_control():
-    source = (Path(__file__).parents[1] / "app/naiveproxy/http.py").read_text()
+def test_ui_uses_clients_protocol_hook_and_native_connections_panel():
+    root = Path(__file__).parents[1]
+    source = (root / "app/naiveproxy/http.py").read_text()
+    template = (root / "app/web/templates/connections.html").read_text()
+    panel = (root / "app/web/templates/_naiveproxy_panel.html").read_text()
+
     assert '<input type="checkbox" name="protocols" value="naiveproxy"' in source
     assert "SG_PROTOCOL_ORDER_END" in source
-    assert "app.after_request(_inject_naiveproxy_ui)" in source
-    assert 'id="sg-naiveproxy-settings"' in source
-    assert 'class="cnv1-engine-card sg-ljd-card xps2-naiveproxy-card"' in source
-    assert "data-naive-port" not in source
-    assert "TCP-порт NaiveProxy" not in source
-    assert "document.querySelector('.xps2-parameter-list')" not in source
-    assert 'anchor = \'<section class="cnv1-note-panel sg-ljd-card">\'' in source
-    assert "let activePort = 8447;" in source
-    assert "activePort = Number(payload.port || payload.default_port || 8447);" in source
-    assert "'/api/naiveproxy/status'" in source
-    assert "'/api/naiveproxy/settings'" in source
-    assert "JSON.stringify({port: Number(activePort)})" in source
-    assert "sg-compact-protocol-cards-v1.css" in source
+    assert "app.after_request(_inject_naiveproxy_protocol_option)" in source
+    assert "_inject_naiveproxy_ui" not in source
+    assert template.count('{% include "_naiveproxy_panel.html" %}') == 1
+    assert template.index("cnv1-note-panel") < template.index('_naiveproxy_panel.html')
+    assert 'id="sg-naiveproxy-settings"' in panel
+    assert "data-naive-host" in panel
+    assert "data-naive-submit" in panel
+    assert "let activePort = 8447;" in panel
+    assert "activePort = Number(payload.port || payload.default_port || 8447);" in panel
+    assert "'/api/naiveproxy/status'" in panel
+    assert "'/api/naiveproxy/settings'" in panel
+    assert "JSON.stringify({port: Number(activePort)})" in panel
 
 
 def test_first_assignment_prepares_8447_from_security_tls():

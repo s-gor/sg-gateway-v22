@@ -2,7 +2,8 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-NAIVE = ROOT / "app/naiveproxy/http.py"
+NAIVE = ROOT / "app/web/templates/_naiveproxy_panel.html"
+CONNECTIONS = ROOT / "app/web/templates/connections.html"
 CSS = ROOT / "app/web/static/sg-compact-protocol-cards-v1.css"
 
 
@@ -10,28 +11,23 @@ def _read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def test_naiveproxy_is_compact_bottom_engine_card_without_visible_port_or_runtime_clutter() -> None:
+def test_naiveproxy_is_native_bottom_engine_card() -> None:
     naive = _read(NAIVE)
+    connections = _read(CONNECTIONS)
 
-    assert '<section id="sg-naiveproxy-settings"' in naive
-    assert 'class="cnv1-engine-card sg-ljd-card xps2-naiveproxy-card"' in naive
-    assert "HTTPS Forward Proxy · TLS" in naive
+    assert '<article id="sg-naiveproxy-settings"' in naive
+    assert "xps2-naiveproxy-card" in naive
+    assert "HTTPS FORWARD PROXY · TLS" in naive
     assert "data-naive-host" in naive
-    assert "data-naive-port" not in naive
-    assert "data-naive-runtime" not in naive
-    assert "TCP-порт NaiveProxy" not in naive
-    assert "document.querySelector('.xps2-parameter-list')" not in naive
-    assert "parameterList.appendChild(root)" not in naive
-    assert 'anchor = \'<section class="cnv1-note-panel sg-ljd-card">\'' in naive
-    assert "body.replace(anchor, _SETTINGS_PANEL + anchor, 1)" in naive
+    assert "data-naive-port" in naive
+    assert "data-naive-runtime" in naive
+    assert "data-naive-submit" in naive
     assert "let activePort = 8447;" in naive
     assert "activePort = Number(payload.port || payload.default_port || 8447);" in naive
     assert "body: JSON.stringify({port: Number(activePort)})" in naive
     assert "healthy ? 'Работает' : 'Не настроен'" in naive
-    assert "data-naive-submit" in naive
-    assert "data-naive-form" not in naive
-    assert "TCP {configured_port}" not in naive
-    assert "sg-compact-protocol-cards-v1.css" in naive
+    assert connections.count('{% include "_naiveproxy_panel.html" %}') == 1
+    assert connections.index("cnv1-note-panel") < connections.index('_naiveproxy_panel.html')
 
 
 def test_hysteria2_has_effective_compact_overrides() -> None:
