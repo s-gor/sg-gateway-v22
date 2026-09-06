@@ -17,6 +17,26 @@ jobs:
           ref: release/02208-rc
           fetch-depth: 0
 
+      - name: Sync public exact-source pin
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          old = "889206dd3ddb7d10ef7480f3b5b23694f0b90b7e"
+          new = "1a74b6e53fc1dd3343c77c1f05678dff2cec225e"
+          for name in ("README.md", "PUBLICATION-02208.md"):
+              path = Path(name)
+              text = path.read_text(encoding="utf-8")
+              if old not in text:
+                  raise SystemExit(f"expected old 022.08 pin not found in {name}")
+              text = text.replace(old, new)
+              if old in text or new not in text:
+                  raise SystemExit(f"failed to synchronize exact-source pin in {name}")
+              path.write_text(text, encoding="utf-8")
+          PY
+
       - name: Regenerate tracked-source SHA256 snapshot
         shell: bash
         run: |
@@ -28,15 +48,15 @@ jobs:
           done | LC_ALL=C sort -k2 > "$tmp"
           mv "$tmp" SOURCE-SHA256SUMS
 
-          if git diff --quiet -- SOURCE-SHA256SUMS; then
-            echo "SOURCE-SHA256SUMS is already current"
+          if git diff --quiet -- README.md PUBLICATION-02208.md SOURCE-SHA256SUMS; then
+            echo "Public pin and SOURCE-SHA256SUMS are already current"
             exit 0
           fi
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add SOURCE-SHA256SUMS
-          git commit -m "build: refresh 022.08 RC source snapshot"
+          git add README.md PUBLICATION-02208.md SOURCE-SHA256SUMS
+          git commit -m "docs: sync final 022.08 install pin"
           git push origin HEAD:release/02208-rc
 
-# Trigger: final test-contract refresh for 022.08 RC.
+# Trigger: synchronize final public exact-source pin and snapshot.
