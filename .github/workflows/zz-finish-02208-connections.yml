@@ -1,0 +1,184 @@
+name: Finish 22.08 Connections contracts
+
+on:
+  push:
+    branches:
+      - release/02208-rc
+    paths:
+      - .github/workflows/zz-finish-02208-connections.yml
+
+permissions:
+  contents: write
+
+jobs:
+  finish:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Sync stale 22.08 contracts
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              p = Path(path)
+              text = p.read_text(encoding="utf-8")
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"expected one match in {path}: {old!r}; found {count}")
+              p.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          replace_once(
+              "tests/test_naiveproxy_http_02207.py",
+              '    assert template.index("cnv1-note-panel") < template.index(\'_naiveproxy_panel.html\')\n',
+              '    assert template.index(\'_naiveproxy_panel.html\') < template.index("cnv1-note-panel")\n',
+          )
+          replace_once(
+              "tests/test_naiveproxy_http_02207.py",
+              '    assert "data-naive-runtime" in panel\n',
+              '    assert "data-naive-runtime" not in panel\n',
+          )
+          replace_once(
+              "tests/test_naiveproxy_integration_02207.py",
+              '    assert template.index("cnv1-note-panel") < template.index(\'_naiveproxy_panel.html\')\n',
+              '    assert template.index(\'_naiveproxy_panel.html\') < template.index("cnv1-note-panel")\n',
+          )
+          replace_once(
+              "tests/test_sg_gateway_v22_awg_cards_unified_ui.py",
+              '    assert ".page-connections .awgd-shell > .cnv1-engine-head { border-bottom: 1px solid var(--sg-line-soft); }" in stylesheet\n',
+              '    assert ".page-connections .awgd-shell > .cnv1-engine-head { border-bottom:" not in stylesheet\n',
+          )
+          replace_once(
+              "tests/test_sg_gateway_v22_compact_protocol_cards_ui_02207.py",
+              '    assert "data-naive-runtime" in naive\n',
+              '    assert "data-naive-runtime" not in naive\n',
+          )
+          replace_once(
+              "tests/test_sg_gateway_v22_compact_protocol_cards_ui_02207.py",
+              '    assert connections.index("cnv1-note-panel") < connections.index(\'_naiveproxy_panel.html\')\n',
+              '    assert connections.index(\'_naiveproxy_panel.html\') < connections.index("cnv1-note-panel")\n',
+          )
+
+          for path, var in (
+              ("tests/test_sg_gateway_02112_final_cumulative_cleanup_r5.py", "text"),
+              ("tests/test_sg_gateway_v22_02206_hardening.py", "installer"),
+          ):
+              replace_once(
+                  path,
+                  f"    assert f'Запускаю полный мастер SG-Gateway {{version}}' in {var}\n",
+                  f"    assert f'Запускаю полный мастер SG-Gateway {{version}} · 24 этапа' in {var}\n",
+              )
+              replace_once(
+                  path,
+                  f"    assert f'Мастер установки SG-Gateway {{version}} запущен' in {var}\n",
+                  "",
+              )
+
+          Path("tests/test_connections_restore_naiveproxy_bottom_02208.py").write_text(
+              '''from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_connections_uses_current_canonical_geometry_contract():
+    css = (ROOT / "app/web/static/sg-ui-connections-v22-08.css").read_text(encoding="utf-8")
+    template = (ROOT / "app/web/templates/connections.html").read_text(encoding="utf-8")
+    mihomo = (ROOT / "app/web/templates/_mihomo_panel.html").read_text(encoding="utf-8")
+
+    assert "calc(" not in css
+    assert "margin-inline" not in css
+    assert '<div class="awgd-inner-rail sg-ui-rail">' in template
+    assert '<div class="mhv2-inner-rail sg-ui-rail">' in mihomo
+
+
+def test_connections_is_direct_template_not_wrapper():
+    template = (ROOT / "app/web/templates/connections.html").read_text(encoding="utf-8")
+
+    assert template.startswith('{% extends "base.html" %}')
+    assert 'connections_legacy_8f7481cb.html' not in template
+    assert 'class="cnv1-engine-pair sg-ui-grid"' in template
+    assert 'class="awgd-card awgd-card-v2"' in template
+    assert '{% include "_mihomo_panel.html" %}' in template
+    assert 'name="fingerprint"' in template
+
+
+def test_naiveproxy_precedes_final_connections_note():
+    template = (ROOT / "app/web/templates/connections.html").read_text(encoding="utf-8")
+
+    naive = template.index('{% include "_naiveproxy_panel.html" %}')
+    note = template.index('class="cnv1-note-panel sg-ljd-card sg-ui-card"')
+    content_end = template.index('{% endblock %}', note)
+
+    assert naive < note < content_end
+    assert template.count('_naiveproxy_panel.html') == 1
+    assert 'sg-naiveproxy-bottom-v1.css' not in template
+    assert 'cnv1-layout-grid' not in template
+    assert 'cnv1-grid-cell' not in template
+
+
+def test_restore_has_no_legacy_wrapper_artifacts():
+    assert not (ROOT / "app/web/templates/connections_legacy_8f7481cb.html").exists()
+    assert not (ROOT / "app/web/static/sg-naiveproxy-bottom-v1.css").exists()
+''',
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Install test dependencies
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Remove transient workflow and refresh source integrity
+        shell: bash
+        run: |
+          git rm .github/workflows/zz-finish-02208-connections.yml
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib
+          import subprocess
+
+          raw = subprocess.check_output(["git", "ls-files", "-z"])
+          paths = [item.decode("utf-8") for item in raw.split(b"\0") if item]
+          rows = []
+          for path in paths:
+              if path == "SOURCE-SHA256SUMS":
+                  continue
+              digest = hashlib.sha256(Path(path).read_bytes()).hexdigest()
+              rows.append(f"{digest}  {path}\n")
+          Path("SOURCE-SHA256SUMS").write_text("".join(rows), encoding="utf-8")
+          print(f"refreshed SOURCE-SHA256SUMS: {len(rows)} files")
+          PY
+
+      - name: Run focused regressions
+        shell: bash
+        run: |
+          pytest -q \
+            tests/test_connections_restore_naiveproxy_bottom_02208.py \
+            tests/test_naiveproxy_http_02207.py \
+            tests/test_naiveproxy_integration_02207.py \
+            tests/test_sg_gateway_02112_final_cumulative_cleanup_r5.py \
+            tests/test_sg_gateway_v22_02206_hardening.py \
+            tests/test_sg_gateway_v22_awg_cards_unified_ui.py \
+            tests/test_sg_gateway_v22_compact_protocol_cards_ui_02207.py \
+            tests/test_connections_layout_v24.py
+
+      - name: Commit synchronized contracts
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git status --short
+          git diff --cached --check
+          git commit -m "test: sync 22.08 Connections contracts"
+          git push origin HEAD:release/02208-rc
