@@ -47,6 +47,7 @@ def test_02208_login_is_standalone_and_preserves_form_contract() -> None:
     assert 'name="next" value="{{ next_url }}"' in LOGIN
     assert 'name="password" type="password" autocomplete="current-password" autofocus required' in LOGIN
     assert 'type="submit"' in LOGIN
+    assert 'sg-ui-button' in LOGIN
 
 
 def test_02208_recovery_is_standalone_and_preserves_restore_contract() -> None:
@@ -59,6 +60,7 @@ def test_02208_recovery_is_standalone_and_preserves_restore_contract() -> None:
     assert "url_for('recovery_restore_backup_route', name=backup.name)" in RECOVERY
     for href in ('href="/maintenance"', 'href="/maintenance/diagnostics.json"', 'href="/"'):
         assert href in RECOVERY
+    assert 'recovery-restore-button sg-ui-button' in RECOVERY
 '''
 
 OP_CONTRACT = r'''from __future__ import annotations
@@ -74,7 +76,7 @@ def test_02208_operation_job_assets_semantics_and_polling_contract() -> None:
     assert "static_asset('sg-ui-operation-job-v22-08.css')" in T
     assert not (ROOT / "app/web/static/sg-operation-job-v13.css").exists()
     assert (ROOT / "app/web/static/sg-ui-operation-job-v22-08.css").exists()
-    for marker in ('data-sg-ui-page="operation-job"', 'data-sg-section="operation-head"', 'data-sg-section="operation-terminal"', 'data-sg-section="operation-actions"', 'sg-ui-page', 'sg-ui-page-head', 'sg-ui-section', 'sg-ui-actions'):
+    for marker in ('data-sg-ui-page="operation-job"', 'data-sg-section="operation-head"', 'data-sg-section="operation-terminal"', 'data-sg-section="operation-actions"', 'sg-ui-page', 'sg-ui-page-head', 'sg-ui-actions'):
         assert marker in T, marker
     for marker in ('data-kind="{{ job.kind }}"', 'data-restart-expected=', 'data-target-url=', 'data-status-url=', 'id="opjob-log"', 'id="opjob-status"', 'id="opjob-target"', 'id="opjob-refresh"', 'id="opjob-return-gateway"', "fetch(root.dataset.statusUrl", "window.setTimeout(update", "window.location.replace"):
         assert marker in T, marker
@@ -94,7 +96,9 @@ def close(a,b,t=1.0): assert math.isclose(a,b,abs_tol=t),(a,b)
 
 
 def _shell_geometry(css_name: str, html: str, selectors: tuple[str,...]) -> None:
+    foundation=(ROOT/"app/web/static/sg-ui-foundation-v22-08.css").read_text(encoding="utf-8")
     layout=(ROOT/"app/web/static/sg-ui-layout-v22-08.css").read_text(encoding="utf-8")
+    components=(ROOT/"app/web/static/sg-ui-components-v22-08.css").read_text(encoding="utf-8")
     css=(ROOT/f"app/web/static/{css_name}").read_text(encoding="utf-8")
     with sync_playwright() as p:
         browser=p.chromium.launch()
@@ -103,7 +107,8 @@ def _shell_geometry(css_name: str, html: str, selectors: tuple[str,...]) -> None
                 by_theme={}
                 for theme in ("dark","light"):
                     page=browser.new_page(viewport=viewport)
-                    page.set_content(html); page.add_style_tag(content=layout); page.add_style_tag(content=css)
+                    page.set_content(html)
+                    for layer in (foundation,layout,components,css): page.add_style_tag(content=layer)
                     page.evaluate("t=>document.documentElement.dataset.theme=t",theme)
                     assert page.evaluate("document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1")
                     boxes={s:page.locator(s).bounding_box() for s in selectors}; root=boxes[selectors[0]]; assert root
@@ -116,29 +121,35 @@ def _shell_geometry(css_name: str, html: str, selectors: tuple[str,...]) -> None
 
 
 def test_02208_help_and_operation_outer_rails() -> None:
-    _shell_geometry("sg-ui-help-v22-08.css", """<main class='sg-content'><section class='sg-ui-page' data-sg-ui-page='help'><header class='sg-ui-page-head' data-sg-section='help-head'>H</header><section class='sg-ui-section' data-sg-section='help-search'>S</section><section class='sg-ui-section' data-sg-section='help-workspace'>W</section></section></main>""", ('[data-sg-ui-page="help"]','[data-sg-section="help-head"]','[data-sg-section="help-search"]','[data-sg-section="help-workspace"]'))
-    _shell_geometry("sg-ui-operation-job-v22-08.css", """<main class='sg-content'><section class='sg-ui-page' data-sg-ui-page='operation-job'><header class='sg-ui-page-head' data-sg-section='operation-head'>H</header><article class='sg-ui-section' data-sg-section='operation-terminal'>T</article><footer class='sg-ui-actions' data-sg-section='operation-actions'>A</footer></section></main>""", ('[data-sg-ui-page="operation-job"]','[data-sg-section="operation-head"]','[data-sg-section="operation-terminal"]','[data-sg-section="operation-actions"]'))
+    _shell_geometry("sg-ui-help-v22-08.css", """<body style='margin:0'><main class='sg-content'><section class='sg-ui-page' data-sg-ui-page='help'><header class='sg-ui-page-head' data-sg-section='help-head'>H</header><section class='sg-ui-section' data-sg-section='help-search'>S</section><section class='sg-ui-section' data-sg-section='help-workspace'>W</section></section></main></body>""", ('[data-sg-ui-page="help"]','[data-sg-section="help-head"]','[data-sg-section="help-search"]','[data-sg-section="help-workspace"]'))
+    _shell_geometry("sg-ui-operation-job-v22-08.css", """<body style='margin:0'><main class='sg-content'><section class='sg-ui-page' data-sg-ui-page='operation-job'><header class='sg-ui-page-head' data-sg-section='operation-head'>H</header><article data-sg-section='operation-terminal'>T</article><footer class='sg-ui-actions' data-sg-section='operation-actions'>A</footer></section></main></body>""", ('[data-sg-ui-page="operation-job"]','[data-sg-section="operation-head"]','[data-sg-section="operation-terminal"]','[data-sg-section="operation-actions"]'))
 
 
 def test_02208_standalone_pages_have_responsive_theme_invariant_frame() -> None:
     foundation=(ROOT/"app/web/static/sg-ui-foundation-v22-08.css").read_text(encoding="utf-8")
     components=(ROOT/"app/web/static/sg-ui-components-v22-08.css").read_text(encoding="utf-8")
     standalone=(ROOT/"app/web/static/sg-ui-standalone-v22-08.css").read_text(encoding="utf-8")
-    html="""<body class='sg-ui-standalone-body'><main class='sg-ui-standalone sg-ui-standalone--login' data-sg-standalone-page='login'><section class='sg-ui-card sg-ui-login-card'>Login</section></main></body>"""
+    cases=(
+      ("""<body class='sg-ui-standalone-body'><main class='sg-ui-standalone sg-ui-standalone--login' data-sg-standalone-page='login'><section class='sg-ui-card sg-ui-login-card'>Login</section></main></body>""",'[data-sg-standalone-page="login"]','.sg-ui-login-card'),
+      ("""<body class='sg-ui-standalone-body'><main class='sg-ui-standalone sg-ui-standalone--recovery' data-sg-standalone-page='recovery'><header class='sg-ui-recovery-head'>Recovery</header><section class='tool-panel'>Health</section><section class='table-panel'>Backups</section></main></body>""",'[data-sg-standalone-page="recovery"]','.tool-panel'),
+    )
     with sync_playwright() as p:
         browser=p.chromium.launch()
         try:
             for viewport in VIEWPORTS:
-                geom={}
-                for theme in ("dark","light"):
-                    page=browser.new_page(viewport=viewport); page.set_content(html)
-                    page.add_style_tag(content=foundation); page.add_style_tag(content=components); page.add_style_tag(content=standalone)
-                    page.evaluate("t=>document.documentElement.dataset.theme=t",theme)
-                    assert page.evaluate("document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1")
-                    box=page.locator('[data-sg-standalone-page="login"]').bounding_box(); assert box
-                    assert box["x"] >= 0 and box["x"]+box["width"] <= viewport["width"]+1
-                    geom[theme]=box; page.close()
-                close(geom["dark"]["x"],geom["light"]["x"]); close(geom["dark"]["width"],geom["light"]["width"])
+                for html,root_sel,child_sel in cases:
+                    geom={}
+                    for theme in ("dark","light"):
+                        page=browser.new_page(viewport=viewport); page.set_content(html)
+                        for layer in (foundation,components,standalone): page.add_style_tag(content=layer)
+                        page.evaluate("t=>document.documentElement.dataset.theme=t",theme)
+                        assert page.evaluate("document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1")
+                        root=page.locator(root_sel).bounding_box(); child=page.locator(child_sel).bounding_box(); assert root and child
+                        assert root["x"] >= -1 and root["x"]+root["width"] <= viewport["width"]+1
+                        assert child["x"] >= root["x"]-1 and child["x"]+child["width"] <= root["x"]+root["width"]+1
+                        geom[theme]=(root,child); page.close()
+                    for idx in (0,1):
+                        close(geom["dark"][idx]["x"],geom["light"][idx]["x"]); close(geom["dark"][idx]["width"],geom["light"][idx]["width"])
         finally: browser.close()
 '''
 
@@ -249,8 +260,9 @@ def migrate_recovery() -> None:
     t=t.replace('<header class="recovery-header">','<header class="recovery-header sg-ui-recovery-head">',1)
     t=t.replace('<div class="topbar-actions">','<div class="topbar-actions sg-ui-actions">',1)
     t=t.replace('class="button primary"','class="button primary sg-ui-button sg-ui-button--primary"')
-    t=t.replace('class="button small"','class="button small sg-ui-button sg-ui-button--small"')
     t=t.replace('class="button small recovery-restore-button"','class="button small recovery-restore-button sg-ui-button sg-ui-button--small"')
+    t=t.replace('class="button small"','class="button small sg-ui-button sg-ui-button--small"')
+    t=t.replace('class="button recovery-restore-button"','class="button recovery-restore-button sg-ui-button"')
     t=t.replace('class="button"','class="button sg-ui-button"')
     path.write_text(t,encoding="utf-8")
 
@@ -259,12 +271,11 @@ def migrate_operation() -> None:
     path=Path("app/web/templates/operation_job.html"); t=path.read_text(encoding="utf-8")
     start=t.index("{% block head %}"); end=t.index("{% endblock %}",start)+len("{% endblock %}")
     t=t[:start]+"{% block page_styles %}\n  <link rel=\"stylesheet\" href=\"{{ static_asset('sg-ui-operation-job-v22-08.css') }}\">\n{% endblock %}"+t[end:]
-    old='<section class="opjob-page"\n'
-    new='<section class="opjob-page sg-ui-page sg-ui-operation-job" data-sg-ui-page="operation-job"\n'
+    old='<section class="opjob-page"\n'; new='<section class="opjob-page sg-ui-page sg-ui-operation-job" data-sg-ui-page="operation-job"\n'
     if old not in t: raise RuntimeError("Operation page marker missing")
     t=t.replace(old,new,1)
     t=t.replace('<header class="opjob-head">','<header class="opjob-head sg-ui-page-head" data-sg-section="operation-head">',1)
-    t=t.replace('<article class="opjob-terminal">','<article class="opjob-terminal sg-ui-section" data-sg-section="operation-terminal">',1)
+    t=t.replace('<article class="opjob-terminal">','<article class="opjob-terminal" data-sg-section="operation-terminal">',1)
     t=t.replace('<footer class="opjob-actions">','<footer class="opjob-actions sg-ui-actions" data-sg-section="operation-actions">',1)
     path.write_text(t,encoding="utf-8")
     legacy=Path("app/web/static/sg-operation-job-v13.css"); css=legacy.read_text(encoding="utf-8")
