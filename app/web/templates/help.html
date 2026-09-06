@@ -1,9 +1,8 @@
 {% extends "base.html" %}
 {% block title %}SG-Gateway · Help{% endblock %}
 
-{% block head %}
-  {{ super() }}
-  <link rel="stylesheet" href="{{ url_for('static', filename='sg-help-visual-v1.css') }}">
+{% block page_styles %}
+  <link rel="stylesheet" href="{{ static_asset('sg-ui-help-v22-08.css') }}">
 {% endblock %}
 
 {% block content %}
@@ -13,21 +12,21 @@
   {% set step_count.value = step_count.value + (item.body | length) %}
 {% endfor %}
 
-<section class="hlpv1-page">
-  <header class="hlpv1-heading">
+<section class="hlpv1-page sg-ui-page sg-ui-help" data-sg-ui-page="help">
+  <header class="hlpv1-heading sg-ui-page-head sg-ui-help-head" data-sg-section="help-head">
     <div>
       <div class="hlpv1-kicker"><span></span> SG-GATEWAY / HELP</div>
       <h1>Практическая справка SG-Gateway</h1>
       <p>Полная практическая справка: установка, клиенты, протоколы, подписки, резервные копии и диагностика.</p>
     </div>
 
-    <div class="hlpv1-heading-actions">
+    <div class="hlpv1-heading-actions sg-ui-actions">
       <a class="button primary" href="{{ url_for('system') }}">Открыть System</a>
       <a class="button" href="{{ url_for('maintenance') }}">Диагностика и Backup</a>
     </div>
   </header>
 
-  <section class="hlpv1-summary sg-ljd-strip">
+  <section class="hlpv1-summary sg-ljd-strip sg-ui-section" data-sg-section="help-summary">
     <article class="hlpv1-summary-card sg-ljd-card">
       <div class="hlpv1-summary-icon blue">
         <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -84,7 +83,7 @@
     </article>
   </section>
 
-  <section class="hlpv1-search-panel sg-ljd-card">
+  <section class="hlpv1-search-panel sg-ljd-card sg-ui-section" data-sg-section="help-search">
     <div class="hlpv1-search-icon">
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <circle cx="11" cy="11" r="7"/>
@@ -101,7 +100,7 @@
     <button class="button hlpv1-clear-search" id="help-clear" type="button">Очистить</button>
   </section>
 
-  <section class="hlpv1-workspace">
+  <section class="hlpv1-workspace sg-ui-section" data-sg-section="help-workspace">
     <aside class="hlpv1-topic-sidebar sg-ljd-card">
       <header class="hlpv1-sidebar-head">
         <div>

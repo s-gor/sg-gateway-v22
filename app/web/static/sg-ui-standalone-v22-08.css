@@ -1,0 +1,32 @@
+/* SG-Gateway 22.08 standalone Login/Recovery layout. No authenticated shell ownership. */
+:root {
+  --bg: var(--sg-ui-bg); --panel: var(--sg-ui-surface); --panel-soft: var(--sg-ui-surface-raised);
+  --line: var(--sg-ui-border); --text: var(--sg-ui-text); --muted: var(--sg-ui-text-muted);
+  --green: var(--sg-ui-accent); --blue: var(--sg-ui-info); --button: var(--sg-ui-surface-raised); --danger: var(--sg-ui-danger);
+}
+* { box-sizing: border-box; }
+html, body { min-width: 320px; min-height: 100%; }
+body.sg-ui-standalone-body { margin: 0; background: var(--sg-ui-bg); color: var(--sg-ui-text); font-family: Inter,"Segoe UI",system-ui,-apple-system,BlinkMacSystemFont,sans-serif; }
+.sg-ui-standalone { width: min(1120px,100%); margin-inline: auto; padding: 32px; }
+.sg-ui-standalone--login { display: grid; min-height: 100vh; place-items: center; }
+.sg-ui-login-card { width: min(420px,100%); }
+.brand { display:flex; gap:12px; align-items:center; margin-bottom:28px; }
+.brand-mark { display:grid; width:42px; height:42px; place-items:center; border-radius:10px; background:var(--sg-ui-info); color:var(--sg-ui-bg); font-weight:800; }
+.brand-name { font-size:18px; font-weight:750; }
+.brand-note { margin-top:2px; color:var(--sg-ui-text-muted); font-size:13px; }
+.sg-ui-standalone-form { display:grid; gap:12px; }
+.sg-ui-standalone-form label { display:grid; gap:8px; color:var(--sg-ui-text-muted); font-size:13px; }
+.sg-ui-standalone-form input { width:100%; min-height:var(--sg-ui-control-height); padding-inline:12px; border:1px solid var(--sg-ui-border-strong); border-radius:var(--sg-ui-control-radius); background:var(--sg-ui-surface-nested); color:var(--sg-ui-text); font:inherit; }
+.error-text { color:var(--sg-ui-danger); }
+.sg-ui-recovery-head { display:flex; align-items:flex-start; justify-content:space-between; gap:24px; margin-bottom:26px; }
+.sg-ui-recovery-head .brand { margin-bottom:0; }
+.topbar-actions,.recovery-backup-actions,.recovery-confirm-actions { display:flex; flex-wrap:wrap; gap:10px; }
+.flash-stack { display:grid; gap:10px; margin-bottom:18px; }
+.flash-message { padding:12px 14px; border:1px solid var(--sg-ui-border); border-radius:var(--sg-ui-control-radius); background:var(--sg-ui-surface); color:var(--sg-ui-text); }
+.flash-message.success { color:var(--sg-ui-accent); }.flash-message.error { color:var(--sg-ui-danger); }
+.tool-panel,.table-panel { margin-bottom:14px; overflow:hidden; border:1px solid var(--sg-ui-border); border-radius:var(--sg-ui-card-radius); background:var(--sg-ui-surface); }
+.tool-panel { padding:var(--sg-ui-card-pad); }
+.section-heading h1 { margin:0 0 6px; }.section-heading p { margin:0; color:var(--sg-ui-text-muted); line-height:1.5; }
+.data-table { width:100%; border-collapse:collapse; }.data-table th,.data-table td { padding:14px; border-bottom:1px solid var(--sg-ui-border); text-align:left; vertical-align:middle; }.data-table th { color:var(--sg-ui-text-muted); font-size:13px; font-weight:600; }.data-table tr:last-child td { border-bottom:0; }
+.actions-cell { width:1%; white-space:nowrap; }.badge { display:inline-flex; padding:7px 10px; border:1px solid var(--sg-ui-border); border-radius:999px; color:var(--sg-ui-text-muted); }.badge.success { color:var(--sg-ui-accent); }.empty-state { padding:28px; }
+@media (max-width:760px) { .sg-ui-standalone { padding:18px 16px 28px; } .sg-ui-recovery-head { display:grid; } .topbar-actions { justify-content:flex-start; } .data-table { display:block; overflow-x:auto; } }
