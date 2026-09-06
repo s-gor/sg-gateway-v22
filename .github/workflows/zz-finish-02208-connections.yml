@@ -164,7 +164,7 @@ jobs:
       - name: Run focused regressions
         shell: bash
         run: |
-          pytest -q \
+          PYTHONPATH=. pytest -q \
             tests/test_connections_restore_naiveproxy_bottom_02208.py \
             tests/test_naiveproxy_http_02207.py \
             tests/test_naiveproxy_integration_02207.py \
