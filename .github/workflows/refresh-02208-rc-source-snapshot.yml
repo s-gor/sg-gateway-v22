@@ -1,0 +1,40 @@
+name: Refresh 022.08 RC source snapshot
+
+on:
+  push:
+    branches:
+      - automation/02208-rc-refresh-source-snapshot
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: release/02208-rc
+          fetch-depth: 0
+
+      - name: Regenerate tracked-source SHA256 snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          tmp="$(mktemp)"
+          git ls-files -z | while IFS= read -r -d '' f; do
+            [ "$f" = "SOURCE-SHA256SUMS" ] && continue
+            sha256sum "$f"
+          done | LC_ALL=C sort -k2 > "$tmp"
+          mv "$tmp" SOURCE-SHA256SUMS
+
+          if git diff --quiet -- SOURCE-SHA256SUMS; then
+            echo "SOURCE-SHA256SUMS is already current"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add SOURCE-SHA256SUMS
+          git commit -m "build: refresh 022.08 RC source snapshot"
+          git push origin HEAD:release/02208-rc
