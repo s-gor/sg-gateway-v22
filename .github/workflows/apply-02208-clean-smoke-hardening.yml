@@ -1,0 +1,38 @@
+name: Apply 022.08 clean smoke hardening
+
+on:
+  push:
+    branches:
+      - automation/02208-clean-smoke-hardening
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout release candidate
+        uses: actions/checkout@v4
+        with:
+          ref: release/02208-rc
+          fetch-depth: 0
+
+      - name: Checkout hardening helper
+        uses: actions/checkout@v4
+        with:
+          ref: automation/02208-clean-smoke-hardening
+          path: .automation
+          fetch-depth: 1
+
+      - name: Apply clean smoke hardening
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .automation/tools/fix_02208_clean_smoke.py
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add install.sh tests/test_sg_gateway_v22_reinstall_after_full_uninstall.py tests/test_sg_gateway_v22_release_02208.py
+          git commit -m "fix: harden 022.08 clean install release paths"
+          git push origin HEAD:release/02208-rc
