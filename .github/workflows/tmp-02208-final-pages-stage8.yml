@@ -1,0 +1,120 @@
+name: TEMP 22.08 final pages stage 8
+
+on:
+  push:
+    branches: [tmp/02208-final-pages-stage8-run]
+    paths: [.github/workflows/tmp-02208-final-pages-stage8.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 5
+      - name: Prepare exact Stage 7 base
+        run: |
+          cp tools/tmp_02208_final_pages_stage8.py /tmp/stage8.py
+          git fetch --no-tags --depth=1 origin e744720df2c2777d8f0248b36feebdb67334535c
+          git checkout --detach FETCH_HEAD
+          test "$(git rev-parse HEAD)" = "e744720df2c2777d8f0248b36feebdb67334535c"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: |
+          python -m pip install -r requirements-dev.txt
+          python -m playwright install --with-deps chromium
+      - name: Confirm RED final-page contracts
+        run: |
+          python - <<'PY'
+          import importlib.util
+          spec=importlib.util.spec_from_file_location('stage8','/tmp/stage8.py')
+          mod=importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
+          mod.write_tests()
+          PY
+          set +e
+          python -m pytest -q \
+            tests/test_sg_gateway_v22_help_contract_02208.py \
+            tests/test_sg_gateway_v22_standalone_contract_02208.py \
+            tests/test_sg_gateway_v22_operation_job_contract_02208.py
+          contract_rc=$?
+          python -m pytest -q tests/test_sg_gateway_v22_final_pages_geometry_02208.py
+          geometry_rc=$?
+          set -e
+          test "$contract_rc" -ne 0
+          test "$geometry_rc" -ne 0
+          echo "Confirmed RED: contract=$contract_rc geometry=$geometry_rc"
+      - name: Apply Help Login Recovery Operation Job migration
+        run: |
+          python - <<'PY'
+          import importlib.util
+          spec=importlib.util.spec_from_file_location('stage8','/tmp/stage8.py')
+          mod=importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
+          mod.migrate()
+          PY
+          git add -A
+      - name: Focused final-page GREEN and all page geometry
+        env:
+          PYTHONPATH: ${{ github.workspace }}/hostd
+        run: |
+          python -m pytest -q \
+            tests/test_sg_gateway_v22_help_contract_02208.py \
+            tests/test_sg_gateway_v22_standalone_contract_02208.py \
+            tests/test_sg_gateway_v22_operation_job_contract_02208.py \
+            tests/test_sg_gateway_v22_final_pages_geometry_02208.py \
+            tests/test_sg_gateway_v22_outbounds_contract_02208.py \
+            tests/test_sg_gateway_v22_outbounds_geometry_02208.py \
+            tests/test_sg_gateway_v22_maintenance_contract_02208.py \
+            tests/test_sg_gateway_v22_maintenance_geometry_02208.py \
+            tests/test_sg_gateway_v22_system_geometry_02208.py \
+            tests/test_sg_gateway_v22_security_geometry_02208.py \
+            tests/test_sg_gateway_v22_routing_geometry_02208.py \
+            tests/test_sg_gateway_v22_clients_geometry_02208.py \
+            tests/test_sg_gateway_v22_connections_geometry_02208.py \
+            tests/test_sg_gateway_v22_ui_function_contract_02208.py \
+            tests/test_sg_gateway_v22_ui_architecture_02208.py
+      - name: Help Recovery Login Operation Job regression set
+        env:
+          PYTHONPATH: ${{ github.workspace }}/hostd
+        run: python -m pytest tests -q -k 'help or recovery or login or operation_job or operationjob or panel_update_channel or tls_issue'
+      - name: Refresh source integrity
+        run: |
+          python - <<'PY'
+          import hashlib, subprocess
+          from pathlib import Path
+          tracked=sorted(p for p in subprocess.check_output(['git','ls-files'], text=True).splitlines() if p != 'SOURCE-SHA256SUMS')
+          Path('SOURCE-SHA256SUMS').write_text('\n'.join(f"{hashlib.sha256(subprocess.check_output(['git','show',f':{p}'])).hexdigest()}  {p}" for p in tracked)+'\n', encoding='utf-8')
+          PY
+          git add SOURCE-SHA256SUMS
+      - name: Full pytest
+        run: python -m pytest tests -q
+      - name: Create clean commit
+        run: |
+          git config user.name 'Ser.Gor'
+          git config user.email '293675787+s-gor@users.noreply.github.com'
+          git commit -m 'refactor: migrate final pages to 22.08 UI system'
+      - name: Verify committed source integrity
+        run: |
+          python - <<'PY'
+          import hashlib, subprocess
+          from pathlib import Path
+          expected={}
+          for line in Path('SOURCE-SHA256SUMS').read_text(encoding='utf-8').splitlines():
+              if line.strip(): digest,path=line.split('  ',1); expected[path]=digest
+          tracked=sorted(p for p in subprocess.check_output(['git','ls-files'], text=True).splitlines() if p != 'SOURCE-SHA256SUMS')
+          assert sorted(expected)==tracked
+          for p in tracked: assert hashlib.sha256(subprocess.check_output(['git','show',f'HEAD:{p}'])).hexdigest()==expected[p],p
+          print(f'Source integrity verified for {len(tracked)} tracked files')
+          PY
+      - name: FULL package verify
+        run: |
+          VERSION="$(tr -d '[:space:]' < VERSION)"
+          OUT="/tmp/SG-Gateway-${VERSION}-FULL.run"
+          bash build-run.sh "$OUT"
+          bash "$OUT" --verify-only
+      - name: Publish GREEN candidate
+        run: git push --force origin HEAD:refs/heads/feature/02208-final-pages-stage8-green
