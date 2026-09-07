@@ -1,0 +1,44 @@
+name: Refresh source checksums temporary
+
+on:
+  push:
+    branches:
+      - fix/02208-naiveproxy-reinstall-smoke
+    paths:
+      - .github/workflows/refresh-source-checksums-temp.yml
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/02208-naiveproxy-reinstall-smoke
+          fetch-depth: 0
+
+      - name: Refresh and commit source checksums
+        run: |
+          git rm .github/workflows/refresh-source-checksums-temp.yml
+          python3 - <<'PY'
+          import hashlib
+          import subprocess
+          from pathlib import Path
+
+          paths = subprocess.check_output(["git", "ls-files"], text=True, encoding="utf-8").splitlines()
+          rows = []
+          for path in paths:
+              if path == "SOURCE-SHA256SUMS":
+                  continue
+              digest = hashlib.sha256(Path(path).read_bytes()).hexdigest()
+              rows.append(f"{digest}  {path}")
+          Path("SOURCE-SHA256SUMS").write_text("\n".join(rows) + "\n", encoding="utf-8")
+          PY
+          git add SOURCE-SHA256SUMS
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore: refresh source integrity metadata"
+          git push origin HEAD:fix/02208-naiveproxy-reinstall-smoke
