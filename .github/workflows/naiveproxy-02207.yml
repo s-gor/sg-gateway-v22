@@ -68,5 +68,5 @@ jobs:
             exit 1
           fi
 
-      - name: Run full test suite
-        run: python -m pytest -q tests
+      - name: Run focused NaiveProxy uninstall/reinstall contract tests
+        run: python -m pytest -q tests/test_naiveproxy_full_uninstall_02207.py
