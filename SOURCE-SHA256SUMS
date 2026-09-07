@@ -5,7 +5,7 @@ e68728efbc5d4191ddad8406e79698c16aa1e06ce429484e418bf8aa33f59de4  .env.example
 9e25981262749d865e3aeb853efd927d19bab70fca1942abcfde83b6de62ad67  .github/workflows/dev-02206-guard.yml
 4f4a923bb53f09f0699f1bb5ef0a9a3bcec98fa64c8fe2f85295b6ca2d867988  .github/workflows/docs-help-focused.yml
 9b71b8a6e454533f5920d7c7583ab28ec2fd30c467398455da9c251077cb131b  .github/workflows/naiveproxy-02207.yml
-ad50a468298ad337e68c06c43ad2f0364235ead86e7644bde0703d54dd6e3f54  .github/workflows/reinstall-after-full-uninstall-smoke.yml
+b7a6f6d4d0c3b18fefe029ffd839938478b57a2ee1489dbd26027cad13275eaf  .github/workflows/reinstall-after-full-uninstall-smoke.yml
 080433c20dcf079cf091ba7d4aa7f7051c84cd09228a455d90fadffaaa19ab4f  .github/workflows/release-02204-stable.yml
 c6c1693c0c802f727f7c3380e6e7f9fa6d94402760c34e81b979ac1debba0528  .github/workflows/release-02208-stable.yml
 65e042823f19cb7ff641b62ac7164074aac733c1cb0a24b6dd8835ba3c1a9891  .github/workflows/release-fix30.yml
