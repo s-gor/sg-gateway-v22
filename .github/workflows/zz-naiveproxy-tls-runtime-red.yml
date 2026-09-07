@@ -1,4 +1,4 @@
-name: "RED NaiveProxy TLS runtime contract"
+name: "Fix NaiveProxy TLS runtime contract"
 
 on:
   push:
@@ -6,15 +6,244 @@ on:
       - "fix/02208-naiveproxy-tls-runtime-contract"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  red:
+  fix:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: python -m pip install -q pytest
-      - run: python -m pytest -q tests/test_naiveproxy_tls_runtime_contract_02208.py
+
+      - name: Apply minimal TLS permission fix
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          runtime_path = Path("hostd/sg_hostd/naiveproxy_runtime.py")
+          runtime = runtime_path.read_text(encoding="utf-8")
+
+          anchor = '''def _snapshot(source: Path, destination: Path) -> bool:
+          '''.replace("          ", "")
+          helper = '''def _ensure_tls_permissions() -> None:
+              CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+              TLS_DIR.mkdir(parents=True, exist_ok=True)
+              for directory in (CONFIG_DIR, TLS_DIR):
+                  os.chmod(directory, 0o750)
+                  try:
+                      shutil.chown(directory, user="root", group="sg-naiveproxy")
+                  except LookupError:
+                      pass
+              for path, mode in (
+                  (TLS_CERTIFICATE, 0o644),
+                  (TLS_PRIVATE_KEY, 0o640),
+              ):
+                  if not path.is_file():
+                      continue
+                  os.chmod(path, mode)
+                  try:
+                      shutil.chown(path, user="root", group="sg-naiveproxy")
+                  except LookupError:
+                      pass
+
+
+          def _snapshot(source: Path, destination: Path) -> bool:
+          '''.replace("          ", "")
+          if anchor not in runtime:
+              raise SystemExit("runtime helper anchor not found")
+          runtime = runtime.replace(anchor, helper, 1)
+
+          old_sync = '''def sync() -> dict:
+              settings, users, credential_ids = _load()
+              _validate(settings)
+              CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+              TLS_DIR.mkdir(parents=True, exist_ok=True)
+              STATE_DIR.mkdir(parents=True, exist_ok=True)
+          '''.replace("          ", "")
+          new_sync = '''def sync() -> dict:
+              settings, users, credential_ids = _load()
+              CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+              TLS_DIR.mkdir(parents=True, exist_ok=True)
+              STATE_DIR.mkdir(parents=True, exist_ok=True)
+              _ensure_tls_permissions()
+              _validate(settings)
+          '''.replace("          ", "")
+          if old_sync not in runtime:
+              raise SystemExit("runtime sync anchor not found")
+          runtime = runtime.replace(old_sync, new_sync, 1)
+
+          old_replace = '''        os.replace(candidate_certificate, TLS_CERTIFICATE)
+                  os.replace(candidate_private_key, TLS_PRIVATE_KEY)
+                  _atomic_write(candidate_config, _render(settings, users), 0o640)
+          '''.replace("          ", "")
+          new_replace = '''        os.replace(candidate_certificate, TLS_CERTIFICATE)
+                  os.replace(candidate_private_key, TLS_PRIVATE_KEY)
+                  _ensure_tls_permissions()
+                  _atomic_write(candidate_config, _render(settings, users), 0o640)
+          '''.replace("          ", "")
+          if old_replace not in runtime:
+              raise SystemExit("runtime replace anchor not found")
+          runtime = runtime.replace(old_replace, new_replace, 1)
+
+          old_restore = '''    _restore_file(
+                  TLS_PRIVATE_KEY,
+                  TLS_DIR / "privkey.pem.previous",
+                  snapshot["private_key"],
+              )
+              if restart:
+          '''.replace("          ", "")
+          new_restore = '''    _restore_file(
+                  TLS_PRIVATE_KEY,
+                  TLS_DIR / "privkey.pem.previous",
+                  snapshot["private_key"],
+              )
+              _ensure_tls_permissions()
+              if restart:
+          '''.replace("          ", "")
+          if old_restore not in runtime:
+              raise SystemExit("runtime rollback anchor not found")
+          runtime = runtime.replace(old_restore, new_restore, 1)
+          runtime_path.write_text(runtime, encoding="utf-8")
+
+          install_path = Path("install.sh")
+          install = install_path.read_text(encoding="utf-8")
+
+          old_stage13 = '''  chmod o+x "$CONFIG_DIR"
+            install -d -o root -g sg-naiveproxy -m 0750 "$NAIVEPROXY_CONFIG"
+
+            cat >> "$CONFIG_DIR/runtime.env" <<EOF
+          '''.replace("          ", "")
+          new_stage13 = '''  chmod o+x "$CONFIG_DIR"
+            install -d -o root -g sg-naiveproxy -m 0750 "$NAIVEPROXY_CONFIG"
+            install -d -o root -g sg-naiveproxy -m 0750 "$NAIVEPROXY_CONFIG/tls"
+            if [[ -f "$NAIVEPROXY_CONFIG/tls/fullchain.pem" ]]; then
+              chown root:sg-naiveproxy "$NAIVEPROXY_CONFIG/tls/fullchain.pem"
+              chmod 0644 "$NAIVEPROXY_CONFIG/tls/fullchain.pem"
+            fi
+            if [[ -f "$NAIVEPROXY_CONFIG/tls/privkey.pem" ]]; then
+              chown root:sg-naiveproxy "$NAIVEPROXY_CONFIG/tls/privkey.pem"
+              chmod 0640 "$NAIVEPROXY_CONFIG/tls/privkey.pem"
+            fi
+
+            cat >> "$CONFIG_DIR/runtime.env" <<EOF
+          '''.replace("          ", "")
+          if old_stage13 not in install:
+              raise SystemExit("installer stage 13 TLS anchor not found")
+          install = install.replace(old_stage13, new_stage13, 1)
+
+          verify_anchor = '''  getent group sg-naiveproxy >/dev/null
+
+            local state_path actual expected
+          '''.replace("          ", "")
+          verify_block = '''  getent group sg-naiveproxy >/dev/null
+
+            local tls_path tls_actual tls_expected
+            tls_actual="$(stat -c '%U:%G:%a' "$NAIVEPROXY_CONFIG/tls")"
+            [[ "$tls_actual" == "root:sg-naiveproxy:750" ]] || {
+              echo "NaiveProxy TLS directory ownership mismatch: $tls_actual (expected root:sg-naiveproxy:750)" >&2
+              return 1
+            }
+            for tls_path in \\
+              "$NAIVEPROXY_CONFIG/tls/fullchain.pem" \\
+              "$NAIVEPROXY_CONFIG/tls/privkey.pem"; do
+              [[ -f "$tls_path" ]] || continue
+              tls_expected="root:sg-naiveproxy:644"
+              [[ "$tls_path" != "$NAIVEPROXY_CONFIG/tls/privkey.pem" ]] || \\
+                tls_expected="root:sg-naiveproxy:640"
+              tls_actual="$(stat -c '%U:%G:%a' "$tls_path")"
+              [[ "$tls_actual" == "$tls_expected" ]] || {
+                echo "NaiveProxy TLS file ownership mismatch: $tls_path: $tls_actual (expected $tls_expected)" >&2
+                return 1
+              }
+            done
+            if [[ -f "$NAIVEPROXY_CONFIG/Caddyfile" ]]; then
+              [[ -f "$NAIVEPROXY_CONFIG/tls/fullchain.pem" ]] || {
+                echo "NaiveProxy TLS certificate is missing" >&2
+                return 1
+              }
+              [[ -f "$NAIVEPROXY_CONFIG/tls/privkey.pem" ]] || {
+                echo "NaiveProxy TLS private key is missing" >&2
+                return 1
+              }
+            fi
+
+            local state_path actual expected
+          '''.replace("          ", "")
+          if verify_anchor not in install:
+              raise SystemExit("installer verify TLS anchor not found")
+          install = install.replace(verify_anchor, verify_block, 1)
+          install_path.write_text(install, encoding="utf-8")
+          PY
+
+      - name: Remove temporary workflow and refresh source checksums
+        run: |
+          git rm .github/workflows/zz-naiveproxy-tls-runtime-red.yml
+          python3 - <<'PY'
+          import hashlib
+          import subprocess
+          from pathlib import Path
+
+          tracked = subprocess.check_output(
+              ["git", "ls-files"], text=True, encoding="utf-8"
+          ).splitlines()
+          tracked = sorted(path for path in tracked if path != "SOURCE-SHA256SUMS")
+          rows = [
+              f"{hashlib.sha256(Path(path).read_bytes()).hexdigest()}  {path}"
+              for path in tracked
+          ]
+          Path("SOURCE-SHA256SUMS").write_text("\n".join(rows) + "\n", encoding="utf-8")
+          PY
+
+      - name: Create candidate commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix: enforce NaiveProxy TLS runtime permissions"
+
+      - name: Verify focused regression and syntax
+        run: |
+          python -m pip install -q pytest
+          python -m pytest -q \
+            tests/test_naiveproxy_tls_runtime_contract_02208.py \
+            tests/test_naiveproxy_native_state_ownership_02208.py
+          python -m py_compile hostd/sg_hostd/naiveproxy_runtime.py
+          bash -n install.sh
+
+      - name: Verify exact source integrity
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import re
+          import subprocess
+          from pathlib import Path
+
+          expected = {}
+          for raw in Path("SOURCE-SHA256SUMS").read_text(encoding="utf-8").splitlines():
+              if not raw.strip():
+                  continue
+              match = re.fullmatch(r"([0-9a-f]{64})  (.+)", raw)
+              assert match, raw
+              expected[match.group(2)] = match.group(1)
+          tracked = set(subprocess.check_output(["git", "ls-files"], text=True).splitlines())
+          tracked.discard("SOURCE-SHA256SUMS")
+          assert set(expected) == tracked
+          for path in sorted(tracked):
+              data = subprocess.check_output(["git", "show", f"HEAD:{path}"])
+              assert hashlib.sha256(data).hexdigest() == expected[path], path
+          print(f"source integrity ok: {len(tracked)} files")
+          PY
+
+      - name: Build and self-verify FULL package
+        run: |
+          VERSION="$(tr -d '[:space:]' < VERSION)"
+          OUT="/tmp/SG-Gateway-${VERSION}-NAIVE-TLS-FIX.run"
+          bash build-run.sh "$OUT"
+          bash "$OUT" --verify-only
+
+      - name: Publish verified candidate
+        run: git push origin HEAD:fix/02208-naiveproxy-tls-runtime-contract
