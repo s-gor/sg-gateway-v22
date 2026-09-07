@@ -5,7 +5,6 @@ on:
     branches:
       - feature/02207-naiveproxy
       - dev-02207
-      - fix/02208-naiveproxy-reinstall-smoke
   pull_request:
     branches:
       - dev-02207
@@ -49,7 +48,6 @@ jobs:
           bash -n deploy/full-uninstall-02207.sh
 
       - name: Guard frozen 22.06 artifacts
-        if: github.ref_name != 'fix/02208-naiveproxy-reinstall-smoke'
         run: |
           git fetch --no-tags origin dev-02207
           changed="$(git diff --name-only origin/dev-02207...HEAD)"
@@ -68,5 +66,5 @@ jobs:
             exit 1
           fi
 
-      - name: Run focused NaiveProxy uninstall/reinstall contract tests
-        run: python -m pytest -q tests/test_naiveproxy_full_uninstall_02207.py
+      - name: Run full test suite
+        run: python -m pytest -q tests
