@@ -68,3 +68,19 @@ def test_02208_full_uninstall_requires_naiveproxy_listener_to_be_gone():
     assert 'ss -H -ltn "sport = :${NAIVEPROXY_PORT}"' in source
     assert "NaiveProxy listener" in source
     assert "Остаток после удаления" in source
+
+
+def test_02208_reinstall_smoke_exercises_real_naiveproxy_listener():
+    source = (
+        ROOT / ".github/workflows/reinstall-after-full-uninstall-smoke.yml"
+    ).read_text()
+
+    assert "Verify NaiveProxy removed after full uninstall" in source
+    assert "Start real NaiveProxy after reinstall" in source
+    assert "Verify NaiveProxy listener after reinstall" in source
+    assert "sg-gateway-naiveproxy.service" in source
+    assert "! id sg-naiveproxy" in source
+    assert "! getent group sg-naiveproxy" in source
+    assert "sport = :8447" in source
+    assert "openssl req -x509" in source
+    assert "naiveproxy_runtime.sync()" in source
