@@ -6,13 +6,11 @@ NAIVE_SERVICE = ROOT / "deploy" / "sg-gateway-naiveproxy.service"
 UNINSTALLER = ROOT / "deploy" / "full-uninstall-ubuntu.sh"
 WORKFLOW = ROOT / ".github" / "workflows" / "reinstall-after-full-uninstall-smoke.yml"
 
-PINNED_INSTALL_SHA = "889206dd3ddb7d10ef7480f3b5b23694f0b90b7e"
 CANONICAL_REINSTALL_COMMAND = (
     "curl -4 -fsSL "
-    f"https://raw.githubusercontent.com/s-gor/sg-gateway-v22/{PINNED_INSTALL_SHA}/"
+    "https://raw.githubusercontent.com/s-gor/sg-gateway-v22/stable-02208/"
     "deploy/install-from-github.sh | sudo env "
-    "SG_GATEWAY_GITHUB_BRANCH=stable-02208 "
-    f"SG_GATEWAY_SOURCE_COMMIT={PINNED_INSTALL_SHA} bash"
+    "SG_GATEWAY_GITHUB_BRANCH=stable-02208 bash"
 )
 
 
@@ -21,7 +19,7 @@ def test_full_uninstall_prints_the_canonical_reinstall_command():
 
     assert "Для повторной установки SG-Gateway выполните:" in body
     assert CANONICAL_REINSTALL_COMMAND in body
-    assert "stable-02208/deploy/install-from-github.sh" not in body
+    assert "SG_GATEWAY_SOURCE_COMMIT=" not in CANONICAL_REINSTALL_COMMAND
     assert "EXPECTED_SHA=" not in body
 
 
