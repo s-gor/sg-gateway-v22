@@ -2,7 +2,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-INSTALLER = ROOT / "install.sh"
+NAIVE_SERVICE = ROOT / "deploy" / "sg-gateway-naiveproxy.service"
 UNINSTALLER = ROOT / "deploy" / "full-uninstall-ubuntu.sh"
 WORKFLOW = ROOT / ".github" / "workflows" / "reinstall-after-full-uninstall-smoke.yml"
 
@@ -27,7 +27,7 @@ def test_full_uninstall_prints_the_canonical_reinstall_command():
 
 def test_reinstall_smoke_covers_the_real_same_server_lifecycle():
     body = WORKFLOW.read_text(encoding="utf-8")
-    installer = INSTALLER.read_text(encoding="utf-8")
+    naive_service = NAIVE_SERVICE.read_text(encoding="utf-8")
 
     required_steps = (
         "Run first native install",
@@ -61,9 +61,9 @@ def test_reinstall_smoke_covers_the_real_same_server_lifecycle():
     assert 'show awg3 listen-port)' in body
     assert 'show awg31 listen-port)' in body
 
-    # NaiveProxy runs under its own service account.  The shared SG state root
-    # therefore must remain traversable after the later configuration stage,
-    # while the panel log directory keeps its existing restrictive mode.
-    assert 'install -d -m 0751 -o "$PANEL_USER" -g "$PANEL_GROUP" "$DATA_DIR"' in installer
-    assert 'install -d -m 0750 -o "$PANEL_USER" -g "$PANEL_GROUP" "$LOG_DIR"' in installer
-    assert 'install -d -m 0750 -o "$PANEL_USER" -g "$PANEL_GROUP" "$DATA_DIR" "$LOG_DIR"' not in installer
+    # /var/lib/sg-gateway deliberately remains 0750 sg-gateway:sg-gateway.
+    # NaiveProxy is isolated under its own primary account, so systemd must
+    # grant that process the SG group solely for traversing the shared parent.
+    assert "User=sg-naiveproxy" in naive_service
+    assert "Group=sg-naiveproxy" in naive_service
+    assert "SupplementaryGroups=sg-gateway" in naive_service
