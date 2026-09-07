@@ -210,6 +210,28 @@ def _copy_private(source: Path, destination: Path, mode: int) -> None:
         pass
 
 
+def _ensure_tls_permissions() -> None:
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    TLS_DIR.mkdir(parents=True, exist_ok=True)
+    for directory in (CONFIG_DIR, TLS_DIR):
+        os.chmod(directory, 0o750)
+        try:
+            shutil.chown(directory, user="root", group="sg-naiveproxy")
+        except LookupError:
+            pass
+    for path, mode in (
+        (TLS_CERTIFICATE, 0o644),
+        (TLS_PRIVATE_KEY, 0o640),
+    ):
+        if not path.is_file():
+            continue
+        os.chmod(path, mode)
+        try:
+            shutil.chown(path, user="root", group="sg-naiveproxy")
+        except LookupError:
+            pass
+
+
 def _snapshot(source: Path, destination: Path) -> bool:
     if not source.is_file():
         destination.unlink(missing_ok=True)
@@ -250,6 +272,7 @@ def _restore_snapshot(snapshot: dict[str, bool], restart: bool) -> None:
         TLS_DIR / "privkey.pem.previous",
         snapshot["private_key"],
     )
+    _ensure_tls_permissions()
     if restart:
         result = _run(["systemctl", "restart", SERVICE], timeout=60)
         if result.returncode != 0:
@@ -264,10 +287,11 @@ def _restore_snapshot(snapshot: dict[str, bool], restart: bool) -> None:
 
 def sync() -> dict:
     settings, users, credential_ids = _load()
-    _validate(settings)
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     TLS_DIR.mkdir(parents=True, exist_ok=True)
     STATE_DIR.mkdir(parents=True, exist_ok=True)
+    _ensure_tls_permissions()
+    _validate(settings)
 
     candidate_certificate = TLS_DIR / "fullchain.pem.candidate"
     candidate_private_key = TLS_DIR / "privkey.pem.candidate"
@@ -333,6 +357,7 @@ def sync() -> dict:
     try:
         os.replace(candidate_certificate, TLS_CERTIFICATE)
         os.replace(candidate_private_key, TLS_PRIVATE_KEY)
+        _ensure_tls_permissions()
         _atomic_write(candidate_config, _render(settings, users), 0o640)
         final_validation = _run(
             [
@@ -427,6 +452,7 @@ def rollback(restart: bool = True) -> dict:
     shutil.copy2(previous_state, STATE_PATH)
     shutil.copy2(previous_certificate, TLS_CERTIFICATE)
     shutil.copy2(previous_private_key, TLS_PRIVATE_KEY)
+    _ensure_tls_permissions()
     if restart:
         result = _run(["systemctl", "restart", SERVICE], timeout=60)
         if result.returncode != 0:

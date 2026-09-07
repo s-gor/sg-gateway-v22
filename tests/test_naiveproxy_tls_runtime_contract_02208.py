@@ -68,6 +68,7 @@ def test_sync_and_rollback_normalize_tls_permissions_before_service_start():
     runtime = _load_runtime()
     sync_source = inspect.getsource(runtime.sync)
     rollback_source = inspect.getsource(runtime._restore_snapshot)
+    public_rollback_source = inspect.getsource(runtime.rollback)
 
     assert sync_source.count("_ensure_tls_permissions()") >= 2
     assert sync_source.rfind("_ensure_tls_permissions()") < sync_source.index(
@@ -75,6 +76,10 @@ def test_sync_and_rollback_normalize_tls_permissions_before_service_start():
     )
     assert "_ensure_tls_permissions()" in rollback_source
     assert rollback_source.index("_ensure_tls_permissions()") < rollback_source.index(
+        '["systemctl", "restart", SERVICE]'
+    )
+    assert "_ensure_tls_permissions()" in public_rollback_source
+    assert public_rollback_source.index("_ensure_tls_permissions()") < public_rollback_source.index(
         '["systemctl", "restart", SERVICE]'
     )
 
