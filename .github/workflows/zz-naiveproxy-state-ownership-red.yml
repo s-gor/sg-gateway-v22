@@ -1,0 +1,20 @@
+name: "RED NaiveProxy state ownership"
+
+on:
+  push:
+    branches:
+      - "fix/02208-naiveproxy-state-ownership"
+
+permissions:
+  contents: read
+
+jobs:
+  red:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -q pytest
+      - run: python -m pytest -q tests/test_naiveproxy_native_state_ownership_02208.py
