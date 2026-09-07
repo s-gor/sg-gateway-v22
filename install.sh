@@ -3387,6 +3387,15 @@ stage_configuration_and_database_02208() {
 
   chmod o+x "$CONFIG_DIR"
   install -d -o root -g sg-naiveproxy -m 0750 "$NAIVEPROXY_CONFIG"
+  install -d -o root -g sg-naiveproxy -m 0750 "$NAIVEPROXY_CONFIG/tls"
+  if [[ -f "$NAIVEPROXY_CONFIG/tls/fullchain.pem" ]]; then
+    chown root:sg-naiveproxy "$NAIVEPROXY_CONFIG/tls/fullchain.pem"
+    chmod 0644 "$NAIVEPROXY_CONFIG/tls/fullchain.pem"
+  fi
+  if [[ -f "$NAIVEPROXY_CONFIG/tls/privkey.pem" ]]; then
+    chown root:sg-naiveproxy "$NAIVEPROXY_CONFIG/tls/privkey.pem"
+    chmod 0640 "$NAIVEPROXY_CONFIG/tls/privkey.pem"
+  fi
 
   cat >> "$CONFIG_DIR/runtime.env" <<EOF
 SG_GATEWAY_NAIVEPROXY_INSTALLED_BY_SG=1
@@ -3463,6 +3472,36 @@ verify_naiveproxy_install_contract() {
   [[ -d "$NAIVEPROXY_STATE" ]]
   id -u sg-naiveproxy >/dev/null 2>&1
   getent group sg-naiveproxy >/dev/null
+
+  local tls_path tls_actual tls_expected
+  tls_actual="$(stat -c '%U:%G:%a' "$NAIVEPROXY_CONFIG/tls")"
+  [[ "$tls_actual" == "root:sg-naiveproxy:750" ]] || {
+    echo "NaiveProxy TLS directory ownership mismatch: $tls_actual (expected root:sg-naiveproxy:750)" >&2
+    return 1
+  }
+  for tls_path in \
+    "$NAIVEPROXY_CONFIG/tls/fullchain.pem" \
+    "$NAIVEPROXY_CONFIG/tls/privkey.pem"; do
+    [[ -f "$tls_path" ]] || continue
+    tls_expected="root:sg-naiveproxy:644"
+    [[ "$tls_path" != "$NAIVEPROXY_CONFIG/tls/privkey.pem" ]] || \
+      tls_expected="root:sg-naiveproxy:640"
+    tls_actual="$(stat -c '%U:%G:%a' "$tls_path")"
+    [[ "$tls_actual" == "$tls_expected" ]] || {
+      echo "NaiveProxy TLS file ownership mismatch: $tls_path: $tls_actual (expected $tls_expected)" >&2
+      return 1
+    }
+  done
+  if [[ -f "$NAIVEPROXY_CONFIG/Caddyfile" ]]; then
+    [[ -f "$NAIVEPROXY_CONFIG/tls/fullchain.pem" ]] || {
+      echo "NaiveProxy TLS certificate is missing" >&2
+      return 1
+    }
+    [[ -f "$NAIVEPROXY_CONFIG/tls/privkey.pem" ]] || {
+      echo "NaiveProxy TLS private key is missing" >&2
+      return 1
+    }
+  fi
 
   local state_path actual expected
   for state_path in \
