@@ -79,53 +79,48 @@ jobs:
               raise SystemExit("runtime sync anchor not found")
           runtime = runtime.replace(old_sync, new_sync, 1)
 
-          old_replace = dedent("""\
-                  os.replace(candidate_certificate, TLS_CERTIFICATE)
-                  os.replace(candidate_private_key, TLS_PRIVATE_KEY)
-                  _atomic_write(candidate_config, _render(settings, users), 0o640)
-          """)
-          new_replace = dedent("""\
-                  os.replace(candidate_certificate, TLS_CERTIFICATE)
-                  os.replace(candidate_private_key, TLS_PRIVATE_KEY)
-                  _ensure_tls_permissions()
-                  _atomic_write(candidate_config, _render(settings, users), 0o640)
-          """)
+          old_replace = (
+              "        os.replace(candidate_certificate, TLS_CERTIFICATE)\n"
+              "        os.replace(candidate_private_key, TLS_PRIVATE_KEY)\n"
+              "        _atomic_write(candidate_config, _render(settings, users), 0o640)\n"
+          )
+          new_replace = (
+              "        os.replace(candidate_certificate, TLS_CERTIFICATE)\n"
+              "        os.replace(candidate_private_key, TLS_PRIVATE_KEY)\n"
+              "        _ensure_tls_permissions()\n"
+              "        _atomic_write(candidate_config, _render(settings, users), 0o640)\n"
+          )
           if old_replace not in runtime:
               raise SystemExit("runtime replace anchor not found")
           runtime = runtime.replace(old_replace, new_replace, 1)
 
-          old_restore = dedent("""\
-              _restore_file(
-                  TLS_PRIVATE_KEY,
-                  TLS_DIR / "privkey.pem.previous",
-                  snapshot["private_key"],
-              )
-              if restart:
-          """)
-          new_restore = dedent("""\
-              _restore_file(
-                  TLS_PRIVATE_KEY,
-                  TLS_DIR / "privkey.pem.previous",
-                  snapshot["private_key"],
-              )
-              _ensure_tls_permissions()
-              if restart:
-          """)
+          old_restore = (
+              "    _restore_file(\n"
+              "        TLS_PRIVATE_KEY,\n"
+              "        TLS_DIR / \"privkey.pem.previous\",\n"
+              "        snapshot[\"private_key\"],\n"
+              "    )\n"
+              "    if restart:\n"
+          )
+          new_restore = old_restore.replace(
+              "    if restart:\n",
+              "    _ensure_tls_permissions()\n    if restart:\n",
+              1,
+          )
           if old_restore not in runtime:
               raise SystemExit("runtime internal rollback anchor not found")
           runtime = runtime.replace(old_restore, new_restore, 1)
 
-          old_public_rollback = dedent("""\
-              shutil.copy2(previous_certificate, TLS_CERTIFICATE)
-              shutil.copy2(previous_private_key, TLS_PRIVATE_KEY)
-              if restart:
-          """)
-          new_public_rollback = dedent("""\
-              shutil.copy2(previous_certificate, TLS_CERTIFICATE)
-              shutil.copy2(previous_private_key, TLS_PRIVATE_KEY)
-              _ensure_tls_permissions()
-              if restart:
-          """)
+          old_public_rollback = (
+              "    shutil.copy2(previous_certificate, TLS_CERTIFICATE)\n"
+              "    shutil.copy2(previous_private_key, TLS_PRIVATE_KEY)\n"
+              "    if restart:\n"
+          )
+          new_public_rollback = old_public_rollback.replace(
+              "    if restart:\n",
+              "    _ensure_tls_permissions()\n    if restart:\n",
+              1,
+          )
           if old_public_rollback not in runtime:
               raise SystemExit("runtime public rollback anchor not found")
           runtime = runtime.replace(old_public_rollback, new_public_rollback, 1)
@@ -133,71 +128,71 @@ jobs:
 
           install_path = Path("install.sh")
           install = install_path.read_text(encoding="utf-8")
-          old_stage13 = dedent("""\
-            chmod o+x "$CONFIG_DIR"
-            install -d -o root -g sg-naiveproxy -m 0750 "$NAIVEPROXY_CONFIG"
-
-            cat >> "$CONFIG_DIR/runtime.env" <<EOF
-          """)
-          new_stage13 = dedent("""\
-            chmod o+x "$CONFIG_DIR"
-            install -d -o root -g sg-naiveproxy -m 0750 "$NAIVEPROXY_CONFIG"
-            install -d -o root -g sg-naiveproxy -m 0750 "$NAIVEPROXY_CONFIG/tls"
-            if [[ -f "$NAIVEPROXY_CONFIG/tls/fullchain.pem" ]]; then
-              chown root:sg-naiveproxy "$NAIVEPROXY_CONFIG/tls/fullchain.pem"
-              chmod 0644 "$NAIVEPROXY_CONFIG/tls/fullchain.pem"
-            fi
-            if [[ -f "$NAIVEPROXY_CONFIG/tls/privkey.pem" ]]; then
-              chown root:sg-naiveproxy "$NAIVEPROXY_CONFIG/tls/privkey.pem"
-              chmod 0640 "$NAIVEPROXY_CONFIG/tls/privkey.pem"
-            fi
-
-            cat >> "$CONFIG_DIR/runtime.env" <<EOF
-          """)
+          old_stage13 = (
+              "  chmod o+x \"$CONFIG_DIR\"\n"
+              "  install -d -o root -g sg-naiveproxy -m 0750 \"$NAIVEPROXY_CONFIG\"\n"
+              "\n"
+              "  cat >> \"$CONFIG_DIR/runtime.env\" <<EOF\n"
+          )
+          new_stage13 = (
+              "  chmod o+x \"$CONFIG_DIR\"\n"
+              "  install -d -o root -g sg-naiveproxy -m 0750 \"$NAIVEPROXY_CONFIG\"\n"
+              "  install -d -o root -g sg-naiveproxy -m 0750 \"$NAIVEPROXY_CONFIG/tls\"\n"
+              "  if [[ -f \"$NAIVEPROXY_CONFIG/tls/fullchain.pem\" ]]; then\n"
+              "    chown root:sg-naiveproxy \"$NAIVEPROXY_CONFIG/tls/fullchain.pem\"\n"
+              "    chmod 0644 \"$NAIVEPROXY_CONFIG/tls/fullchain.pem\"\n"
+              "  fi\n"
+              "  if [[ -f \"$NAIVEPROXY_CONFIG/tls/privkey.pem\" ]]; then\n"
+              "    chown root:sg-naiveproxy \"$NAIVEPROXY_CONFIG/tls/privkey.pem\"\n"
+              "    chmod 0640 \"$NAIVEPROXY_CONFIG/tls/privkey.pem\"\n"
+              "  fi\n"
+              "\n"
+              "  cat >> \"$CONFIG_DIR/runtime.env\" <<EOF\n"
+          )
           if old_stage13 not in install:
               raise SystemExit("installer stage 13 TLS anchor not found")
           install = install.replace(old_stage13, new_stage13, 1)
 
-          verify_anchor = dedent("""\
-            getent group sg-naiveproxy >/dev/null
-
-            local state_path actual expected
-          """)
-          verify_block = dedent("""\
-            getent group sg-naiveproxy >/dev/null
-
-            local tls_path tls_actual tls_expected
-            tls_actual="$(stat -c '%U:%G:%a' "$NAIVEPROXY_CONFIG/tls")"
-            [[ "$tls_actual" == "root:sg-naiveproxy:750" ]] || {
-              echo "NaiveProxy TLS directory ownership mismatch: $tls_actual (expected root:sg-naiveproxy:750)" >&2
-              return 1
-            }
-            for tls_path in \\
-              "$NAIVEPROXY_CONFIG/tls/fullchain.pem" \\
-              "$NAIVEPROXY_CONFIG/tls/privkey.pem"; do
-              [[ -f "$tls_path" ]] || continue
-              tls_expected="root:sg-naiveproxy:644"
-              [[ "$tls_path" != "$NAIVEPROXY_CONFIG/tls/privkey.pem" ]] || \\
-                tls_expected="root:sg-naiveproxy:640"
-              tls_actual="$(stat -c '%U:%G:%a' "$tls_path")"
-              [[ "$tls_actual" == "$tls_expected" ]] || {
-                echo "NaiveProxy TLS file ownership mismatch: $tls_path: $tls_actual (expected $tls_expected)" >&2
-                return 1
-              }
-            done
-            if [[ -f "$NAIVEPROXY_CONFIG/Caddyfile" ]]; then
-              [[ -f "$NAIVEPROXY_CONFIG/tls/fullchain.pem" ]] || {
-                echo "NaiveProxy TLS certificate is missing" >&2
-                return 1
-              }
-              [[ -f "$NAIVEPROXY_CONFIG/tls/privkey.pem" ]] || {
-                echo "NaiveProxy TLS private key is missing" >&2
-                return 1
-              }
-            fi
-
-            local state_path actual expected
-          """)
+          verify_anchor = (
+              "  getent group sg-naiveproxy >/dev/null\n"
+              "\n"
+              "  local state_path actual expected\n"
+          )
+          verify_block = (
+              "  getent group sg-naiveproxy >/dev/null\n"
+              "\n"
+              "  local tls_path tls_actual tls_expected\n"
+              "  tls_actual=\"$(stat -c '%U:%G:%a' \"$NAIVEPROXY_CONFIG/tls\")\"\n"
+              "  [[ \"$tls_actual\" == \"root:sg-naiveproxy:750\" ]] || {\n"
+              "    echo \"NaiveProxy TLS directory ownership mismatch: $tls_actual (expected root:sg-naiveproxy:750)\" >&2\n"
+              "    return 1\n"
+              "  }\n"
+              "  for tls_path in \\\n"
+              "    \"$NAIVEPROXY_CONFIG/tls/fullchain.pem\" \\\n"
+              "    \"$NAIVEPROXY_CONFIG/tls/privkey.pem\"; do\n"
+              "    [[ -f \"$tls_path\" ]] || continue\n"
+              "    tls_expected=\"root:sg-naiveproxy:644\"\n"
+              "    [[ \"$tls_path\" != \"$NAIVEPROXY_CONFIG/tls/privkey.pem\" ]] || \\\n"
+              "      tls_expected=\"root:sg-naiveproxy:640\"\n"
+              "    tls_actual=\"$(stat -c '%U:%G:%a' \"$tls_path\")\"\n"
+              "    [[ \"$tls_actual\" == \"$tls_expected\" ]] || {\n"
+              "      echo \"NaiveProxy TLS file ownership mismatch: $tls_path: $tls_actual (expected $tls_expected)\" >&2\n"
+              "      return 1\n"
+              "    }\n"
+              "  done\n"
+              "  if [[ -f \"$NAIVEPROXY_CONFIG/Caddyfile\" ]]; then\n"
+              "    [[ -f \"$NAIVEPROXY_CONFIG/tls/fullchain.pem\" ]] || {\n"
+              "      echo \"NaiveProxy TLS certificate is missing\" >&2\n"
+              "      return 1\n"
+              "    }\n"
+              "    [[ -f \"$NAIVEPROXY_CONFIG/tls/privkey.pem\" ]] || {\n"
+              "      echo \"NaiveProxy TLS private key is missing\" >&2\n"
+              "      return 1\n"
+              "    }\n"
+              "  fi\n"
+              "\n"
+              "  local state_path actual expected\n"
+          )
           if verify_anchor not in install:
               raise SystemExit("installer verify TLS anchor not found")
           install = install.replace(verify_anchor, verify_block, 1)
@@ -205,34 +200,31 @@ jobs:
 
           test_path = Path("tests/test_naiveproxy_tls_runtime_contract_02208.py")
           test = test_path.read_text(encoding="utf-8")
-          old_test = dedent("""\
-              rollback_source = inspect.getsource(runtime._restore_snapshot)
-
-              assert sync_source.count("_ensure_tls_permissions()") >= 2
-          """)
-          new_test = dedent("""\
-              rollback_source = inspect.getsource(runtime._restore_snapshot)
-              public_rollback_source = inspect.getsource(runtime.rollback)
-
-              assert sync_source.count("_ensure_tls_permissions()") >= 2
-          """)
+          old_test = (
+              "    rollback_source = inspect.getsource(runtime._restore_snapshot)\n"
+              "\n"
+              "    assert sync_source.count(\"_ensure_tls_permissions()\") >= 2\n"
+          )
+          new_test = (
+              "    rollback_source = inspect.getsource(runtime._restore_snapshot)\n"
+              "    public_rollback_source = inspect.getsource(runtime.rollback)\n"
+              "\n"
+              "    assert sync_source.count(\"_ensure_tls_permissions()\") >= 2\n"
+          )
           if old_test not in test:
               raise SystemExit("test rollback source anchor not found")
           test = test.replace(old_test, new_test, 1)
-          old_assert = dedent("""\
-              assert rollback_source.index("_ensure_tls_permissions()") < rollback_source.index(
-                  '["systemctl", "restart", SERVICE]'
-              )
-          """)
-          new_assert = dedent("""\
-              assert rollback_source.index("_ensure_tls_permissions()") < rollback_source.index(
-                  '["systemctl", "restart", SERVICE]'
-              )
-              assert "_ensure_tls_permissions()" in public_rollback_source
-              assert public_rollback_source.index("_ensure_tls_permissions()") < public_rollback_source.index(
-                  '["systemctl", "restart", SERVICE]'
-              )
-          """)
+          old_assert = (
+              "    assert rollback_source.index(\"_ensure_tls_permissions()\") < rollback_source.index(\n"
+              "        '[\"systemctl\", \"restart\", SERVICE]'\n"
+              "    )\n"
+          )
+          new_assert = old_assert + (
+              "    assert \"_ensure_tls_permissions()\" in public_rollback_source\n"
+              "    assert public_rollback_source.index(\"_ensure_tls_permissions()\") < public_rollback_source.index(\n"
+              "        '[\"systemctl\", \"restart\", SERVICE]'\n"
+              "    )\n"
+          )
           if old_assert not in test:
               raise SystemExit("test rollback assertion anchor not found")
           test_path.write_text(test.replace(old_assert, new_assert, 1), encoding="utf-8")
