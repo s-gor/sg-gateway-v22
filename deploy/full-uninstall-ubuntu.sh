@@ -18,6 +18,7 @@ XHTTP_TLS_PORT="8445"
 HYSTERIA2_PORT="8446"
 ANYTLS_PORT="9443"
 TUIC_PORT="10443"
+NAIVEPROXY_PORT="8447"
 TLS_DOMAIN=""
 
 GREEN=$'\033[1;32m'
@@ -102,7 +103,7 @@ run_stage(){
 stop_runtime(){
   local service
   for service in \
-    sg-gateway.service sg-hostd.service xray.service mihomo.service \
+    sg-gateway.service sg-hostd.service xray.service mihomo.service sg-gateway-naiveproxy.service \
     sg-gateway-awg.service sg-gateway-awg3.service sg-gateway-awg31.service sg-gateway-singbox.service; do
     systemctl disable --now "$service" >/dev/null 2>&1 || true
   done
@@ -124,6 +125,7 @@ remove_service_and_web_config(){
     /etc/systemd/system/sg-gateway-awg.service \
     /etc/systemd/system/sg-gateway-awg3.service \
     /etc/systemd/system/sg-gateway-awg31.service \
+    /etc/systemd/system/sg-gateway-naiveproxy.service \
     /etc/systemd/system/xray.service \
     /etc/systemd/system/xray@.service \
     /etc/systemd/system/mihomo.service \
@@ -134,6 +136,7 @@ remove_service_and_web_config(){
   rm -rf \
     /etc/systemd/system/sg-gateway.service.d \
     /etc/systemd/system/sg-hostd.service.d \
+    /etc/systemd/system/sg-gateway-naiveproxy.service.d \
     /etc/systemd/system/xray.service.d \
     /etc/systemd/system/xray@.service.d
   systemctl daemon-reload
@@ -297,7 +300,7 @@ cleanup_firewall(){
     local rule
     for rule in \
       "${PANEL_PORT}/tcp" "80/tcp" "${XRAY_PORT}/tcp" \
-      "${XHTTP_REALITY_PORT}/tcp" "${XHTTP_TLS_PORT}/tcp" \
+      "${XHTTP_REALITY_PORT}/tcp" "${XHTTP_TLS_PORT}/tcp" "${NAIVEPROXY_PORT}/tcp" \
       "${AWG_PORT}/udp" "${AWG3_PORT}/udp" "${AWG31_PORT}/udp" "${HYSTERIA2_PORT}/udp" \
       "${MIHOMO_PORT}/tcp" "${ANYTLS_PORT}/tcp" "${TUIC_PORT}/udp"; do
       ufw --force delete allow "$rule" >/dev/null 2>&1 || true
@@ -307,6 +310,14 @@ cleanup_firewall(){
 }
 
 remove_account_and_verify(){
+  if id sg-naiveproxy >/dev/null 2>&1; then
+    pkill -TERM -u sg-naiveproxy >/dev/null 2>&1 || true
+    sleep 1
+    pkill -KILL -u sg-naiveproxy >/dev/null 2>&1 || true
+    userdel sg-naiveproxy >/dev/null 2>&1 || true
+  fi
+  getent group sg-naiveproxy >/dev/null 2>&1 && groupdel sg-naiveproxy >/dev/null 2>&1 || true
+
   if id sg-gateway >/dev/null 2>&1; then
     pkill -TERM -u sg-gateway >/dev/null 2>&1 || true
     sleep 1
@@ -324,6 +335,14 @@ remove_account_and_verify(){
   systemctl reset-failed >/dev/null 2>&1 || true
 
   local bad=0 path
+  if id sg-naiveproxy >/dev/null 2>&1; then
+    echo "Остаток после удаления: пользователь sg-naiveproxy" >&2
+    bad=1
+  fi
+  if getent group sg-naiveproxy >/dev/null 2>&1; then
+    echo "Остаток после удаления: группа sg-naiveproxy" >&2
+    bad=1
+  fi
   if id sg-gateway >/dev/null 2>&1; then
     echo "Остаток после удаления: пользователь sg-gateway" >&2
     bad=1
@@ -339,6 +358,7 @@ remove_account_and_verify(){
     /etc/systemd/system/sg-gateway-awg.service \
     /etc/systemd/system/sg-gateway-awg3.service \
     /etc/systemd/system/sg-gateway-awg31.service \
+    /etc/systemd/system/sg-gateway-naiveproxy.service \
     /etc/systemd/system/xray.service \
     /etc/nginx/stream-conf.d/sg-gateway-443.conf \
     /var/www/sg-gateway-placeholder \
@@ -349,6 +369,10 @@ remove_account_and_verify(){
       bad=1
     fi
   done
+  if command -v ss >/dev/null 2>&1 && [[ -n "$(ss -H -ltn "sport = :${NAIVEPROXY_PORT}" 2>/dev/null || true)" ]]; then
+    echo "Остаток после удаления: NaiveProxy listener ${NAIVEPROXY_PORT}/tcp" >&2
+    bad=1
+  fi
   if [[ -f /etc/nginx/nginx.conf ]] && grep -Eq '^\s*include\s+/etc/nginx/stream-conf\.d/sg-gateway-443\.conf;\s*$' /etc/nginx/nginx.conf; then
     echo "Остаток после удаления: include sg-gateway-443.conf в nginx.conf" >&2
     bad=1
