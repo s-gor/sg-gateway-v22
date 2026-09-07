@@ -16,6 +16,9 @@ jobs:
         with:
           ref: fix/02208-official-install-path
 
+      - name: Install focused test dependency
+        run: python3 -m pip install pytest
+
       - name: Create regression test
         run: |
           cat > tests/test_official_install_path_02208.py <<'PY'
