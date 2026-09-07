@@ -12,8 +12,12 @@ on:
       - .github/workflows/reinstall-after-full-uninstall-smoke.yml
       - tests/test_sg_gateway_v22_reinstall_after_full_uninstall.py
       - tests/test_sg_gateway_v22_awg30_idle_bootstrap.py
+      - tests/test_naiveproxy_full_uninstall_02207.py
       - install.sh
       - deploy/full-uninstall-ubuntu.sh
+      - deploy/install-naiveproxy.sh
+      - deploy/uninstall-naiveproxy.sh
+      - deploy/sg-gateway-naiveproxy.service
       - deploy/sg-gateway-awg3.service
       - deploy/sg-gateway-awg3-userspace.sh
       - deploy/sg-gateway-awg31.service
@@ -24,6 +28,9 @@ on:
       - app/clients/**
       - app/engines/provisioning.py
       - hostd/sg_hostd/awg3_runtime.py
+      - hostd/sg_hostd/naiveproxy_runtime.py
+      - hostd/sg_hostd/naiveproxy_listener_patch.py
+      - hostd/systemd/sg-hostd.service
   pull_request:
     branches:
       - main
@@ -31,8 +38,12 @@ on:
       - .github/workflows/reinstall-after-full-uninstall-smoke.yml
       - tests/test_sg_gateway_v22_reinstall_after_full_uninstall.py
       - tests/test_sg_gateway_v22_awg30_idle_bootstrap.py
+      - tests/test_naiveproxy_full_uninstall_02207.py
       - install.sh
       - deploy/full-uninstall-ubuntu.sh
+      - deploy/install-naiveproxy.sh
+      - deploy/uninstall-naiveproxy.sh
+      - deploy/sg-gateway-naiveproxy.service
       - deploy/sg-gateway-awg3.service
       - deploy/sg-gateway-awg3-userspace.sh
       - deploy/sg-gateway-awg31.service
@@ -43,6 +54,9 @@ on:
       - app/clients/**
       - app/engines/provisioning.py
       - hostd/sg_hostd/awg3_runtime.py
+      - hostd/sg_hostd/naiveproxy_runtime.py
+      - hostd/sg_hostd/naiveproxy_listener_patch.py
+      - hostd/systemd/sg-hostd.service
 
 permissions:
   contents: read
@@ -70,6 +84,10 @@ jobs:
           sudo test ! -e /etc/sg-gateway
           sudo test ! -e /var/lib/sg-gateway
           sudo test ! -e /etc/systemd/system/sg-gateway.service
+          sudo test ! -e /etc/systemd/system/sg-gateway-naiveproxy.service
+          ! id sg-naiveproxy
+          ! getent group sg-naiveproxy
+          test -z "$(sudo ss -H -ltn 'sport = :8447')"
 
       - name: Seed first install parameters
         run: |
@@ -112,6 +130,9 @@ jobs:
           sudo systemctl is-active --quiet sg-gateway.service
           sudo systemctl is-active --quiet sg-hostd.service
           sudo systemctl is-active --quiet sg-gateway-awg3.service
+          sudo test -x /opt/sg-gateway/naiveproxy/bin/caddy
+          id sg-naiveproxy
+          getent group sg-naiveproxy
 
       - name: Run official full uninstall
         run: |
@@ -135,6 +156,17 @@ jobs:
           ! id sg-gateway
           ! getent group sg-gateway
           command -v nginx
+
+      - name: Verify NaiveProxy removed after full uninstall
+        run: |
+          sudo test ! -e /etc/systemd/system/sg-gateway-naiveproxy.service
+          sudo test ! -e /opt/sg-gateway/naiveproxy
+          sudo test ! -e /etc/sg-gateway/naiveproxy
+          sudo test ! -e /var/lib/sg-gateway/naiveproxy
+          ! sudo systemctl is-active --quiet sg-gateway-naiveproxy.service
+          ! id sg-naiveproxy
+          ! getent group sg-naiveproxy
+          test -z "$(sudo ss -H -ltn 'sport = :8447')"
 
       - name: Seed second install parameters
         run: |
@@ -255,6 +287,113 @@ jobs:
           PY
           '
 
+      - name: Start real NaiveProxy after reinstall
+        run: |
+          sudo install -d -m 0700 /root/sg-gateway-naiveproxy-ci
+          sudo openssl req -x509 -nodes -newkey rsa:2048 \
+            -keyout /root/sg-gateway-naiveproxy-ci/privkey.pem \
+            -out /root/sg-gateway-naiveproxy-ci/fullchain.pem \
+            -days 1 \
+            -subj '/CN=localhost' \
+            -addext 'subjectAltName=DNS:localhost' >/dev/null 2>&1
+          sudo bash -c '
+            set -a
+            source /etc/sg-gateway/runtime.env
+            source /etc/sg-gateway/sg-gateway.env
+            set +a
+            env PYTHONPATH=/opt/sg-gateway:/opt/sg-gateway/hostd \
+              /opt/sg-gateway/.venv/bin/python - <<"PY"
+          import json
+
+          from app.naiveproxy.integration import install as install_naiveproxy_integration
+
+          install_naiveproxy_integration()
+
+          from app.connections.settings import update_connection_settings
+          from app.db import connect
+          from sg_hostd import naiveproxy_runtime
+
+          updated = update_connection_settings(
+              "naiveproxy",
+              "localhost",
+              8447,
+              {
+                  "domain": "localhost",
+                  "certificate_path": "/root/sg-gateway-naiveproxy-ci/fullchain.pem",
+                  "private_key_path": "/root/sg-gateway-naiveproxy-ci/privkey.pem",
+              },
+          )
+          assert updated, "NaiveProxy connection settings were not updated"
+
+          with connect() as connection:
+              primary = connection.execute(
+                  """
+                  SELECT d.id
+                  FROM devices d
+                  JOIN clients c ON c.id = d.client_id
+                  WHERE c.name = ? AND d.is_primary = 1
+                  ORDER BY d.id
+                  LIMIT 1
+                  """,
+                  ("sg-admin",),
+              ).fetchone()
+              assert primary is not None, "sg-admin primary device is missing"
+              device_id = int(primary["id"])
+              connection.execute(
+                  "DELETE FROM device_credentials WHERE engine = ?",
+                  ("naiveproxy",),
+              )
+              connection.execute(
+                  """
+                  INSERT INTO device_credentials (
+                      device_id, engine, status, engine_object_id, config_json
+                  )
+                  VALUES (?, ?, ?, ?, ?)
+                  """,
+                  (
+                      device_id,
+                      "naiveproxy",
+                      "creating",
+                      "ci-naiveproxy",
+                      json.dumps(
+                          {
+                              "username": "ci-naiveproxy",
+                              "password": "ci-naiveproxy-secret-2026",
+                          },
+                          sort_keys=True,
+                      ),
+                  ),
+              )
+
+          result = naiveproxy_runtime.sync()
+          assert result.get("service") == "sg-gateway-naiveproxy.service", result
+          assert result.get("users") == 1, result
+          print(result)
+          PY
+          '
+
+      - name: Verify NaiveProxy listener after reinstall
+        run: |
+          sudo systemctl is-active --quiet sg-gateway-naiveproxy.service
+          sudo systemctl is-enabled --quiet sg-gateway-naiveproxy.service
+          sudo test -s /etc/sg-gateway/naiveproxy/Caddyfile
+          sudo -u sg-naiveproxy test -r /etc/sg-gateway/naiveproxy/Caddyfile
+          sudo -u sg-naiveproxy test -r /etc/sg-gateway/naiveproxy/tls/fullchain.pem
+          sudo -u sg-naiveproxy test -r /etc/sg-gateway/naiveproxy/tls/privkey.pem
+          test "$(sudo systemctl show sg-gateway-naiveproxy.service -p SupplementaryGroups --value)" = "sg-gateway"
+          MAIN_PID="$(sudo systemctl show sg-gateway-naiveproxy.service -p MainPID --value)"
+          SG_GATEWAY_GID="$(getent group sg-gateway | cut -d: -f3)"
+          test -n "$MAIN_PID"
+          test "$MAIN_PID" != "0"
+          test -n "$SG_GATEWAY_GID"
+          sudo awk -v gid="$SG_GATEWAY_GID" '/^Groups:/ { for (i=2; i<=NF; i++) if ($i == gid) found=1 } END { exit(found ? 0 : 1) }' "/proc/$MAIN_PID/status"
+          sudo test -s /var/lib/sg-gateway/naiveproxy/xdg-config/caddy/autosave.json
+          sudo test -s /var/lib/sg-gateway/naiveproxy/xdg-data/caddy/instance.uuid
+          sudo ss -H -ltn 'sport = :8447' | grep -q ':8447'
+          test "$(sudo stat -c '%U:%G:%a' /etc/sg-gateway/naiveproxy/tls)" = "root:sg-naiveproxy:750"
+          test "$(sudo stat -c '%U:%G:%a' /etc/sg-gateway/naiveproxy/tls/privkey.pem)" = "root:sg-naiveproxy:640"
+          ! sudo journalctl -b -u sg-gateway-naiveproxy.service --no-pager | grep -qi 'permission denied'
+
       - name: Verify second installation and both userspace profiles
         run: |
           sudo test -f /opt/sg-gateway/VERSION
@@ -264,17 +403,24 @@ jobs:
           sudo systemctl is-active --quiet sg-hostd.service
           sudo systemctl is-active --quiet sg-gateway-awg3.service
           sudo systemctl is-active --quiet sg-gateway-awg31.service
+          sudo systemctl is-active --quiet sg-gateway-naiveproxy.service
           sudo test -S /run/amneziawg/awg3.sock
           sudo test -S /run/amneziawg/awg31.sock
           sudo ip link show dev awg3
           sudo ip link show dev awg31
           test "$(sudo /opt/sg-gateway/awg3/bin/awg show awg3 listen-port)" = "586"
           test "$(sudo /opt/sg-gateway/awg31/bin/awg show awg31 listen-port)" = "587"
+          sudo ss -H -ltn 'sport = :8447' | grep -q ':8447'
 
       - name: Print diagnostics on failure
         if: failure()
         run: |
-          sudo systemctl status sg-gateway.service sg-hostd.service sg-gateway-awg3.service sg-gateway-awg31.service --no-pager || true
-          sudo journalctl -b -u sg-gateway.service -u sg-hostd.service -u sg-gateway-awg3.service -u sg-gateway-awg31.service -n 200 --no-pager || true
+          sudo systemctl status sg-gateway.service sg-hostd.service sg-gateway-awg3.service sg-gateway-awg31.service sg-gateway-naiveproxy.service --no-pager || true
+          sudo journalctl -b -u sg-gateway.service -u sg-hostd.service -u sg-gateway-awg3.service -u sg-gateway-awg31.service -u sg-gateway-naiveproxy.service -n 300 --no-pager || true
+          sudo ss -ltnp | grep -E ':(8447|586|587)\b' || true
+          sudo namei -l /etc/sg-gateway/naiveproxy/Caddyfile || true
+          sudo namei -l /etc/sg-gateway/naiveproxy/tls/privkey.pem || true
+          sudo namei -l /var/lib/sg-gateway/naiveproxy/xdg-data || true
+          sudo namei -l /var/lib/sg-gateway/naiveproxy/xdg-config || true
           sudo tail -n 200 /var/log/sg-gateway-installer-02206.log || true
           sudo tail -n 200 /var/log/sg-gateway-full-uninstall-02206.log || true

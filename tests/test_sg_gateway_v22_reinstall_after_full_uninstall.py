@@ -2,6 +2,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+NAIVE_SERVICE = ROOT / "deploy" / "sg-gateway-naiveproxy.service"
 UNINSTALLER = ROOT / "deploy" / "full-uninstall-ubuntu.sh"
 WORKFLOW = ROOT / ".github" / "workflows" / "reinstall-after-full-uninstall-smoke.yml"
 
@@ -26,6 +27,7 @@ def test_full_uninstall_prints_the_canonical_reinstall_command():
 
 def test_reinstall_smoke_covers_the_real_same_server_lifecycle():
     body = WORKFLOW.read_text(encoding="utf-8")
+    naive_service = NAIVE_SERVICE.read_text(encoding="utf-8")
 
     required_steps = (
         "Run first native install",
@@ -58,3 +60,10 @@ def test_reinstall_smoke_covers_the_real_same_server_lifecycle():
     assert "assert actual_access == expected_access" in body
     assert 'show awg3 listen-port)' in body
     assert 'show awg31 listen-port)' in body
+
+    # /var/lib/sg-gateway deliberately remains 0750 sg-gateway:sg-gateway.
+    # NaiveProxy is isolated under its own primary account, so systemd must
+    # grant that process the SG group solely for traversing the shared parent.
+    assert "User=sg-naiveproxy" in naive_service
+    assert "Group=sg-naiveproxy" in naive_service
+    assert "SupplementaryGroups=sg-gateway" in naive_service
