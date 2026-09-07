@@ -27,6 +27,7 @@ def test_full_uninstall_prints_the_canonical_reinstall_command():
 
 def test_reinstall_smoke_covers_the_real_same_server_lifecycle():
     body = WORKFLOW.read_text(encoding="utf-8")
+    installer = INSTALLER.read_text(encoding="utf-8")
 
     required_steps = (
         "Run first native install",
@@ -60,10 +61,9 @@ def test_reinstall_smoke_covers_the_real_same_server_lifecycle():
     assert 'show awg3 listen-port)' in body
     assert 'show awg31 listen-port)' in body
 
-
-def test_authoritative_installer_keeps_shared_state_parent_traversable_for_isolated_runtimes():
-    body = INSTALLER.read_text(encoding="utf-8")
-
-    assert 'install -d -m 0751 -o "$PANEL_USER" -g "$PANEL_GROUP" "$DATA_DIR"' in body
-    assert 'install -d -m 0750 -o "$PANEL_USER" -g "$PANEL_GROUP" "$LOG_DIR"' in body
-    assert 'install -d -m 0750 -o "$PANEL_USER" -g "$PANEL_GROUP" "$DATA_DIR" "$LOG_DIR"' not in body
+    # NaiveProxy runs under its own service account.  The shared SG state root
+    # therefore must remain traversable after the later configuration stage,
+    # while the panel log directory keeps its existing restrictive mode.
+    assert 'install -d -m 0751 -o "$PANEL_USER" -g "$PANEL_GROUP" "$DATA_DIR"' in installer
+    assert 'install -d -m 0750 -o "$PANEL_USER" -g "$PANEL_GROUP" "$LOG_DIR"' in installer
+    assert 'install -d -m 0750 -o "$PANEL_USER" -g "$PANEL_GROUP" "$DATA_DIR" "$LOG_DIR"' not in installer
