@@ -1,0 +1,51 @@
+/* SG-Gateway 22.08 · Clients and Client Detail page ownership. */
+[data-sg-ui-page="clients"],
+[data-sg-ui-page="client-detail"] {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+}
+
+[data-sg-ui-page="clients"] > .sg-ui-page-head,
+[data-sg-ui-page="client-detail"] > .sg-ui-page-head,
+[data-sg-section="clients-admin-explainer"],
+[data-sg-section="clients-filters"],
+[data-sg-section="clients-list"],
+[data-sg-section="devices"] {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  margin-inline: 0;
+}
+
+[data-sg-ui-page="clients"] > .sg-ui-page-head,
+[data-sg-ui-page="client-detail"] > .sg-ui-page-head {
+  padding-inline: 0;
+}
+
+[data-sg-ui-page="clients"] .sg-ui-actions,
+[data-sg-ui-page="client-detail"] .sg-ui-actions {
+  min-width: 0;
+}
+
+[data-sg-section="clients-list"] .cv2-table-scroll,
+[data-sg-section="devices"] > [data-sg-device-card] {
+  min-width: 0;
+  max-width: 100%;
+}
+
+@media (max-width: 760px) {
+  [data-sg-ui-page="clients"] > .sg-ui-page-head,
+  [data-sg-ui-page="client-detail"] > .sg-ui-page-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  [data-sg-ui-page="clients"] .sg-ui-actions,
+  [data-sg-ui-page="client-detail"] .sg-ui-actions {
+    width: 100%;
+  }
+}

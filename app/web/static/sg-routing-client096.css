@@ -47,18 +47,17 @@ html[data-theme="light"] body.page-routing {
   --r096-page-bg: radial-gradient(circle at 78% -8%, #FBF4E8 0%, #F1EEE6 22%, #E5ECE7 58%, #E5ECE7 100%);
 }
 
-body.page-routing .sg-workspace,
-body.page-routing .sg-content { background: var(--r096-page-bg) !important; }
-body.page-routing .sg-sidebar { background: var(--r096-sidebar) !important; }
-body.page-routing .sg-global-topbar { background: var(--r096-header) !important; }
+
+
+
 body.page-routing { color: var(--r096-text); }
 
-.r096-page { display: grid; gap: 0; min-width: 0; color: var(--r096-text); }
-.r096-heading { display: flex; justify-content: space-between; align-items: center; gap: 20px; min-height: 78px; padding: 12px 18px; border: 1px solid var(--r096-line-strong); border-radius: 16px 16px 0 0; background: var(--r096-header); box-shadow: var(--r096-shadow); }
+
+
 .r096-kicker { display: flex; align-items: center; gap: 8px; color: var(--r096-accent); font-size: 10px; font-weight: 850; letter-spacing: .15em; }
 .r096-kicker span { width: 6px; height: 6px; border-radius: 50%; background: var(--r096-accent); }
-.r096-heading h1 { margin: 6px 0 2px; font-size: 27px; line-height: 1.05; color: var(--r096-text); }
-.r096-heading p { margin: 0; color: var(--r096-muted); font-size: 13px; }
+
+
 .r096-header-button,
 .r096-primary-button,
 .r096-secondary-button { display: inline-flex; align-items: center; justify-content: center; min-height: 38px; border-radius: 10px; padding: 8px 15px; font: inherit; font-size: 12px; font-weight: 750; text-decoration: none; cursor: pointer; }
@@ -69,15 +68,15 @@ html[data-theme="dark"] .r096-primary-button { border-color: var(--r096-accent-l
 .r096-primary-button:disabled,
 .r096-secondary-button:disabled { opacity: .48; cursor: not-allowed; }
 
-.r096-tabs { display: flex; min-height: 62px; align-items: center; gap: 8px; padding: 11px 18px; border-inline: 1px solid var(--r096-line-strong); border-bottom: 1px solid var(--r096-line); background: var(--r096-soft); }
-.r096-tabs button { display: inline-flex; align-items: center; justify-content: center; min-width: 0; min-height: 38px; border: 1px solid var(--r096-line); border-radius: 10px; background: var(--r096-raised); color: var(--r096-text); padding: 8px 15px; font: inherit; font-size: 12px; font-weight: 750; line-height: 1.2; cursor: pointer; box-shadow: none; transition: border-color .16s ease, box-shadow .16s ease, filter .16s ease; }
-.r096-tabs button:hover { border-color: var(--r096-line-strong); color: var(--r096-text); filter: brightness(1.025); }
-html[data-theme="light"] .r096-tabs button { box-shadow: 0 2px 5px rgba(43, 52, 46, .10); }
-html[data-theme="light"] .r096-tabs button.active { border-color: #5C846F; background: linear-gradient(180deg, #6F9A84 0%, #527D69 100%); color: #FFFFFF; box-shadow: 0 10px 22px rgba(69, 111, 92, .20), 0 2px 5px rgba(43, 52, 46, .12); }
-html[data-theme="dark"] .r096-tabs button.active { border-color: #4E82B1; background: linear-gradient(180deg, #477AAA 0%, #315E8C 100%); color: #F4F7FA; box-shadow: 0 8px 18px rgba(0, 0, 0, .22); }
 
-.r096-panel { display: grid; gap: 12px; padding: 14px 18px 22px; border-inline: 1px solid var(--r096-line-strong); background: var(--r096-bg); }
-.r096-panel[hidden] { display: none; }
+
+
+
+
+
+
+
+
 #r096-smart-form { display: grid; gap: 12px; }
 .r096-card,
 .r096-geo-card { border: 1px solid var(--r096-line); border-radius: 12px; background: var(--r096-raised); padding: 15px; box-shadow: var(--r096-shadow); }
@@ -222,14 +221,11 @@ html[data-theme="dark"] .r096-tabs button.active { border-color: #4E82B1; backgr
   .r096-source-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
 }
 @media (max-width: 760px) {
-  .r096-heading,
-  .r096-selected-head,
-  .r096-geofiles-summary,
-  .r096-footer { align-items: stretch; flex-direction: column; }
-  .r096-heading { display: grid; }
-  .r096-tabs { padding-inline: 8px; }
-  .r096-tabs button { min-width: 0; flex: 1; padding-inline: 8px; }
-  .r096-panel { padding-inline: 10px; }
+  
+  
+  
+  
+  
   .r096-preset-grid,
   .r096-rule-editor,
   .r096-geo-pair,

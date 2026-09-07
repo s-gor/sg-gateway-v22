@@ -1,19 +1,5 @@
 /* SG-Gateway UI STEP 9 — Help Visual V1 */
 
-.hlpv1-page {
-  display: grid;
-  gap: 18px;
-  min-width: 0;
-}
-
-.hlpv1-heading {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 24px;
-  padding: 0 4px 2px;
-}
-
 .hlpv1-kicker {
   display: flex;
   align-items: center;
@@ -703,3 +689,9 @@
     padding-block: 14px;
   }
 }
+
+/* 22.08 semantic page ownership */
+[data-sg-ui-page="help"] { --sg-ui-page-gap:18px; min-width:0; }
+.sg-ui-help-head { align-items:flex-end; }
+[data-sg-ui-page="help"] > .sg-ui-section { width:100%; margin-inline:0; }
+@media(max-width:760px){ .sg-ui-help-head { align-items:stretch; } }

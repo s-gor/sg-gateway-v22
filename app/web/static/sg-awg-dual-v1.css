@@ -1,7 +1,6 @@
 /* AWG2/AWG3 symmetric cards: one visual contract */
 /* SG-Gateway Fix29 — unified AWG 2.0 / 3.0 / 3.1 presentation. */
 .page-connections .awgd-shell { grid-column: 1 / -1; }
-.page-connections .awgd-shell > .cnv1-engine-head { border-bottom: 1px solid var(--sg-line-soft); }
 .page-connections .awgd-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

@@ -1,0 +1,178 @@
+/* SG-Gateway 22.08 Connections composition.
+   Global shell and outer page rail belong to sg-ui-layout-v22-08.css. */
+
+body.page-connections .cnv1-page.sg-ui-page {
+  gap: var(--sg-ui-page-gap, 18px);
+}
+
+body.page-connections .cnv1-heading.sg-ui-page-head {
+  margin: 0;
+}
+
+body.page-connections .cnv1-heading-actions.sg-ui-actions {
+  align-self: flex-start;
+  gap: var(--sg-ui-grid-gap, 12px);
+}
+
+body.page-connections :is(
+  .cnv1-engine-xray,
+  .awgd-shell,
+  .mhv2-panel,
+  #xray-xmux .xmux1-card,
+  .xps2-naiveproxy-card,
+  .cnv1-note-panel
+) {
+  min-width: 0;
+  border-radius: var(--sg-ui-card-radius, 14px);
+}
+
+body.page-connections :is(
+  .cnv1-endpoint-card,
+  .xps2-selection,
+  .xps2-parameters,
+  .xps2-parameter-row,
+  .xps2-choice,
+  .awgd-card,
+  .awgd-shared-dns,
+  .mhv2-listener,
+  .mhv2-pending,
+  .mhv2-tls-warning,
+  .mhv2-tls-ready,
+  #xray-xmux .xmux1-mode > span,
+  #xray-xmux .xmux1-extra,
+  #xray-xmux .xmux1-dialog-grid > div,
+  #xray-xmux .xmux1-dialog-json,
+  .xps2-naiveproxy-meta
+) {
+  min-width: 0;
+  border-radius: var(--sg-ui-nested-radius, 10px);
+}
+
+body.page-connections .cnv1-engine-xray.sg-ui-card {
+  padding: 0;
+}
+
+body.page-connections .cnv1-engine-xray.sg-ui-section {
+  gap: 0;
+}
+
+body.page-connections .cnv1-engine-xray .xps2-panel.sg-ui-section {
+  gap: var(--sg-ui-section-gap, 16px);
+}
+
+body.page-connections .cnv1-engine-xray .sg-ui-rail {
+  padding-inline: var(--sg-ui-rail-inset, 18px);
+}
+
+body.page-connections .cnv1-engine-pair.sg-ui-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sg-ui-grid-gap, 12px);
+}
+
+body.page-connections .cnv1-engine-pair.sg-ui-grid > * {
+  min-width: 0;
+}
+
+body.page-connections :is(
+  .xps2-parameter-list,
+  .xps2-choice-grid,
+  .awgd-grid,
+  .mhv2-listeners,
+  .mhv2-form,
+  .mhv2-form-compact,
+  .mhv2-basic-fields,
+  .mhv2-advanced-body,
+  .mhv2-listener,
+  .mhv2-client-actions,
+  #xray-xmux .xmux1-modes,
+  #xray-xmux .xmux1-actions,
+  .mhv2-actions
+) {
+  gap: var(--sg-ui-grid-gap, 12px);
+}
+
+body.page-connections :is(
+  #xray-xmux .xmux1-actions,
+  .mhv2-actions,
+  .cnv1-form-actions
+) {
+  align-items: center;
+  justify-content: flex-end;
+}
+
+body.page-connections :is(
+  .button,
+  .xps2-parameter-row input:not([type="checkbox"]):not([type="radio"]),
+  .xps2-parameter-row select,
+  .xray-reality-value-row input,
+  .xray-reality-value-row textarea,
+  .awgd-shared-dns-form input,
+  .mhv2-basic-fields input,
+  .mhv2-basic-fields select,
+  .mhv2-advanced-body input,
+  .mhv2-advanced-body select
+) {
+  border-radius: var(--sg-ui-control-radius, 9px);
+}
+
+body.page-connections :is(
+  .button,
+  .xps2-parameter-row input:not([type="checkbox"]):not([type="radio"]),
+  .xps2-parameter-row select,
+  .xray-reality-value-row input,
+  .awgd-shared-dns-form input,
+  .mhv2-basic-fields input,
+  .mhv2-basic-fields select,
+  .mhv2-advanced-body input,
+  .mhv2-advanced-body select
+) {
+  min-height: var(--sg-ui-control-height, 42px);
+}
+
+body.page-connections :is(
+  .cnv1-engine-status,
+  .xps2-choice-status,
+  #xray-xmux .xmux1-chip,
+  .mhv2-state,
+  .cdv2-badge
+) {
+  min-height: var(--sg-ui-badge-height, 28px);
+  border-radius: 999px;
+}
+
+body.page-connections .cnv1-note-panel.sg-ui-card {
+  padding: var(--sg-ui-card-pad, 18px);
+}
+
+body.page-connections .xps2-naiveproxy-card .cnv1-engine-head {
+  padding: 15px 18px 12px;
+}
+
+body.page-connections .xps2-naiveproxy-body {
+  gap: 0;
+  margin-top: 10px;
+  border-top: 0;
+  padding: 8px 18px 14px;
+}
+
+body.page-connections .xps2-naiveproxy-body .cnv1-form-actions {
+  border-top: 0;
+  padding-top: 0;
+}
+
+@media (max-width: 900px) {
+  body.page-connections .cnv1-engine-pair.sg-ui-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 760px) {
+  body.page-connections .cnv1-heading-actions.sg-ui-actions {
+    align-self: stretch;
+  }
+
+  body.page-connections .cnv1-engine-xray .sg-ui-rail {
+    padding-inline: var(--sg-ui-rail-inset, 14px);
+  }
+}
+

@@ -1,8 +1,10 @@
 {% set xmux_mode = xray_xmux.mode if xray_xmux is defined else 'auto' %}
 {% set xmux_stored_json = xray_xmux.stored_json if xray_xmux is defined else '{}' %}
+{% set xmux_manual = xray_xmux.manual if xray_xmux is defined else {} %}
 
 <style>
-/* XMUX compact panel: keep this UI dense and scoped to the XHTTP client-only block. */
+/* XMUX client-only controls. Fixed presets stay read-only; manual values are
+   submitted as form-associated inputs from the parameter dialog. */
 #xray-xmux.xmux1-wrap {
   margin-top: 14px;
 }
@@ -34,6 +36,7 @@
   min-height: 28px;
   padding: 4px 9px;
   font-size: 11px;
+  white-space: nowrap;
 }
 
 #xray-xmux .xmux1-modes {
@@ -49,7 +52,7 @@
 
 #xray-xmux .xmux1-mode > span {
   display: flex;
-  min-height: 44px;
+  min-height: 46px;
   align-items: center;
   justify-content: center;
   padding: 8px 12px;
@@ -131,8 +134,8 @@
 }
 
 #xray-xmux .xmux1-dialog {
-  width: min(620px, calc(100vw - 28px));
-  max-height: min(82vh, 720px);
+  width: min(760px, calc(100vw - 28px));
+  max-height: min(84vh, 760px);
   padding: 0;
   border: 1px solid var(--sg-line, rgba(120, 145, 135, .4));
   border-radius: 16px;
@@ -215,7 +218,8 @@
   font-size: 10.5px;
 }
 
-#xray-xmux .xmux1-dialog-grid {
+#xray-xmux .xmux1-dialog-grid,
+#xray-xmux .xmux1-manual-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
@@ -233,7 +237,8 @@
   background: color-mix(in srgb, var(--sg-panel, #f5f3ed) 74%, transparent);
 }
 
-#xray-xmux .xmux1-dialog-grid code {
+#xray-xmux .xmux1-dialog-grid code,
+#xray-xmux .xmux1-manual-field code {
   overflow-wrap: anywhere;
   font-size: 10.5px;
 }
@@ -243,8 +248,26 @@
   font-size: 13px;
 }
 
+#xray-xmux .xmux1-manual-field {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+  padding: 9px 10px 10px;
+  border: 1px solid var(--sg-line, rgba(120, 145, 135, .28));
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--sg-panel, #f5f3ed) 74%, transparent);
+}
+
+#xray-xmux .xmux1-manual-field input {
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  padding: 7px 9px;
+  font: 12px/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
 #xray-xmux .xmux1-dialog-json {
-  max-height: 220px;
+  max-height: 180px;
   margin: 0;
   overflow: auto;
   padding: 11px 12px;
@@ -274,11 +297,7 @@
     padding: 6px 9px;
   }
 
-
-  #xray-xmux .xmux1-extra {
-    margin-top: 7px;
-  }
-
+  #xray-xmux .xmux1-extra,
   #xray-xmux .xmux1-actions {
     margin-top: 7px;
   }
@@ -292,7 +311,8 @@
   }
 
   #xray-xmux .xmux1-modes,
-  #xray-xmux .xmux1-dialog-grid {
+  #xray-xmux .xmux1-dialog-grid,
+  #xray-xmux .xmux1-manual-grid {
     grid-template-columns: minmax(0, 1fr);
   }
 
@@ -313,30 +333,24 @@
       <div>
         <div class="cnv1-card-kicker">XRAY · XHTTP · CLIENT EXTRA</div>
         <h2>XMUX для XHTTP</h2>
-        <p>Клиентские XMUX-параметры для VLESS XHTTP Reality и TLS. Серверный Xray не меняется.</p>
+        <p>Два фиксированных пресета и ручная настройка XMUX. Серверный Xray не меняется.</p>
       </div>
-      <span class="xmux1-chip">SG-Panel contract</span>
+      <span class="xmux1-chip">Xray-core 26.7.28 · закреплено</span>
     </header>
 
-    <form method="post" action="/connections/xmux" data-xmux-form>
+    <form id="xray-xmux-form" method="post" action="/connections/xmux" data-xmux-form>
       <div class="xmux1-modes" role="radiogroup" aria-label="Режим XMUX">
-        <label class="xmux1-mode" title="Рекомендуется: maxConnections 2-4, reuse 300-600, requests 1000-2000, lifetime 1200-2400, keepalive 600.">
+        <label class="xmux1-mode" title="Фиксировано: maxConcurrency 0, maxConnections 3, reuse 0, requests 600-900, lifetime 1800-3000, keepalive 0.">
           <input type="radio" name="xhttp_xmux_mode" value="auto" {% if xmux_mode == 'auto' %}checked{% endif %}>
-          <span>
-            <strong>Стандартный</strong>
-          </span>
+          <span><strong>Стандартный</strong></span>
         </label>
-        <label class="xmux1-mode" title="Уменьшенный профиль: maxConcurrency 0, maxConnections 6, reuse 0, requests 600-900, lifetime 1800-3000, keepalive 0.">
+        <label class="xmux1-mode" title="Фиксировано для быстрой ротации: maxConcurrency 5, maxConnections 0, reuse 0, requests 300-600, lifetime 900-1800, keepalive 0.">
           <input type="radio" name="xhttp_xmux_mode" value="reduced" {% if xmux_mode == 'reduced' %}checked{% endif %}>
-          <span>
-            <strong>Для РФ — уменьшенный</strong>
-          </span>
+          <span><strong>Для РФ — быстрая ротация</strong></span>
         </label>
-        <label class="xmux1-mode" title="Полный Client Extra JSON. Объект xmux обязателен; остальные поля сохраняются.">
+        <label class="xmux1-mode" title="Все шесть XMUX-параметров можно менять вручную; Client Extra JSON остаётся отдельно.">
           <input type="radio" name="xhttp_xmux_mode" value="expert" {% if xmux_mode == 'expert' %}checked{% endif %}>
-          <span>
-            <strong>Ручной</strong>
-          </span>
+          <span><strong>Ручной</strong></span>
         </label>
       </div>
 
@@ -345,7 +359,7 @@
         <label>
           <span>Дополнительные клиентские поля</span>
           <textarea name="xhttp_extra_client_json" rows="10" spellcheck="false" data-xmux-json>{{ xmux_stored_json }}</textarea>
-          <small>В Стандартном/РФ режимах дополнительные поля сохраняются, а <code>xmux</code> заменяется выбранным пресетом. В Ручном режиме JSON используется как есть после проверки конфликта maxConnections/maxConcurrency.</small>
+          <small>Дополнительные поля JSON сохраняются. В фиксированных режимах объект <code>xmux</code> заменяется выбранным пресетом; в Ручном — значениями из шести полей.</small>
         </label>
       </details>
 
@@ -369,34 +383,61 @@
         </header>
 
         <section class="xmux1-dialog-panel" data-xmux-dialog-panel="auto" hidden>
-          <p>После сохранения будет установлен стандартный клиентский XMUX-пресет:</p>
-          <div class="xmux1-dialog-grid">
-            <div><code>maxConnections</code><strong>2-4</strong></div>
-            <div><code>cMaxReuseTimes</code><strong>300-600</strong></div>
-            <div><code>hMaxRequestTimes</code><strong>1000-2000</strong></div>
-            <div><code>hMaxReusableSecs</code><strong>1200-2400</strong></div>
-            <div><code>hKeepAlivePeriod</code><strong>600</strong></div>
-          </div>
-          <small>Остальные поля Client Extra сохраняются; объект <code>xmux</code> заменяется этим пресетом.</small>
-        </section>
-
-        <section class="xmux1-dialog-panel" data-xmux-dialog-panel="reduced" hidden>
-          <p>После сохранения будет установлен уменьшенный клиентский XMUX-пресет:</p>
+          <p>Фиксированный актуальный пресет Xray-core 26.7.28:</p>
           <div class="xmux1-dialog-grid">
             <div><code>maxConcurrency</code><strong>0</strong></div>
-            <div><code>maxConnections</code><strong>6</strong></div>
+            <div><code>maxConnections</code><strong>3</strong></div>
             <div><code>cMaxReuseTimes</code><strong>0</strong></div>
             <div><code>hMaxRequestTimes</code><strong>600-900</strong></div>
             <div><code>hMaxReusableSecs</code><strong>1800-3000</strong></div>
             <div><code>hKeepAlivePeriod</code><strong>0</strong></div>
           </div>
-          <small>Остальные поля Client Extra сохраняются; объект <code>xmux</code> заменяется этим пресетом.</small>
+          <small>Поля не редактируются. Остальные поля Client Extra сохраняются.</small>
+        </section>
+
+        <section class="xmux1-dialog-panel" data-xmux-dialog-panel="reduced" hidden>
+          <p>Фиксированный профиль для РФ с более быстрой ротацией:</p>
+          <div class="xmux1-dialog-grid">
+            <div><code>maxConcurrency</code><strong>5</strong></div>
+            <div><code>maxConnections</code><strong>0</strong></div>
+            <div><code>cMaxReuseTimes</code><strong>0</strong></div>
+            <div><code>hMaxRequestTimes</code><strong>300-600</strong></div>
+            <div><code>hMaxReusableSecs</code><strong>900-1800</strong></div>
+            <div><code>hKeepAlivePeriod</code><strong>0</strong></div>
+          </div>
+          <small>Поля не редактируются. Остальные поля Client Extra сохраняются.</small>
         </section>
 
         <section class="xmux1-dialog-panel" data-xmux-dialog-panel="expert" hidden>
-          <p>В ручном режиме после сохранения используется весь Client Extra JSON как есть. Объект <code>xmux</code> обязателен.</p>
+          <p>Ручной XMUX. Можно задавать целое число или диапазон A-B; <code>hKeepAlivePeriod</code> — только целое.</p>
+          <div class="xmux1-manual-grid">
+            <label class="xmux1-manual-field">
+              <code>maxConcurrency</code>
+              <input form="xray-xmux-form" name="xhttp_xmux_maxConcurrency" value="{{ xmux_manual.get('maxConcurrency', 0) }}" inputmode="numeric" autocomplete="off">
+            </label>
+            <label class="xmux1-manual-field">
+              <code>maxConnections</code>
+              <input form="xray-xmux-form" name="xhttp_xmux_maxConnections" value="{{ xmux_manual.get('maxConnections', 3) }}" inputmode="numeric" autocomplete="off">
+            </label>
+            <label class="xmux1-manual-field">
+              <code>cMaxReuseTimes</code>
+              <input form="xray-xmux-form" name="xhttp_xmux_cMaxReuseTimes" value="{{ xmux_manual.get('cMaxReuseTimes', 0) }}" inputmode="numeric" autocomplete="off">
+            </label>
+            <label class="xmux1-manual-field">
+              <code>hMaxRequestTimes</code>
+              <input form="xray-xmux-form" name="xhttp_xmux_hMaxRequestTimes" value="{{ xmux_manual.get('hMaxRequestTimes', '600-900') }}" inputmode="numeric" autocomplete="off">
+            </label>
+            <label class="xmux1-manual-field">
+              <code>hMaxReusableSecs</code>
+              <input form="xray-xmux-form" name="xhttp_xmux_hMaxReusableSecs" value="{{ xmux_manual.get('hMaxReusableSecs', '1800-3000') }}" inputmode="numeric" autocomplete="off">
+            </label>
+            <label class="xmux1-manual-field">
+              <code>hKeepAlivePeriod</code>
+              <input form="xray-xmux-form" name="xhttp_xmux_hKeepAlivePeriod" value="{{ xmux_manual.get('hKeepAlivePeriod', 0) }}" inputmode="numeric" autocomplete="off">
+            </label>
+          </div>
           <pre class="xmux1-dialog-json" data-xmux-manual-preview>{}</pre>
-          <small>Проверка не позволит одновременно задать положительные <code>maxConnections</code> и <code>maxConcurrency</code>.</small>
+          <small>Положительные <code>maxConnections</code> и <code>maxConcurrency</code> одновременно запрещены. Client Extra JSON остаётся источником дополнительных полей.</small>
         </section>
 
         <footer class="xmux1-dialog-foot">

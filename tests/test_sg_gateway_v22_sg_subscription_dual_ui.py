@@ -15,7 +15,7 @@ def test_dual_ui_is_source_native_exactly_once_before_devices() -> None:
     text = DETAIL.read_text(encoding="utf-8")
     marker = "<!-- SG_SUBSCRIPTION_DUAL_UI_V1 -->"
     include = '{% include "_sg_subscription_dual.html" %}'
-    devices = '<section class="dv16-devices" aria-label="Устройства клиента">'
+    devices = 'data-sg-section="devices"'
     assert text.count(marker) == 1
     assert text.count(include) == 1
     assert text.index(marker) < text.index(include) < text.index(devices)

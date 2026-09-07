@@ -1,0 +1,500 @@
+/* SG-Gateway 22.08 · Connections visual components only. Page geometry belongs to the canonical sg-ui layout. */
+
+
+
+
+
+.cnv1-kicker {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--sg-blue);
+  font-size: 9px;
+  font-weight: 850;
+  letter-spacing: .16em;
+}
+
+.cnv1-kicker > span {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--sg-blue);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--sg-blue) 55%, transparent);
+}
+
+.cnv1-heading h1 {
+  margin: 7px 0 4px;
+  font-size: clamp(31px, 2.25vw, 38px);
+}
+
+.cnv1-heading p {
+  margin: 0;
+  color: var(--sg-muted);
+  font-size: 13.5px;
+}
+
+
+
+.cnv1-heading-actions .button {
+  min-height: 43px;
+  justify-content: center;
+  font-size: 9px;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+.cnv1-engine-card,
+.cnv1-note-panel{
+  border: 1px solid var(--sg-line);
+  border-radius: 15px;
+  background: var(--sg-panel);
+  box-shadow: inset 0 1px rgba(255,255,255,.018);
+}
+
+
+
+.cnv1-engine-head{
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.cnv1-card-kicker {
+  color: var(--sg-blue);
+  font-size: 7.5px;
+  font-weight: 850;
+  letter-spacing: .13em;
+}
+
+.cnv1-engine-head h2{
+  margin: 5px 0 0;
+  font-size: 19px;
+}
+
+.cnv1-engine-head p{
+  margin: 6px 0 0;
+  color: var(--sg-muted);
+  font-size: 9.5px;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+.cnv1-engine-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 25px;
+  border: 1px solid var(--sg-line);
+  border-radius: 999px;
+  background: var(--sg-panel-soft);
+  color: var(--sg-muted);
+  padding: 0 9px;
+  font-size: 7px;
+  font-weight: 780;
+  white-space: nowrap;
+}
+
+.cnv1-engine-status.success {
+  border-color: var(--sg-green-line);
+  background: var(--sg-green-bg);
+  color: var(--sg-green);
+}
+
+.cnv1-engine-status.warning {
+  border-color: color-mix(in srgb, var(--sg-yellow) 48%, transparent);
+  background: color-mix(in srgb, var(--sg-yellow) 10%, var(--sg-panel-deep));
+  color: var(--sg-yellow);
+}
+
+.cnv1-engine-status > span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+
+
+.cnv1-engine-card {
+  overflow: hidden;
+}
+
+.cnv1-engine-head {
+  padding: 18px;
+}
+
+.cnv1-engine-title {
+  display: flex;
+  align-items: flex-start;
+  gap: 13px;
+  min-width: 0;
+}
+
+.cnv1-engine-logo {
+  display: grid;
+  place-items: center;
+  width: 45px;
+  height: 45px;
+  flex: 0 0 45px;
+  border-radius: 12px;
+}
+
+.cnv1-engine-logo svg {
+  width: 23px;
+  height: 23px;
+}
+
+.cnv1-engine-logo.awg {
+  border: 1px solid rgba(49, 207, 145, .23);
+  background: rgba(49, 207, 145, .11);
+  color: var(--sg-green);
+}
+
+.cnv1-engine-logo.xray {
+  border: 1px solid rgba(157, 122, 255, .23);
+  background: rgba(126, 93, 226, .12);
+  color: #aa91ff;
+}
+
+.cnv1-endpoint-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 18px;
+  border: 1px solid var(--sg-line-soft);
+  border-radius: 11px;
+  background:
+    radial-gradient(circle at 100% 0, rgba(96, 169, 243, .07), transparent 48%),
+    var(--sg-panel-deep);
+  padding: 13px;
+}
+
+.cnv1-endpoint-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.cnv1-endpoint-main img {
+  width: 30px;
+  height: 20px;
+  flex: 0 0 30px;
+  border-radius: 2px;
+  object-fit: cover;
+  box-shadow: 0 0 0 1px rgba(255,255,255,.08);
+}
+
+.cnv1-endpoint-main > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.cnv1-endpoint-main span{
+  color: var(--sg-muted);
+  font-size: 6.8px;
+  font-weight: 850;
+  letter-spacing: .10em;
+}
+
+.cnv1-endpoint-main strong {
+  overflow: hidden;
+  max-width: 260px;
+  color: var(--sg-text);
+  font-size: 10.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cnv1-endpoint-main small {
+  color: var(--sg-muted);
+  font-size: 7.5px;
+}
+
+.cnv1-port-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  border: 1px solid color-mix(in srgb, var(--sg-blue) 35%, var(--sg-line));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--sg-blue) 9%, var(--sg-panel-soft));
+  color: var(--sg-blue);
+  padding: 0 9px;
+  font-size: 7.5px;
+  font-weight: 780;
+  white-space: nowrap;
+}
+
+
+
+
+
+
+
+
+
+
+
+.cnv1-engine-form {
+  display: grid;
+  gap: 13px;
+  margin-top: 16px;
+  border-top: 1px solid var(--sg-line-soft);
+  padding: 16px 18px 18px;
+}
+
+
+
+
+
+.cnv1-form-grid {
+  display: grid;
+  grid-template-columns: .75fr 1.25fr;
+  gap: 10px;
+}
+
+
+
+.cnv1-engine-form label {
+  display: grid;
+  gap: 6px;
+}
+
+.cnv1-engine-form label > span {
+  color: var(--sg-text);
+  font-size: 8.5px;
+  font-weight: 700;
+}
+
+.cnv1-engine-form input,
+.cnv1-engine-form select,
+.cnv1-engine-form textarea {
+  width: 100%;
+  font-size: 9px;
+}
+
+.cnv1-engine-form textarea {
+  resize: vertical;
+  min-height: 74px;
+  padding: 10px 11px;
+}
+
+.cnv1-advanced {
+  overflow: hidden;
+  border: 1px solid var(--sg-line-soft);
+  border-radius: 10px;
+  background: var(--sg-panel-deep);
+}
+
+.cnv1-advanced summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 42px;
+  color: var(--sg-text);
+  padding: 0 11px;
+  font-size: 8.5px;
+  font-weight: 700;
+  cursor: pointer;
+  list-style: none;
+}
+
+.cnv1-advanced summary::-webkit-details-marker {
+  display: none;
+}
+
+.cnv1-advanced summary span:last-child {
+  color: var(--sg-muted);
+  font-size: 7.5px;
+  font-weight: 650;
+}
+
+.cnv1-advanced-body {
+  border-top: 1px solid var(--sg-line-soft);
+  padding: 11px;
+}
+
+.cnv1-advanced-body small {
+  color: var(--sg-muted);
+  font-size: 7.5px;
+  line-height: 1.45;
+}
+
+
+
+.cnv1-form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border-top: 1px solid var(--sg-line-soft);
+  padding-top: 13px;
+}
+
+.cnv1-form-actions > span {
+  color: var(--sg-muted);
+  font-size: 7.5px;
+  line-height: 1.4;
+}
+
+.cnv1-form-actions .button {
+  min-width: 145px;
+  min-height: 39px;
+  justify-content: center;
+  font-size: 8.5px;
+}
+
+.cnv1-note-panel {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 13px;
+  padding: 15px 16px;
+}
+
+.cnv1-note-icon {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 11px;
+  background: rgba(96, 169, 243, .11);
+  color: var(--sg-blue);
+}
+
+.cnv1-note-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.cnv1-note-panel > div:nth-child(2) {
+  display: grid;
+  gap: 5px;
+}
+
+.cnv1-note-panel strong {
+  color: var(--sg-text);
+  font-size: 10px;
+}
+
+.cnv1-note-panel p {
+  margin: 0;
+  color: var(--sg-muted);
+  font-size: 8.5px;
+  line-height: 1.5;
+}
+
+.cnv1-note-panel .button {
+  min-height: 36px;
+  justify-content: center;
+  font-size: 8px;
+}
+
+
+
+
+
+
+
+@media (max-width: 760px) {
+  
+
+  
+
+  .cnv1-heading-actions .button {
+    flex: 1;
+  }
+
+  .cnv1-form-grid{
+    grid-template-columns: 1fr;
+  }
+
+  
+
+  .cnv1-form-actions,
+  .cnv1-note-panel {
+    align-items: stretch;
+    grid-template-columns: 1fr;
+  }
+
+  .cnv1-form-actions {
+    flex-direction: column;
+  }
+
+  .cnv1-form-actions .button,
+  .cnv1-note-panel .button {
+    width: 100%;
+  }
+
+  
+}
+
+/* V23: engine editors are full-width; Xray selection must not be squeezed into half a page. */
+
+
+

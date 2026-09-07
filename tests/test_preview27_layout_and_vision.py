@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -17,6 +18,16 @@ from app.clients import exports
 from app.clients.repository import Client
 from app.xray.profiles import REALITY_TCP_FLOW
 from sg_hostd import client_runtime
+
+
+def _class_tag_index(template: str, tag: str, class_name: str, start: int = 0) -> int:
+    match = re.search(
+        rf'<{tag}\b[^>]*class="[^"]*\b{re.escape(class_name)}\b[^"]*"[^>]*>',
+        template[start:],
+    )
+    if match is None:
+        raise ValueError(f"{tag} with class token {class_name!r} not found")
+    return start + match.start()
 
 
 def test_half_width_cards_have_equal_height():
@@ -54,7 +65,7 @@ def test_runtime_candidate_contains_vision_for_reality_tcp(monkeypatch):
     monkeypatch.setattr(client_runtime, "_read_env", lambda path: {
         "SG_GATEWAY_XRAY_PRIVATE_KEY": "private-key",
         "SG_GATEWAY_XRAY_SHORT_ID": "0123456789abcdef",
-        "SG_GATEWAY_VLESS_ENCRYPTION": "mlkem768x25519plus.native.0rtt.100-111-1111.75-0-111.50-0-3333.Q0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0M",
+        "SG_GATEWAY_VLESS_ENCRYPTION": "mlkem768x25519plus.native.0rtt.100-111-1111.75-0-111.50-0-3333.Q0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0M",
             "SG_GATEWAY_VLESS_DECRYPTION": "mlkem768x25519plus.native.600s.100-111-1111.75-0-111.50-0-3333.U1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTUw",
         "SG_GATEWAY_REALITY_SNI": "www.bing.com",
         "SG_GATEWAY_REALITY_TARGET": "www.bing.com:443",
@@ -95,14 +106,14 @@ def test_client_link_contains_same_vision_flow(monkeypatch):
 def test_xray_is_above_equal_height_awg_mihomo_pair():
     template = (ROOT / "app/web/templates/connections.html").read_text(encoding="utf-8")
     xray = template.index('class="cnv1-engines cnv1-xray-row"')
-    pair = template.index('class="cnv1-engine-pair"')
-    note = template.index('class="cnv1-note-panel sg-ljd-card"')
+    pair = _class_tag_index(template, "section", "cnv1-engine-pair")
+    note = _class_tag_index(template, "section", "cnv1-note-panel")
     assert xray < pair < note
 
 
 def test_awg_and_mihomo_still_share_one_equal_height_row():
     template = (ROOT / "app/web/templates/connections.html").read_text(encoding="utf-8")
-    pair_start = template.index('<section class="cnv1-engine-pair">')
+    pair_start = _class_tag_index(template, "section", "cnv1-engine-pair")
     pair_end = template.index('</section>', template.index('{% include "_mihomo_panel.html" %}', pair_start))
     pair = template[pair_start:pair_end]
     assert 'class="cnv1-engine-card cnv1-engine-awg' in pair

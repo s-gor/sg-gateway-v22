@@ -59,10 +59,17 @@ def test_approved_client_detail_typography_is_not_targeted() -> None:
     assert "dv16-add-bottom" not in detail
 
 
-def test_standalone_login_and_recovery_load_readable_typography() -> None:
+def test_standalone_login_and_recovery_use_02208_canonical_typography_stack() -> None:
     for name in ("login.html", "recovery.html"):
         source = (ROOT / "app/web/templates" / name).read_text(encoding="utf-8")
-        assert "sg-readable-typography-v3.css" in source
+        for asset in (
+            "sg-ui-foundation-v22-08.css",
+            "sg-ui-components-v22-08.css",
+            "sg-ui-standalone-v22-08.css",
+        ):
+            assert f"static_asset('{asset}')" in source
+        assert "sg-readable-typography-v3.css" not in source
+        assert "?v=" not in source
         Environment().parse(source)
 
 

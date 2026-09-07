@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import Any, Mapping
 
 from app.connections.settings import get_connection_settings, update_connection_settings
@@ -12,40 +13,50 @@ XMUX_MODE_EXPERT = "expert"
 XMUX_MODES = (XMUX_MODE_STANDARD, XMUX_MODE_REDUCED, XMUX_MODE_EXPERT)
 
 # Keep the internal mode names identical to SG-Panel for compatibility:
-#   auto    -> Standard preset
-#   reduced -> Для РФ — уменьшенный
-#   expert  -> manual Client Extra JSON
+#   auto    -> fixed current Xray preset
+#   reduced -> fixed Russian-network fast-rotation preset
+#   expert  -> manual XMUX fields plus Client Extra JSON
 XMUX_STANDARD_PRESET: dict[str, object] = {
-    "maxConnections": "2-4",
-    "cMaxReuseTimes": "300-600",
-    "hMaxRequestTimes": "1000-2000",
-    "hMaxReusableSecs": "1200-2400",
-    "hKeepAlivePeriod": 600,
-}
-XMUX_REDUCED_PRESET: dict[str, object] = {
     "maxConcurrency": 0,
-    "maxConnections": "6",
+    "maxConnections": 3,
     "cMaxReuseTimes": 0,
     "hMaxRequestTimes": "600-900",
     "hMaxReusableSecs": "1800-3000",
     "hKeepAlivePeriod": 0,
 }
+XMUX_REDUCED_PRESET: dict[str, object] = {
+    "maxConcurrency": 5,
+    "maxConnections": 0,
+    "cMaxReuseTimes": 0,
+    "hMaxRequestTimes": "300-600",
+    "hMaxReusableSecs": "900-1800",
+    "hKeepAlivePeriod": 0,
+}
+XMUX_FIELD_NAMES = (
+    "maxConcurrency",
+    "maxConnections",
+    "cMaxReuseTimes",
+    "hMaxRequestTimes",
+    "hMaxReusableSecs",
+    "hKeepAlivePeriod",
+)
+_XMUX_RANGE_RE = re.compile(r"^(\d+)(?:-(\d+))?$")
 
 XMUX_MODE_OPTIONS = (
     {
         "value": XMUX_MODE_STANDARD,
         "title": "Стандартный",
-        "note": "Рекомендуемый пресет SG-Panel для обычных сетей.",
+        "note": "Фиксированный актуальный пресет Xray-core 26.7.28.",
     },
     {
         "value": XMUX_MODE_REDUCED,
-        "title": "Для РФ — уменьшенный",
-        "note": "Уменьшенное число соединений; maxConcurrency остаётся 0.",
+        "title": "Для РФ — быстрая ротация",
+        "note": "Фиксированный профиль с более быстрой ротацией соединений.",
     },
     {
         "value": XMUX_MODE_EXPERT,
         "title": "Ручной",
-        "note": "Полный Client Extra JSON. Объект xmux обязателен.",
+        "note": "Шесть XMUX-полей вручную; дополнительные Client Extra поля сохраняются.",
     },
 )
 
@@ -112,6 +123,31 @@ def validate_xmux_conflicts(extra: Mapping[str, Any], *, label: str = "Client Ex
         )
 
 
+def _manual_value(name: str, value: Any) -> int | str:
+    text = str(value if value is not None else "").strip()
+    match = _XMUX_RANGE_RE.fullmatch(text)
+    if not match:
+        raise XmuxError(f"{name}: укажите 0 или неотрицательное число/диапазон A-B")
+    start = int(match.group(1))
+    end_raw = match.group(2)
+    if end_raw is None:
+        return start
+    if name == "hKeepAlivePeriod":
+        raise XmuxError("hKeepAlivePeriod: допустимо только целое число")
+    end = int(end_raw)
+    if start > end:
+        raise XmuxError(f"{name}: начало диапазона не может быть больше конца")
+    return f"{start}-{end}"
+
+
+def manual_xmux_from_form(form: Any) -> dict[str, int | str]:
+    values: dict[str, int | str] = {}
+    for name in XMUX_FIELD_NAMES:
+        values[name] = _manual_value(name, form.get(f"xhttp_xmux_{name}"))
+    validate_xmux_conflicts({"xmux": values}, label="Ручной XMUX")
+    return values
+
+
 def effective_client_extra(config: Mapping[str, Any]) -> dict[str, Any]:
     mode = normalise_mode(config.get("xhttp_xmux_mode"))
     extra = parse_client_extra(config.get("xhttp_extra_client_json"))
@@ -122,8 +158,14 @@ def effective_client_extra(config: Mapping[str, Any]) -> dict[str, Any]:
         validate_xmux_conflicts(extra)
         return extra
 
+    # Configurations saved by this UI carry concrete XMUX values. Honor them
+    # verbatim on later exports so an application update cannot silently change
+    # a user's already-saved preset.
+    if config.get("xhttp_xmux_preset_revision") and isinstance(extra.get("xmux"), Mapping):
+        validate_xmux_conflicts(extra)
+        return extra
+
     result = dict(extra)
-    result.pop("xmux", None)
     result["xmux"] = dict(
         XMUX_STANDARD_PRESET if mode == XMUX_MODE_STANDARD else XMUX_REDUCED_PRESET
     )
@@ -140,6 +182,17 @@ def state_from_config(config: Mapping[str, Any]) -> dict[str, Any]:
         stored = parse_client_extra(config.get("xhttp_extra_client_json"))
     except XmuxError:
         stored = {}
+
+    stored_xmux = stored.get("xmux")
+    if isinstance(stored_xmux, Mapping):
+        manual = {
+            name: stored_xmux.get(name, XMUX_STANDARD_PRESET[name])
+            for name in XMUX_FIELD_NAMES
+        }
+    else:
+        fallback = XMUX_REDUCED_PRESET if mode == XMUX_MODE_REDUCED else XMUX_STANDARD_PRESET
+        manual = dict(fallback)
+
     effective_config = dict(config)
     effective_config["xhttp_xmux_mode"] = mode
     effective_config["xhttp_extra_client_json"] = stored
@@ -158,6 +211,7 @@ def state_from_config(config: Mapping[str, Any]) -> dict[str, Any]:
         "effective_json": json.dumps(effective, ensure_ascii=False, indent=2, sort_keys=True),
         "standard": dict(XMUX_STANDARD_PRESET),
         "reduced": dict(XMUX_REDUCED_PRESET),
+        "manual": manual,
         "error": error,
         "reality_client_mode": "stream-one",
         "tls_client_mode": str(config.get("xhttp_tls_mode") or "auto"),
@@ -180,14 +234,26 @@ def update_from_form(form: Any) -> dict[str, Any]:
     else:
         extra = parse_client_extra(raw_extra)
 
+    if mode == XMUX_MODE_EXPERT and any(
+        form.get(f"xhttp_xmux_{name}") is not None for name in XMUX_FIELD_NAMES
+    ):
+        extra = dict(extra)
+        extra["xmux"] = manual_xmux_from_form(form)
+
     candidate = dict(config)
     candidate["xhttp_xmux_mode"] = mode
     candidate["xhttp_extra_client_json"] = extra
-    # SG-Panel contract: Reality XHTTP server is auto and client is fixed stream-one.
     candidate["xhttp_reality_mode"] = "stream-one"
+    candidate.pop("xhttp_xmux_preset_revision", None)
 
-    # Validate the exact Client Extra that will be exported before saving.
-    effective_client_extra(candidate)
+    # Persist the concrete XMUX object for every mode. The mode remains a
+    # UI/compatibility marker. Fixed presets also get a revision marker so later
+    # application updates keep the concrete values already saved by the user.
+    candidate["xhttp_extra_client_json"] = effective_client_extra(candidate)
+    if mode == XMUX_MODE_EXPERT:
+        candidate.pop("xhttp_xmux_preset_revision", None)
+    else:
+        candidate["xhttp_xmux_preset_revision"] = "xray-26.7.28"
 
     if not update_connection_settings("xray", settings.host, settings.port, candidate):
         raise XmuxError("Не удалось сохранить настройки XMUX")

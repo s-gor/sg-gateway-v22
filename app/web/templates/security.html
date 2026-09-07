@@ -1,25 +1,26 @@
 {% extends "base.html" %}
 {% block title %}SG-Gateway · Security{% endblock %}
-{% block head %}
-<link rel="stylesheet" href="{{ url_for('static', filename='sg-security-v2.css') }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='sg-security-password-fix1.css') }}">
+{% block page_styles %}
+  <link rel="stylesheet" href="{{ static_asset('sg-security-v2.css') }}">
+  <link rel="stylesheet" href="{{ static_asset('sg-security-password-fix1.css') }}">
+  <link rel="stylesheet" href="{{ static_asset('sg-ui-security-v22-08.css') }}">
 {% endblock %}
 
 {% block content %}
-<section class="secv2-page">
-  <header class="ts2-page-heading">
+<section class="secv2-page sg-ui-page sg-ui-security" data-sg-ui-page="security">
+  <header class="ts2-page-heading sg-ui-page-head sg-ui-security-head" data-sg-section="security-head">
     <div>
       <div class="ts2-kicker">SG-GATEWAY / SECURITY</div>
       <h1>Security</h1>
       <p>Домен панели, сертификат Let’s Encrypt, Nginx и защищённый вход по HTTPS.</p>
     </div>
-    <div class="ts2-heading-actions">
+    <div class="ts2-heading-actions sg-ui-actions">
       <a class="button" href="{{ url_for('maintenance') }}">Backup и диагностика</a>
       <a class="button" href="{{ url_for('recovery') }}">Recovery</a>
     </div>
   </header>
 
-  <section class="secv2-summary sg-ljd-strip">
+  <section class="secv2-summary sg-ljd-strip" data-sg-section="security-summary">
     <article>
       <span>HTTPS</span>
       <strong class="{{ 'ok' if tls.https_ready else 'warning' }}">
@@ -68,7 +69,7 @@
     </article>
   </section>
 
-  <article class="secv2-workflow sg-ljd-card-large">
+  <article class="secv2-workflow sg-ljd-card-large" data-sg-section="security-tls">
     <header class="secv2-card-head">
       <div>
         <div class="secv2-kicker">ДОМЕН И HTTPS</div>
@@ -187,7 +188,7 @@
   </article>
 
 
-  <article class="secv2-password-card sg-ljd-card-large" id="password-change">
+  <article class="secv2-password-card sg-ljd-card-large" id="password-change" data-sg-section="security-password">
     <header class="secv2-card-head">
       <div>
         <div class="secv2-kicker">ПАРОЛЬ АДМИНИСТРАТОРА</div>
@@ -216,7 +217,7 @@
       </div>
     </form>
   </article>
-  <section class="secv2-lower-grid">
+  <section class="secv2-lower-grid" data-sg-section="security-status">
     <article class="secv2-card sg-ljd-card">
       <header class="secv2-card-head">
         <div>
@@ -297,7 +298,7 @@
     </article>
   </section>
 
-  <details class="secv2-tech sg-ljd-card">
+  <details class="secv2-tech sg-ljd-card" data-sg-section="security-tech">
     <summary>Технические детали</summary>
     <div>
       <section>
@@ -319,7 +320,7 @@
     </div>
   </details>
 
-  <footer class="secv2-footer">
+  <footer class="secv2-footer" data-sg-section="security-footer">
     <strong>Безопасное применение</strong>
     <span>Перед изменением создаётся backup. При ошибке Certbot, проверки Nginx или перезапуска панели прежняя рабочая конфигурация возвращается автоматически.</span>
   </footer>

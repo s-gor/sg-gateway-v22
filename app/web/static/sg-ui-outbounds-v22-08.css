@@ -10,10 +10,6 @@
   --ob-jade: var(--sg-green, #55d592);
   --ob-blue: var(--sg-blue, #5aa4ef);
   --ob-yellow: var(--sg-yellow, #e7c45b);
-  display: grid;
-  gap: 24px;
-  width: min(100%, 1500px);
-  margin: 0 auto;
 }
 .ob49-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:24px; }
 .ob49-heading h1 { margin:6px 0 4px; color:var(--ob-text); font-size:clamp(32px,3vw,44px); line-height:1; letter-spacing:-.04em; }
@@ -127,3 +123,6 @@ html[data-theme="light"] .ob49-danger { background:linear-gradient(180deg,#F3D7D
   .ob49-warp-active-row { grid-template-columns:1fr; }
   .ob49-warp-buttons-full { justify-content:flex-start; }
 }
+
+/* 22.08 semantic rail ownership */
+[data-sg-ui-page="outbounds"] { --sg-ui-page-gap: 24px; }

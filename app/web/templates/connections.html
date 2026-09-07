@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 {% block title %}SG-Gateway · Connections{% endblock %}
 
-{% block head %}
-  {{ super() }}
-  <link rel="stylesheet" href="{{ url_for('static', filename='sg-connections-visual-v1.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='sg-xray-profiles-v2.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='sg-xmux-settings-v1.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='sg-awg-dual-v1.css') }}?v={{ app_version }}">
+{% block page_styles %}
+  <link rel="stylesheet" href="{{ static_asset('sg-ui-connections-components-v22-08.css') }}">
+  <link rel="stylesheet" href="{{ static_asset('sg-xray-profiles-v2.css') }}">
+  <link rel="stylesheet" href="{{ static_asset('sg-xmux-settings-v1.css') }}">
+  <link rel="stylesheet" href="{{ static_asset('sg-awg-dual-v1.css') }}">
+  <link rel="stylesheet" href="{{ static_asset('sg-ui-connections-v22-08.css') }}">
 {% endblock %}
 
 {% block content %}
@@ -24,22 +24,22 @@
 {% set awg3_public_host = connections[3].public_host if connections | length > 3 else awg3_settings.host %}
 {% set awg31_public_host = awg3_public_host %}
 
-<section class="cnv1-page">
-  <header class="cnv1-heading">
+<section class="cnv1-page sg-ui-page">
+  <header class="cnv1-heading sg-ui-page-head">
     <div>
       <div class="cnv1-kicker"><span></span> SG-GATEWAY / CONNECTIONS</div>
       <h1>Connections</h1>
       <p>AmneziaWG 2 / 3, четыре независимых Xray-профиля и Mihomo.</p>
     </div>
 
-    <div class="cnv1-heading-actions">
+    <div class="cnv1-heading-actions sg-ui-actions">
       <a class="button primary" href="{{ url_for('clients') }}">Открыть Clients</a>
       <a class="button" href="{{ url_for('routing') }}">Открыть Routing</a>
     </div>
   </header>
 
   <section class="cnv1-engines cnv1-xray-row">
-    <article class="cnv1-engine-card cnv1-engine-xray cnv1-engine-wide sg-ljd-card">
+    <article class="cnv1-engine-card cnv1-engine-xray cnv1-engine-wide sg-ljd-card sg-ui-card sg-ui-section">
       <header class="cnv1-engine-head">
         <div class="cnv1-engine-title">
           <div class="cnv1-engine-logo xray">
@@ -59,7 +59,7 @@
         </div>
       </header>
 
-      <section class="cnv1-endpoint-card sg-ljd-nested">
+      <section class="cnv1-endpoint-card sg-ljd-nested sg-ui-nested">
         <div class="cnv1-endpoint-main">
           <img src="{{ country_flag_url(xray_country) }}" alt="{{ country_name(xray_country) }}" width="30" height="20">
           <div>
@@ -71,7 +71,7 @@
         <span class="cnv1-port-chip">{{ xray_profiles.profiles | length }} профиля</span>
       </section>
 
-      <div id="xray-profiles" class="xps2-panel">
+      <div id="xray-profiles" class="xps2-panel sg-ui-section">
         <form id="xps2-form" method="post" action="{{ url_for('update_xray_profiles') }}">
           <input type="hidden" name="host" value="{{ xray_public_host }}">
 
@@ -79,7 +79,7 @@
             <button class="button primary sg-ljd-key-action" type="button" data-xps2-top-apply>Проверить и запустить</button>
           </div>
 
-          <section class="xps2-selection sg-ljd-nested">
+          <section class="xps2-selection sg-ljd-nested sg-ui-nested sg-ui-rail">
             <header class="xps2-section-head">
               <div>
                 <div class="cnv1-card-kicker">ВЫБОР ПРОФИЛЕЙ</div>
@@ -119,7 +119,7 @@
             </div>
           </section>
 
-          <section class="xps2-parameters sg-ljd-nested">
+          <section class="xps2-parameters sg-ljd-nested sg-ui-nested sg-ui-rail">
             <header class="xps2-section-head">
               <div>
                 <div class="cnv1-card-kicker">ПАРАМЕТРЫ</div>
@@ -310,7 +310,7 @@
 
   {% include "_xray_xmux_settings.html" %}
 
-  <section class="cnv1-engine-pair">
+  <section class="cnv1-engine-pair sg-ui-grid">
     <article class="cnv1-engine-card cnv1-engine-awg awgd-shell sg-ljd-card">
       <header class="cnv1-engine-head">
         <div class="cnv1-engine-title">
@@ -324,13 +324,14 @@
         <div class="awgd-footer"><span>AWG 2.0</span><span>AWG 3.0</span><span>AWG 3.1</span></div>
       </header>
 
+      <div class="awgd-inner-rail sg-ui-rail">
       <div class="awgd-grid">
         <section class="awgd-card awgd-card-v2">
           <header class="awgd-head">
             <div class="awgd-title"><span class="awgd-generation">AWG2</span><div><strong>AmneziaWG 2.0</strong><small>Проверенная kernel-линия 1.x · существующие профили не меняются.</small></div></div>
             <span class="cnv1-engine-status {{ 'success' if awg_key_ready else 'warning' }}"><span></span>{{ 'Настроено' if awg_key_ready else 'Требует настройки' }}</span>
           </header>
-          <section class="cnv1-endpoint-card sg-ljd-nested">
+          <section class="cnv1-endpoint-card sg-ljd-nested sg-ui-nested">
             <div class="cnv1-endpoint-main"><img src="{{ country_flag_url(awg_country) }}" alt="{{ country_name(awg_country) }}" width="30" height="20"><div><span>ВНЕШНЯЯ ТОЧКА</span><strong>{{ awg_public_host }}:{{ awg_settings.port }} · DNS {{ awg_dns.dns }}</strong><small>{{ country_name(awg_country) }}</small></div></div>
           </section>
           <form method="post" action="{{ url_for('update_amneziawg') }}" class="cnv1-engine-form cnv1-engine-form-compact awgd-legacy-settings" hidden>
@@ -346,7 +347,7 @@
             <div class="awgd-title"><span class="awgd-generation">AWG3</span><div><strong>AmneziaWG 3.0</strong><small>Изолированный userspace runtime 3.0 · AWG2 kernel и tools не заменяются.</small></div></div>
             <span class="cnv1-engine-status {{ 'success' if awg3_key_ready else 'warning' }}"><span></span>{{ 'Настроено' if awg3_key_ready else 'Готов к первому запуску' }}</span>
           </header>
-          <section class="cnv1-endpoint-card sg-ljd-nested">
+          <section class="cnv1-endpoint-card sg-ljd-nested sg-ui-nested">
             <div class="cnv1-endpoint-main"><img src="{{ country_flag_url(awg3_country) }}" alt="{{ country_name(awg3_country) }}" width="30" height="20"><div><span>ВНЕШНЯЯ ТОЧКА</span><strong>{{ awg3_public_host }}:{{ awg3_settings.port }} · DNS {{ awg_dns.dns }}</strong><small>{{ country_name(awg3_country) }}</small></div></div>
           </section>
           <form method="post" action="{{ url_for('update_amneziawg3') }}" class="cnv1-engine-form cnv1-engine-form-compact awgd-legacy-settings" hidden>
@@ -372,12 +373,15 @@
         </form>
         {% if not awg_dns.consistent %}<p class="awgd-shared-dns-warning">В профилях сохранены разные DNS. Нажмите «Сохранить DNS», чтобы синхронизировать их.</p>{% endif %}
       </section>
+      </div>
     </article>
 
     {% include "_mihomo_panel.html" %}
   </section>
 
-  <section class="cnv1-note-panel sg-ljd-card">
+  {% include "_naiveproxy_panel.html" %}
+
+  <section class="cnv1-note-panel sg-ljd-card sg-ui-card">
     <div class="cnv1-note-icon">
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <circle cx="12" cy="12" r="9"/>
@@ -391,12 +395,6 @@
     <a class="button" href="{{ url_for('clients') }}">Перейти к клиентам</a>
   </section>
 
-  <footer class="cnv1-page-footer">
-    <span>AWG2: {{ awg_public_host }}:{{ awg_settings.port }}</span>
-    <span>AWG3: {{ awg3_public_host }}:{{ awg3_settings.port }}</span>
-    <span>Xray Reality: {{ xray_public_host }}:{{ xray_settings.port }}</span>
-    <span>Mihomo: {{ mihomo_public_host }} · {{ mihomo.listener_active }}/{{ mihomo.listener_total }}</span>
-  </footer>
 </section>
 {% endblock %}
 

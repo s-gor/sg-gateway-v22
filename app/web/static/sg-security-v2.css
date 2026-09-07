@@ -1,11 +1,5 @@
 /* SG-Gateway Security UX Fix 1 */
 
-.secv2-page {
-  display: grid;
-  gap: 17px;
-  min-width: 0;
-}
-
 .secv2-summary {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

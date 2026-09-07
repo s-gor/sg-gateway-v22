@@ -1,0 +1,164 @@
+/* SG-Gateway 22.08 shared UI components. Page geometry stays in sg-ui-layout. */
+.sg-ui-card {
+  min-width: 0;
+  padding: var(--sg-ui-card-pad, 18px);
+  border: 1px solid var(--sg-ui-border);
+  border-radius: var(--sg-ui-card-radius, 14px);
+  background: var(--sg-ui-surface);
+  box-shadow: var(--sg-ui-shadow);
+}
+
+.sg-ui-nested {
+  border: 1px solid var(--sg-ui-border);
+  background: var(--sg-ui-surface-nested);
+}
+
+.sg-ui-button {
+  display: inline-flex;
+  min-height: var(--sg-ui-control-height, 42px);
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 15px;
+  border: 1px solid var(--sg-ui-border-strong);
+  border-radius: var(--sg-ui-control-radius, 9px);
+  background: var(--sg-ui-surface-raised);
+  color: var(--sg-ui-text);
+  font: inherit;
+  font-weight: 650;
+  line-height: 1;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.sg-ui-button:hover {
+  border-color: color-mix(in srgb, var(--sg-ui-accent) 55%, var(--sg-ui-border-strong));
+}
+
+.sg-ui-button:focus-visible,
+.sg-ui-field :is(input, select, textarea):focus-visible {
+  outline: none;
+  box-shadow: var(--sg-ui-focus-ring);
+}
+
+.sg-ui-button--primary {
+  border-color: color-mix(in srgb, var(--sg-ui-accent) 72%, transparent);
+  background: var(--sg-ui-accent-soft);
+  color: var(--sg-ui-text);
+}
+
+.sg-ui-button--small {
+  min-height: var(--sg-ui-control-height-sm, 32px);
+  padding-inline: 11px;
+  font-size: 12px;
+}
+
+.sg-ui-field > :is(input, select, textarea) {
+  width: 100%;
+  min-width: 0;
+  min-height: var(--sg-ui-control-height, 42px);
+  box-sizing: border-box;
+  border: 1px solid var(--sg-ui-border-strong);
+  border-radius: var(--sg-ui-control-radius, 9px);
+  background: var(--sg-ui-surface-nested);
+  color: var(--sg-ui-text);
+  font: inherit;
+}
+
+.sg-ui-field > :is(input, select) {
+  padding-inline: 12px;
+}
+
+.sg-ui-field > textarea {
+  min-height: 92px;
+  padding: 10px 12px;
+  resize: vertical;
+}
+
+.sg-ui-field > label,
+.sg-ui-field-label {
+  color: var(--sg-ui-text-muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.sg-ui-badge {
+  display: inline-flex;
+  min-height: var(--sg-ui-badge-height, 28px);
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding-inline: 10px;
+  border: 1px solid var(--sg-ui-border);
+  border-radius: 999px;
+  background: var(--sg-ui-surface-nested);
+  color: var(--sg-ui-text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.sg-ui-badge--active {
+  border-color: color-mix(in srgb, var(--sg-ui-accent) 45%, var(--sg-ui-border));
+  background: var(--sg-ui-accent-soft);
+  color: var(--sg-ui-accent);
+}
+
+.sg-ui-notice {
+  padding: 12px 14px;
+  border: 1px solid var(--sg-ui-border);
+  border-radius: var(--sg-ui-nested-radius, 10px);
+  background: var(--sg-ui-surface-nested);
+  color: var(--sg-ui-text-muted);
+}
+
+.sg-ui-section-head :is(h2, h3),
+.sg-ui-page-head :is(h1, h2) {
+  margin: 0;
+  color: var(--sg-ui-text);
+}
+
+.sg-ui-section-head p,
+.sg-ui-page-head p {
+  margin: 4px 0 0;
+  color: var(--sg-ui-text-muted);
+}
+
+@media (max-width: 760px) {
+  .sg-ui-actions > .sg-ui-button {
+    flex: 1 1 auto;
+  }
+}
+
+/* SG-Gateway 22.08 canonical tabs. Structural rail ownership remains in sg-ui-layout. */
+.sg-ui-tabs {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.sg-ui-tab {
+  display: inline-flex;
+  min-height: var(--sg-ui-control-height-sm, 32px);
+  align-items: center;
+  justify-content: center;
+  padding: 7px 13px;
+  border: 1px solid var(--sg-ui-border-strong);
+  border-radius: var(--sg-ui-control-radius, 9px);
+  background: var(--sg-ui-surface-raised);
+  color: var(--sg-ui-text-muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sg-ui-tab.active {
+  border-color: color-mix(in srgb, var(--sg-ui-accent) 60%, var(--sg-ui-border-strong));
+  background: var(--sg-ui-accent-soft);
+  color: var(--sg-ui-accent);
+}
+

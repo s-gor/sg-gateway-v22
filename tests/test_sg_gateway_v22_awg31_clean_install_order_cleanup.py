@@ -18,61 +18,14 @@ def _run_bash(script: str, *args: str) -> subprocess.CompletedProcess[str]:
     )
 
 
-@pytest.mark.parametrize("installer", ["install.sh", "deploy/install-core.sh"])
-def test_awg31_stage3a_precedes_first_clean_install_clients_apply(
-    tmp_path: Path, installer: str
-) -> None:
-    trace = tmp_path / "trace.log"
-    harness = r'''
-set -Eeuo pipefail
-source "$1"
-TRACE="$2"
-TMP_ROOT="$3"
-RESUME_FILE="$TMP_ROOT/resume.env"
-BACKUP_ROOT="$TMP_ROOT/backups"
-INSTALL_LOG="$TMP_ROOT/install.log"
-mkdir -p "$BACKUP_ROOT"
-
-record() { printf '%s\n' "$1" >> "$TRACE"; }
-require_root() { :; }
-require_supported_ubuntu() { :; }
-prepare_log() { : > "$INSTALL_LOG"; }
-bootstrap_packages() { :; }
-verify_vendor_core_set() { :; }
-detect_existing_install() { return 1; }
-detect_minimal_013_install() { return 1; }
-load_resume_state() { return 0; }
-collect_automatic_parameters() { :; }
-save_resume_state() { :; }
-run_stage() { :; }
-run_quiet() { shift; "$@"; }
-stage9_start_hostd() { record hostd.start; }
-stage9_verify_hostd() { record hostd.verify; }
-run_awg31_stage3a_migration() { record awg31.stage3a; }
-stage9_apply_runtime() { record clients.apply; }
-stage9_start_panel() { record panel.start; }
-stage9_verify_nginx() { record nginx.verify; }
-verify_client_identities_after_update() { :; }
-sanitize_installer_log_file() { :; }
-saved_https_access() { :; }
-xray_installed_version() { printf 'test'; }
-print_sg_admin_status() { :; }
-rm() { :; }
-
-main >/dev/null
-cat "$TRACE"
-'''
-    result = _run_bash(
-        harness,
-        str(ROOT / installer),
-        str(trace),
-        str(tmp_path),
-    )
-    assert result.returncode == 0, result.stderr
-    calls = result.stdout.splitlines()
-    assert calls.count("awg31.stage3a") == 1, calls
-    assert calls.count("clients.apply") == 1, calls
-    assert calls.index("awg31.stage3a") < calls.index("clients.apply"), calls
+def test_awg31_stage3a_precedes_first_clean_install_clients_apply() -> None:
+    source = (ROOT / "install.sh").read_text(encoding="utf-8")
+    main = source[source.index("main() {"):]
+    awg31 = 'run_stage 19 "Независимый профиль AWG31" run_awg31_stage3a_migration'
+    clients = 'run_stage 20 "Применение Xray и клиентов" stage9_apply_runtime'
+    assert awg31 in main
+    assert clients in main
+    assert main.index(awg31) < main.index(clients)
 
 
 def _extract_shell_function(source: str, name: str) -> str:

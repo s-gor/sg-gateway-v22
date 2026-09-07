@@ -41,9 +41,11 @@ def test_canonical_profile_ids_preserve_v1_order_with_independent_awg_profiles()
         "mieru",
         "anytls",
         "tuic",
+        "naiveproxy",
     )
     assert "amneziawg3" in subscription.canonical_profile_ids()
     assert "amneziawg31" in subscription.canonical_profile_ids()
+    assert subscription.canonical_profile_ids()[-1] == "naiveproxy"
 
 
 def test_anytls_and_tuic_uris_are_canonicalized() -> None:

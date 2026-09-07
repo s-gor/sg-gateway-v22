@@ -26,42 +26,31 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='sg-mihomo-v1.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='sg-mihomo-v2.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='sg-global-ui-system-v1.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='sg-layout-contract-v1.css') }}?v={{ app_version }}-layout-contract-v1">
   <link rel="stylesheet" href="{{ url_for('static', filename='sg-luxury-jade-depth-v2.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='sg-preview28-final.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='sg-preview32-final.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='sg-preview34-final.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='sg-confirm-modal-v1.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='sg-preview45-xray-theme-fix.css') }}">
-  {% if active_page|default('') == 'routing' %}<link rel="stylesheet" href="{{ url_for('static', filename='sg-routing-client096.css') }}">{% endif %}
-  {% if active_page|default('') == 'outbounds' %}<link rel="stylesheet" href="{{ url_for('static', filename='sg-outbounds-v49.css') }}">{% endif %}
   <link rel="stylesheet" href="{{ url_for('static', filename='sg-clients-simple-hotfix1.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='sg-clients-clarity-hotfix2.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='sg-readable-typography-v3.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='sg-page-frame-routing-v1.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='sg-controls-final-v1.css') }}">
   {% if active_page|default('') == 'connections' %}<link rel="stylesheet" href="{{ url_for('static', filename='sg-connections-dark-classic-v1.css') }}?v={{ app_version }}-connections-dark-classic-v1">{% endif %}
-  {% if active_page|default('') == 'system' %}
-<link rel="stylesheet" href="{{ url_for('static', filename='sg-system-unified-free-color-v2.css') }}?v={{ app_version }}">
-<script src="{{ url_for('static', filename='sg-system-unified-free-color-v2.js') }}?v={{ app_version }}" defer></script>
-{% endif %}
-  {% if active_page|default('') == 'system' %}<link rel="stylesheet" href="{{ url_for('static', filename='sg-system-cpu-summary-header-v1.css') }}?v={{ app_version }}"><script src="{{ url_for('static', filename='sg-system-cpu-summary-header-v1.js') }}?v={{ app_version }}" defer></script>{% endif %}
-  {% if active_page|default('') == 'system' %}<link rel="stylesheet" href="{{ url_for('static', filename='sg-system-memory-row-bars-v1.css') }}?v={{ app_version }}"><script src="{{ url_for('static', filename='sg-system-memory-row-bars-v1.js') }}?v={{ app_version }}" defer></script>{% endif %}
-  {% if active_page|default('') == 'system' %}
-<link rel="stylesheet" href="{{ url_for('static', filename='sg-system-top-dividers-remove-v2.css') }}?v={{ app_version }}">
-{% endif %}
-  {% if active_page|default('') == 'system' %}<link rel="stylesheet" href="{{ url_for('static', filename='sg-system-memory-legend-divider-remove-v1.css') }}?v={{ app_version }}">{% endif %}
-  {% if active_page|default('') == 'system' %}<link rel="stylesheet" href="{{ url_for('static', filename='sg-system-light-theme-v3.css') }}?v={{ app_version }}">{% endif %}
-  {% if active_page|default('') == 'system' %}<link rel="stylesheet" href="{{ url_for('static', filename='sg-system-simple-dials-v1.css') }}?v={{ app_version }}">{% endif %}
+
+
+
+
+
+
   <link rel="stylesheet" href="{{ url_for('static', filename='sg-mobile-sidebar-v1.css') }}?v={{ app_version }}-mobile-v1">
   <link rel="stylesheet" href="{{ url_for('static', filename='sg-low-resolution-v1.css') }}?v={{ app_version }}-low-resolution-v1">
-  {% if active_page|default('') == 'clients' %}
-  <!-- SG_DEVICE_COLLAPSE_V4_LAST_CSS -->
-  <link rel="stylesheet" href="{{ url_for('static', filename='sg-device-collapse-v4.css') }}?v={{ app_version }}-devices-collapse-v4">
-  {% endif %}
-  {% if active_page|default('') == 'clients' %}
-  <!-- SG_DEVICE_EXPANDED_CLEANUP_V1_LAST_CSS -->
-  <link rel="stylesheet" href="{{ url_for('static', filename='sg-device-expanded-cleanup-v1.css') }}?v={{ app_version }}-device-expanded-cleanup-v1">
-  {% endif %}
+  <link rel="stylesheet" href="{{ static_asset('sg-ui-foundation-v22-08.css') }}">
+  <link rel="stylesheet" href="{{ static_asset('sg-ui-layout-v22-08.css') }}">
+  <link rel="stylesheet" href="{{ static_asset('sg-ui-components-v22-08.css') }}">
+  {% block page_styles %}{% endblock %}
   {% if active_page|default('') == 'maintenance' %}
   <script src="{{ url_for('static', filename='sg-maintenance-recovery-v1.js') }}?v={{ app_version }}-maintenance-recovery-v2" defer></script>
   <script src="{{ url_for('static', filename='sg-clients-keys-download-v1.js') }}?v={{ app_version }}-clients-keys-https-sqlite-v2" defer></script>

@@ -33,7 +33,7 @@ from app.xray.settings_transactions import (
 
 
 REALITY_TCP_FLOW = "xtls-rprx-vision"
-XRAY_MINIMUM_VERSION = "26.6.27"
+XRAY_MINIMUM_VERSION = "26.7.28"
 # Compatibility name used by older modules; the policy is minimum, not exact.
 XRAY_REQUIRED_VERSION = XRAY_MINIMUM_VERSION
 XHTTP_MODES = ("auto", "stream-one", "stream-up", "packet-up")
@@ -82,15 +82,15 @@ FINGERPRINT_VALUES = (
 FINGERPRINT_DEFAULT = "firefox"
 VLESS_ENCRYPTION_PLACEHOLDER = "PLACEHOLDER_VLESS_ENCRYPTION"
 
-# Client-only XHTTP XMUX preset confirmed for Russian networks.
-# maxConcurrency stays 0 because Xray forbids a positive maxConcurrency together
-# with a positive maxConnections.
+# Client-only XHTTP XMUX fast-rotation preset for Russian networks.
+# maxConnections stays 0 because Xray forbids a positive maxConnections together
+# with a positive maxConcurrency.
 XHTTP_XMUX_RF = {
-    "maxConcurrency": 0,
-    "maxConnections": 6,
+    "maxConcurrency": 5,
+    "maxConnections": 0,
     "cMaxReuseTimes": 0,
-    "hMaxRequestTimes": "600-900",
-    "hMaxReusableSecs": "1800-3000",
+    "hMaxRequestTimes": "300-600",
+    "hMaxReusableSecs": "900-1800",
     "hKeepAlivePeriod": 0,
 }
 

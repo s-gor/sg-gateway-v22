@@ -1,19 +1,5 @@
 /* SG-Gateway UI STEP 4 — System Visual V1 */
 
-.sv1-page {
-  display: grid;
-  gap: 18px;
-  min-width: 0;
-}
-
-.sv1-heading {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 24px;
-  padding: 0 4px 2px;
-}
-
 .sv1-kicker {
   display: flex;
   align-items: center;
@@ -41,12 +27,6 @@
   margin: 0;
   color: var(--sg-muted);
   font-size: 13.5px;
-}
-
-.sv1-heading-actions {
-  display: flex;
-  gap: 9px;
-  flex-wrap: wrap;
 }
 
 .sv1-heading-actions .button {
@@ -786,10 +766,6 @@
 }
 
 @media (max-width: 760px) {
-  .sv1-heading {
-    align-items: flex-start;
-    flex-direction: column;
-  }
 
   .sv1-summary,
   .sv1-resource-grid,
@@ -812,9 +788,6 @@
     text-align: center;
   }
 
-  .sv1-heading-actions {
-    width: 100%;
-  }
 
   .sv1-heading-actions .button {
     flex: 1;

@@ -11,6 +11,7 @@ from app.clients.exports import (
     build_awg31_config,
     build_mieru_json,
     build_mieru_link,
+    build_protocol_export,
     build_subscription_url,
     build_tuic_link,
     build_xray_profile_link,
@@ -402,6 +403,39 @@ def build_access_cards(
                     device,
                     kind="tuic",
                     title="TUIC v5",
+                    exc=exc,
+                )
+            )
+
+    naiveproxy = deployments.get("naiveproxy")
+    if naiveproxy is not None:
+        try:
+            ready = protocol_ready(client, "naiveproxy", device)
+            status = _status(client, device, naiveproxy, ready=ready)
+            export_url, qr_url = _urls(client, device, "naiveproxy")
+            cards.append(
+                AccessCard(
+                    kind="naiveproxy",
+                    title="NaiveProxy",
+                    status=status,
+                    description="HTTPS Forward Proxy · TLS.",
+                    primary_action="Скачать NaiveProxy-ссылку",
+                    export_url=export_url,
+                    qr_url=qr_url,
+                    payload=(
+                        build_protocol_export(client, "naiveproxy", device).body
+                        if status == "applied"
+                        else ""
+                    ),
+                )
+            )
+        except Exception as exc:
+            cards.append(
+                _error_card(
+                    client,
+                    device,
+                    kind="naiveproxy",
+                    title="NaiveProxy",
                     exc=exc,
                 )
             )

@@ -67,10 +67,13 @@ def test_help_visual_v1_does_not_claim_missing_features():
         assert forbidden not in template
 
 
-def test_help_visual_v1_css_exists():
-    path = ROOT / "app/web/static/sg-help-visual-v1.css"
+def test_help_02208_css_replaces_legacy_visual_asset_and_keeps_component_rules():
+    legacy = ROOT / "app/web/static/sg-help-visual-v1.css"
+    path = ROOT / "app/web/static/sg-ui-help-v22-08.css"
+    assert not legacy.exists()
     assert path.is_file()
     css = path.read_text(encoding="utf-8")
     assert ".hlpv1-workspace" in css
     assert ".hlpv1-topic-list" in css
     assert ".hlpv1-journey" in css
+    assert '[data-sg-ui-page="help"]' in css

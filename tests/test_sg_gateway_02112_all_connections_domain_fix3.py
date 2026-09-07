@@ -76,10 +76,10 @@ def test_connections_page_uses_public_host_for_every_engine():
         "DNS {{ awg_dns.dns }}</strong>"
     ) in page
     assert 'name="host" value="{{ awg3_public_host }}"' in page
-    assert "AWG2: {{ awg_public_host }}:{{ awg_settings.port }}" in page
-    assert "AWG3: {{ awg3_public_host }}:{{ awg3_settings.port }}" in page
-    assert "Xray Reality: {{ xray_public_host }}:{{ xray_settings.port }}" in page
-    assert "Mihomo: {{ mihomo_public_host }}" in page
+
+    # 022.07 removed the duplicate bottom endpoint summary. The live controls
+    # above remain bound to the same resolved public_host values.
+    assert 'class="cnv1-page-footer"' not in page
 
     # Mihomo still receives the same resolved public endpoint from the service,
     # but the fixed endpoint is intentionally not rendered as a separate card.

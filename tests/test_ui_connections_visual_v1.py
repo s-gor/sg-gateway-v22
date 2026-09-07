@@ -90,10 +90,10 @@ def test_connections_visual_v1_does_not_claim_automatic_apply_on_choice():
 
 
 def test_connections_visual_v1_css_exists():
-    path = ROOT / "app/web/static/sg-connections-visual-v1.css"
+    path = ROOT / "app/web/static/sg-ui-connections-components-v22-08.css"
     assert path.is_file()
     css = path.read_text(encoding="utf-8")
-    assert ".cnv1-engines" in css
+    assert ".cnv1-engines" not in css
     assert ".cnv1-engine-card" in css
     final = (ROOT / "app/web/static/sg-preview28-final.css").read_text(encoding="utf-8")
     assert ".cnv1-engine-pair" in final
