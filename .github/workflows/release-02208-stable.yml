@@ -63,7 +63,8 @@ jobs:
           tmp="$(mktemp)"
           git ls-files -z | while IFS= read -r -d '' f; do
             [ "$f" = "SOURCE-SHA256SUMS" ] && continue
-            sha256sum "$f"
+            digest="$(git show "HEAD:$f" | sha256sum | cut -d' ' -f1)"
+            printf '%s  %s\n' "$digest" "$f"
           done | LC_ALL=C sort -k2 > "$tmp"
           diff -u SOURCE-SHA256SUMS "$tmp"
 
