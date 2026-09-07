@@ -380,12 +380,19 @@ jobs:
           sudo -u sg-naiveproxy test -r /etc/sg-gateway/naiveproxy/Caddyfile
           sudo -u sg-naiveproxy test -r /etc/sg-gateway/naiveproxy/tls/fullchain.pem
           sudo -u sg-naiveproxy test -r /etc/sg-gateway/naiveproxy/tls/privkey.pem
-          sudo -u sg-naiveproxy test -x /var/lib/sg-gateway
-          sudo -u sg-naiveproxy test -w /var/lib/sg-gateway/naiveproxy/xdg-data
-          sudo -u sg-naiveproxy test -w /var/lib/sg-gateway/naiveproxy/xdg-config
+          test "$(sudo systemctl show sg-gateway-naiveproxy.service -p SupplementaryGroups --value)" = "sg-gateway"
+          MAIN_PID="$(sudo systemctl show sg-gateway-naiveproxy.service -p MainPID --value)"
+          SG_GATEWAY_GID="$(getent group sg-gateway | cut -d: -f3)"
+          test -n "$MAIN_PID"
+          test "$MAIN_PID" != "0"
+          test -n "$SG_GATEWAY_GID"
+          sudo awk -v gid="$SG_GATEWAY_GID" '/^Groups:/ { for (i=2; i<=NF; i++) if ($i == gid) found=1 } END { exit(found ? 0 : 1) }' "/proc/$MAIN_PID/status"
+          sudo test -s /var/lib/sg-gateway/naiveproxy/xdg-config/caddy/autosave.json
+          sudo test -s /var/lib/sg-gateway/naiveproxy/xdg-data/caddy/instance.uuid
           sudo ss -H -ltn 'sport = :8447' | grep -q ':8447'
           test "$(sudo stat -c '%U:%G:%a' /etc/sg-gateway/naiveproxy/tls)" = "root:sg-naiveproxy:750"
           test "$(sudo stat -c '%U:%G:%a' /etc/sg-gateway/naiveproxy/tls/privkey.pem)" = "root:sg-naiveproxy:640"
+          ! sudo journalctl -b -u sg-gateway-naiveproxy.service --no-pager | grep -qi 'permission denied'
 
       - name: Verify second installation and both userspace profiles
         run: |
