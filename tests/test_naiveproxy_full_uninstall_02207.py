@@ -46,3 +46,25 @@ def test_02207_full_uninstall_refuses_other_channels_and_never_edits_base_file()
     assert 'cp -- "$BASE" "$PATCHED"' in source
     assert "python3 - \"$PATCHED\"" in source
     assert "python3 - \"$BASE\"" not in source
+
+
+def test_02208_full_uninstall_stops_removes_and_verifies_naiveproxy():
+    source = (ROOT / "deploy/full-uninstall-ubuntu.sh").read_text()
+
+    assert 'NAIVEPROXY_PORT="8447"' in source
+    assert "sg-gateway-naiveproxy.service" in source
+    assert "/etc/systemd/system/sg-gateway-naiveproxy.service" in source
+    assert "pkill -TERM -u sg-naiveproxy" in source
+    assert "userdel sg-naiveproxy" in source
+    assert "groupdel sg-naiveproxy" in source
+    assert "пользователь sg-naiveproxy" in source
+    assert "группа sg-naiveproxy" in source
+    assert '"${NAIVEPROXY_PORT}/tcp"' in source
+
+
+def test_02208_full_uninstall_requires_naiveproxy_listener_to_be_gone():
+    source = (ROOT / "deploy/full-uninstall-ubuntu.sh").read_text()
+
+    assert 'ss -H -ltn "sport = :${NAIVEPROXY_PORT}"' in source
+    assert "NaiveProxy listener" in source
+    assert "Остаток после удаления" in source
