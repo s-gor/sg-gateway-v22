@@ -8,6 +8,7 @@ ConditionPathExists=/etc/sg-gateway/naiveproxy/Caddyfile
 Type=notify
 User=sg-naiveproxy
 Group=sg-naiveproxy
+SupplementaryGroups=sg-gateway
 Environment=HOME=/var/lib/sg-gateway/naiveproxy
 Environment=XDG_DATA_HOME=/var/lib/sg-gateway/naiveproxy/xdg-data
 Environment=XDG_CONFIG_HOME=/var/lib/sg-gateway/naiveproxy/xdg-config
