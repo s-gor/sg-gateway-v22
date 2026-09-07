@@ -22,6 +22,7 @@ def test_stage_13_reclaims_naiveproxy_state_after_recursive_panel_chown():
         'install -d -o sg-naiveproxy -g sg-naiveproxy -m 0700 "$NAIVEPROXY_STATE"',
         'install -d -o sg-naiveproxy -g sg-naiveproxy -m 0750 "$NAIVEPROXY_STATE/site"',
         '"$NAIVEPROXY_STATE/xdg-data" "$NAIVEPROXY_STATE/xdg-config"',
+        'chown -R sg-naiveproxy:sg-naiveproxy "$NAIVEPROXY_STATE"',
     )
     positions = []
     for line in required:
@@ -37,6 +38,9 @@ def test_stage_23_rejects_wrong_naiveproxy_state_ownership():
     assert "sg-naiveproxy:sg-naiveproxy:750" in body
     assert '"$NAIVEPROXY_STATE/xdg-data"' in body
     assert '"$NAIVEPROXY_STATE/xdg-config"' in body
+    assert 'find "$NAIVEPROXY_STATE" -xdev' in body
+    assert '! -user sg-naiveproxy' in body
+    assert '! -group sg-naiveproxy' in body
 
 
 def test_installer_keeps_exact_24_stage_contract():

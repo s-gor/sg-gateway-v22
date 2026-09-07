@@ -3381,6 +3381,9 @@ stage_configuration_and_database_02208() {
   install -d -o sg-naiveproxy -g sg-naiveproxy -m 0750 "$NAIVEPROXY_STATE/site"
   install -d -o sg-naiveproxy -g sg-naiveproxy -m 0700 \
     "$NAIVEPROXY_STATE/xdg-data" "$NAIVEPROXY_STATE/xdg-config"
+  # Retained Caddy/XDG files were also caught by the generic recursive DATA_DIR chown.
+  # Reclaim the complete private subtree, not only its top-level directories.
+  chown -R sg-naiveproxy:sg-naiveproxy "$NAIVEPROXY_STATE"
 
   chmod o+x "$CONFIG_DIR"
   install -d -o root -g sg-naiveproxy -m 0750 "$NAIVEPROXY_CONFIG"
@@ -3475,6 +3478,14 @@ verify_naiveproxy_install_contract() {
       return 1
     }
   done
+
+  local foreign_state=""
+  foreign_state="$(find "$NAIVEPROXY_STATE" -xdev \
+    \( ! -user sg-naiveproxy -o ! -group sg-naiveproxy \) -print -quit)"
+  [[ -z "$foreign_state" ]] || {
+    echo "NaiveProxy retained state has wrong owner/group: $foreign_state" >&2
+    return 1
+  }
 
   local installed_modules=""
   installed_modules="$("$NAIVEPROXY_PREFIX/bin/caddy" list-modules)"
