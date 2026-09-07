@@ -2,6 +2,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+INSTALLER = ROOT / "install.sh"
 UNINSTALLER = ROOT / "deploy" / "full-uninstall-ubuntu.sh"
 WORKFLOW = ROOT / ".github" / "workflows" / "reinstall-after-full-uninstall-smoke.yml"
 
@@ -58,3 +59,11 @@ def test_reinstall_smoke_covers_the_real_same_server_lifecycle():
     assert "assert actual_access == expected_access" in body
     assert 'show awg3 listen-port)' in body
     assert 'show awg31 listen-port)' in body
+
+
+def test_authoritative_installer_keeps_shared_state_parent_traversable_for_isolated_runtimes():
+    body = INSTALLER.read_text(encoding="utf-8")
+
+    assert 'install -d -m 0751 -o "$PANEL_USER" -g "$PANEL_GROUP" "$DATA_DIR"' in body
+    assert 'install -d -m 0750 -o "$PANEL_USER" -g "$PANEL_GROUP" "$LOG_DIR"' in body
+    assert 'install -d -m 0750 -o "$PANEL_USER" -g "$PANEL_GROUP" "$DATA_DIR" "$LOG_DIR"' not in body
