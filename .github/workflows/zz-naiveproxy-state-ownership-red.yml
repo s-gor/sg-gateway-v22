@@ -1,4 +1,4 @@
-name: "RED NaiveProxy state ownership"
+name: "Fix NaiveProxy state ownership"
 
 on:
   push:
@@ -6,15 +6,190 @@ on:
       - "fix/02208-naiveproxy-state-ownership"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  red:
+  fix:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: python -m pip install -q pytest
-      - run: python -m pytest -q tests/test_naiveproxy_native_state_ownership_02208.py
+      - name: Apply minimal installer fix
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path("install.sh")
+          text = p.read_text(encoding="utf-8")
+
+          old = '''stage_configuration_and_database_02208() {
+            stage_configuration_and_database
+
+            chmod o+x "$CONFIG_DIR"
+            install -d -o root -g sg-naiveproxy -m 0750 "$NAIVEPROXY_CONFIG"
+          '''.replace("          ", "")
+          new = '''stage_configuration_and_database_02208() {
+            stage_configuration_and_database
+
+            # stage_configuration_and_database recursively gives DATA_DIR to the panel user.
+            # Reclaim NaiveProxy private runtime state after that recursive chown.
+            install -d -o sg-naiveproxy -g sg-naiveproxy -m 0700 "$NAIVEPROXY_STATE"
+            install -d -o sg-naiveproxy -g sg-naiveproxy -m 0750 "$NAIVEPROXY_STATE/site"
+            install -d -o sg-naiveproxy -g sg-naiveproxy -m 0700 \\
+              "$NAIVEPROXY_STATE/xdg-data" "$NAIVEPROXY_STATE/xdg-config"
+
+            chmod o+x "$CONFIG_DIR"
+            install -d -o root -g sg-naiveproxy -m 0750 "$NAIVEPROXY_CONFIG"
+          '''.replace("          ", "")
+          if old not in text:
+              raise SystemExit("stage 13 anchor not found")
+          text = text.replace(old, new, 1)
+
+          old_verify = '''  getent group sg-naiveproxy >/dev/null
+
+            local installed_modules=""
+          '''.replace("          ", "")
+          new_verify = '''  getent group sg-naiveproxy >/dev/null
+
+            local state_path actual expected
+            for state_path in \\
+              "$NAIVEPROXY_STATE" \\
+              "$NAIVEPROXY_STATE/site" \\
+              "$NAIVEPROXY_STATE/xdg-data" \\
+              "$NAIVEPROXY_STATE/xdg-config"; do
+              actual="$(stat -c '%U:%G:%a' "$state_path")"
+              expected="sg-naiveproxy:sg-naiveproxy:700"
+              [[ "$state_path" != "$NAIVEPROXY_STATE/site" ]] || expected="sg-naiveproxy:sg-naiveproxy:750"
+              [[ "$actual" == "$expected" ]] || {
+                echo "NaiveProxy state ownership mismatch: $state_path: $actual (expected $expected)" >&2
+                return 1
+              }
+            done
+
+            local installed_modules=""
+          '''.replace("          ", "")
+          if old_verify not in text:
+              raise SystemExit("NaiveProxy verification anchor not found")
+          text = text.replace(old_verify, new_verify, 1)
+          p.write_text(text, encoding="utf-8")
+          PY
+
+      - name: Correct and strengthen regression test
+        run: |
+          cat > tests/test_naiveproxy_native_state_ownership_02208.py <<'PYTEST'
+          from pathlib import Path
+          import re
+
+
+          ROOT = Path(__file__).parents[1]
+          INSTALL = (ROOT / "install.sh").read_text(encoding="utf-8")
+
+
+          def _function_body(name: str) -> str:
+              match = re.search(rf"^{re.escape(name)}\(\) \{{\n(?P<body>.*?)^\}}$", INSTALL, re.M | re.S)
+              assert match is not None, f"missing shell function: {name}"
+              return match.group("body")
+
+
+          def test_stage_13_reclaims_naiveproxy_state_after_recursive_panel_chown():
+              base = _function_body("stage_configuration_and_database")
+              wrapper = _function_body("stage_configuration_and_database_02208")
+
+              assert 'chown -R "$PANEL_USER":"$PANEL_GROUP" "$DATA_DIR" "$LOG_DIR"' in base
+              base_call = wrapper.index("stage_configuration_and_database")
+              required = (
+                  'install -d -o sg-naiveproxy -g sg-naiveproxy -m 0700 "$NAIVEPROXY_STATE"',
+                  'install -d -o sg-naiveproxy -g sg-naiveproxy -m 0750 "$NAIVEPROXY_STATE/site"',
+                  '"$NAIVEPROXY_STATE/xdg-data" "$NAIVEPROXY_STATE/xdg-config"',
+              )
+              positions = []
+              for line in required:
+                  assert line in wrapper, f"stage 13 does not reclaim NaiveProxy state: {line}"
+                  positions.append(wrapper.index(line))
+              assert all(position > base_call for position in positions)
+
+
+          def test_stage_23_rejects_wrong_naiveproxy_state_ownership():
+              body = _function_body("verify_naiveproxy_install_contract")
+              assert "stat -c '%U:%G:%a'" in body
+              assert "sg-naiveproxy:sg-naiveproxy:700" in body
+              assert "sg-naiveproxy:sg-naiveproxy:750" in body
+              assert '"$NAIVEPROXY_STATE/xdg-data"' in body
+              assert '"$NAIVEPROXY_STATE/xdg-config"' in body
+
+
+          def test_installer_keeps_exact_24_stage_contract():
+              main = _function_body("main")
+              stages = [
+                  int(value)
+                  for value in re.findall(r"^  run_(?:interactive_)?stage ([0-9]+) ", main, re.M)
+              ]
+              assert stages == list(range(1, 25))
+          PYTEST
+
+      - name: Remove temporary workflow and refresh source checksums
+        run: |
+          git rm .github/workflows/zz-naiveproxy-state-ownership-red.yml
+          python3 - <<'PY'
+          import hashlib
+          import subprocess
+          from pathlib import Path
+
+          tracked = subprocess.check_output(["git", "ls-files"], text=True, encoding="utf-8").splitlines()
+          tracked = sorted(path for path in tracked if path != "SOURCE-SHA256SUMS")
+          rows = []
+          for path in tracked:
+              rows.append(f"{hashlib.sha256(Path(path).read_bytes()).hexdigest()}  {path}")
+          Path("SOURCE-SHA256SUMS").write_text("\n".join(rows) + "\n", encoding="utf-8")
+          PY
+
+      - name: Create candidate commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix: reclaim NaiveProxy state after stage 13 chown"
+
+      - name: Verify focused regression and 24 stages
+        run: |
+          python -m pip install -q pytest
+          python -m pytest -q tests/test_naiveproxy_native_state_ownership_02208.py
+          bash -n install.sh
+
+      - name: Verify exact committed source integrity
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import re
+          import subprocess
+          from pathlib import Path
+
+          expected = {}
+          for raw in Path("SOURCE-SHA256SUMS").read_text(encoding="utf-8").splitlines():
+              if not raw.strip():
+                  continue
+              m = re.fullmatch(r"([0-9a-f]{64})  (.+)", raw)
+              assert m, raw
+              expected[m.group(2)] = m.group(1)
+          tracked = set(subprocess.check_output(["git", "ls-files"], text=True).splitlines())
+          tracked.discard("SOURCE-SHA256SUMS")
+          assert set(expected) == tracked
+          for path in sorted(tracked):
+              data = subprocess.check_output(["git", "show", f"HEAD:{path}"])
+              assert hashlib.sha256(data).hexdigest() == expected[path], path
+          print(f"source integrity ok: {len(tracked)} files")
+          PY
+
+      - name: Build and self-verify FULL package
+        run: |
+          VERSION="$(tr -d '[:space:]' < VERSION)"
+          OUT="/tmp/SG-Gateway-${VERSION}-NAIVE-OWNERSHIP-FIX.run"
+          bash build-run.sh "$OUT"
+          bash "$OUT" --verify-only
+
+      - name: Publish verified candidate
+        run: git push origin HEAD:fix/02208-naiveproxy-state-ownership
