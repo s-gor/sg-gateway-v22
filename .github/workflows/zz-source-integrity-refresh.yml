@@ -1,0 +1,59 @@
+name: TEMP source integrity refresh
+
+on:
+  push:
+    branches: [fix/02208-official-install-path]
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/02208-official-install-path
+      - name: Verify repaired reinstall command contract
+        run: |
+          python3 - <<'PY'
+          import runpy
+          ns = runpy.run_path('tests/test_sg_gateway_v22_reinstall_after_full_uninstall.py')
+          ns['test_full_uninstall_prints_the_canonical_reinstall_command']()
+          ns = runpy.run_path('tests/test_official_install_path_02208.py')
+          ns['test_public_clean_install_is_pinned_to_final_verified_source']()
+          ns['test_full_uninstall_reinstall_hint_follows_stable_channel_without_stale_sha']()
+          print('official install path contracts ok')
+          PY
+      - name: Remove temporary workflow and refresh checksums
+        run: |
+          git rm .github/workflows/zz-source-integrity-refresh.yml
+          python3 - <<'PY'
+          import hashlib, subprocess
+          from pathlib import Path
+          tracked = subprocess.check_output(['git','ls-files'], text=True, encoding='utf-8').splitlines()
+          tracked = [p for p in tracked if p != 'SOURCE-SHA256SUMS']
+          rows = [f"{hashlib.sha256(Path(p).read_bytes()).hexdigest()}  {p}" for p in sorted(tracked)]
+          Path('SOURCE-SHA256SUMS').write_text('\n'.join(rows) + '\n', encoding='utf-8', newline='\n')
+          PY
+          git add SOURCE-SHA256SUMS tests/test_sg_gateway_v22_reinstall_after_full_uninstall.py
+      - name: Verify source integrity
+        run: |
+          python3 - <<'PY'
+          import hashlib, subprocess
+          from pathlib import Path
+          expected={}
+          for raw in Path('SOURCE-SHA256SUMS').read_text(encoding='utf-8').splitlines():
+              digest,path=raw.split('  ',1); expected[path]=digest
+          tracked=set(subprocess.check_output(['git','ls-files'], text=True).splitlines()); tracked.discard('SOURCE-SHA256SUMS')
+          assert set(expected)==tracked, (sorted(tracked-set(expected)), sorted(set(expected)-tracked))
+          for p in tracked:
+              assert hashlib.sha256(Path(p).read_bytes()).hexdigest()==expected[p], p
+          print(f'source integrity ok: {len(tracked)} files')
+          PY
+      - name: Commit checksum refresh
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'chore: refresh 22.08 source integrity'
+          git push origin HEAD:fix/02208-official-install-path
