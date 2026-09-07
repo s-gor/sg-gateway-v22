@@ -22,44 +22,36 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
-
           p = Path("install.sh")
           text = p.read_text(encoding="utf-8")
-
-          old = '''  install -d -o sg-naiveproxy -g sg-naiveproxy -m 0700 \\
-    "$NAIVEPROXY_STATE/xdg-data" "$NAIVEPROXY_STATE/xdg-config"
-
-  chmod o+x "$CONFIG_DIR"
-'''
-          new = '''  install -d -o sg-naiveproxy -g sg-naiveproxy -m 0700 \\
-    "$NAIVEPROXY_STATE/xdg-data" "$NAIVEPROXY_STATE/xdg-config"
-  # Retained Caddy/XDG files were also caught by the generic recursive DATA_DIR chown.
-  # Reclaim the complete private subtree, not only its top-level directories.
-  chown -R sg-naiveproxy:sg-naiveproxy "$NAIVEPROXY_STATE"
-
-  chmod o+x "$CONFIG_DIR"
-'''
+          old = (
+              '  install -d -o sg-naiveproxy -g sg-naiveproxy -m 0700 \\\n'
+              '    "$NAIVEPROXY_STATE/xdg-data" "$NAIVEPROXY_STATE/xdg-config"\n\n'
+              '  chmod o+x "$CONFIG_DIR"\n'
+          )
+          new = (
+              '  install -d -o sg-naiveproxy -g sg-naiveproxy -m 0700 \\\n'
+              '    "$NAIVEPROXY_STATE/xdg-data" "$NAIVEPROXY_STATE/xdg-config"\n'
+              '  # Retained Caddy/XDG files were also caught by the generic recursive DATA_DIR chown.\n'
+              '  # Reclaim the complete private subtree, not only its top-level directories.\n'
+              '  chown -R sg-naiveproxy:sg-naiveproxy "$NAIVEPROXY_STATE"\n\n'
+              '  chmod o+x "$CONFIG_DIR"\n'
+          )
           if old not in text:
               raise SystemExit("stage 13 recursive ownership anchor not found")
           text = text.replace(old, new, 1)
-
-          old_verify = '''  done
-
-  local installed_modules=""
-'''
-          new_verify = '''  done
-
-  local foreign_state=""
-  foreign_state="$(find "$NAIVEPROXY_STATE" -xdev \\
-    \( ! -user sg-naiveproxy -o ! -group sg-naiveproxy \) -print -quit)"
-  [[ -z "$foreign_state" ]] || {
-    echo "NaiveProxy retained state has wrong owner/group: $foreign_state" >&2
-    return 1
-  }
-
-  local installed_modules=""
-'''
-          # Apply only inside verify_naiveproxy_install_contract by anchoring after the owner/mode loop.
+          old_verify = '  done\n\n  local installed_modules=""\n'
+          new_verify = (
+              '  done\n\n'
+              '  local foreign_state=""\n'
+              '  foreign_state="$(find "$NAIVEPROXY_STATE" -xdev \\\n'
+              '    \\( ! -user sg-naiveproxy -o ! -group sg-naiveproxy \\) -print -quit)"\n'
+              '  [[ -z "$foreign_state" ]] || {\n'
+              '    echo "NaiveProxy retained state has wrong owner/group: $foreign_state" >&2\n'
+              '    return 1\n'
+              '  }\n\n'
+              '  local installed_modules=""\n'
+          )
           verify_start = text.index("verify_naiveproxy_install_contract() {")
           idx = text.index(old_verify, verify_start)
           text = text[:idx] + text[idx:].replace(old_verify, new_verify, 1)
