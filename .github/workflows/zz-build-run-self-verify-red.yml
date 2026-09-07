@@ -1,4 +1,4 @@
-name: "RED build-run self verify"
+name: "Fix build-run self verify"
 
 on:
   push:
@@ -6,15 +6,59 @@ on:
       - "fix/02208-build-run-self-verify"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  red:
+  fix:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: python -m pip install -q pytest
-      - run: python -m pytest -q tests/test_build_run_self_verify_02208.py
+      - name: Apply minimal self-verify fix
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('build-run.sh')
+          s = p.read_text(encoding='utf-8')
+          old = '\n"$OUT" --verify-only\n'
+          new = '\nbash "$OUT" --verify-only\n'
+          if s.count(old) != 1:
+              raise SystemExit(f'expected exactly one bare self-verify invocation, found {s.count(old)}')
+          p.write_text(s.replace(old, new, 1), encoding='utf-8')
+          PY
+      - name: Verify regression and 24-stage contract
+        run: |
+          python -m pip install -q pytest
+          python -m pytest -q \
+            tests/test_build_run_self_verify_02208.py \
+            tests/test_installer_02208_master_24_stages.py
+          bash -n build-run.sh
+      - name: Finalize source snapshot locally
+        run: |
+          git rm .github/workflows/zz-build-run-self-verify-red.yml
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib
+          import subprocess
+          root = Path('.')
+          paths = [p for p in subprocess.check_output(['git','ls-files'], text=True).splitlines() if p != 'SOURCE-SHA256SUMS']
+          Path('SOURCE-SHA256SUMS').write_text(
+              ''.join(f"{hashlib.sha256((root / p).read_bytes()).hexdigest()}  {p}\n" for p in paths),
+              encoding='utf-8',
+          )
+          PY
+          git add build-run.sh tests/test_build_run_self_verify_02208.py SOURCE-SHA256SUMS
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "fix: invoke generated FULL package through bash"
+      - name: Reproduce release package build with bare output name
+        run: |
+          RUN_NAME="SG-Gateway-0.1.0-022.08-FULL.run"
+          bash build-run.sh "$RUN_NAME"
+          bash "$RUN_NAME" --verify-only
+      - name: Publish verified branch commit
+        run: git push
