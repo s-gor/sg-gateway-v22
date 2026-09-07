@@ -4,14 +4,14 @@
 
 ## Чистая установка
 
-Только для сервера без установленного SG-Gateway. Команда закреплена на проверенный исходный commit `1a74b6e53fc1dd3343c77c1f05678dff2cec225e`:
+Только для сервера без установленного SG-Gateway. Команда закреплена на проверенный исходный commit `f709015548de91c631a5daf174194f245f7cce00`:
 
 ```bash
 curl -4 -fsSL \
-  https://raw.githubusercontent.com/s-gor/sg-gateway-v22/1a74b6e53fc1dd3343c77c1f05678dff2cec225e/deploy/install-from-github.sh \
+  https://raw.githubusercontent.com/s-gor/sg-gateway-v22/f709015548de91c631a5daf174194f245f7cce00/deploy/install-from-github.sh \
 | sudo env \
   SG_GATEWAY_GITHUB_BRANCH=stable-02208 \
-  SG_GATEWAY_SOURCE_COMMIT=1a74b6e53fc1dd3343c77c1f05678dff2cec225e \
+  SG_GATEWAY_SOURCE_COMMIT=f709015548de91c631a5daf174194f245f7cce00 \
   bash
 ```
 
