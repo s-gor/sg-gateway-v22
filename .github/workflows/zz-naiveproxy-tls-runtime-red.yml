@@ -23,13 +23,14 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          from textwrap import dedent
 
           runtime_path = Path("hostd/sg_hostd/naiveproxy_runtime.py")
           runtime = runtime_path.read_text(encoding="utf-8")
 
-          anchor = '''def _snapshot(source: Path, destination: Path) -> bool:
-          '''.replace("          ", "")
-          helper = '''def _ensure_tls_permissions() -> None:
+          anchor = "def _snapshot(source: Path, destination: Path) -> bool:\n"
+          helper = dedent("""\
+          def _ensure_tls_permissions() -> None:
               CONFIG_DIR.mkdir(parents=True, exist_ok=True)
               TLS_DIR.mkdir(parents=True, exist_ok=True)
               for directory in (CONFIG_DIR, TLS_DIR):
@@ -52,72 +53,94 @@ jobs:
 
 
           def _snapshot(source: Path, destination: Path) -> bool:
-          '''.replace("          ", "")
+          """)
           if anchor not in runtime:
               raise SystemExit("runtime helper anchor not found")
           runtime = runtime.replace(anchor, helper, 1)
 
-          old_sync = '''def sync() -> dict:
+          old_sync = dedent("""\
+          def sync() -> dict:
               settings, users, credential_ids = _load()
               _validate(settings)
               CONFIG_DIR.mkdir(parents=True, exist_ok=True)
               TLS_DIR.mkdir(parents=True, exist_ok=True)
               STATE_DIR.mkdir(parents=True, exist_ok=True)
-          '''.replace("          ", "")
-          new_sync = '''def sync() -> dict:
+          """)
+          new_sync = dedent("""\
+          def sync() -> dict:
               settings, users, credential_ids = _load()
               CONFIG_DIR.mkdir(parents=True, exist_ok=True)
               TLS_DIR.mkdir(parents=True, exist_ok=True)
               STATE_DIR.mkdir(parents=True, exist_ok=True)
               _ensure_tls_permissions()
               _validate(settings)
-          '''.replace("          ", "")
+          """)
           if old_sync not in runtime:
               raise SystemExit("runtime sync anchor not found")
           runtime = runtime.replace(old_sync, new_sync, 1)
 
-          old_replace = '''        os.replace(candidate_certificate, TLS_CERTIFICATE)
+          old_replace = dedent("""\
+                  os.replace(candidate_certificate, TLS_CERTIFICATE)
                   os.replace(candidate_private_key, TLS_PRIVATE_KEY)
                   _atomic_write(candidate_config, _render(settings, users), 0o640)
-          '''.replace("          ", "")
-          new_replace = '''        os.replace(candidate_certificate, TLS_CERTIFICATE)
+          """)
+          new_replace = dedent("""\
+                  os.replace(candidate_certificate, TLS_CERTIFICATE)
                   os.replace(candidate_private_key, TLS_PRIVATE_KEY)
                   _ensure_tls_permissions()
                   _atomic_write(candidate_config, _render(settings, users), 0o640)
-          '''.replace("          ", "")
+          """)
           if old_replace not in runtime:
               raise SystemExit("runtime replace anchor not found")
           runtime = runtime.replace(old_replace, new_replace, 1)
 
-          old_restore = '''    _restore_file(
+          old_restore = dedent("""\
+              _restore_file(
                   TLS_PRIVATE_KEY,
                   TLS_DIR / "privkey.pem.previous",
                   snapshot["private_key"],
               )
               if restart:
-          '''.replace("          ", "")
-          new_restore = '''    _restore_file(
+          """)
+          new_restore = dedent("""\
+              _restore_file(
                   TLS_PRIVATE_KEY,
                   TLS_DIR / "privkey.pem.previous",
                   snapshot["private_key"],
               )
               _ensure_tls_permissions()
               if restart:
-          '''.replace("          ", "")
+          """)
           if old_restore not in runtime:
-              raise SystemExit("runtime rollback anchor not found")
+              raise SystemExit("runtime internal rollback anchor not found")
           runtime = runtime.replace(old_restore, new_restore, 1)
+
+          old_public_rollback = dedent("""\
+              shutil.copy2(previous_certificate, TLS_CERTIFICATE)
+              shutil.copy2(previous_private_key, TLS_PRIVATE_KEY)
+              if restart:
+          """)
+          new_public_rollback = dedent("""\
+              shutil.copy2(previous_certificate, TLS_CERTIFICATE)
+              shutil.copy2(previous_private_key, TLS_PRIVATE_KEY)
+              _ensure_tls_permissions()
+              if restart:
+          """)
+          if old_public_rollback not in runtime:
+              raise SystemExit("runtime public rollback anchor not found")
+          runtime = runtime.replace(old_public_rollback, new_public_rollback, 1)
           runtime_path.write_text(runtime, encoding="utf-8")
 
           install_path = Path("install.sh")
           install = install_path.read_text(encoding="utf-8")
-
-          old_stage13 = '''  chmod o+x "$CONFIG_DIR"
+          old_stage13 = dedent("""\
+            chmod o+x "$CONFIG_DIR"
             install -d -o root -g sg-naiveproxy -m 0750 "$NAIVEPROXY_CONFIG"
 
             cat >> "$CONFIG_DIR/runtime.env" <<EOF
-          '''.replace("          ", "")
-          new_stage13 = '''  chmod o+x "$CONFIG_DIR"
+          """)
+          new_stage13 = dedent("""\
+            chmod o+x "$CONFIG_DIR"
             install -d -o root -g sg-naiveproxy -m 0750 "$NAIVEPROXY_CONFIG"
             install -d -o root -g sg-naiveproxy -m 0750 "$NAIVEPROXY_CONFIG/tls"
             if [[ -f "$NAIVEPROXY_CONFIG/tls/fullchain.pem" ]]; then
@@ -130,16 +153,18 @@ jobs:
             fi
 
             cat >> "$CONFIG_DIR/runtime.env" <<EOF
-          '''.replace("          ", "")
+          """)
           if old_stage13 not in install:
               raise SystemExit("installer stage 13 TLS anchor not found")
           install = install.replace(old_stage13, new_stage13, 1)
 
-          verify_anchor = '''  getent group sg-naiveproxy >/dev/null
+          verify_anchor = dedent("""\
+            getent group sg-naiveproxy >/dev/null
 
             local state_path actual expected
-          '''.replace("          ", "")
-          verify_block = '''  getent group sg-naiveproxy >/dev/null
+          """)
+          verify_block = dedent("""\
+            getent group sg-naiveproxy >/dev/null
 
             local tls_path tls_actual tls_expected
             tls_actual="$(stat -c '%U:%G:%a' "$NAIVEPROXY_CONFIG/tls")"
@@ -172,11 +197,45 @@ jobs:
             fi
 
             local state_path actual expected
-          '''.replace("          ", "")
+          """)
           if verify_anchor not in install:
               raise SystemExit("installer verify TLS anchor not found")
           install = install.replace(verify_anchor, verify_block, 1)
           install_path.write_text(install, encoding="utf-8")
+
+          test_path = Path("tests/test_naiveproxy_tls_runtime_contract_02208.py")
+          test = test_path.read_text(encoding="utf-8")
+          old_test = dedent("""\
+              rollback_source = inspect.getsource(runtime._restore_snapshot)
+
+              assert sync_source.count("_ensure_tls_permissions()") >= 2
+          """)
+          new_test = dedent("""\
+              rollback_source = inspect.getsource(runtime._restore_snapshot)
+              public_rollback_source = inspect.getsource(runtime.rollback)
+
+              assert sync_source.count("_ensure_tls_permissions()") >= 2
+          """)
+          if old_test not in test:
+              raise SystemExit("test rollback source anchor not found")
+          test = test.replace(old_test, new_test, 1)
+          old_assert = dedent("""\
+              assert rollback_source.index("_ensure_tls_permissions()") < rollback_source.index(
+                  '["systemctl", "restart", SERVICE]'
+              )
+          """)
+          new_assert = dedent("""\
+              assert rollback_source.index("_ensure_tls_permissions()") < rollback_source.index(
+                  '["systemctl", "restart", SERVICE]'
+              )
+              assert "_ensure_tls_permissions()" in public_rollback_source
+              assert public_rollback_source.index("_ensure_tls_permissions()") < public_rollback_source.index(
+                  '["systemctl", "restart", SERVICE]'
+              )
+          """)
+          if old_assert not in test:
+              raise SystemExit("test rollback assertion anchor not found")
+          test_path.write_text(test.replace(old_assert, new_assert, 1), encoding="utf-8")
           PY
 
       - name: Remove temporary workflow and refresh source checksums
@@ -186,16 +245,12 @@ jobs:
           import hashlib
           import subprocess
           from pathlib import Path
-
-          tracked = subprocess.check_output(
-              ["git", "ls-files"], text=True, encoding="utf-8"
-          ).splitlines()
+          tracked = subprocess.check_output(["git", "ls-files"], text=True, encoding="utf-8").splitlines()
           tracked = sorted(path for path in tracked if path != "SOURCE-SHA256SUMS")
-          rows = [
-              f"{hashlib.sha256(Path(path).read_bytes()).hexdigest()}  {path}"
-              for path in tracked
-          ]
-          Path("SOURCE-SHA256SUMS").write_text("\n".join(rows) + "\n", encoding="utf-8")
+          Path("SOURCE-SHA256SUMS").write_text(
+              "\n".join(f"{hashlib.sha256(Path(path).read_bytes()).hexdigest()}  {path}" for path in tracked) + "\n",
+              encoding="utf-8",
+          )
           PY
 
       - name: Create candidate commit
@@ -221,14 +276,12 @@ jobs:
           import re
           import subprocess
           from pathlib import Path
-
           expected = {}
           for raw in Path("SOURCE-SHA256SUMS").read_text(encoding="utf-8").splitlines():
-              if not raw.strip():
-                  continue
-              match = re.fullmatch(r"([0-9a-f]{64})  (.+)", raw)
-              assert match, raw
-              expected[match.group(2)] = match.group(1)
+              if raw.strip():
+                  match = re.fullmatch(r"([0-9a-f]{64})  (.+)", raw)
+                  assert match, raw
+                  expected[match.group(2)] = match.group(1)
           tracked = set(subprocess.check_output(["git", "ls-files"], text=True).splitlines())
           tracked.discard("SOURCE-SHA256SUMS")
           assert set(expected) == tracked
