@@ -366,7 +366,7 @@ jobs:
               )
 
           result = naiveproxy_runtime.sync()
-          assert result.get("service") == "active", result
+          assert result.get("service") == "sg-gateway-naiveproxy.service", result
           assert result.get("users") == 1, result
           print(result)
           PY
@@ -380,6 +380,9 @@ jobs:
           sudo -u sg-naiveproxy test -r /etc/sg-gateway/naiveproxy/Caddyfile
           sudo -u sg-naiveproxy test -r /etc/sg-gateway/naiveproxy/tls/fullchain.pem
           sudo -u sg-naiveproxy test -r /etc/sg-gateway/naiveproxy/tls/privkey.pem
+          sudo -u sg-naiveproxy test -x /var/lib/sg-gateway
+          sudo -u sg-naiveproxy test -w /var/lib/sg-gateway/naiveproxy/xdg-data
+          sudo -u sg-naiveproxy test -w /var/lib/sg-gateway/naiveproxy/xdg-config
           sudo ss -H -ltn 'sport = :8447' | grep -q ':8447'
           test "$(sudo stat -c '%U:%G:%a' /etc/sg-gateway/naiveproxy/tls)" = "root:sg-naiveproxy:750"
           test "$(sudo stat -c '%U:%G:%a' /etc/sg-gateway/naiveproxy/tls/privkey.pem)" = "root:sg-naiveproxy:640"
@@ -410,5 +413,7 @@ jobs:
           sudo ss -ltnp | grep -E ':(8447|586|587)\b' || true
           sudo namei -l /etc/sg-gateway/naiveproxy/Caddyfile || true
           sudo namei -l /etc/sg-gateway/naiveproxy/tls/privkey.pem || true
+          sudo namei -l /var/lib/sg-gateway/naiveproxy/xdg-data || true
+          sudo namei -l /var/lib/sg-gateway/naiveproxy/xdg-config || true
           sudo tail -n 200 /var/log/sg-gateway-installer-02206.log || true
           sudo tail -n 200 /var/log/sg-gateway-full-uninstall-02206.log || true
