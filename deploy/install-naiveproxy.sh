@@ -7,7 +7,8 @@ RUNTIME_URL="https://github.com/klzgrad/forwardproxy/releases/download/${RUNTIME
 PREFIX="/opt/sg-gateway/naiveproxy"
 CONFIG_DIR="/etc/sg-gateway/naiveproxy"
 PANEL_CONFIG_DIR="/etc/sg-gateway"
-STATE_DIR="/var/lib/sg-gateway/naiveproxy"
+PANEL_STATE_DIR="/var/lib/sg-gateway"
+STATE_DIR="$PANEL_STATE_DIR/naiveproxy"
 CADDY_DATA_HOME="$STATE_DIR/xdg-data"
 CADDY_CONFIG_HOME="$STATE_DIR/xdg-config"
 SERVICE="sg-gateway-naiveproxy.service"
@@ -20,6 +21,7 @@ UPDATE_BRANCH="${SG_GATEWAY_UPDATE_BRANCH:-}"
 SOURCE_ROOT="${SG_GATEWAY_SOURCE_ROOT:-/opt/sg-gateway}"
 TX_DIR=""
 PANEL_CONFIG_MODE=""
+PANEL_STATE_MODE=""
 INSTALL_OK=0
 HAD_PREFIX=0
 HAD_CONFIG=0
@@ -133,6 +135,9 @@ rollback_install() {
     if [[ -n "$PANEL_CONFIG_MODE" && -d "$PANEL_CONFIG_DIR" ]]; then
       chmod "$PANEL_CONFIG_MODE" "$PANEL_CONFIG_DIR" || true
     fi
+    if [[ -n "$PANEL_STATE_MODE" && -d "$PANEL_STATE_DIR" ]]; then
+      chmod "$PANEL_STATE_MODE" "$PANEL_STATE_DIR" || true
+    fi
     systemctl daemon-reload >/dev/null 2>&1 || true
     restore_service_state "$HOSTD_SERVICE" "$HOSTD_WAS_ENABLED" "$HOSTD_WAS_ACTIVE"
     restore_service_state "$PANEL_SERVICE" "$PANEL_WAS_ENABLED" "$PANEL_WAS_ACTIVE"
@@ -158,6 +163,7 @@ done
 [[ -f "$SOURCE_ROOT/deploy/$SERVICE" ]] || die "NaiveProxy systemd unit is missing"
 [[ -f "$SOURCE_ROOT/hostd/systemd/$HOSTD_SERVICE" ]] || die "NaiveProxy-capable hostd unit is missing"
 [[ -d "$PANEL_CONFIG_DIR" ]] || die "Panel config directory is missing: $PANEL_CONFIG_DIR"
+[[ -d "$PANEL_STATE_DIR" ]] || die "Panel state directory is missing: $PANEL_STATE_DIR"
 
 TX_DIR="$(mktemp -d /root/sg-gateway-naiveproxy-install.XXXXXX)"
 snapshot_path "$PREFIX" prefix HAD_PREFIX
@@ -167,6 +173,7 @@ snapshot_path "$SERVICE_PATH" unit HAD_UNIT
 snapshot_path "$HOSTD_SERVICE_PATH" hostd-unit HAD_HOSTD_UNIT
 snapshot_path "$PANEL_ENV" panel-env HAD_PANEL_ENV
 PANEL_CONFIG_MODE="$(stat -c '%a' "$PANEL_CONFIG_DIR")"
+PANEL_STATE_MODE="$(stat -c '%a' "$PANEL_STATE_DIR")"
 id -u sg-naiveproxy >/dev/null 2>&1 && HAD_USER=1
 getent group sg-naiveproxy >/dev/null 2>&1 && HAD_GROUP=1
 systemctl is-active --quiet "$SERVICE" 2>/dev/null && WAS_ACTIVE=1
@@ -182,6 +189,7 @@ if ! id -u sg-naiveproxy >/dev/null 2>&1; then
   useradd --system --gid sg-naiveproxy --home-dir "$STATE_DIR" --shell /usr/sbin/nologin sg-naiveproxy
 fi
 chmod o+x "$PANEL_CONFIG_DIR"
+chmod o+x "$PANEL_STATE_DIR"
 install -d -o root -g sg-naiveproxy -m 0750 "$CONFIG_DIR"
 install -d -o sg-naiveproxy -g sg-naiveproxy -m 0700 "$STATE_DIR"
 install -d -o sg-naiveproxy -g sg-naiveproxy -m 0750 "$STATE_DIR/site"
