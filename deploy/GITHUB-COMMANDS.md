@@ -36,3 +36,5 @@ curl -4 -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/stable-0220
 ```text
 DELETE SG-GATEWAY
 ```
+
+<!-- retrigger -->
