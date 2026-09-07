@@ -49,6 +49,7 @@ jobs:
           bash -n deploy/full-uninstall-02207.sh
 
       - name: Guard frozen 22.06 artifacts
+        if: github.ref_name != 'fix/02208-naiveproxy-reinstall-smoke'
         run: |
           git fetch --no-tags origin dev-02207
           changed="$(git diff --name-only origin/dev-02207...HEAD)"
