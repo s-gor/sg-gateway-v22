@@ -3375,6 +3375,13 @@ EOF
 stage_configuration_and_database_02208() {
   stage_configuration_and_database
 
+  # stage_configuration_and_database recursively gives DATA_DIR to the panel user.
+  # Reclaim NaiveProxy private runtime state after that recursive chown.
+  install -d -o sg-naiveproxy -g sg-naiveproxy -m 0700 "$NAIVEPROXY_STATE"
+  install -d -o sg-naiveproxy -g sg-naiveproxy -m 0750 "$NAIVEPROXY_STATE/site"
+  install -d -o sg-naiveproxy -g sg-naiveproxy -m 0700 \
+    "$NAIVEPROXY_STATE/xdg-data" "$NAIVEPROXY_STATE/xdg-config"
+
   chmod o+x "$CONFIG_DIR"
   install -d -o root -g sg-naiveproxy -m 0750 "$NAIVEPROXY_CONFIG"
 
@@ -3453,6 +3460,21 @@ verify_naiveproxy_install_contract() {
   [[ -d "$NAIVEPROXY_STATE" ]]
   id -u sg-naiveproxy >/dev/null 2>&1
   getent group sg-naiveproxy >/dev/null
+
+  local state_path actual expected
+  for state_path in \
+    "$NAIVEPROXY_STATE" \
+    "$NAIVEPROXY_STATE/site" \
+    "$NAIVEPROXY_STATE/xdg-data" \
+    "$NAIVEPROXY_STATE/xdg-config"; do
+    actual="$(stat -c '%U:%G:%a' "$state_path")"
+    expected="sg-naiveproxy:sg-naiveproxy:700"
+    [[ "$state_path" != "$NAIVEPROXY_STATE/site" ]] || expected="sg-naiveproxy:sg-naiveproxy:750"
+    [[ "$actual" == "$expected" ]] || {
+      echo "NaiveProxy state ownership mismatch: $state_path: $actual (expected $expected)" >&2
+      return 1
+    }
+  done
 
   local installed_modules=""
   installed_modules="$("$NAIVEPROXY_PREFIX/bin/caddy" list-modules)"
