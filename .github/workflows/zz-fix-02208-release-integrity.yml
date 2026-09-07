@@ -1,0 +1,180 @@
+name: Fix 22.08 release source-integrity verification
+
+on:
+  push:
+    branches:
+      - release/02208-rc
+    paths:
+      - .github/workflows/zz-fix-02208-release-integrity.yml
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Replace mutable-working-tree verification with git-blob verification
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('.github/workflows/release-02208-stable.yml')
+          text = path.read_text(encoding='utf-8')
+          old = '''      - name: Verify source integrity
+        shell: bash
+        run: |
+          set -euo pipefail
+          tmp="$(mktemp)"
+          git ls-files -z | while IFS= read -r -d '' f; do
+            [ "$f" = "SOURCE-SHA256SUMS" ] && continue
+            sha256sum "$f"
+          done | LC_ALL=C sort -k2 > "$tmp"
+          diff -u SOURCE-SHA256SUMS "$tmp"
+'''
+          new = '''      - name: Verify source integrity
+        shell: bash
+        run: |
+          python3 -B - <<'PYVERIFY'
+          import hashlib
+          import re
+          import subprocess
+          from pathlib import Path
+
+          rows = Path("SOURCE-SHA256SUMS").read_text(encoding="utf-8").splitlines()
+          expected = {}
+          for line_no, raw in enumerate(rows, 1):
+              if not raw.strip():
+                  continue
+              match = re.fullmatch(r"([0-9a-f]{64})  (.+)", raw)
+              if match is None:
+                  raise SystemExit(f"invalid SOURCE-SHA256SUMS line {line_no}: {raw!r}")
+              digest, item = match.groups()
+              if item in expected:
+                  raise SystemExit(f"duplicate checksum path: {item}")
+              expected[item] = digest
+
+          tracked = set(subprocess.check_output(["git", "ls-files"], text=True, encoding="utf-8").splitlines())
+          tracked.discard("SOURCE-SHA256SUMS")
+          listed = set(expected)
+          problems = []
+          missing = sorted(tracked - listed)
+          extra = sorted(listed - tracked)
+          if missing:
+              problems.append(f"checksum inventory missing: {missing}")
+          if extra:
+              problems.append(f"checksum inventory extra: {extra}")
+
+          for item in sorted(tracked):
+              proc = subprocess.Popen(["git", "show", f"HEAD:{item}"], stdout=subprocess.PIPE)
+              assert proc.stdout is not None
+              digest = hashlib.sha256()
+              while True:
+                  chunk = proc.stdout.read(1024 * 1024)
+                  if not chunk:
+                      break
+                  digest.update(chunk)
+              rc = proc.wait()
+              if rc != 0:
+                  problems.append(f"git show failed for {item}: rc={rc}")
+                  continue
+              actual = digest.hexdigest()
+              wanted = expected.get(item)
+              if actual != wanted:
+                  problems.append(f"source hash mismatch: {item}: expected={wanted or '<missing>'} actual={actual}")
+
+          if problems:
+              print("Source integrity mismatches:")
+              for problem in problems:
+                  print(problem)
+              raise SystemExit(f"source integrity failed: {len(problems)} problem(s)")
+          print(f"Git-blob source integrity ok: {len(tracked)} tracked files verified")
+          PYVERIFY
+'''
+          count = text.count(old)
+          if count != 1:
+              raise SystemExit(f'expected one release integrity block, found {count}')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+
+      - name: Refresh SOURCE-SHA256SUMS for the workflow change
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib
+          import subprocess
+
+          raw = subprocess.check_output(["git", "ls-files", "-z"])
+          paths = [item.decode("utf-8") for item in raw.split(b"\0") if item]
+          rows = []
+          for item in paths:
+              if item == "SOURCE-SHA256SUMS":
+                  continue
+              rows.append(f"{hashlib.sha256(Path(item).read_bytes()).hexdigest()}  {item}\n")
+          Path("SOURCE-SHA256SUMS").write_text("".join(rows), encoding="utf-8")
+          print(f"refreshed SOURCE-SHA256SUMS: {len(rows)} files")
+          PY
+
+      - name: Commit release verification fix
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/workflows/release-02208-stable.yml SOURCE-SHA256SUMS
+          git diff --cached --check
+          git diff --cached --stat
+          git commit -m "fix: verify 22.08 release integrity from git blobs"
+
+      - name: Verify committed source snapshot before push
+        shell: bash
+        run: |
+          python3 -B - <<'PY'
+          import hashlib
+          import re
+          import subprocess
+          from pathlib import Path
+
+          expected = {}
+          for line_no, raw in enumerate(Path("SOURCE-SHA256SUMS").read_text(encoding="utf-8").splitlines(), 1):
+              if not raw.strip():
+                  continue
+              match = re.fullmatch(r"([0-9a-f]{64})  (.+)", raw)
+              if match is None:
+                  raise SystemExit(f"invalid SOURCE-SHA256SUMS line {line_no}: {raw!r}")
+              digest, item = match.groups()
+              if item in expected:
+                  raise SystemExit(f"duplicate checksum path: {item}")
+              expected[item] = digest
+
+          tracked = set(subprocess.check_output(["git", "ls-files"], text=True, encoding="utf-8").splitlines())
+          tracked.discard("SOURCE-SHA256SUMS")
+          assert set(expected) == tracked, (sorted(tracked - set(expected)), sorted(set(expected) - tracked))
+          for item in sorted(tracked):
+              data = subprocess.check_output(["git", "show", f"HEAD:{item}"])
+              actual = hashlib.sha256(data).hexdigest()
+              if actual != expected[item]:
+                  raise SystemExit(f"source hash mismatch after commit: {item}")
+          print(f"post-commit git-blob verification ok: {len(tracked)} files")
+          PY
+
+      - name: Push fixed main
+        shell: bash
+        run: git push origin HEAD:main
+
+      - name: Remove transient workflow from RC branch
+        shell: bash
+        run: |
+          git fetch origin release/02208-rc
+          git checkout -B release/02208-rc origin/release/02208-rc
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/zz-fix-02208-release-integrity.yml
+          git commit -m "ci: remove transient 22.08 release-integrity fixer"
+          git push origin HEAD:release/02208-rc
