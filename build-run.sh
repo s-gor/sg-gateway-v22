@@ -249,7 +249,7 @@ cat "$PAYLOAD" >> "$OUT"
 chmod +x "$OUT"
 
 awk -v marker="$PAYLOAD_MARKER" '$0 == marker { exit } { print }' "$OUT" | bash -n
-"$OUT" --verify-only
+bash "$OUT" --verify-only
 RUN_SHA="$(sha256sum "$OUT" | awk '{print $1}')"
 printf '%s  %s\n' "$RUN_SHA" "$(basename "$OUT")" > "$SHA_FILE"
 rm -f "$TRANSFER_ZIP"
