@@ -1,0 +1,52 @@
+name: TEMP refresh 22.08 source integrity for NaiveProxy fix
+
+on:
+  push:
+    branches:
+      - fix/02208-naiveproxy-reinstall-smoke
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/02208-naiveproxy-reinstall-smoke
+          fetch-depth: 0
+
+      - name: Remove temporary workflow and regenerate source inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm .github/workflows/_temp-refresh-source-naiveproxy-02208.yml
+          python3 -B - <<'PY'
+          import hashlib
+          import subprocess
+          from pathlib import Path
+
+          tracked = sorted(
+              path for path in subprocess.check_output(
+                  ["git", "ls-files"], text=True, encoding="utf-8"
+              ).splitlines()
+              if path != "SOURCE-SHA256SUMS"
+          )
+          rows = []
+          for path in tracked:
+              digest = hashlib.sha256(Path(path).read_bytes()).hexdigest()
+              rows.append(f"{digest}  {path}")
+          Path("SOURCE-SHA256SUMS").write_text("\n".join(rows) + "\n", encoding="utf-8")
+          print(f"regenerated {len(rows)} entries")
+          PY
+
+      - name: Commit refreshed inventory to fix branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "sg-gateway-integrity-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add SOURCE-SHA256SUMS
+          git commit -m "build: refresh 22.08 source integrity for NaiveProxy smoke"
+          git push origin HEAD:fix/02208-naiveproxy-reinstall-smoke
