@@ -1,0 +1,48 @@
+name: Temporary finalize AWG23 restore fix
+on:
+  push:
+    branches: [fix/02208-awg23-restore-repair-persist]
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/02208-awg23-restore-repair-persist
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: python -m pip install -r requirements-dev.txt
+      - name: Verify late rollback regression
+        env:
+          PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/hostd
+        run: |
+          pytest -q tests/test_clients_keys_tls_contract_fix_awg_persist.py
+          pytest -q tests/test_clients_keys_dormant_restore_02208.py
+          python -m py_compile hostd/sg_hostd/clients_keys_tls_contract_fix.py hostd/sg_hostd/clients_keys_portable_restore_patch.py
+      - name: Remove helper and regenerate source manifest
+        run: |
+          git rm .github/workflows/_tmp-finalize-awg23-restore.yml
+          python - <<'PY'
+          import hashlib, subprocess
+          from pathlib import Path
+
+          paths = subprocess.check_output(['git', 'ls-files'], text=True).splitlines()
+          paths = sorted(p for p in paths if p != 'SOURCE-SHA256SUMS')
+          rows = []
+          for path in paths:
+              digest = hashlib.sha256(Path(path).read_bytes()).hexdigest()
+              rows.append(f'{digest}  {path}')
+          Path('SOURCE-SHA256SUMS').write_text('\n'.join(rows) + '\n', encoding='utf-8')
+          PY
+          git add SOURCE-SHA256SUMS tests/test_clients_keys_tls_contract_fix_awg_persist.py hostd/sg_hostd/clients_keys_tls_contract_fix.py
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'fix: stop late AWG restore rollback'
+          git push origin HEAD:fix/02208-awg23-restore-repair-persist
