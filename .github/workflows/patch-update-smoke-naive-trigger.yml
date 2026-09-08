@@ -9,30 +9,31 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - name: Patch trigger and refresh checksum
+      - name: Add updater contract note and refresh checksum
         shell: bash
         run: |
           set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
-          p = Path('.github/workflows/update-idle-awg3-smoke.yml')
+          p = Path('deploy/update-from-github.sh')
           text = p.read_text(encoding='utf-8')
-          needle = '      - deploy/update-from-github.sh\n'
-          assert text.count(needle) == 2
-          text = text.replace(needle, needle + '      - deploy/install-naiveproxy.sh\n')
-          p.write_text(text, encoding='utf-8')
+          needle = 'set -Eeuo pipefail\n\n'
+          note = '# NaiveProxy runtime self-repair is part of the transactional core update contract.\n'
+          assert note not in text
+          assert needle in text
+          p.write_text(text.replace(needle, needle + note, 1), encoding='utf-8')
           PY
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git rm .github/workflows/patch-update-smoke-naive-trigger.yml
-          git add .github/workflows/update-idle-awg3-smoke.yml
+          git add deploy/update-from-github.sh
           tmp="$(mktemp)"
           git ls-files -z | while IFS= read -r -d '' f; do
             [ "$f" = "SOURCE-SHA256SUMS" ] && continue
+            [ "$f" = ".github/workflows/patch-update-smoke-naive-trigger.yml" ] && continue
             digest="$(sha256sum "$f" | cut -d' ' -f1)"
             printf '%s  %s\n' "$digest" "$f"
           done | LC_ALL=C sort -k2 > "$tmp"
           mv "$tmp" SOURCE-SHA256SUMS
           git add SOURCE-SHA256SUMS
-          git commit -m 'ci: cover NaiveProxy installer in update smoke'
+          git commit -m 'ci: trigger full update smoke for NaiveProxy repair'
           git push origin HEAD:fix/02208-update-smoke-naive-trigger
