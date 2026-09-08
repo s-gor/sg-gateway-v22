@@ -26,12 +26,18 @@ def test_portable_restore_runtime_reconcile_is_nonfatal_when_destination_runtime
     """Durable Clients & Keys restore must survive transient runtime unavailability."""
 
     monkeypatch.setattr(portable_restore.Path, "is_file", lambda self: True)
-    full = SimpleNamespace(
-        _probe=lambda *args, **kwargs: _ProbeResult(
+    captured: dict = {}
+
+    def probe(*args, **kwargs):
+        captured.update(kwargs)
+        return _ProbeResult(
             1,
             stdout='{"ok": false, "error": "xray runtime is not configured"}',
-        ),
-        _runtime_subprocess_env=lambda: {},
+        )
+
+    full = SimpleNamespace(
+        _probe=probe,
+        _runtime_subprocess_env=lambda: {"EXISTING": "1"},
     )
 
     result = portable_restore._apply_portable_clients_runtime_required(full)
@@ -39,6 +45,8 @@ def test_portable_restore_runtime_reconcile_is_nonfatal_when_destination_runtime
     assert result is not None
     assert result["ok"] is False
     assert result["deferred"] is True
+    assert captured["env"]["EXISTING"] == "1"
+    assert captured["env"]["SG_GATEWAY_CLIENTS_KEYS_RESTORE"] == "1"
 
 
 def test_applied_xray_credential_is_not_export_ready_when_connection_is_disabled(
@@ -122,6 +130,61 @@ def test_destination_runtime_policy_hides_only_unready_engine_and_restores_crede
     finally:
         db.close()
     assert statuses == {"amneziawg": "applied", "xray": "applied"}
+
+
+def test_naiveproxy_missing_runtime_is_deferred_only_during_clients_keys_restore(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A restored NaiveProxy credential survives when its destination runtime is absent."""
+
+    from sg_hostd import naiveproxy_client_runtime_patch as naive_patch
+
+    database_path = tmp_path / "sg-gateway.sqlite"
+    db = sqlite3.connect(database_path)
+    try:
+        db.execute("CREATE TABLE connection_settings (engine TEXT, host TEXT)")
+        db.execute("CREATE TABLE device_credentials (engine TEXT)")
+        db.execute(
+            "INSERT INTO connection_settings VALUES ('naiveproxy', 'vpn.example.test')"
+        )
+        db.execute("INSERT INTO device_credentials VALUES ('naiveproxy')")
+        db.commit()
+    finally:
+        db.close()
+
+    sync_calls: list[str] = []
+    runtime = SimpleNamespace(
+        DB_PATH=database_path,
+        BINARY=tmp_path / "missing-caddy",
+        _load=lambda: (
+            {"domain": "vpn.example.test", "port": 8447},
+            [{"username": "restored-user", "password": "restored-password-123456"}],
+            [41],
+        ),
+        sync=lambda: sync_calls.append("sync") or (_ for _ in ()).throw(
+            RuntimeError("NaiveProxy runtime is not installed")
+        ),
+        _redact=str,
+    )
+    base = lambda: {"ok": True, "message": "base applied", "engines": []}
+    client_runtime = SimpleNamespace(
+        apply_all_clients=base,
+        ClientRuntimeError=RuntimeError,
+    )
+    commands = SimpleNamespace(apply_all_clients=base)
+    naive_patch.install(client_runtime, commands, runtime)
+    monkeypatch.setenv("SG_GATEWAY_CLIENTS_KEYS_RESTORE", "1")
+
+    result = client_runtime.apply_all_clients()
+
+    assert result["ok"] is True
+    assert sync_calls == []
+    naive = result["engines"][-1]
+    assert naive["engine"] == "naiveproxy"
+    assert naive["ok"] is False
+    assert naive["deferred"] is True
+    assert naive["credentials"] == 1
 
 
 def test_xray_tls_profile_wakes_up_with_same_restored_uuid(
