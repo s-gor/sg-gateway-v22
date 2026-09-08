@@ -117,6 +117,8 @@ AWG3_SERVICE="sg-gateway-awg3.service"
 AWG3_CONFIG="/etc/amnezia/amneziawg/awg3.conf"
 AWG3_UNIT="/etc/systemd/system/sg-gateway-awg3.service"
 AWG3_ROOT="$PREFIX/awg3"
+NAIVE_SERVICE="sg-gateway-naiveproxy.service"
+NAIVE_ROOT="$PREFIX/naiveproxy"
 TEMP_DIR=""
 BACKUP_DIR=""
 SOURCE_DIR=""
@@ -450,7 +452,7 @@ capture_service_states() {
   : > "$output"
   for service in \
     nginx.service xray.service mihomo.service sg-gateway-awg.service "$AWG3_SERVICE" \
-    sg-gateway-singbox.service "$HOSTD_SERVICE" "$PANEL_SERVICE"; do
+    sg-gateway-singbox.service "$NAIVE_SERVICE" "$HOSTD_SERVICE" "$PANEL_SERVICE"; do
     active=0
     enabled=0
     failed=0
@@ -542,6 +544,7 @@ values = [
     "/etc/amnezia/amneziawg/awg3.conf",
     "/etc/systemd/system/sg-gateway-awg3.service",
     "/opt/sg-gateway/awg3",
+    "/opt/sg-gateway/naiveproxy",
 ]
 for raw in sys.argv[2:]:
     raw = str(raw or "").strip()
@@ -1141,7 +1144,7 @@ deploy_source() {
   local child
   while IFS= read -r -d '' child; do
     case "$(basename "$child")" in
-      ".venv"|"awg3") continue ;;
+      ".venv"|"awg3"|"naiveproxy") continue ;;
       "assets") continue ;;
     esac
     rm -rf "$child"
@@ -1155,13 +1158,13 @@ deploy_source() {
   fi
   chmod 0755 "$PREFIX"
   find "$PREFIX" \
-    \( -path "$PREFIX/.venv" -o -path "$PREFIX/assets" -o -path "$AWG3_ROOT" \) -prune -o \
+    \( -path "$PREFIX/.venv" -o -path "$PREFIX/assets" -o -path "$AWG3_ROOT" -o -path "$NAIVE_ROOT" \) -prune -o \
     -exec chown root:root {} +
   find "$PREFIX" \
-    \( -path "$PREFIX/.venv" -o -path "$PREFIX/assets" -o -path "$AWG3_ROOT" \) -prune -o \
+    \( -path "$PREFIX/.venv" -o -path "$PREFIX/assets" -o -path "$AWG3_ROOT" -o -path "$NAIVE_ROOT" \) -prune -o \
     -type d -exec chmod 0755 {} +
   find "$PREFIX" \
-    \( -path "$PREFIX/.venv" -o -path "$PREFIX/assets" -o -path "$AWG3_ROOT" \) -prune -o \
+    \( -path "$PREFIX/.venv" -o -path "$PREFIX/assets" -o -path "$AWG3_ROOT" -o -path "$NAIVE_ROOT" \) -prune -o \
     -type f -exec chmod 0644 {} +
   find "$PREFIX/deploy" -maxdepth 1 -type f -name '*.sh' -exec chmod 0755 {} + 2>/dev/null || true
   chmod -R a+rX "$PREFIX/.venv"

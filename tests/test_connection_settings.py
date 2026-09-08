@@ -1,3 +1,6 @@
+from types import SimpleNamespace
+
+from app.clients import exports
 from app.clients.exports import build_awg_config, build_xray_link
 from app.clients.repository import create_client, get_client
 from app.connections.service import list_connections
@@ -30,6 +33,25 @@ def test_update_connection_settings_changes_new_exports(tmp_path, monkeypatch):
     xray_config["short_id"] = "abc123"
     updated = update_connection_settings("xray", "xray.test", 443, xray_config)
     assert updated is True
+
+    monkeypatch.setattr(
+        exports,
+        "_xray_profile",
+        lambda profile_id: (
+            {"host": "xray.test", "tls_domain": ""},
+            SimpleNamespace(
+                id=profile_id,
+                title="VLESS Reality TCP",
+                enabled=True,
+                ready=True,
+                port=443,
+                path="",
+                mode="",
+                xmux_enabled=False,
+                xmux=None,
+            ),
+        ),
+    )
 
     client_id = create_client(
         "Irina",

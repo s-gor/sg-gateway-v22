@@ -9,6 +9,7 @@ def test_runtime_installer_accepts_current_02208_release_channels():
     assert 'stable-02208' in source
     assert 'release/02208-*' in source
     assert 'feature/02208-*' in source
+    assert 'fix/02208-*' in source
     assert 'Refusing invalid 22.08 update channel' in source
     assert 'Refusing invalid 22.07 update channel' not in source
 

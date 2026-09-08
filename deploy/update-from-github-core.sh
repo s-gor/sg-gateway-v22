@@ -41,6 +41,8 @@ AWG31_CONFIG="$(system_path /etc/amnezia/amneziawg/awg31)"
 AWG31_STATE="$(system_path /var/lib/sg-gateway/awg31)"
 AWG31_UNIT="$(system_path /etc/systemd/system/sg-gateway-awg31.service)"
 AWG3_ROOT="$PREFIX/awg3"
+NAIVE_SERVICE="sg-gateway-naiveproxy.service"
+NAIVE_ROOT="$PREFIX/naiveproxy"
 LETSENCRYPT_DIR="$(system_path /etc/letsencrypt)"
 NGINX_CONFIG="$(system_path /etc/nginx/nginx.conf)"
 NGINX_SITE_AVAILABLE="$(system_path /etc/nginx/sites-available/sg-gateway)"
@@ -610,7 +612,7 @@ capture_service_states() {
   : > "$output"
   for service in \
     nginx.service xray.service mihomo.service sg-gateway-awg.service "$AWG3_SERVICE" "$AWG31_SERVICE" \
-    sg-gateway-singbox.service "$HOSTD_SERVICE" "$PANEL_SERVICE"; do
+    sg-gateway-singbox.service "$NAIVE_SERVICE" "$HOSTD_SERVICE" "$PANEL_SERVICE"; do
     active=0
     enabled=0
     failed=0
@@ -694,7 +696,7 @@ protected_runtime_paths() {
     "$LETSENCRYPT_DIR" "$DATA_DIR/security/tls-state.json" \
     "$AWG2_CONFIG" "$AWG2_UNIT" \
     "$AWG3_CONFIG" "$AWG3_ROOT" \
-    "$AWG31_CONFIG" "$AWG31_STATE" "$AWG31_UNIT" "$PREFIX/awg31" \
+    "$AWG31_CONFIG" "$AWG31_STATE" "$AWG31_UNIT" "$PREFIX/awg31" "$NAIVE_ROOT" \
     -- "$cert" "$key" <<'PYPROTECTED'
 import os
 import sys
@@ -1252,6 +1254,7 @@ prepare_source_light() {
     /app/ \
     /hostd/requirements.txt \
     /hostd/sg_hostd/ \
+    /hostd/systemd/ \
     /deploy/ \
     /vendor/cores/amneziawg-tools-3.0.20260805.tar.gz \
     /vendor/cores/amneziawg-go-linux-amd64-v3.0.0 \
@@ -1331,6 +1334,51 @@ PYCHECK
 }
 
 # SG_GATEWAY_02112_LIGHT_UPDATE_ASSET_PRESERVE_FIX10
+naiveproxy_profile_present() {
+  [[ -f "$DATABASE" ]] || return 1
+  "$PREFIX/.venv/bin/python" -B - "$DATABASE" <<'PYNAIVEPROFILE'
+import sqlite3
+import sys
+
+connection = sqlite3.connect(f"file:{sys.argv[1]}?mode=ro", uri=True)
+try:
+    tables = {
+        str(row[0])
+        for row in connection.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        ).fetchall()
+    }
+    count = 0
+    if "connection_settings" in tables:
+        count += int(connection.execute(
+            "SELECT COUNT(*) FROM connection_settings WHERE engine='naiveproxy'"
+        ).fetchone()[0])
+    if "device_credentials" in tables:
+        count += int(connection.execute(
+            "SELECT COUNT(*) FROM device_credentials WHERE engine='naiveproxy'"
+        ).fetchone()[0])
+finally:
+    connection.close()
+raise SystemExit(0 if count else 1)
+PYNAIVEPROFILE
+}
+
+repair_naiveproxy_runtime_if_needed() {
+  [[ "$SYSTEM_ROOT" == / ]] || return 0
+  [[ -x "$NAIVE_ROOT/bin/caddy" ]] && return 0
+  naiveproxy_profile_present || return 0
+  [[ -f "$PREFIX/deploy/install-naiveproxy.sh" ]] || fail "NaiveProxy runtime is missing and installer is unavailable"
+  [[ -f "$PREFIX/deploy/$NAIVE_SERVICE" ]] || fail "NaiveProxy runtime is missing and service source is unavailable"
+  [[ -f "$PREFIX/hostd/systemd/$HOSTD_SERVICE" ]] || fail "NaiveProxy runtime is missing and hostd systemd source is unavailable"
+
+  printf '[SG-Gateway Update] NaiveProxy profile exists but runtime is missing; repairing pinned runtime...\n'
+  SG_GATEWAY_SOURCE_ROOT="$PREFIX" \
+  SG_GATEWAY_UPDATE_BRANCH="$BRANCH" \
+    bash "$PREFIX/deploy/install-naiveproxy.sh"
+  [[ -x "$NAIVE_ROOT/bin/caddy" ]] || fail "NaiveProxy runtime repair did not install caddy"
+  printf '[SG-Gateway Update] NaiveProxy runtime repaired: OK\n'
+}
+
 prepare_preserved_assets() {
   local live="$PREFIX/assets"
   local country_rel="geoip/sg-country-geoip.dat"
@@ -1396,7 +1444,7 @@ deploy_source() {
   find "$PREFIX" -mindepth 1 -maxdepth 1 -print0 > "$children"
   while IFS= read -r -d '' child; do
     case "$(basename "$child")" in
-      ".venv"|"awg3") continue ;;
+      ".venv"|"awg3"|"naiveproxy") continue ;;
       "assets") continue ;;
     esac
     rm -rf "$child"
@@ -1410,13 +1458,13 @@ deploy_source() {
   fi
   chmod 0755 "$PREFIX"
   find "$PREFIX" \
-    \( -path "$PREFIX/.venv" -o -path "$PREFIX/assets" -o -path "$AWG3_ROOT" \) -prune -o \
+    \( -path "$PREFIX/.venv" -o -path "$PREFIX/assets" -o -path "$AWG3_ROOT" -o -path "$NAIVE_ROOT" \) -prune -o \
     -exec chown root:root {} +
   find "$PREFIX" \
-    \( -path "$PREFIX/.venv" -o -path "$PREFIX/assets" -o -path "$AWG3_ROOT" \) -prune -o \
+    \( -path "$PREFIX/.venv" -o -path "$PREFIX/assets" -o -path "$AWG3_ROOT" -o -path "$NAIVE_ROOT" \) -prune -o \
     -type d -exec chmod 0755 {} +
   find "$PREFIX" \
-    \( -path "$PREFIX/.venv" -o -path "$PREFIX/assets" -o -path "$AWG3_ROOT" \) -prune -o \
+    \( -path "$PREFIX/.venv" -o -path "$PREFIX/assets" -o -path "$AWG3_ROOT" -o -path "$NAIVE_ROOT" \) -prune -o \
     -type f -exec chmod 0644 {} +
   find "$PREFIX/deploy" -maxdepth 1 -type f -name '*.sh' -exec chmod 0755 {} + 2>/dev/null || true
 
@@ -1603,6 +1651,12 @@ main() {
   run_stage 5 "Перезапуск только panel + hostd" restart_panel
   run_stage 6 "AWG31 Stage3A migration внутри Update transaction" run_stage3a_migration
   run_stage 7 "Проверка HTTPS, credentials, Nginx и runtime" verify_final
+
+  # Repair a runtime that was already missing before this Update only after
+  # all pre-existing protected runtime has passed the immutability checks.
+  # The global ERR trap is still active here, so a failed repair rolls the
+  # entire Update back to the Safety Backup.
+  repair_naiveproxy_runtime_if_needed
   bind_panel_update_state
 
   if ! prune_safety_backups "$BACKUP_KEEP"; then
