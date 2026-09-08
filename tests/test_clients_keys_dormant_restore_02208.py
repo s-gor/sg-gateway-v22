@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 import sqlite3
+import sys
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "hostd"))
 
 from app.clients import exports
 from sg_hostd import clients_keys_portable_restore_patch as portable_restore
