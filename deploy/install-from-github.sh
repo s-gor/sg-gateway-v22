@@ -142,10 +142,28 @@ wait_for_cloud_init() {
   fi
 
   printf '[SG-Gateway] Waiting for cloud-init to finish...\n'
-  if ! cloud-init status --wait; then
-    fail "cloud-init did not finish successfully; resolve the Ubuntu first-boot state and rerun the installer"
+  local cloud_init_output="" cloud_init_rc=0
+  set +e
+  cloud_init_output="$(cloud-init status --wait 2>&1)"
+  cloud_init_rc=$?
+  set -e
+  printf '%s\n' "$cloud_init_output"
+
+  if (( cloud_init_rc == 0 )); then
+    printf '[SG-Gateway] cloud-init: ready.\n'
+    return 0
   fi
-  printf '[SG-Gateway] cloud-init: ready.\n'
+
+  # cloud-init 24.x uses exit code 2 when initialization completed with
+  # recoverable/degraded errors.  A completed first boot must not block the
+  # SG-Gateway installer; later apt/network preflights still fail normally if
+  # the machine is genuinely unusable.
+  if (( cloud_init_rc == 2 )) && grep -Eq '(^|[[:space:]])status:[[:space:]]*done([[:space:]]|$)' <<<"$cloud_init_output"; then
+    printf '[SG-Gateway] cloud-init: completed with recoverable errors; continuing.\n'
+    return 0
+  fi
+
+  fail "cloud-init did not finish successfully; resolve the Ubuntu first-boot state and rerun the installer"
 }
 
 require_free_space() {
