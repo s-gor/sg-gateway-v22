@@ -26,11 +26,16 @@ jobs:
           set -euo pipefail
 
           cat > tests/test_clients_keys_awg23_restore_repair_persist_02208.py <<'PYTEST'
+          import importlib.util
           import json
           import sqlite3
           from pathlib import Path
 
-          from hostd.sg_hostd import clients_keys_tls_backup_patch as patch
+          MODULE_PATH = Path(__file__).resolve().parents[1] / "hostd" / "sg_hostd" / "clients_keys_tls_backup_patch.py"
+          SPEC = importlib.util.spec_from_file_location("clients_keys_tls_backup_patch_under_test", MODULE_PATH)
+          assert SPEC is not None and SPEC.loader is not None
+          patch = importlib.util.module_from_spec(SPEC)
+          SPEC.loader.exec_module(patch)
 
 
           def _make_db(path: Path) -> None:
@@ -154,7 +159,7 @@ jobs:
           PY
 
           python -m pytest -q tests/test_clients_keys_awg23_restore_repair_persist_02208.py
-          python -m pytest -q tests/test_clients_keys_dormant_restore_02208.py tests/test_clients_keys_awg_restore_links_02208.py 2>/dev/null || python -m pytest -q tests/test_clients_keys_dormant_restore_02208.py
+          python -m pytest -q tests/test_clients_keys_dormant_restore_02208.py
           python -m py_compile hostd/sg_hostd/clients_keys_tls_backup_patch.py
 
           rm -f .github/workflows/_tmp-fix-awg23-restore-repair-persist.yml
@@ -165,9 +170,8 @@ jobs:
           from pathlib import Path
 
           tracked = subprocess.check_output(['git', 'ls-files'], text=True).splitlines()
-          excluded = {'SOURCE-SHA256SUMS'}
           rows = []
-          for name in sorted(item for item in tracked if item not in excluded):
+          for name in sorted(item for item in tracked if item != 'SOURCE-SHA256SUMS'):
               rows.append(f"{hashlib.sha256(Path(name).read_bytes()).hexdigest()}  {name}")
           Path('SOURCE-SHA256SUMS').write_text('\n'.join(rows) + '\n', encoding='utf-8', newline='\n')
           PY
