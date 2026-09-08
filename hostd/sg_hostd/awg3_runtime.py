@@ -438,6 +438,10 @@ def apply_awg3() -> cr.EngineResult:
         raise cr.ClientRuntimeError(f"AWG3 runtime helper missing: {AWG3_HELPER}")
     secrets = _ensure_server_secrets()
     _repair_configs(secrets)
+    # _repair_configs() commits destination server fields/public keys to DB.
+    # Re-read rows so rendering uses the repaired config_json instead of the
+    # stale pre-repair sqlite Row snapshots captured above.
+    rows = cr._deployment_rows(ENGINE)
 
     candidate = cr.CANDIDATE_DIR / "awg3.conf"
     backup = AWG3_CONFIG.with_suffix(".conf.previous")

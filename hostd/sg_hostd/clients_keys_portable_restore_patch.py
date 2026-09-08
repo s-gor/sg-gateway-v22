@@ -47,10 +47,17 @@ def _apply_portable_clients_runtime_required(full: ModuleType) -> dict:
         }
     code = (
         "import json,sys; "
-        "from sg_hostd.client_runtime import apply_all_clients; "
-        "r=apply_all_clients(); "
+        "from sg_hostd import client_runtime as cr; "
+        "from sg_hostd.awg3_runtime import apply_awg3; "
+        "cr._repair_deployment_configs(); "
+        "awg2=cr._apply_awg(); "
+        "awg3=apply_awg3(); "
+        "r=cr.apply_all_clients(); "
+        "r['restore_awg23']=["
+        "{'engine':awg2.engine,'ok':awg2.ok,'message':awg2.message,'clients':awg2.clients},"
+        "{'engine':awg3.engine,'ok':awg3.ok,'message':awg3.message,'clients':awg3.clients}]; "
         "print(json.dumps(r,ensure_ascii=False,indent=2,default=str)); "
-        "sys.exit(0 if r.get('ok') else 1)"
+        "sys.exit(0 if r.get('ok') and awg2.ok and awg3.ok else 1)"
     )
     runtime_env = dict(full._runtime_subprocess_env())
     runtime_env["SG_GATEWAY_CLIENTS_KEYS_RESTORE"] = "1"
