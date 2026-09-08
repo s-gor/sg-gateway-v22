@@ -118,3 +118,73 @@ def test_destination_runtime_policy_hides_only_unready_engine_and_restores_crede
     finally:
         db.close()
     assert statuses == {"amneziawg": "applied", "xray": "applied"}
+
+
+def test_xray_tls_profile_wakes_up_with_same_restored_uuid(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Profile readiness may change; the shared restored Xray UUID must not."""
+
+    restored_uuid = "11111111-2222-3333-4444-555555555555"
+    client = SimpleNamespace(id=1, name="Restored", enabled=True)
+    device = SimpleNamespace(id=7, name="Primary", is_primary=True, enabled=True)
+    config = {
+        "uuid": restored_uuid,
+        "profiles": ["reality_tcp", "xhttp_tls"],
+    }
+    current = SimpleNamespace(
+        enabled=True,
+        host="vpn.example.com",
+        port=443,
+        config={
+            "public_key": "server-public-key",
+            "short_id": "0123456789abcdef",
+            "fingerprint": "firefox",
+            "server_name": "www.microsoft.com",
+            "vless_encryption": "mlkem768x25519plus.native/xorpub/random.5min.0rtt",
+        },
+    )
+    tls_ready = {"value": False}
+
+    def profile(profile_id: str):
+        ready = profile_id == "reality_tcp" or tls_ready["value"]
+        port = 443 if profile_id == "xhttp_tls" else 8443
+        return (
+            {"host": "vpn.example.com", "tls_domain": "vpn.example.com"},
+            SimpleNamespace(
+                id=profile_id,
+                title=profile_id,
+                enabled=True,
+                ready=ready,
+                port=port,
+                path="/xhttp",
+                mode="auto",
+                xmux_enabled=False,
+                xmux=None,
+            ),
+        )
+
+    monkeypatch.setattr(exports, "_deployment_config", lambda *args, **kwargs: config)
+    monkeypatch.setattr(exports, "_xray_profile", profile)
+    monkeypatch.setattr(exports, "get_connection_settings", lambda engine: current)
+    monkeypatch.setattr(exports, "pending_settings_transaction", lambda engine: None)
+    monkeypatch.setattr(exports, "_public_export_host", lambda *args: "vpn.example.com")
+    monkeypatch.setattr(
+        exports,
+        "_working_tls_domain",
+        lambda: "vpn.example.com" if tls_ready["value"] else "",
+    )
+
+    reality = exports.build_xray_profile_link(client, "reality_tcp", device)
+    dormant_tls = exports.build_xray_profile_link(client, "xhttp_tls", device)
+
+    assert reality.body
+    assert restored_uuid in reality.body
+    assert dormant_tls.body == ""
+
+    tls_ready["value"] = True
+    awakened_tls = exports.build_xray_profile_link(client, "xhttp_tls", device)
+
+    assert awakened_tls.body
+    assert restored_uuid in awakened_tls.body
+    assert config["uuid"] == restored_uuid
