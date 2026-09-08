@@ -2,7 +2,14 @@ from __future__ import annotations
 
 import json
 
-from app.naiveproxy.runtime import DEFAULT_PORT, NaiveProxySettings, NaiveProxyUser, build_client_uri, generate_user
+from app.naiveproxy.runtime import (
+    DEFAULT_PORT,
+    NaiveProxySettings,
+    NaiveProxyUser,
+    build_client_uri,
+    generate_user,
+    normalize_domain,
+)
 
 DEFAULT_CONNECTION = {
     "host": "",
@@ -18,6 +25,35 @@ DEFAULT_CONNECTION = {
         sort_keys=True,
     ),
 }
+
+
+def _effective_naiveproxy_domain(settings, credential: dict, tls: dict) -> str:
+    """Resolve the TLS hostname used by NaiveProxy clients.
+
+    NaiveProxy is certificate-bound: when SG-Gateway HTTPS is ready, the
+    certificate domain is authoritative even if the generic Connection host
+    contains the server public IP.  Fall back to stored NaiveProxy-specific
+    domain values only when there is no ready HTTPS domain.
+    """
+
+    candidates: list[str] = []
+    if bool(tls.get("https_ready")):
+        candidates.append(str(tls.get("domain") or ""))
+    candidates.extend(
+        (
+            str(getattr(settings, "config", {}).get("domain") or ""),
+            str(credential.get("host") or ""),
+            str(getattr(settings, "host", "") or ""),
+        )
+    )
+    for candidate in candidates:
+        if not candidate.strip():
+            continue
+        try:
+            return normalize_domain(candidate)
+        except Exception:
+            continue
+    return normalize_domain("")
 
 
 def _restore_connection_settings(previous) -> bool:
@@ -78,8 +114,7 @@ def _prepare_runtime_settings():
             "SELECT COUNT(*) AS total FROM device_credentials WHERE engine = 'naiveproxy'"
         ).fetchone()
     assigned_total = int(assigned["total"] or 0)
-    configured_host = str(setting["host"] or "").strip() if setting else ""
-    if configured_host or assigned_total == 0:
+    if assigned_total == 0:
         return None
 
     from app.security.tls import overview as tls_overview
@@ -92,8 +127,19 @@ def _prepare_runtime_settings():
     domain = str(tls.get("domain") or "").strip()
     if not tls.get("https_ready") or not domain:
         raise RuntimeError("NaiveProxy требует настроенный HTTPS в Security")
+    domain = normalize_domain(domain)
 
     previous = get_connection_settings("naiveproxy")
+    configured_host = str(setting["host"] or "").strip() if setting else ""
+    configured_domain = ""
+    if configured_host:
+        try:
+            configured_domain = normalize_domain(configured_host)
+        except Exception:
+            configured_domain = ""
+    if configured_domain == domain and str(previous.config.get("domain") or "").strip() == domain:
+        return None
+
     updated = update_connection_settings(
         "naiveproxy",
         domain,
@@ -189,8 +235,10 @@ def install() -> None:
         if engine != "naiveproxy":
             return original_builder(engine, access_id, access_name)
         settings = provisioning.get_connection_settings("naiveproxy")
+        from app.security.tls import overview as tls_overview
+
+        domain = _effective_naiveproxy_domain(settings, {}, tls_overview())
         user = generate_user(f"sg-{access_id}", client_id=str(access_id))
-        domain = str(settings.host or settings.config.get("domain") or "").strip()
         payload = {
             "client_name": access_name,
             "device_id": access_id,
@@ -223,7 +271,7 @@ def install() -> None:
     def build_naiveproxy_link(client, device=None):
         config = exports._deployment_config(client, "naiveproxy", device)
         settings = provisioning.get_connection_settings("naiveproxy")
-        domain = str(settings.host or settings.config.get("domain") or config.get("host") or "").strip()
+        domain = _effective_naiveproxy_domain(settings, config, exports.tls_overview())
         user = NaiveProxyUser(
             username=str(config.get("username") or ""),
             password=str(config.get("password") or ""),
