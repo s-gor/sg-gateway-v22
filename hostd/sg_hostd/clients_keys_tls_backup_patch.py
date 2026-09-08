@@ -565,7 +565,16 @@ def destination_protocol_policy(database_path: Path):
             engine = str(engine_raw or "").strip().lower()
             if engine not in CRITICAL_ENGINES:
                 continue
-            snapshots.append((int(row_id), str(status), raw))
+            # Status is always temporary. config_json is temporary only for
+            # Xray, where this policy may narrow selected profiles. AWG2 and
+            # AWG3 runtime apply repairs destination server fields in
+            # config_json; restoring their pre-apply snapshot would undo the
+            # repair and leave exports dormant after restore.
+            snapshots.append((
+                int(row_id),
+                str(status),
+                raw if engine == "xray" else None,
+            ))
             if not settings.get(engine, True):
                 db.execute(
                     "UPDATE device_credentials SET status = 'disabled' WHERE id = ?",
@@ -608,10 +617,16 @@ def destination_protocol_policy(database_path: Path):
     finally:
         try:
             for row_id, status, raw in snapshots:
-                db.execute(
-                    "UPDATE device_credentials SET status = ?, config_json = ? WHERE id = ?",
-                    (status, raw, int(row_id)),
-                )
+                if raw is None:
+                    db.execute(
+                        "UPDATE device_credentials SET status = ? WHERE id = ?",
+                        (status, int(row_id)),
+                    )
+                else:
+                    db.execute(
+                        "UPDATE device_credentials SET status = ?, config_json = ? WHERE id = ?",
+                        (status, raw, int(row_id)),
+                    )
             db.commit()
         finally:
             db.close()
