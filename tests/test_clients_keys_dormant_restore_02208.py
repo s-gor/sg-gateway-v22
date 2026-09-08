@@ -255,3 +255,73 @@ def test_xray_tls_profile_wakes_up_with_same_restored_uuid(
     assert awakened_tls.body
     assert restored_uuid in awakened_tls.body
     assert config["uuid"] == restored_uuid
+
+@pytest.mark.parametrize(
+    ("engine", "flag"),
+    (("anytls", "anytls_enabled"), ("tuic", "tuic_enabled")),
+)
+def test_singbox_subprofile_export_readiness_uses_mihomo_connection(
+    engine: str,
+    flag: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """AnyTLS/TUIC readiness comes from Mihomo config, not nonexistent rows."""
+
+    client = SimpleNamespace(id=1, enabled=True)
+    device = SimpleNamespace(id=7, enabled=True)
+    deployment = SimpleNamespace(status="applied", config_json='{}')
+    calls: list[str] = []
+
+    monkeypatch.setattr(exports, "_resolve_device", lambda client, device=None: device)
+    monkeypatch.setattr(
+        exports,
+        "_deployments",
+        lambda client, device=None: {engine: deployment},
+    )
+
+    def settings(requested_engine: str):
+        calls.append(requested_engine)
+        if requested_engine != "mihomo":
+            raise AssertionError(f"unexpected connection lookup: {requested_engine}")
+        return SimpleNamespace(enabled=True, config={flag: True}, host="", port=0)
+
+    monkeypatch.setattr(exports, "get_connection_settings", settings)
+
+    assert exports.is_export_ready(client, engine, device) is True
+    assert calls == ["mihomo"]
+
+
+@pytest.mark.parametrize(
+    ("engine", "flag"),
+    (("anytls", "anytls_enabled"), ("tuic", "tuic_enabled")),
+)
+def test_singbox_subprofile_export_stays_dormant_when_profile_flag_is_off(
+    engine: str,
+    flag: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = SimpleNamespace(id=1, enabled=True)
+    device = SimpleNamespace(id=7, enabled=True)
+    deployment = SimpleNamespace(status="applied", config_json='{}')
+
+    monkeypatch.setattr(exports, "_resolve_device", lambda client, device=None: device)
+    monkeypatch.setattr(
+        exports,
+        "_deployments",
+        lambda client, device=None: {engine: deployment},
+    )
+    monkeypatch.setattr(
+        exports,
+        "get_connection_settings",
+        lambda requested_engine: SimpleNamespace(
+            enabled=True,
+            config={flag: False},
+            host="",
+            port=0,
+        ) if requested_engine == "mihomo" else (_ for _ in ()).throw(
+            AssertionError(f"unexpected connection lookup: {requested_engine}")
+        ),
+    )
+
+    assert exports.is_export_ready(client, engine, device) is False
+

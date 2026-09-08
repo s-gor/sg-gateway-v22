@@ -197,10 +197,19 @@ def is_export_ready(
     # credential intact while suppressing exports for disabled Connections.
     if engine != "sgclient":
         try:
-            settings = get_connection_settings(engine)
+            if engine in {"anytls", "tuic"}:
+                # AnyTLS and TUIC v5 are sing-box subprofiles managed by the
+                # Mihomo Connection.  Their readiness flags live in
+                # mihomo.config_json; there are no standalone connection rows.
+                settings = get_connection_settings("mihomo")
+                profile_enabled = bool(settings.config.get(f"{engine}_enabled"))
+                if not settings.enabled or not profile_enabled:
+                    return False
+            else:
+                settings = get_connection_settings(engine)
+                if not settings.enabled:
+                    return False
         except (KeyError, LookupError):
-            return False
-        if not settings.enabled:
             return False
 
     if engine not in _AWG_EXPORT_REQUIRED_FIELDS:
