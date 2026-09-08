@@ -25,7 +25,7 @@ jobs:
           body = path.read_text(encoding='utf-8')
 
           replacements = [
-              ('AWG3_ROOT="$PREFIX/awg3"\nLETSENCRYPT_DIR=', 'AWG3_ROOT="$PREFIX/awg3"\nNAIVE_SERVICE="sg-gateway-naiveproxy.service"\nNAIVE_ROOT="$PREFIX/naiveproxy"\nLETSENCRYPT_DIR='),
+              ('AWG3_ROOT="$PREFIX/awg3"\nLETSENCRYPT_DIR="$(system_path /etc/letsencrypt)"', 'AWG3_ROOT="$PREFIX/awg3"\nNAIVE_SERVICE="sg-gateway-naiveproxy.service"\nNAIVE_ROOT="$PREFIX/naiveproxy"\nLETSENCRYPT_DIR="$(system_path /etc/letsencrypt)"'),
               ('    /hostd/sg_hostd/ \\\n    /deploy/ \\\n', '    /hostd/sg_hostd/ \\\n    /hostd/systemd/ \\\n    /deploy/ \\\n'),
               ('      ".venv"|"awg3") continue ;;', '      ".venv"|"awg3"|"naiveproxy") continue ;;'),
               ('    nginx.service xray.service mihomo.service sg-gateway-awg.service "$AWG3_SERVICE" "$AWG31_SERVICE" \\\n    sg-gateway-singbox.service "$HOSTD_SERVICE" "$PANEL_SERVICE"; do', '    nginx.service xray.service mihomo.service sg-gateway-awg.service "$AWG3_SERVICE" "$AWG31_SERVICE" \\\n    sg-gateway-singbox.service "$NAIVE_SERVICE" "$HOSTD_SERVICE" "$PANEL_SERVICE"; do'),
@@ -33,7 +33,7 @@ jobs:
           for old, new in replacements:
               count = body.count(old)
               if count != 1:
-                  raise SystemExit(f'expected one target, got {count}: {old[:90]!r}')
+                  raise SystemExit(f'expected one target, got {count}: {old[:120]!r}')
               body = body.replace(old, new, 1)
 
           old_prune = '\\( -path "$PREFIX/.venv" -o -path "$PREFIX/assets" -o -path "$AWG3_ROOT" \\) -prune -o \\\n'
