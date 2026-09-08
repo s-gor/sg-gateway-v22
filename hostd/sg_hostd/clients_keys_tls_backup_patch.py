@@ -548,14 +548,13 @@ def _connection_policy(database: sqlite3.Connection) -> tuple[dict[str, bool], s
 
 @contextmanager
 def destination_protocol_policy(database_path: Path):
-    """Temporarily hide imported protocols/profiles disabled on destination.
+    """Temporarily hide only destination-disabled protocols/profiles.
 
-    The original portable client credentials are restored after runtime generation,
-    so enabling a protocol later can reuse the migrated client identity.
+    Restore only fields changed by this policy. Successful runtime reconciliation
+    owns the final status/config for ready engines.
     """
-
     db = sqlite3.connect(database_path, timeout=15)
-    snapshots: list[tuple[int, str, str | None]] = []
+    snapshots: list[tuple[int, str | None, str | None]] = []
     try:
         settings, enabled_xray_profiles = _connection_policy(db)
         rows = db.execute(
@@ -565,12 +564,15 @@ def destination_protocol_policy(database_path: Path):
             engine = str(engine_raw or "").strip().lower()
             if engine not in CRITICAL_ENGINES:
                 continue
-            snapshots.append((int(row_id), str(status), raw))
+            restore_status: str | None = None
+            restore_config: str | None = None
             if not settings.get(engine, True):
+                restore_status = str(status)
                 db.execute(
                     "UPDATE device_credentials SET status = 'disabled' WHERE id = ?",
                     (int(row_id),),
                 )
+                snapshots.append((int(row_id), restore_status, restore_config))
                 continue
             if engine != "xray":
                 continue
@@ -583,35 +585,42 @@ def destination_protocol_policy(database_path: Path):
             selected = payload.get("profiles")
             if not isinstance(selected, list) or not selected:
                 selected = ["reality_tcp", "xhttp_reality"]
-            active = [
-                str(item)
-                for item in selected
-                if str(item) in enabled_xray_profiles
-            ]
+            active = [str(item) for item in selected if str(item) in enabled_xray_profiles]
             if not active:
+                restore_status = str(status)
                 db.execute(
                     "UPDATE device_credentials SET status = 'disabled' WHERE id = ?",
                     (int(row_id),),
                 )
-                continue
-            if active != [str(item) for item in selected]:
+            elif active != [str(item) for item in selected]:
+                restore_config = raw
                 payload["profiles"] = active
                 db.execute(
                     "UPDATE device_credentials SET config_json = ? WHERE id = ?",
                     (json.dumps(payload, ensure_ascii=False, sort_keys=True), int(row_id)),
                 )
+            if restore_status is not None or restore_config is not None:
+                snapshots.append((int(row_id), restore_status, restore_config))
         db.commit()
-        yield {
-            "settings": settings,
-            "xray_profiles": sorted(enabled_xray_profiles),
-        }
+        yield {"settings": settings, "xray_profiles": sorted(enabled_xray_profiles)}
     finally:
         try:
             for row_id, status, raw in snapshots:
-                db.execute(
-                    "UPDATE device_credentials SET status = ?, config_json = ? WHERE id = ?",
-                    (status, raw, int(row_id)),
-                )
+                if status is not None and raw is not None:
+                    db.execute(
+                        "UPDATE device_credentials SET status = ?, config_json = ? WHERE id = ?",
+                        (status, raw, int(row_id)),
+                    )
+                elif status is not None:
+                    db.execute(
+                        "UPDATE device_credentials SET status = ? WHERE id = ?",
+                        (status, int(row_id)),
+                    )
+                elif raw is not None:
+                    db.execute(
+                        "UPDATE device_credentials SET config_json = ? WHERE id = ?",
+                        (raw, int(row_id)),
+                    )
             db.commit()
         finally:
             db.close()

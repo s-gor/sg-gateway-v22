@@ -82,15 +82,15 @@ def _destination_policy(
 
 @contextmanager
 def _destination_protocol_policy(tls: ModuleType, database_path: Path):
-    """Expose only protocols enabled by the destination during check/apply.
+    """Expose only destination-enabled protocols during check/apply.
 
-    Imported credential status and Xray profile selections are restored exactly
-    after the temporary runtime view. A later manual protocol enable therefore
-    reuses the migrated client identity instead of generating new credentials.
+    Only values temporarily changed by this policy are restored afterwards.
+    Successful runtime reconciliation owns the final status/config of ready
+    engines, so repaired AWG2/AWG3 config_json must survive the context exit.
     """
 
     db = sqlite3.connect(database_path, timeout=15)
-    snapshots: list[tuple[int, object, object]] = []
+    snapshots: list[tuple[int, str | None, str | None]] = []
     try:
         enabled, enabled_xray_profiles = _destination_policy(tls, db)
         rows = db.execute(
@@ -101,15 +101,19 @@ def _destination_protocol_policy(tls: ModuleType, database_path: Path):
             engine = str(engine_raw or "").strip().lower()
             if engine not in FILTERED_ENGINES:
                 continue
-            snapshots.append((int(row_id), status, raw))
+
+            restore_status: str | None = None
+            restore_config: str | None = None
 
             # Missing destination settings are treated as disabled. Portable
             # restore must never invent server protocol enablement.
             if not enabled.get(engine, False):
+                restore_status = str(status)
                 db.execute(
                     "UPDATE device_credentials SET status = 'disabled' WHERE id = ?",
                     (int(row_id),),
                 )
+                snapshots.append((int(row_id), restore_status, restore_config))
                 continue
 
             if engine != "xray":
@@ -129,11 +133,13 @@ def _destination_protocol_policy(tls: ModuleType, database_path: Path):
                 if str(item) in enabled_xray_profiles
             ]
             if not active:
+                restore_status = str(status)
                 db.execute(
                     "UPDATE device_credentials SET status = 'disabled' WHERE id = ?",
                     (int(row_id),),
                 )
             elif active != [str(item) for item in selected]:
+                restore_config = raw
                 payload["profiles"] = active
                 db.execute(
                     "UPDATE device_credentials SET config_json = ? WHERE id = ?",
@@ -142,6 +148,8 @@ def _destination_protocol_policy(tls: ModuleType, database_path: Path):
                         int(row_id),
                     ),
                 )
+            if restore_status is not None or restore_config is not None:
+                snapshots.append((int(row_id), restore_status, restore_config))
 
         db.commit()
         yield {
@@ -151,11 +159,21 @@ def _destination_protocol_policy(tls: ModuleType, database_path: Path):
     finally:
         try:
             for row_id, status, raw in snapshots:
-                db.execute(
-                    "UPDATE device_credentials "
-                    "SET status = ?, config_json = ? WHERE id = ?",
-                    (status, raw, int(row_id)),
-                )
+                if status is not None and raw is not None:
+                    db.execute(
+                        "UPDATE device_credentials SET status = ?, config_json = ? WHERE id = ?",
+                        (status, raw, int(row_id)),
+                    )
+                elif status is not None:
+                    db.execute(
+                        "UPDATE device_credentials SET status = ? WHERE id = ?",
+                        (status, int(row_id)),
+                    )
+                elif raw is not None:
+                    db.execute(
+                        "UPDATE device_credentials SET config_json = ? WHERE id = ?",
+                        (raw, int(row_id)),
+                    )
             db.commit()
         finally:
             db.close()
