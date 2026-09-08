@@ -74,7 +74,7 @@ restore_service_state() {
 
 persist_update_channel() {
   [[ -n "$UPDATE_BRANCH" ]] || return 0
-  [[ "$UPDATE_BRANCH" == "stable-02208" || "$UPDATE_BRANCH" == release/02208-* || "$UPDATE_BRANCH" == feature/02208-* || "$UPDATE_BRANCH" == fix/02208-* ]] || \
+  [[ "$UPDATE_BRANCH" == "main" || "$UPDATE_BRANCH" == "stable-02208" || "$UPDATE_BRANCH" == release/02208-* || "$UPDATE_BRANCH" == feature/02208-* || "$UPDATE_BRANCH" == fix/02208-* ]] || \
     die "Refusing invalid 22.08 update channel: $UPDATE_BRANCH"
   [[ -f "$PANEL_ENV" ]] || die "Panel environment is missing: $PANEL_ENV"
   python3 - "$PANEL_ENV" "$UPDATE_BRANCH" <<'PY'
