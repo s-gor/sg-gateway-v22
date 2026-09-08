@@ -220,10 +220,28 @@ def is_export_ready(
         config = json.loads(deployment.config_json)
     except (TypeError, ValueError, json.JSONDecodeError):
         return False
-    return bool(
+    if not (
         isinstance(config, dict)
         and _awg_export_config_ready(engine, config)
-    )
+    ):
+        return False
+
+    # AWG31 backups intentionally preserve the full client config. On a new
+    # destination that means the restored row may still contain the source
+    # server public key while its durable client private key is perfectly
+    # valid. Never export that stale server binding: keep it dormant until
+    # the destination runtime repairs config_json with its current server key.
+    if engine == "amneziawg31":
+        try:
+            current = get_awg31_settings()
+        except Exception:
+            return False
+        current_key = str(current.server_public_key or "").strip()
+        restored_key = str(config.get("server_public_key") or "").strip()
+        if not current.enabled or not current_key or restored_key != current_key:
+            return False
+
+    return True
 
 
 def _selected_xray_profiles(
@@ -806,6 +824,9 @@ def build_protocol_export(
     builder = builders.get(kind)
     if builder is None:
         return ClientExport("", "text/plain; charset=utf-8", "")
+    if kind in {"amneziawg", "amneziawg3", "amneziawg31", "amneziawg31-uri"}:
+        if not protocol_ready(client, kind, device):
+            return ClientExport("", "text/plain; charset=utf-8", "")
     return builder(client, device)
 
 
