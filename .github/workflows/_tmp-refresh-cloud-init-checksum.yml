@@ -1,0 +1,38 @@
+name: Temporary refresh cloud-init hotfix checksum
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    if: github.head_ref == 'fix/02208-cloud-init-done-exit2'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+      - name: Refresh source checksum from final staged tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/_tmp-refresh-cloud-init-checksum.yml
+          git add -A
+          python - <<'PY'
+          import hashlib, subprocess
+          from pathlib import Path
+          tracked = subprocess.check_output(['git','ls-files'], text=True).splitlines()
+          rows=[]
+          for p in sorted(x for x in tracked if x != 'SOURCE-SHA256SUMS'):
+              rows.append(f"{hashlib.sha256(Path(p).read_bytes()).hexdigest()}  {p}")
+          Path('SOURCE-SHA256SUMS').write_text('\n'.join(rows)+'\n',encoding='utf-8',newline='\n')
+          PY
+          git add SOURCE-SHA256SUMS
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'ci: refresh source checksum for cloud-init hotfix'
+          git push origin HEAD:${{ github.head_ref }}
