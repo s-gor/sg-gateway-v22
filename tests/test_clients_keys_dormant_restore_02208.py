@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sqlite3
 from types import SimpleNamespace
 
 import pytest
@@ -29,8 +30,6 @@ def test_portable_restore_runtime_reconcile_is_nonfatal_when_destination_runtime
         _runtime_subprocess_env=lambda: {},
     )
 
-    # RED on 22.08 stable: the current helper raises RuntimeError here and the
-    # enclosing restore rolls the already-valid restored database back.
     result = portable_restore._apply_portable_clients_runtime_required(full)
 
     assert result is not None
@@ -62,6 +61,60 @@ def test_applied_xray_credential_is_not_export_ready_when_connection_is_disabled
         lambda engine: SimpleNamespace(enabled=False, config={}, host="", port=0),
     )
 
-    # RED on 22.08 stable: non-AWG engines currently return True immediately
-    # once the credential status is 'applied'.
     assert exports.is_export_ready(client, "xray", device) is False
+
+
+def test_destination_runtime_policy_hides_only_unready_engine_and_restores_credential(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """One missing runtime must not block ready restored protocols."""
+
+    database_path = tmp_path / "sg-gateway.sqlite"
+    db = sqlite3.connect(database_path)
+    try:
+        db.execute(
+            "CREATE TABLE device_credentials (id INTEGER PRIMARY KEY, engine TEXT, status TEXT)"
+        )
+        db.executemany(
+            "INSERT INTO device_credentials(id, engine, status) VALUES (?, ?, ?)",
+            [
+                (1, "amneziawg", "applied"),
+                (2, "xray", "applied"),
+            ],
+        )
+        db.commit()
+    finally:
+        db.close()
+
+    from sg_hostd import runtime_contracts
+
+    monkeypatch.setattr(
+        runtime_contracts,
+        "inspect_runtime_contract",
+        lambda **kwargs: {
+            "ok": False,
+            "failures": [{"engine": "xray", "ready": False}],
+            "checks": [
+                {"engine": "amneziawg", "ready": True},
+                {"engine": "xray", "ready": False},
+            ],
+        },
+    )
+
+    with portable_restore._destination_runtime_policy(database_path) as state:
+        db = sqlite3.connect(database_path)
+        try:
+            statuses = dict(db.execute("SELECT engine, status FROM device_credentials"))
+        finally:
+            db.close()
+        assert state["deferred_engines"] == ["xray"]
+        assert statuses["amneziawg"] == "applied"
+        assert statuses["xray"] == "disabled"
+
+    db = sqlite3.connect(database_path)
+    try:
+        statuses = dict(db.execute("SELECT engine, status FROM device_credentials"))
+    finally:
+        db.close()
+    assert statuses == {"amneziawg": "applied", "xray": "applied"}
