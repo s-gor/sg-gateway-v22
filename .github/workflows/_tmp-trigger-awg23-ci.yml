@@ -1,8 +1,0 @@
-name: Temporary AWG23 CI trigger
-on:
-  workflow_dispatch:
-jobs:
-  noop:
-    runs-on: ubuntu-24.04
-    steps:
-      - run: true
