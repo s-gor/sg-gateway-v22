@@ -48,7 +48,7 @@ def test_destination_policy_keeps_runtime_repaired_awg_configs(tmp_path: Path) -
         con = sqlite3.connect(db)
         try:
             for row_id, engine in ((1, "amneziawg"), (2, "amneziawg3")):
-                con.execute("UPDATE device_credentials SET status = 'checking', config_json = ? WHERE id = ?", (json.dumps(repaired[engine], sort_keys=True), row_id))
+                con.execute("UPDATE device_credentials SET status = 'applied', config_json = ? WHERE id = ?", (json.dumps(repaired[engine], sort_keys=True), row_id))
             con.commit()
         finally:
             con.close()
@@ -60,3 +60,26 @@ def test_destination_policy_keeps_runtime_repaired_awg_configs(tmp_path: Path) -
     assert [row[1] for row in rows] == ["applied", "applied"]
     assert json.loads(rows[0][2]) == repaired["amneziawg"]
     assert json.loads(rows[1][2]) == repaired["amneziawg3"]
+
+def test_destination_policy_preserves_successful_awg_runtime_status(tmp_path: Path) -> None:
+    db = tmp_path / "sg-gateway.sqlite"
+    _make_db(db)
+    con = sqlite3.connect(db)
+    try:
+        con.execute("UPDATE device_credentials SET status = 'pending'")
+        con.commit()
+    finally:
+        con.close()
+    with patch.destination_protocol_policy(db):
+        con = sqlite3.connect(db)
+        try:
+            con.execute("UPDATE device_credentials SET status = 'applied'")
+            con.commit()
+        finally:
+            con.close()
+    con = sqlite3.connect(db)
+    try:
+        statuses = [row[0] for row in con.execute("SELECT status FROM device_credentials ORDER BY id").fetchall()]
+    finally:
+        con.close()
+    assert statuses == ["applied", "applied"]
