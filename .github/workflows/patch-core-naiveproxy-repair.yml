@@ -25,104 +25,99 @@ jobs:
           body = path.read_text(encoding='utf-8')
 
           replacements = [
-              (
-                  'AWG3_ROOT="$PREFIX/awg3"\nLETSENCRYPT_DIR=',
-                  'AWG3_ROOT="$PREFIX/awg3"\nNAIVE_SERVICE="sg-gateway-naiveproxy.service"\nNAIVE_ROOT="$PREFIX/naiveproxy"\nLETSENCRYPT_DIR=',
-              ),
-              (
-                  '    /hostd/sg_hostd/ \\\n    /deploy/ \\\n',
-                  '    /hostd/sg_hostd/ \\\n    /hostd/systemd/ \\\n    /deploy/ \\\n',
-              ),
-              (
-                  '      ".venv"|"awg3") continue ;;',
-                  '      ".venv"|"awg3"|"naiveproxy") continue ;;',
-              ),
-              (
-                  '    nginx.service xray.service mihomo.service sg-gateway-awg.service "$AWG3_SERVICE" "$AWG31_SERVICE" \\\n    sg-gateway-singbox.service "$HOSTD_SERVICE" "$PANEL_SERVICE"; do',
-                  '    nginx.service xray.service mihomo.service sg-gateway-awg.service "$AWG3_SERVICE" "$AWG31_SERVICE" \\\n    sg-gateway-singbox.service "$NAIVE_SERVICE" "$HOSTD_SERVICE" "$PANEL_SERVICE"; do',
-              ),
+              ('AWG3_ROOT="$PREFIX/awg3"\nLETSENCRYPT_DIR=', 'AWG3_ROOT="$PREFIX/awg3"\nNAIVE_SERVICE="sg-gateway-naiveproxy.service"\nNAIVE_ROOT="$PREFIX/naiveproxy"\nLETSENCRYPT_DIR='),
+              ('    /hostd/sg_hostd/ \\\n    /deploy/ \\\n', '    /hostd/sg_hostd/ \\\n    /hostd/systemd/ \\\n    /deploy/ \\\n'),
+              ('      ".venv"|"awg3") continue ;;', '      ".venv"|"awg3"|"naiveproxy") continue ;;'),
+              ('    nginx.service xray.service mihomo.service sg-gateway-awg.service "$AWG3_SERVICE" "$AWG31_SERVICE" \\\n    sg-gateway-singbox.service "$HOSTD_SERVICE" "$PANEL_SERVICE"; do', '    nginx.service xray.service mihomo.service sg-gateway-awg.service "$AWG3_SERVICE" "$AWG31_SERVICE" \\\n    sg-gateway-singbox.service "$NAIVE_SERVICE" "$HOSTD_SERVICE" "$PANEL_SERVICE"; do'),
           ]
           for old, new in replacements:
               count = body.count(old)
               if count != 1:
-                  raise SystemExit(f'expected exactly one replacement target, got {count}: {old[:80]!r}')
+                  raise SystemExit(f'expected one target, got {count}: {old[:90]!r}')
               body = body.replace(old, new, 1)
 
-          body = body.replace(
-              '\\( -path "$PREFIX/.venv" -o -path "$PREFIX/assets" -o -path "$AWG3_ROOT" \\) -prune -o \\\n',
-              '\\( -path "$PREFIX/.venv" -o -path "$PREFIX/assets" -o -path "$AWG3_ROOT" -o -path "$NAIVE_ROOT" \\) -prune -o \\\n',
-          )
+          old_prune = '\\( -path "$PREFIX/.venv" -o -path "$PREFIX/assets" -o -path "$AWG3_ROOT" \\) -prune -o \\\n'
+          new_prune = '\\( -path "$PREFIX/.venv" -o -path "$PREFIX/assets" -o -path "$AWG3_ROOT" -o -path "$NAIVE_ROOT" \\) -prune -o \\\n'
+          prune_count = body.count(old_prune)
+          if prune_count < 3:
+              raise SystemExit(f'expected >=3 permission prune targets, got {prune_count}')
+          body = body.replace(old_prune, new_prune)
 
-          marker = '''prepare_preserved_assets() {\n'''
-          if marker not in body:
-              raise SystemExit('prepare_preserved_assets marker missing')
-
-          helper = r'''naiveproxy_profile_present() {
-  [[ -f "$DATABASE" ]] || return 1
-  "$PREFIX/.venv/bin/python" -B - "$DATABASE" <<'PYNAIVEPROFILE'
-import sqlite3
-import sys
-
-path = sys.argv[1]
-connection = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
-try:
-    tables = {
-        str(row[0])
-        for row in connection.execute(
-            "SELECT name FROM sqlite_master WHERE type='table'"
-        ).fetchall()
-    }
-    count = 0
-    if "connection_settings" in tables:
-        count += int(connection.execute(
-            "SELECT COUNT(*) FROM connection_settings WHERE engine='naiveproxy'"
-        ).fetchone()[0])
-    if "device_credentials" in tables:
-        count += int(connection.execute(
-            "SELECT COUNT(*) FROM device_credentials WHERE engine='naiveproxy'"
-        ).fetchone()[0])
-finally:
-    connection.close()
-raise SystemExit(0 if count else 1)
-PYNAIVEPROFILE
-}
-
-repair_naiveproxy_runtime_if_needed() {
-  [[ -x "$NAIVE_ROOT/bin/caddy" ]] && return 0
-  naiveproxy_profile_present || return 0
-  [[ -f "$PREFIX/deploy/install-naiveproxy.sh" ]] || fail "NaiveProxy runtime is missing and installer is unavailable"
-  [[ -f "$PREFIX/deploy/$NAIVE_SERVICE" ]] || fail "NaiveProxy runtime is missing and service source is unavailable"
-  [[ -f "$PREFIX/hostd/systemd/$HOSTD_SERVICE" ]] || fail "NaiveProxy runtime is missing and hostd systemd source is unavailable"
-
-  printf '[SG-Gateway Update] NaiveProxy profile exists but runtime is missing; repairing pinned runtime...\n'
-  SG_GATEWAY_SOURCE_ROOT="$PREFIX" \
-  SG_GATEWAY_UPDATE_BRANCH="$BRANCH" \
-    bash "$PREFIX/deploy/install-naiveproxy.sh"
-  [[ -x "$NAIVE_ROOT/bin/caddy" ]] || fail "NaiveProxy runtime repair did not install caddy"
-  printf '[SG-Gateway Update] NaiveProxy runtime repaired: OK\n'
-}
-
-'''
+          helper_lines = [
+              'naiveproxy_profile_present() {',
+              '  [[ -f "$DATABASE" ]] || return 1',
+              '  "$PREFIX/.venv/bin/python" -B - "$DATABASE" <<\'PYNAIVEPROFILE\'',
+              'import sqlite3',
+              'import sys',
+              '',
+              'path = sys.argv[1]',
+              'connection = sqlite3.connect(f"file:{path}?mode=ro", uri=True)',
+              'try:',
+              '    tables = {str(row[0]) for row in connection.execute("SELECT name FROM sqlite_master WHERE type=\'table\'").fetchall()}',
+              '    count = 0',
+              '    if "connection_settings" in tables:',
+              '        count += int(connection.execute("SELECT COUNT(*) FROM connection_settings WHERE engine=\'naiveproxy\'").fetchone()[0])',
+              '    if "device_credentials" in tables:',
+              '        count += int(connection.execute("SELECT COUNT(*) FROM device_credentials WHERE engine=\'naiveproxy\'").fetchone()[0])',
+              'finally:',
+              '    connection.close()',
+              'raise SystemExit(0 if count else 1)',
+              'PYNAIVEPROFILE',
+              '}',
+              '',
+              'repair_naiveproxy_runtime_if_needed() {',
+              '  [[ -x "$NAIVE_ROOT/bin/caddy" ]] && return 0',
+              '  naiveproxy_profile_present || return 0',
+              '  [[ -f "$PREFIX/deploy/install-naiveproxy.sh" ]] || fail "NaiveProxy runtime is missing and installer is unavailable"',
+              '  [[ -f "$PREFIX/deploy/$NAIVE_SERVICE" ]] || fail "NaiveProxy runtime is missing and service source is unavailable"',
+              '  [[ -f "$PREFIX/hostd/systemd/$HOSTD_SERVICE" ]] || fail "NaiveProxy runtime is missing and hostd systemd source is unavailable"',
+              '  printf \'[SG-Gateway Update] NaiveProxy profile exists but runtime is missing; repairing pinned runtime...\\n\'',
+              '  SG_GATEWAY_SOURCE_ROOT="$PREFIX" \\',
+              '  SG_GATEWAY_UPDATE_BRANCH="$BRANCH" \\',
+              '    bash "$PREFIX/deploy/install-naiveproxy.sh"',
+              '  [[ -x "$NAIVE_ROOT/bin/caddy" ]] || fail "NaiveProxy runtime repair did not install caddy"',
+              '  printf \'[SG-Gateway Update] NaiveProxy runtime repaired: OK\\n\'',
+              '}',
+              '',
+          ]
+          helper = '\n'.join(helper_lines) + '\n'
+          marker = 'prepare_preserved_assets() {\n'
+          if body.count(marker) != 1:
+              raise SystemExit('prepare_preserved_assets marker mismatch')
           body = body.replace(marker, helper + marker, 1)
 
-          deploy_tail = '''  migrate_panel_wsgi_service\n}\n\nrestart_panel() {'''
+          deploy_tail = '  migrate_panel_wsgi_service\n}\n\nrestart_panel() {'
           if body.count(deploy_tail) != 1:
               raise SystemExit('deploy_source tail marker mismatch')
-          body = body.replace(
-              deploy_tail,
-              '''  migrate_panel_wsgi_service\n  repair_naiveproxy_runtime_if_needed\n}\n\nrestart_panel() {''',
-              1,
-          )
-
+          body = body.replace(deploy_tail, '  migrate_panel_wsgi_service\n  repair_naiveproxy_runtime_if_needed\n}\n\nrestart_panel() {', 1)
           path.write_text(body, encoding='utf-8')
 
-          test = Path('tests/test_naiveproxy_core_update_repair_02208.py')
-          test.write_text('''from pathlib import Path\n\n\ndef test_core_update_preserves_and_repairs_naiveproxy_runtime():\n    source = Path("deploy/update-from-github-core.sh").read_text(encoding="utf-8")\n    assert "/hostd/systemd/" in source\n    assert '\".venv\"|\"awg3\"|\"naiveproxy\"' in source\n    assert 'NAIVE_ROOT=\"$PREFIX/naiveproxy\"' in source\n    assert 'sg-gateway-singbox.service \"$NAIVE_SERVICE\"' in source\n    assert 'repair_naiveproxy_runtime_if_needed' in source\n    assert 'naiveproxy_profile_present' in source\n    assert 'SG_GATEWAY_SOURCE_ROOT=\"$PREFIX\"' in source\n    assert 'bash \"$PREFIX/deploy/install-naiveproxy.sh\"' in source\n\n\ndef test_core_update_protects_naiveproxy_from_permission_rewrite():\n    source = Path("deploy/update-from-github-core.sh").read_text(encoding="utf-8")\n    assert '-o -path \"$NAIVE_ROOT\"' in source\n''', encoding='utf-8')
+          test_lines = [
+              'from pathlib import Path',
+              '',
+              '',
+              'def test_core_update_preserves_and_repairs_naiveproxy_runtime():',
+              '    source = Path("deploy/update-from-github-core.sh").read_text(encoding="utf-8")',
+              '    assert "/hostd/systemd/" in source',
+              '    assert \'".venv"|"awg3"|"naiveproxy"\' in source',
+              '    assert \'NAIVE_ROOT="$PREFIX/naiveproxy"\' in source',
+              '    assert \'sg-gateway-singbox.service "$NAIVE_SERVICE"\' in source',
+              '    assert "repair_naiveproxy_runtime_if_needed" in source',
+              '    assert "naiveproxy_profile_present" in source',
+              '    assert \'SG_GATEWAY_SOURCE_ROOT="$PREFIX"\' in source',
+              '    assert \'bash "$PREFIX/deploy/install-naiveproxy.sh"\' in source',
+              '',
+              '',
+              'def test_core_update_protects_naiveproxy_from_permission_rewrite():',
+              '    source = Path("deploy/update-from-github-core.sh").read_text(encoding="utf-8")',
+              '    assert \'-o -path "$NAIVE_ROOT"\' in source',
+              '',
+          ]
+          Path('tests/test_naiveproxy_core_update_repair_02208.py').write_text('\n'.join(test_lines), encoding='utf-8')
           PY
 
           python3 -m pytest -q tests/test_naiveproxy_core_update_repair_02208.py
           bash -n deploy/update-from-github-core.sh
-
           rm -f .github/workflows/patch-core-naiveproxy-repair.yml
 
           python3 - <<'PY'
@@ -130,15 +125,12 @@ repair_naiveproxy_runtime_if_needed() {
           from pathlib import Path
           tracked = subprocess.check_output(['git','ls-files'], text=True).splitlines()
           tracked = [p for p in tracked if p != 'SOURCE-SHA256SUMS' and Path(p).exists()]
-          rows=[]
-          for p in sorted(tracked):
-              data=subprocess.check_output(['git','show',f':{p}']) if False else Path(p).read_bytes()
-              rows.append(f'{hashlib.sha256(data).hexdigest()}  {p}')
-          Path('SOURCE-SHA256SUMS').write_text('\n'.join(rows)+'\n', encoding='utf-8')
+          rows = [f'{hashlib.sha256(Path(p).read_bytes()).hexdigest()}  {p}' for p in sorted(tracked)]
+          Path('SOURCE-SHA256SUMS').write_text('\n'.join(rows) + '\n', encoding='utf-8')
           PY
 
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add deploy/update-from-github-core.sh tests/test_naiveproxy_core_update_repair_02208.py SOURCE-SHA256SUMS .github/workflows/patch-core-naiveproxy-repair.yml
+          git add -A
           git commit -m 'fix: repair missing NaiveProxy runtime in core update'
           git push origin HEAD:fix/02208-clients-keys-dormant-restore
