@@ -1,0 +1,102 @@
+name: Temporary AWG2 AWG3 explicit restore reconcile
+on:
+  push:
+    branches: [fix/02208-awg23-restore-repair-persist]
+permissions:
+  contents: write
+jobs:
+  tdd:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/02208-awg23-restore-repair-persist
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install deps
+        run: python -m pip install -q -r requirements-dev.txt
+      - name: RED then GREEN explicit AWG2 AWG3 restore reconcile
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > tests/test_clients_keys_awg23_explicit_reconcile_02208.py <<'PYTEST'
+          from pathlib import Path
+
+          ROOT = Path(__file__).resolve().parents[1]
+          PORTABLE = ROOT / "hostd/sg_hostd/clients_keys_portable_restore_patch.py"
+          AWG3 = ROOT / "hostd/sg_hostd/awg3_runtime.py"
+
+          def test_portable_restore_reconciles_awg23_before_global_apply() -> None:
+              text = PORTABLE.read_text(encoding="utf-8")
+              start = text.index("def _apply_portable_clients_runtime_required")
+              end = text.index("\n\n@contextmanager", start)
+              body = text[start:end]
+              repair = body.index("cr._repair_deployment_configs()")
+              awg2 = body.index("cr._apply_awg()")
+              awg3 = body.index("apply_awg3()")
+              global_apply = body.index("cr.apply_all_clients()")
+              assert repair < awg2 < awg3 < global_apply
+
+          def test_awg3_refetches_rows_after_repair_before_render() -> None:
+              text = AWG3.read_text(encoding="utf-8")
+              start = text.index("def apply_awg3()")
+              body = text[start:]
+              repair = body.index("_repair_configs(secrets)")
+              refetch = body.index("rows = cr._deployment_rows(ENGINE)", repair)
+              render = body.index("body = _render(rows, secrets)", repair)
+              assert repair < refetch < render
+          PYTEST
+
+          set +e
+          python -m pytest -q tests/test_clients_keys_awg23_explicit_reconcile_02208.py
+          red_rc=$?
+          set -e
+          if (( red_rc == 0 )); then
+            echo 'Expected explicit AWG2/AWG3 restore reconcile regression to be RED' >&2
+            exit 1
+          fi
+          echo 'RED confirmed'
+
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path('hostd/sg_hostd/clients_keys_portable_restore_patch.py')
+          text = p.read_text(encoding='utf-8')
+          old = '''    code = (\n        "import json,sys; "\n        "from sg_hostd.client_runtime import apply_all_clients; "\n        "r=apply_all_clients(); "\n        "print(json.dumps(r,ensure_ascii=False,indent=2,default=str)); "\n        "sys.exit(0 if r.get('ok') else 1)"\n    )'''
+          new = '''    code = (\n        "import json,sys; "\n        "from sg_hostd import client_runtime as cr; "\n        "from sg_hostd.awg3_runtime import apply_awg3; "\n        "cr._repair_deployment_configs(); "\n        "awg2=cr._apply_awg(); "\n        "awg3=apply_awg3(); "\n        "r=cr.apply_all_clients(); "\n        "r['restore_awg23']=["\n        "{'engine':awg2.engine,'ok':awg2.ok,'message':awg2.message,'clients':awg2.clients},"\n        "{'engine':awg3.engine,'ok':awg3.ok,'message':awg3.message,'clients':awg3.clients}]; "\n        "print(json.dumps(r,ensure_ascii=False,indent=2,default=str)); "\n        "sys.exit(0 if r.get('ok') and awg2.ok and awg3.ok else 1)"\n    )'''
+          if old not in text:
+              raise SystemExit('portable runtime code block not found')
+          p.write_text(text.replace(old, new, 1), encoding='utf-8', newline='\n')
+
+          p = Path('hostd/sg_hostd/awg3_runtime.py')
+          text = p.read_text(encoding='utf-8')
+          old = '''    secrets = _ensure_server_secrets()\n    _repair_configs(secrets)\n\n    candidate = cr.CANDIDATE_DIR / "awg3.conf"'''
+          new = '''    secrets = _ensure_server_secrets()\n    _repair_configs(secrets)\n    # _repair_configs() commits destination server fields/public keys to DB.\n    # Re-read rows so rendering uses the repaired config_json instead of the\n    # stale pre-repair sqlite Row snapshots captured above.\n    rows = cr._deployment_rows(ENGINE)\n\n    candidate = cr.CANDIDATE_DIR / "awg3.conf"'''
+          if old not in text:
+              raise SystemExit('awg3 repair block not found')
+          p.write_text(text.replace(old, new, 1), encoding='utf-8', newline='\n')
+          PY
+
+          python -m pytest -q tests/test_clients_keys_awg23_explicit_reconcile_02208.py
+          python -m pytest -q tests/test_clients_keys_awg23_restore_repair_persist_02208.py
+          python -m pytest -q tests/test_clients_keys_dormant_restore_02208.py
+          python -m py_compile hostd/sg_hostd/clients_keys_portable_restore_patch.py hostd/sg_hostd/awg3_runtime.py
+
+          rm -f .github/workflows/_tmp-fix-awg23-explicit-reconcile.yml
+          git add -A
+          python - <<'PY'
+          import hashlib, subprocess
+          from pathlib import Path
+          tracked = subprocess.check_output(['git','ls-files'], text=True).splitlines()
+          rows=[]
+          for name in sorted(x for x in tracked if x != 'SOURCE-SHA256SUMS'):
+              rows.append(f"{hashlib.sha256(Path(name).read_bytes()).hexdigest()}  {name}")
+          Path('SOURCE-SHA256SUMS').write_text('\n'.join(rows)+'\n', encoding='utf-8', newline='\n')
+          PY
+          git add SOURCE-SHA256SUMS
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'fix: explicitly reconcile AWG2 and AWG3 on restore'
+          git push origin HEAD:fix/02208-awg23-restore-repair-persist
