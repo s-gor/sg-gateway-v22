@@ -1491,7 +1491,6 @@ deploy_source() {
     'import flask, jinja2, waitress; print("Python runtime: OK")'
 
   migrate_panel_wsgi_service
-  repair_naiveproxy_runtime_if_needed
 }
 
 restart_panel() {
@@ -1652,6 +1651,12 @@ main() {
   run_stage 5 "Перезапуск только panel + hostd" restart_panel
   run_stage 6 "AWG31 Stage3A migration внутри Update transaction" run_stage3a_migration
   run_stage 7 "Проверка HTTPS, credentials, Nginx и runtime" verify_final
+
+  # Repair a runtime that was already missing before this Update only after
+  # all pre-existing protected runtime has passed the immutability checks.
+  # The global ERR trap is still active here, so a failed repair rolls the
+  # entire Update back to the Safety Backup.
+  repair_naiveproxy_runtime_if_needed
   bind_panel_update_state
 
   if ! prune_safety_backups "$BACKUP_KEEP"; then
