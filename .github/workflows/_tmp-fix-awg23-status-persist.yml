@@ -1,0 +1,91 @@
+name: Temporary AWG2 AWG3 restore status persist
+on:
+  push:
+    branches: [fix/02208-awg23-restore-repair-persist]
+permissions:
+  contents: write
+jobs:
+  tdd:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/02208-awg23-restore-repair-persist
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install test deps
+        run: python -m pip install -q -r requirements-dev.txt
+      - name: RED then GREEN AWG2/AWG3 status persistence
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat >> tests/test_clients_keys_awg23_restore_repair_persist_02208.py <<'PYTEST'
+
+          def test_destination_policy_preserves_successful_awg_runtime_status(tmp_path: Path) -> None:
+              db = tmp_path / "sg-gateway.sqlite"
+              _make_db(db)
+              con = sqlite3.connect(db)
+              try:
+                  con.execute("UPDATE device_credentials SET status = 'pending'")
+                  con.commit()
+              finally:
+                  con.close()
+
+              with patch.destination_protocol_policy(db):
+                  con = sqlite3.connect(db)
+                  try:
+                      con.execute("UPDATE device_credentials SET status = 'applied'")
+                      con.commit()
+                  finally:
+                      con.close()
+
+              con = sqlite3.connect(db)
+              try:
+                  statuses = [row[0] for row in con.execute("SELECT status FROM device_credentials ORDER BY id").fetchall()]
+              finally:
+                  con.close()
+              assert statuses == ["applied", "applied"]
+          PYTEST
+
+          set +e
+          python -m pytest -q tests/test_clients_keys_awg23_restore_repair_persist_02208.py
+          red_rc=$?
+          set -e
+          if (( red_rc == 0 )); then
+            echo 'Expected RED status rollback regression to fail' >&2
+            exit 1
+          fi
+          echo 'RED confirmed: successful AWG runtime status is rolled back'
+
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('hostd/sg_hostd/clients_keys_tls_backup_patch.py')
+          text = p.read_text(encoding='utf-8')
+          start = text.index('@contextmanager\ndef destination_protocol_policy')
+          end = text.index('\n\ndef install(data: ModuleType)', start)
+          replacement = '''@contextmanager\ndef destination_protocol_policy(database_path: Path):\n    """Temporarily hide imported protocols/profiles disabled on destination.\n\n    Restore only fields this policy changes itself. Runtime reconciliation owns\n    the final status/config for ready engines; reverting those values would\n    incorrectly hide successfully repaired AWG2/AWG3 exports.\n    """\n\n    db = sqlite3.connect(database_path, timeout=15)\n    snapshots: list[tuple[int, str | None, str | None]] = []\n    try:\n        settings, enabled_xray_profiles = _connection_policy(db)\n        rows = db.execute(\n            "SELECT id, engine, status, config_json FROM device_credentials ORDER BY id"\n        ).fetchall()\n        for row_id, engine_raw, status, raw in rows:\n            engine = str(engine_raw or "").strip().lower()\n            if engine not in CRITICAL_ENGINES:\n                continue\n\n            restore_status: str | None = None\n            restore_config: str | None = None\n            if not settings.get(engine, True):\n                restore_status = str(status)\n                db.execute(\n                    "UPDATE device_credentials SET status = 'disabled' WHERE id = ?",\n                    (int(row_id),),\n                )\n                snapshots.append((int(row_id), restore_status, restore_config))\n                continue\n            if engine != "xray":\n                continue\n            try:\n                payload = json.loads(raw or "{}")\n            except (TypeError, ValueError, json.JSONDecodeError):\n                payload = {}\n            if not isinstance(payload, dict):\n                payload = {}\n            selected = payload.get("profiles")\n            if not isinstance(selected, list) or not selected:\n                selected = ["reality_tcp", "xhttp_reality"]\n            active = [str(item) for item in selected if str(item) in enabled_xray_profiles]\n            if not active:\n                restore_status = str(status)\n                db.execute(\n                    "UPDATE device_credentials SET status = 'disabled' WHERE id = ?",\n                    (int(row_id),),\n                )\n            elif active != [str(item) for item in selected]:\n                restore_config = raw\n                payload["profiles"] = active\n                db.execute(\n                    "UPDATE device_credentials SET config_json = ? WHERE id = ?",\n                    (json.dumps(payload, ensure_ascii=False, sort_keys=True), int(row_id)),\n                )\n            if restore_status is not None or restore_config is not None:\n                snapshots.append((int(row_id), restore_status, restore_config))\n        db.commit()\n        yield {\n            "settings": settings,\n            "xray_profiles": sorted(enabled_xray_profiles),\n        }\n    finally:\n        try:\n            for row_id, status, raw in snapshots:\n                if status is not None and raw is not None:\n                    db.execute(\n                        "UPDATE device_credentials SET status = ?, config_json = ? WHERE id = ?",\n                        (status, raw, int(row_id)),\n                    )\n                elif status is not None:\n                    db.execute(\n                        "UPDATE device_credentials SET status = ? WHERE id = ?",\n                        (status, int(row_id)),\n                    )\n                elif raw is not None:\n                    db.execute(\n                        "UPDATE device_credentials SET config_json = ? WHERE id = ?",\n                        (raw, int(row_id)),\n                    )\n            db.commit()\n        finally:\n            db.close()\n'''
+          p.write_text(text[:start] + replacement + text[end:], encoding='utf-8', newline='\n')
+          PY
+
+          python -m pytest -q tests/test_clients_keys_awg23_restore_repair_persist_02208.py
+          python -m pytest -q tests/test_clients_keys_dormant_restore_02208.py
+          python -m py_compile hostd/sg_hostd/clients_keys_tls_backup_patch.py
+
+          rm -f .github/workflows/_tmp-fix-awg23-status-persist.yml
+          git add -A
+          python - <<'PY'
+          import hashlib, subprocess
+          from pathlib import Path
+          tracked = subprocess.check_output(['git','ls-files'], text=True).splitlines()
+          rows=[]
+          for name in sorted(x for x in tracked if x != 'SOURCE-SHA256SUMS'):
+              rows.append(f"{hashlib.sha256(Path(name).read_bytes()).hexdigest()}  {name}")
+          Path('SOURCE-SHA256SUMS').write_text('\n'.join(rows)+'\n', encoding='utf-8', newline='\n')
+          PY
+          git add SOURCE-SHA256SUMS
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'fix: keep successful AWG2 and AWG3 status after restore'
+          git push origin HEAD:fix/02208-awg23-restore-repair-persist
