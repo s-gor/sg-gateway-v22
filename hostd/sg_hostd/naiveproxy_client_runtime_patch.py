@@ -1,7 +1,12 @@
 from __future__ import annotations
 
+import os
 import sqlite3
 from functools import wraps
+from pathlib import Path
+
+
+RESTORE_CONTEXT_ENV = "SG_GATEWAY_CLIENTS_KEYS_RESTORE"
 
 
 def _profile_present(runtime) -> bool:
@@ -32,6 +37,70 @@ def _profile_present(runtime) -> bool:
         database.close()
 
 
+def _restore_readiness_issue(runtime, settings: dict) -> str:
+    """Return only destination-readiness failures that are safe to defer.
+
+    Credential/schema validation happens in runtime._load() before this helper.
+    Ordinary client apply does not set RESTORE_CONTEXT_ENV and therefore keeps
+    the established strict NaiveProxy transaction semantics.
+    """
+
+    if os.environ.get(RESTORE_CONTEXT_ENV) != "1":
+        return ""
+
+    domain = str(settings.get("domain") or "").strip()
+    if not domain:
+        return "NaiveProxy connection is not configured"
+
+    try:
+        port = int(settings.get("port") or 0)
+    except (TypeError, ValueError):
+        return ""
+    if not 1 <= port <= 65535:
+        return ""
+
+    binary = Path(getattr(runtime, "BINARY", "/opt/sg-gateway/naiveproxy/bin/caddy"))
+    if not binary.is_file() or not os.access(binary, os.X_OK):
+        return "NaiveProxy runtime is not installed"
+
+    certificate = Path(
+        str(settings.get("certificate_path") or "")
+        or f"/etc/letsencrypt/live/{domain}/fullchain.pem"
+    )
+    private_key = Path(
+        str(settings.get("private_key_path") or "")
+        or f"/etc/letsencrypt/live/{domain}/privkey.pem"
+    )
+    if not certificate.is_file() or not private_key.is_file():
+        return "NaiveProxy TLS certificate is not ready"
+
+    return ""
+
+
+def _deferred_result(base: dict, settings: dict, credential_ids: list[int], reason: str) -> dict:
+    engine = {
+        "engine": "naiveproxy",
+        "ok": False,
+        "deferred": True,
+        "message": f"NaiveProxy dormant: {reason}",
+        "clients": 0,
+        "critical": False,
+        "service": "sg-gateway-naiveproxy.service",
+        "port": int(settings.get("port") or 8447),
+        "credentials": len(credential_ids),
+    }
+    result = dict(base)
+    result["engines"] = [*list(base.get("engines") or []), engine]
+    base_message = str(base.get("message") or "").strip()
+    result["message"] = (
+        base_message + "; " + engine["message"]
+        if base_message
+        else engine["message"]
+    )
+    result["ok"] = True
+    return result
+
+
 def install(client_runtime, commands, runtime) -> None:
     if getattr(client_runtime, "_naiveproxy_apply_installed", False):
         return
@@ -55,6 +124,14 @@ def install(client_runtime, commands, runtime) -> None:
             configured = bool(str(settings.get("domain") or "").strip())
             if not configured and not credential_ids:
                 return base
+            readiness_issue = _restore_readiness_issue(runtime, settings)
+            if readiness_issue:
+                return _deferred_result(
+                    base,
+                    settings,
+                    credential_ids,
+                    readiness_issue,
+                )
             payload = runtime.sync()
             if not payload.get("ok", True):
                 raise RuntimeError("NaiveProxy runtime apply failed")
