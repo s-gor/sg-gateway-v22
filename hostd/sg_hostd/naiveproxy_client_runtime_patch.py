@@ -7,6 +7,11 @@ from pathlib import Path
 
 
 RESTORE_CONTEXT_ENV = "SG_GATEWAY_CLIENTS_KEYS_RESTORE"
+_RESTORE_READINESS_ERRORS = {
+    "NaiveProxy connection is not configured",
+    "NaiveProxy runtime is not installed",
+    "NaiveProxy TLS certificate is not ready",
+}
 
 
 def _profile_present(runtime) -> bool:
@@ -37,6 +42,23 @@ def _profile_present(runtime) -> bool:
         database.close()
 
 
+def _restore_context() -> bool:
+    return os.environ.get(RESTORE_CONTEXT_ENV) == "1"
+
+
+def _restore_readiness_exception(exc: Exception) -> str:
+    """Return a whitelisted transient restore-readiness error, if any.
+
+    Do not broaden this to arbitrary RuntimeError values: malformed credentials,
+    conflicting ports and invalid generated configuration must remain fatal.
+    """
+
+    if not _restore_context():
+        return ""
+    message = str(exc).strip()
+    return message if message in _RESTORE_READINESS_ERRORS else ""
+
+
 def _restore_readiness_issue(runtime, settings: dict) -> str:
     """Return only destination-readiness failures that are safe to defer.
 
@@ -45,7 +67,7 @@ def _restore_readiness_issue(runtime, settings: dict) -> str:
     the established strict NaiveProxy transaction semantics.
     """
 
-    if os.environ.get(RESTORE_CONTEXT_ENV) != "1":
+    if not _restore_context():
         return ""
 
     domain = str(settings.get("domain") or "").strip()
@@ -119,6 +141,8 @@ def install(client_runtime, commands, runtime) -> None:
         if not _profile_present(runtime):
             return base
 
+        settings: dict = {}
+        credential_ids: list[int] = []
         try:
             settings, users, credential_ids = runtime._load()
             configured = bool(str(settings.get("domain") or "").strip())
@@ -136,6 +160,14 @@ def install(client_runtime, commands, runtime) -> None:
             if not payload.get("ok", True):
                 raise RuntimeError("NaiveProxy runtime apply failed")
         except Exception as exc:
+            readiness_issue = _restore_readiness_exception(exc)
+            if readiness_issue:
+                return _deferred_result(
+                    base,
+                    settings,
+                    credential_ids,
+                    readiness_issue,
+                )
             redact = getattr(runtime, "_redact", str)
             raise client_runtime.ClientRuntimeError(
                 f"NaiveProxy: {redact(str(exc))}"
