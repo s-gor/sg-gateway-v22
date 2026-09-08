@@ -2,30 +2,29 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-BASE = ROOT / "app/web/templates/base.html"
-PERF = ROOT / "app/web/static/sg-ui-performance-v22-08.css"
+CONTROLS = ROOT / "app/web/static/sg-controls-final-v1.css"
+LUXURY = ROOT / "app/web/static/sg-luxury-jade-depth-v2.css"
 
 
-def test_base_loads_final_performance_layer_after_ui_components():
-    text = BASE.read_text(encoding="utf-8")
-    components = "sg-ui-components-v22-08.css"
-    performance = "sg-ui-performance-v22-08.css"
+def test_light_theme_does_not_use_fixed_full_page_background():
+    luxury = LUXURY.read_text(encoding="utf-8")
+    controls = CONTROLS.read_text(encoding="utf-8")
 
-    assert performance in text
-    assert text.index(performance) > text.index(components)
-
-
-def test_obsolete_preview_layers_are_not_loaded_globally():
-    text = BASE.read_text(encoding="utf-8")
-
-    assert "sg-preview28-final.css" not in text
-    assert "sg-preview32-final.css" not in text
-    assert "sg-preview34-final.css" not in text
-    assert "sg-preview45-xray-theme-fix.css" not in text
+    assert "radial-gradient" in luxury
+    assert "background-attachment: scroll !important" in controls
 
 
-def test_performance_layer_disables_fixed_full_page_background_paint():
-    text = PERF.read_text(encoding="utf-8")
+def test_large_panel_surfaces_are_paint_contained():
+    controls = CONTROLS.read_text(encoding="utf-8")
 
-    assert "background-attachment: scroll !important" in text
-    assert "contain: paint" in text
+    assert "contain: paint" in controls
+    assert ".sg-content" in controls
+    assert ".sg-main" in controls
+
+
+def test_sidebar_and_topbar_do_not_animate_layout_properties():
+    controls = CONTROLS.read_text(encoding="utf-8")
+
+    assert ".sg-sidebar" in controls
+    assert ".sg-global-topbar" in controls
+    assert "transition-property: none !important" in controls
