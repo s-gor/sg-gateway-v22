@@ -1,6 +1,7 @@
 from pathlib import Path
 
 
+# Regression contract for the final 22.08 UI rendering path.
 ROOT = Path(__file__).resolve().parents[1]
 COMPONENTS = ROOT / "app/web/static/sg-ui-components-v22-08.css"
 LUXURY = ROOT / "app/web/static/sg-luxury-jade-depth-v2.css"
