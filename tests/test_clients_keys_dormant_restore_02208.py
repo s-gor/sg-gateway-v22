@@ -325,3 +325,16 @@ def test_singbox_subprofile_export_stays_dormant_when_profile_flag_is_off(
 
     assert exports.is_export_ready(client, engine, device) is False
 
+
+
+def test_safety_rollback_refreshes_https_before_health_check() -> None:
+    source = (
+        Path(__file__).resolve().parents[1]
+        / "hostd"
+        / "sg_hostd"
+        / "clients_keys_portable_restore_patch.py"
+    ).read_text(encoding="utf-8")
+    rollback = source.split("except Exception as restore_exc:", 1)[1]
+    refresh = rollback.index("_refresh_restored_https_from_local_files")
+    health = rollback.index("hard._local_panel_health(full)")
+    assert refresh < health
