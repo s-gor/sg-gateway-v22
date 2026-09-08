@@ -6,7 +6,7 @@ UPDATER = Path("deploy/update-from-github-core.sh")
 def test_panel_update_preserves_awg3_userspace_and_checks_service_state():
     text = UPDATER.read_text(encoding="utf-8")
     assert "sg-gateway-awg3.service" in text
-    assert '".venv"|"awg3") continue ;;' in text
+    assert '".venv"|"awg3"|"naiveproxy") continue ;;' in text
     assert '"assets") continue ;;' in text
     assert "verify_runtime_states_unchanged" in text
 
@@ -26,7 +26,7 @@ def test_panel_update_deploys_current_awg3_unit_without_replacing_runtime():
     assert "etc/systemd/system/sg-gateway-awg3.service" in backup
 
     deploy = text[text.index("deploy_source() {") : text.index("restart_panel() {")]
-    assert '".venv"|"awg3") continue ;;' in deploy
+    assert '".venv"|"awg3"|"naiveproxy") continue ;;' in deploy
     assert 'rm -rf "$stage/vendor/cores"' in deploy
     assert 'install -m 0644 "$PREFIX/deploy/sg-gateway-awg3.service" "$AWG3_UNIT"' in deploy
     assert "systemctl daemon-reload" in deploy
@@ -53,7 +53,7 @@ def test_panel_update_accepts_missing_awg3_as_a_preserved_runtime_state():
     assert 'systemctl is-active --quiet "$PANEL_SERVICE"' in preflight
 
     deploy = text[text.index("deploy_source() {") : text.index("verify_final() {")]
-    assert '".venv"|"awg3") continue ;;' in deploy
+    assert '".venv"|"awg3"|"naiveproxy") continue ;;' in deploy
     assert 'rm -rf "$stage/vendor/cores"' in deploy
 
     final = text[text.index("verify_final() {") : text.index("bind_panel_update_state() {")]
