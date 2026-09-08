@@ -82,13 +82,29 @@ if call not in body:
     body = body.replace(old, call, 1)
 CORE.write_text(body, encoding="utf-8")
 
+checks = [
+    "/hostd/systemd/",
+    '".venv"|"awg3"|"naiveproxy"',
+    'NAIVE_ROOT="$PREFIX/naiveproxy"',
+    'sg-gateway-singbox.service "$NAIVE_SERVICE"',
+    "repair_naiveproxy_runtime_if_needed",
+    "naiveproxy_profile_present",
+    'SG_GATEWAY_SOURCE_ROOT="$PREFIX"',
+    'bash "$PREFIX/deploy/install-naiveproxy.sh"',
+    '[[ "$SYSTEM_ROOT" == / ]] || return 0',
+    '-o -path "$NAIVE_ROOT"',
+]
+patched = CORE.read_text(encoding="utf-8")
+missing_checks = [item for item in checks if item not in patched]
+if missing_checks:
+    raise SystemExit(f"patched core contract missing: {missing_checks!r}")
+subprocess.run(["bash", "-n", str(CORE)], check=True)
+
 TEST.write_text(
     '''from pathlib import Path\n\n\ndef test_core_update_preserves_and_repairs_naiveproxy_runtime():\n    source = Path("deploy/update-from-github-core.sh").read_text(encoding="utf-8")\n    assert "/hostd/systemd/" in source\n    assert '\".venv\"|\"awg3\"|\"naiveproxy\"' in source\n    assert 'NAIVE_ROOT="$PREFIX/naiveproxy"' in source\n    assert 'sg-gateway-singbox.service "$NAIVE_SERVICE"' in source\n    assert "repair_naiveproxy_runtime_if_needed" in source\n    assert "naiveproxy_profile_present" in source\n    assert 'SG_GATEWAY_SOURCE_ROOT="$PREFIX"' in source\n    assert 'bash "$PREFIX/deploy/install-naiveproxy.sh"' in source\n    assert '[[ "$SYSTEM_ROOT" == / ]] || return 0' in source\n\n\ndef test_core_update_protects_naiveproxy_from_permission_rewrite():\n    source = Path("deploy/update-from-github-core.sh").read_text(encoding="utf-8")\n    assert '-o -path "$NAIVE_ROOT"' in source\n''',
     encoding="utf-8",
 )
-
-subprocess.run(["python3", "-m", "pytest", "-q", str(TEST)], check=True)
-subprocess.run(["bash", "-n", str(CORE)], check=True)
+compile(TEST.read_text(encoding="utf-8"), str(TEST), "exec")
 
 WORKFLOW.unlink(missing_ok=True)
 SELF.unlink(missing_ok=True)
