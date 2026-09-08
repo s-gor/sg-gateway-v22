@@ -178,45 +178,71 @@ id -u sg-naiveproxy >/dev/null 2>&1 && HAD_USER=1
 getent group sg-naiveproxy >/dev/null 2>&1 && HAD_GROUP=1
 systemctl is-active --quiet "$SERVICE" 2>/dev/null && WAS_ACTIVE=1
 systemctl is-enabled --quiet "$SERVICE" 2>/dev/null && WAS_ENABLED=1
-HOSTD_WAS_ACTIVE=0
-HOSTD_WAS_ENABLED=0
-PANEL_WAS_ACTIVE=0
-PANEL_WAS_ENABLED=0
 systemctl is-active --quiet "$HOSTD_SERVICE" 2>/dev/null && HOSTD_WAS_ACTIVE=1
 systemctl is-enabled --quiet "$HOSTD_SERVICE" 2>/dev/null && HOSTD_WAS_ENABLED=1
 systemctl is-active --quiet "$PANEL_SERVICE" 2>/dev/null && PANEL_WAS_ACTIVE=1
 systemctl is-enabled --quiet "$PANEL_SERVICE" 2>/dev/null && PANEL_WAS_ENABLED=1
 
-# Remaining installer body is unchanged below this point in repository history.
-# This file replacement intentionally preserves the existing implementation contract;
-# the only behavior change above is accepting fix/02208-* as a valid persisted channel.
-
-# Fetch and execute the pinned runtime installation using the established transaction.
-install -d -m 0755 "$PREFIX/bin" "$CONFIG_DIR" "$STATE_DIR" "$CADDY_DATA_HOME" "$CADDY_CONFIG_HOME"
-archive="$TX_DIR/naiveproxy-runtime.tar.xz"
-curl -4fL --retry 5 --retry-all-errors --retry-delay 2 --connect-timeout 20 -o "$archive" "$RUNTIME_URL"
-echo "$RUNTIME_ARCHIVE_SHA256  $archive" | sha256sum -c -
-tar -xJf "$archive" -C "$TX_DIR"
-runtime_bin="$(find "$TX_DIR" -type f -name caddy -perm -u+x | head -n 1)"
-[[ -n "$runtime_bin" ]] || die "NaiveProxy runtime archive does not contain caddy"
-install -o root -g root -m 0755 "$runtime_bin" "$PREFIX/bin/caddy"
-
-if ! getent group sg-naiveproxy >/dev/null 2>&1; then
-  groupadd --system sg-naiveproxy
-fi
+install -d -m 0755 "$PREFIX/bin"
+if ! getent group sg-naiveproxy >/dev/null; then groupadd --system sg-naiveproxy; fi
 if ! id -u sg-naiveproxy >/dev/null 2>&1; then
   useradd --system --gid sg-naiveproxy --home-dir "$STATE_DIR" --shell /usr/sbin/nologin sg-naiveproxy
 fi
-chown -R sg-naiveproxy:sg-naiveproxy "$STATE_DIR"
-install -o root -g root -m 0644 "$SOURCE_ROOT/deploy/$SERVICE" "$SERVICE_PATH"
-install -o root -g root -m 0644 "$SOURCE_ROOT/hostd/systemd/$HOSTD_SERVICE" "$HOSTD_SERVICE_PATH"
-systemctl daemon-reload
-systemctl enable "$HOSTD_SERVICE" >/dev/null
-systemctl restart "$HOSTD_SERVICE"
-systemctl enable "$PANEL_SERVICE" >/dev/null
-systemctl restart "$PANEL_SERVICE"
-systemctl is-active --quiet "$HOSTD_SERVICE"
-systemctl is-active --quiet "$PANEL_SERVICE"
+chmod o+x "$PANEL_CONFIG_DIR"
+chmod o+x "$PANEL_STATE_DIR"
+install -d -o root -g sg-naiveproxy -m 0750 "$CONFIG_DIR"
+install -d -o sg-naiveproxy -g sg-naiveproxy -m 0700 "$STATE_DIR"
+install -d -o sg-naiveproxy -g sg-naiveproxy -m 0750 "$STATE_DIR/site"
+install -d -o sg-naiveproxy -g sg-naiveproxy -m 0700 "$CADDY_DATA_HOME" "$CADDY_CONFIG_HOME"
+if [[ -f "$CONFIG_DIR/Caddyfile" ]]; then
+  chown root:sg-naiveproxy "$CONFIG_DIR/Caddyfile"
+  chmod 0640 "$CONFIG_DIR/Caddyfile"
+fi
+
+work="$TX_DIR/download"
+mkdir -p "$work"
+archive="$work/caddy-forwardproxy-naive.tar.xz"
+curl -fsSL --retry 3 --connect-timeout 15 -o "$archive" "$RUNTIME_URL"
+printf '%s  %s\n' "$RUNTIME_ARCHIVE_SHA256" "$archive" | sha256sum -c - >/dev/null
+tar -xJf "$archive" -C "$work"
+candidate="$work/caddy-forwardproxy-naive/caddy"
+[[ -x "$candidate" ]] || die "Pinned archive does not contain executable caddy"
+"$candidate" list-modules | grep -qx 'http.handlers.forward_proxy' || die "forward_proxy module missing"
+if [[ -f "$CONFIG_DIR/Caddyfile" ]]; then
+  caddy_validate_log="$TX_DIR/caddy-validate.log"
+  if ! "$candidate" validate --config "$CONFIG_DIR/Caddyfile" --adapter caddyfile >"$caddy_validate_log" 2>&1; then
+    cat "$caddy_validate_log" >&2
+    die "Caddy configuration validation failed"
+  fi
+fi
+
+install -m 0755 "$candidate" "$PREFIX/bin/caddy.new"
+mv -f "$PREFIX/bin/caddy.new" "$PREFIX/bin/caddy"
+binary_sha256="$(sha256sum "$PREFIX/bin/caddy" | awk '{print $1}')"
+[[ "$binary_sha256" =~ ^[0-9a-f]{64}$ ]] || die "Cannot calculate installed Caddy SHA-256"
+printf '%s  %s\n' "$binary_sha256" "$PREFIX/bin/caddy" > "$PREFIX/CADDY-SHA256"
+cat > "$PREFIX/VERSIONS.env" <<EOF
+RUNTIME_VERSION=$RUNTIME_VERSION
+RUNTIME_ARCHIVE_SHA256=$RUNTIME_ARCHIVE_SHA256
+RUNTIME_BINARY_SHA256=$binary_sha256
+RUNTIME_URL=$RUNTIME_URL
+EOF
+
+install -m 0644 "$SOURCE_ROOT/deploy/$SERVICE" "$SERVICE_PATH"
+install -m 0644 "$SOURCE_ROOT/hostd/systemd/$HOSTD_SERVICE" "$HOSTD_SERVICE_PATH"
 persist_update_channel
+systemctl daemon-reload
+if (( HOSTD_WAS_ACTIVE == 1 )); then
+  systemctl restart "$HOSTD_SERVICE"
+  systemctl is-active --quiet "$HOSTD_SERVICE" || die "sg-hostd failed after NaiveProxy sandbox update"
+fi
+if (( PANEL_WAS_ACTIVE == 1 )); then
+  systemctl restart "$PANEL_SERVICE"
+  systemctl is-active --quiet "$PANEL_SERVICE" || die "SG-Gateway panel failed after update-channel migration"
+fi
+if (( WAS_ACTIVE == 1 )); then
+  systemctl restart "$SERVICE"
+  systemctl is-active --quiet "$SERVICE" || die "NaiveProxy service failed after runtime update"
+fi
 INSTALL_OK=1
-log "NaiveProxy runtime installed: $PREFIX/bin/caddy"
+log "NaiveProxy runtime ${RUNTIME_VERSION} installed. Configure domain/users, validate, then enable $SERVICE."
