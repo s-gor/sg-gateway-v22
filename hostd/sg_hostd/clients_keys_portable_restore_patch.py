@@ -52,10 +52,12 @@ def _apply_portable_clients_runtime_required(full: ModuleType) -> dict:
         "print(json.dumps(r,ensure_ascii=False,indent=2,default=str)); "
         "sys.exit(0 if r.get('ok') else 1)"
     )
+    runtime_env = dict(full._runtime_subprocess_env())
+    runtime_env["SG_GATEWAY_CLIENTS_KEYS_RESTORE"] = "1"
     result = full._probe(
         [str(python), "-c", code],
         timeout=420,
-        env=full._runtime_subprocess_env(),
+        env=runtime_env,
     )
     output = (result.stdout or result.stderr or "").strip()
     if output:
@@ -75,7 +77,10 @@ def _apply_portable_clients_runtime_required(full: ModuleType) -> dict:
             "error": output[-3200:] or "Portable Clients & Keys runtime apply deferred",
         }
     payload.setdefault("ok", True)
-    payload["deferred"] = False
+    payload["deferred"] = any(
+        isinstance(item, dict) and bool(item.get("deferred"))
+        for item in payload.get("engines", [])
+    )
     return payload
 
 
@@ -268,6 +273,16 @@ def _restore_clients_keys(full: ModuleType, hard: ModuleType) -> dict:
                         )
                     runtime_result = _apply_portable_clients_runtime_required(full)
 
+            runtime_deferred_engines = [
+                str(item.get("engine") or "").strip().lower()
+                for item in runtime_result.get("engines", [])
+                if isinstance(item, dict)
+                and item.get("deferred")
+                and str(item.get("engine") or "").strip()
+            ]
+            deferred_engines = sorted(
+                set(deferred_engines) | set(runtime_deferred_engines)
+            )
             runtime_validation = _validate_portable_runtime_best_effort(full)
             cert_ready, cert_domain = full._restored_certificate_ready()
             if (
