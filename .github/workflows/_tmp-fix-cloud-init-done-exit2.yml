@@ -19,6 +19,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Install pytest
+        run: python -m pip install 'pytest<9,>=8.0'
       - name: Patch and verify cloud-init degraded-complete handling
         shell: bash
         run: |
