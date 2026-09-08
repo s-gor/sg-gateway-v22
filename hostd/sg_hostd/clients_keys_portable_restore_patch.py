@@ -29,10 +29,21 @@ def _is_clients_keys_restore(full: ModuleType, archive: Path) -> bool:
     )
 
 
-def _apply_portable_clients_runtime_required(full: ModuleType) -> None:
+def _apply_portable_clients_runtime_required(full: ModuleType) -> dict:
+    """Best-effort runtime reconcile after durable Clients & Keys restore.
+
+    Runtime/Connection readiness belongs to the destination server and is not
+    part of backup integrity.  A missing runtime therefore leaves the restored
+    identity dormant instead of rolling the database back.
+    """
+
     python = Path("/opt/sg-gateway/.venv/bin/python")
     if not python.is_file():
-        raise RuntimeError("SG-Gateway venv Python is missing")
+        return {
+            "ok": False,
+            "deferred": True,
+            "error": "SG-Gateway venv Python is missing",
+        }
     code = (
         "import json,sys; "
         "from sg_hostd.client_runtime import apply_all_clients; "
@@ -48,9 +59,58 @@ def _apply_portable_clients_runtime_required(full: ModuleType) -> None:
     output = (result.stdout or result.stderr or "").strip()
     if output:
         print(output[-16000:], flush=True)
-    if result.returncode != 0:
-        detail = output[-3200:]
-        raise RuntimeError("Portable Clients & Keys runtime apply failed: " + detail)
+    payload: dict = {}
+    if output:
+        try:
+            decoded = json.loads(output)
+            if isinstance(decoded, dict):
+                payload = decoded
+        except (TypeError, ValueError, json.JSONDecodeError):
+            payload = {}
+    if result.returncode != 0 or payload.get("ok") is False:
+        return {
+            "ok": False,
+            "deferred": True,
+            "error": output[-3200:] or "Portable Clients & Keys runtime apply deferred",
+        }
+    payload.setdefault("ok", True)
+    payload["deferred"] = False
+    return payload
+
+
+def _validate_portable_runtime_best_effort(full: ModuleType) -> dict:
+    try:
+        full._validate_runtime_after_restore()
+    except Exception as exc:
+        return {"ok": False, "deferred": True, "error": str(exc)}
+    return {"ok": True, "deferred": False}
+
+
+def _install_destination_runtime_contract_defer() -> None:
+    """Do not let destination runtime readiness reject a valid portable backup."""
+
+    if getattr(tls_backup_patch, "_dormant_runtime_contract_installed", False):
+        return
+    original = tls_backup_patch._runtime_contract_for_destination
+
+    @wraps(original)
+    def deferred(data: ModuleType, database_path: Path) -> dict:
+        try:
+            return original(data, database_path)
+        except Exception as exc:
+            if exc.__class__.__name__ != "RuntimeContractError":
+                raise
+            return {
+                "ok": False,
+                "deferred": True,
+                "checks": [],
+                "profile": "clients-and-keys",
+                "disabled_destination_protocols_skipped": True,
+                "error": str(exc),
+            }
+
+    tls_backup_patch._runtime_contract_for_destination = deferred
+    tls_backup_patch._dormant_runtime_contract_installed = True
 
 
 def _restore_clients_keys(full: ModuleType, hard: ModuleType) -> dict:
@@ -103,6 +163,8 @@ def _restore_clients_keys(full: ModuleType, hard: ModuleType) -> dict:
             "[Restore 3/8] Создаю страховочный Full Backup текущего сервера"
         )
         safety = full.create_full_backup_archive(prefix="SG-Gateway-SAFETY")
+        runtime_result: dict = {"ok": False, "deferred": True}
+        runtime_validation: dict = {"ok": False, "deferred": True}
 
         try:
             full._restore_progress(
@@ -140,13 +202,19 @@ def _restore_clients_keys(full: ModuleType, hard: ModuleType) -> dict:
                     full._refresh_restored_https_from_local_files(
                         allow_xray_inactive=True
                     )
-                _apply_portable_clients_runtime_required(full)
+                runtime_result = _apply_portable_clients_runtime_required(full)
 
-            full._validate_runtime_after_restore()
+            runtime_validation = _validate_portable_runtime_best_effort(full)
             cert_ready, cert_domain = full._restored_certificate_ready()
+            if runtime_result.get("deferred") or runtime_validation.get("deferred"):
+                full._restore_progress(
+                    "[Restore 6/8] Клиенты и ключи восстановлены; часть runtime "
+                    "пока не готова и останется dormant до включения Connections"
+                )
             if cert_domain and not cert_ready:
-                raise RuntimeError(
-                    f"Restored certificate validation failed for {cert_domain}"
+                full._restore_progress(
+                    f"[Restore 6/8] HTTPS для {cert_domain} пока не готов; "
+                    "TLS-зависимые профили останутся dormant"
                 )
 
             full._restore_progress(
@@ -235,8 +303,11 @@ def _restore_clients_keys(full: ModuleType, hard: ModuleType) -> dict:
             timeout=20,
         ).returncode
         == 0,
-        "client_runtime_applied": True,
-        "portable_runtime_regenerated": True,
+        "client_runtime_applied": bool(runtime_result.get("ok")),
+        "client_runtime_deferred": bool(
+            runtime_result.get("deferred") or runtime_validation.get("deferred")
+        ),
+        "portable_runtime_regenerated": bool(runtime_result.get("ok")),
         "restore_space_preflight": plan,
         "panel_health_validated": True,
         "panel_post_restart_health_validated": True,
@@ -245,8 +316,8 @@ def _restore_clients_keys(full: ModuleType, hard: ModuleType) -> dict:
         "destination_protocol_enablement_preserved": True,
         "message": (
             "Clients & Keys restored; destination server settings and protocol "
-            "enablement preserved; HTTPS identity restored when compatible; "
-            "new panel process validated after restart"
+            "enablement preserved; unavailable runtime/profiles remain dormant "
+            "until their Connections become ready"
         ),
     }
 
@@ -254,6 +325,8 @@ def _restore_clients_keys(full: ModuleType, hard: ModuleType) -> dict:
 def install(hard: ModuleType, full: ModuleType) -> None:
     if getattr(full, "_clients_keys_portable_restore_v2_installed", False):
         return
+
+    _install_destination_runtime_contract_defer()
 
     # Wrap only the public restore entry point. The hardened Full Restore
     # implementation remains untouched and is still used byte-for-byte for
