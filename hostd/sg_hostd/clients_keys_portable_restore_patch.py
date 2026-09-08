@@ -4,6 +4,7 @@ import json
 import sqlite3
 import tarfile
 import tempfile
+from contextlib import contextmanager
 from functools import wraps
 from pathlib import Path
 from types import ModuleType
@@ -33,7 +34,7 @@ def _apply_portable_clients_runtime_required(full: ModuleType) -> dict:
     """Best-effort runtime reconcile after durable Clients & Keys restore.
 
     Runtime/Connection readiness belongs to the destination server and is not
-    part of backup integrity.  A missing runtime therefore leaves the restored
+    part of backup integrity. A missing runtime therefore leaves the restored
     identity dormant instead of rolling the database back.
     """
 
@@ -76,6 +77,66 @@ def _apply_portable_clients_runtime_required(full: ModuleType) -> dict:
     payload.setdefault("ok", True)
     payload["deferred"] = False
     return payload
+
+
+@contextmanager
+def _destination_runtime_policy(database_path: Path):
+    """Temporarily hide only credentials whose destination runtime is absent.
+
+    `apply_all_clients()` intentionally uses a global Runtime Contract for
+    ordinary client mutations. Portable restore is different: durable access
+    has already been validated, so a missing runtime must not prevent other
+    ready engines from being reconciled. Original credential statuses are
+    restored byte-for-byte after the best-effort runtime pass.
+    """
+
+    from sg_hostd import runtime_contracts
+
+    contract = runtime_contracts.inspect_runtime_contract(
+        database_path=database_path,
+        strict_optional=False,
+        include_all_critical=False,
+    )
+    deferred_engines = sorted(
+        {
+            str(item.get("engine") or "").strip().lower()
+            for item in contract.get("failures", [])
+            if str(item.get("engine") or "").strip()
+        }
+    )
+    if not deferred_engines:
+        yield {"deferred_engines": [], "runtime_contract": contract}
+        return
+
+    database = sqlite3.connect(database_path, timeout=15)
+    snapshots: list[tuple[int, str]] = []
+    try:
+        placeholders = ",".join("?" for _ in deferred_engines)
+        rows = database.execute(
+            f"SELECT id, status FROM device_credentials WHERE lower(engine) IN ({placeholders})",
+            tuple(deferred_engines),
+        ).fetchall()
+        snapshots = [(int(row_id), str(status)) for row_id, status in rows]
+        for row_id, _status in snapshots:
+            database.execute(
+                "UPDATE device_credentials SET status = 'disabled' WHERE id = ?",
+                (row_id,),
+            )
+        database.commit()
+        yield {
+            "deferred_engines": deferred_engines,
+            "runtime_contract": contract,
+        }
+    finally:
+        try:
+            for row_id, status in snapshots:
+                database.execute(
+                    "UPDATE device_credentials SET status = ? WHERE id = ?",
+                    (status, row_id),
+                )
+            database.commit()
+        finally:
+            database.close()
 
 
 def _validate_portable_runtime_best_effort(full: ModuleType) -> dict:
@@ -165,6 +226,7 @@ def _restore_clients_keys(full: ModuleType, hard: ModuleType) -> dict:
         safety = full.create_full_backup_archive(prefix="SG-Gateway-SAFETY")
         runtime_result: dict = {"ok": False, "deferred": True}
         runtime_validation: dict = {"ok": False, "deferred": True}
+        deferred_engines: list[str] = []
 
         try:
             full._restore_progress(
@@ -198,15 +260,21 @@ def _restore_clients_keys(full: ModuleType, hard: ModuleType) -> dict:
 
             live_database = full._data_dir() / "sg-gateway.sqlite"
             with tls_backup_patch.destination_protocol_policy(live_database):
-                if cert_domain:
-                    full._refresh_restored_https_from_local_files(
-                        allow_xray_inactive=True
-                    )
-                runtime_result = _apply_portable_clients_runtime_required(full)
+                with _destination_runtime_policy(live_database) as runtime_policy:
+                    deferred_engines = list(runtime_policy["deferred_engines"])
+                    if cert_domain:
+                        full._refresh_restored_https_from_local_files(
+                            allow_xray_inactive=True
+                        )
+                    runtime_result = _apply_portable_clients_runtime_required(full)
 
             runtime_validation = _validate_portable_runtime_best_effort(full)
             cert_ready, cert_domain = full._restored_certificate_ready()
-            if runtime_result.get("deferred") or runtime_validation.get("deferred"):
+            if (
+                deferred_engines
+                or runtime_result.get("deferred")
+                or runtime_validation.get("deferred")
+            ):
                 full._restore_progress(
                     "[Restore 6/8] Клиенты и ключи восстановлены; часть runtime "
                     "пока не готова и останется dormant до включения Connections"
@@ -305,8 +373,11 @@ def _restore_clients_keys(full: ModuleType, hard: ModuleType) -> dict:
         == 0,
         "client_runtime_applied": bool(runtime_result.get("ok")),
         "client_runtime_deferred": bool(
-            runtime_result.get("deferred") or runtime_validation.get("deferred")
+            deferred_engines
+            or runtime_result.get("deferred")
+            or runtime_validation.get("deferred")
         ),
+        "client_runtime_deferred_engines": deferred_engines,
         "portable_runtime_regenerated": bool(runtime_result.get("ok")),
         "restore_space_preflight": plan,
         "panel_health_validated": True,
