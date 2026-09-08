@@ -41,6 +41,8 @@ AWG31_CONFIG="$(system_path /etc/amnezia/amneziawg/awg31)"
 AWG31_STATE="$(system_path /var/lib/sg-gateway/awg31)"
 AWG31_UNIT="$(system_path /etc/systemd/system/sg-gateway-awg31.service)"
 AWG3_ROOT="$PREFIX/awg3"
+NAIVE_SERVICE="sg-gateway-naiveproxy.service"
+NAIVE_ROOT="$PREFIX/naiveproxy"
 LETSENCRYPT_DIR="$(system_path /etc/letsencrypt)"
 NGINX_CONFIG="$(system_path /etc/nginx/nginx.conf)"
 NGINX_SITE_AVAILABLE="$(system_path /etc/nginx/sites-available/sg-gateway)"
@@ -610,7 +612,7 @@ capture_service_states() {
   : > "$output"
   for service in \
     nginx.service xray.service mihomo.service sg-gateway-awg.service "$AWG3_SERVICE" "$AWG31_SERVICE" \
-    sg-gateway-singbox.service "$HOSTD_SERVICE" "$PANEL_SERVICE"; do
+    sg-gateway-singbox.service "$NAIVE_SERVICE" "$HOSTD_SERVICE" "$PANEL_SERVICE"; do
     active=0
     enabled=0
     failed=0
@@ -694,7 +696,7 @@ protected_runtime_paths() {
     "$LETSENCRYPT_DIR" "$DATA_DIR/security/tls-state.json" \
     "$AWG2_CONFIG" "$AWG2_UNIT" \
     "$AWG3_CONFIG" "$AWG3_ROOT" \
-    "$AWG31_CONFIG" "$AWG31_STATE" "$AWG31_UNIT" "$PREFIX/awg31" \
+    "$AWG31_CONFIG" "$AWG31_STATE" "$AWG31_UNIT" "$PREFIX/awg31" "$NAIVE_ROOT" \
     -- "$cert" "$key" <<'PYPROTECTED'
 import os
 import sys
@@ -1252,6 +1254,7 @@ prepare_source_light() {
     /app/ \
     /hostd/requirements.txt \
     /hostd/sg_hostd/ \
+    /hostd/systemd/ \
     /deploy/ \
     /vendor/cores/amneziawg-tools-3.0.20260805.tar.gz \
     /vendor/cores/amneziawg-go-linux-amd64-v3.0.0 \
@@ -1396,7 +1399,7 @@ deploy_source() {
   find "$PREFIX" -mindepth 1 -maxdepth 1 -print0 > "$children"
   while IFS= read -r -d '' child; do
     case "$(basename "$child")" in
-      ".venv"|"awg3") continue ;;
+      ".venv"|"awg3"|"naiveproxy") continue ;;
       "assets") continue ;;
     esac
     rm -rf "$child"
@@ -1410,13 +1413,13 @@ deploy_source() {
   fi
   chmod 0755 "$PREFIX"
   find "$PREFIX" \
-    \( -path "$PREFIX/.venv" -o -path "$PREFIX/assets" -o -path "$AWG3_ROOT" \) -prune -o \
+    \( -path "$PREFIX/.venv" -o -path "$PREFIX/assets" -o -path "$AWG3_ROOT" -o -path "$NAIVE_ROOT" \) -prune -o \
     -exec chown root:root {} +
   find "$PREFIX" \
-    \( -path "$PREFIX/.venv" -o -path "$PREFIX/assets" -o -path "$AWG3_ROOT" \) -prune -o \
+    \( -path "$PREFIX/.venv" -o -path "$PREFIX/assets" -o -path "$AWG3_ROOT" -o -path "$NAIVE_ROOT" \) -prune -o \
     -type d -exec chmod 0755 {} +
   find "$PREFIX" \
-    \( -path "$PREFIX/.venv" -o -path "$PREFIX/assets" -o -path "$AWG3_ROOT" \) -prune -o \
+    \( -path "$PREFIX/.venv" -o -path "$PREFIX/assets" -o -path "$AWG3_ROOT" -o -path "$NAIVE_ROOT" \) -prune -o \
     -type f -exec chmod 0644 {} +
   find "$PREFIX/deploy" -maxdepth 1 -type f -name '*.sh' -exec chmod 0755 {} + 2>/dev/null || true
 
