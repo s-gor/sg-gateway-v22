@@ -9,8 +9,17 @@ def test_runtime_installer_accepts_current_02208_release_channels():
     assert 'stable-02208' in source
     assert 'release/02208-*' in source
     assert 'feature/02208-*' in source
+    assert 'fix/02208-*' in source
     assert 'Refusing invalid 22.08 update channel' in source
     assert 'Refusing invalid 22.07 update channel' not in source
+
+
+def test_transactional_updater_accepts_current_02208_fix_channel():
+    source = (ROOT / "deploy/update-from-github-02207.sh").read_text()
+    assert 'fix/02208-*' in source
+    assert 'SG_GATEWAY_SOURCE_COMMIT' in source
+    assert 'run_naive_stage' in source
+    assert 'rollback_panel_update' in source
 
 
 def test_runtime_installer_persists_channel_as_data_and_restarts_panel():
