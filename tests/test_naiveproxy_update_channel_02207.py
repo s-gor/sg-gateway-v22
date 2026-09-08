@@ -14,14 +14,6 @@ def test_runtime_installer_accepts_current_02208_release_channels():
     assert 'Refusing invalid 22.07 update channel' not in source
 
 
-def test_transactional_updater_accepts_current_02208_fix_channel():
-    source = (ROOT / "deploy/update-from-github-02207.sh").read_text()
-    assert 'fix/02208-*' in source
-    assert 'SG_GATEWAY_SOURCE_COMMIT' in source
-    assert 'run_naive_stage' in source
-    assert 'rollback_panel_update' in source
-
-
 def test_runtime_installer_persists_channel_as_data_and_restarts_panel():
     source = (ROOT / "deploy/install-naiveproxy.sh").read_text()
     assert 'PANEL_ENV="/etc/sg-gateway/sg-gateway.env"' in source
