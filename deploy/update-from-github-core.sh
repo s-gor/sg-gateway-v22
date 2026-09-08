@@ -1334,6 +1334,51 @@ PYCHECK
 }
 
 # SG_GATEWAY_02112_LIGHT_UPDATE_ASSET_PRESERVE_FIX10
+naiveproxy_profile_present() {
+  [[ -f "$DATABASE" ]] || return 1
+  "$PREFIX/.venv/bin/python" -B - "$DATABASE" <<'PYNAIVEPROFILE'
+import sqlite3
+import sys
+
+connection = sqlite3.connect(f"file:{sys.argv[1]}?mode=ro", uri=True)
+try:
+    tables = {
+        str(row[0])
+        for row in connection.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        ).fetchall()
+    }
+    count = 0
+    if "connection_settings" in tables:
+        count += int(connection.execute(
+            "SELECT COUNT(*) FROM connection_settings WHERE engine='naiveproxy'"
+        ).fetchone()[0])
+    if "device_credentials" in tables:
+        count += int(connection.execute(
+            "SELECT COUNT(*) FROM device_credentials WHERE engine='naiveproxy'"
+        ).fetchone()[0])
+finally:
+    connection.close()
+raise SystemExit(0 if count else 1)
+PYNAIVEPROFILE
+}
+
+repair_naiveproxy_runtime_if_needed() {
+  [[ "$SYSTEM_ROOT" == / ]] || return 0
+  [[ -x "$NAIVE_ROOT/bin/caddy" ]] && return 0
+  naiveproxy_profile_present || return 0
+  [[ -f "$PREFIX/deploy/install-naiveproxy.sh" ]] || fail "NaiveProxy runtime is missing and installer is unavailable"
+  [[ -f "$PREFIX/deploy/$NAIVE_SERVICE" ]] || fail "NaiveProxy runtime is missing and service source is unavailable"
+  [[ -f "$PREFIX/hostd/systemd/$HOSTD_SERVICE" ]] || fail "NaiveProxy runtime is missing and hostd systemd source is unavailable"
+
+  printf '[SG-Gateway Update] NaiveProxy profile exists but runtime is missing; repairing pinned runtime...\n'
+  SG_GATEWAY_SOURCE_ROOT="$PREFIX" \
+  SG_GATEWAY_UPDATE_BRANCH="$BRANCH" \
+    bash "$PREFIX/deploy/install-naiveproxy.sh"
+  [[ -x "$NAIVE_ROOT/bin/caddy" ]] || fail "NaiveProxy runtime repair did not install caddy"
+  printf '[SG-Gateway Update] NaiveProxy runtime repaired: OK\n'
+}
+
 prepare_preserved_assets() {
   local live="$PREFIX/assets"
   local country_rel="geoip/sg-country-geoip.dat"
@@ -1446,6 +1491,7 @@ deploy_source() {
     'import flask, jinja2, waitress; print("Python runtime: OK")'
 
   migrate_panel_wsgi_service
+  repair_naiveproxy_runtime_if_needed
 }
 
 restart_panel() {
