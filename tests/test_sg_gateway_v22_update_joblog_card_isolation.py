@@ -63,7 +63,7 @@ def test_one_broken_exporter_does_not_break_other_client_cards(monkeypatch) -> N
     monkeypatch.setattr(
         access,
         "protocol_ready",
-        lambda _client, kind, _device: kind == "anytls",
+        lambda _client, kind, _device: kind in {"amneziawg", "anytls"},
     )
     monkeypatch.setattr(
         access,

@@ -162,3 +162,21 @@
   color: var(--sg-ui-accent);
 }
 
+/* 22.08 performance contract: keep the approved look without forcing full-page repaint. */
+html[data-theme="light"],
+html[data-theme="light"] body.sg-body,
+html[data-theme="light"] .sg-workspace,
+html[data-theme="light"] .login-shell,
+html[data-theme="light"] .recovery-shell {
+  background-attachment: scroll !important;
+}
+
+.sg-content,
+.sg-main {
+  contain: paint;
+}
+
+.sg-sidebar,
+.sg-global-topbar {
+  transition-property: none !important;
+}

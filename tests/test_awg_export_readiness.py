@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from types import SimpleNamespace
 
 import pytest
 
@@ -134,6 +135,12 @@ def test_complete_applied_awg_export_is_ready(
     engine: str,
 ) -> None:
     _patch_deployment(monkeypatch, engine, AWG_CONFIGS[engine])
+    if engine == "amneziawg31":
+        monkeypatch.setattr(
+            exports,
+            "get_awg31_settings",
+            lambda: SimpleNamespace(enabled=True, server_public_key="server-public"),
+        )
 
     assert exports.is_export_ready(_client(), engine, _device()) is True
 

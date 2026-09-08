@@ -124,7 +124,8 @@ def build_access_cards(
     awg = deployments.get("amneziawg")
     if awg is not None:
         try:
-            status = _status(client, device, awg)
+            ready = protocol_ready(client, "amneziawg", device)
+            status = _status(client, device, awg, ready=ready)
             export_url, qr_url = _urls(client, device, "amneziawg")
             cards.append(
                 AccessCard(
@@ -152,7 +153,8 @@ def build_access_cards(
     awg3 = deployments.get("amneziawg3")
     if awg3 is not None:
         try:
-            status = _status(client, device, awg3)
+            ready = protocol_ready(client, "amneziawg3", device)
+            status = _status(client, device, awg3, ready=ready)
             export_url, qr_url = _urls(client, device, "amneziawg3")
             cards.append(
                 AccessCard(
@@ -180,7 +182,8 @@ def build_access_cards(
     awg31 = deployments.get("amneziawg31")
     if awg31 is not None:
         try:
-            status = _status(client, device, awg31)
+            ready = protocol_ready(client, "amneziawg31", device)
+            status = _status(client, device, awg31, ready=ready)
             export_url, qr_url = _urls(client, device, "amneziawg31")
             cards.append(
                 AccessCard(

@@ -337,8 +337,19 @@ def _restore_clients_keys(full: ModuleType, hard: ModuleType) -> dict:
                         preserve_machine_env=False,
                     )
                     full._normalize_panel_data_permissions()
+                    rollback_cert_ready, rollback_cert_domain = (
+                        full._restored_certificate_ready()
+                    )
+                    if rollback_cert_domain:
+                        full._refresh_restored_https_from_local_files(
+                            allow_xray_inactive=True
+                        )
                     full._validate_runtime_after_restore()
                     full._restart_runtime(schedule_panel=False)
+                    if rollback_cert_domain:
+                        full._refresh_restored_https_from_local_files(
+                            allow_xray_inactive=True
+                        )
                     hard._local_panel_health(full)
                 rollback_panel_generation = hard._panel_service_generation(full)
                 hard._schedule_panel_restart_required(full)
