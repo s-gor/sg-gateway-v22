@@ -1,0 +1,87 @@
+name: Patch NaiveProxy update preservation
+
+on:
+  push:
+    branches:
+      - fix/02208-clients-keys-dormant-restore
+    paths:
+      - .github/workflows/patch-naiveproxy-update-preservation.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/02208-clients-keys-dormant-restore
+          fetch-depth: 0
+      - name: Patch updater, refresh checksums and self-remove
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git rm .github/workflows/patch-naiveproxy-update-preservation.yml
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('deploy/update-from-github.sh')
+          body = path.read_text(encoding='utf-8')
+
+          def replace_once(old: str, new: str) -> None:
+              global body
+              count = body.count(old)
+              if count != 1:
+                  raise SystemExit(f'expected one updater match, got {count}: {old[:80]!r}')
+              body = body.replace(old, new, 1)
+
+          replace_once(
+              'AWG3_ROOT="$PREFIX/awg3"\nTEMP_DIR=""',
+              'AWG3_ROOT="$PREFIX/awg3"\nNAIVE_SERVICE="sg-gateway-naiveproxy.service"\nNAIVE_ROOT="$PREFIX/naiveproxy"\nTEMP_DIR=""',
+          )
+          replace_once(
+              '    nginx.service xray.service mihomo.service sg-gateway-awg.service "$AWG3_SERVICE" \\\n    sg-gateway-singbox.service "$HOSTD_SERVICE" "$PANEL_SERVICE"; do',
+              '    nginx.service xray.service mihomo.service sg-gateway-awg.service "$AWG3_SERVICE" \\\n    sg-gateway-singbox.service "$NAIVE_SERVICE" "$HOSTD_SERVICE" "$PANEL_SERVICE"; do',
+          )
+          replace_once(
+              '    "/opt/sg-gateway/awg3",\n]',
+              '    "/opt/sg-gateway/awg3",\n    "/opt/sg-gateway/naiveproxy",\n]',
+          )
+          replace_once(
+              '      ".venv"|"awg3") continue ;;',
+              '      ".venv"|"awg3"|"naiveproxy") continue ;;',
+          )
+
+          prune = '\\( -path "$PREFIX/.venv" -o -path "$PREFIX/assets" -o -path "$AWG3_ROOT" \\) -prune -o \\\n'
+          replacement = '\\( -path "$PREFIX/.venv" -o -path "$PREFIX/assets" -o -path "$AWG3_ROOT" -o -path "$NAIVE_ROOT" \\) -prune -o \\\n'
+          count = body.count(prune)
+          if count != 3:
+              raise SystemExit(f'expected three ownership prune matches, got {count}')
+          body = body.replace(prune, replacement)
+
+          path.write_text(body, encoding='utf-8', newline='\n')
+          PY
+
+          python3 - <<'PY'
+          import hashlib
+          import subprocess
+          from pathlib import Path
+
+          paths = subprocess.check_output(['git', 'ls-files'], text=True).splitlines()
+          rows = []
+          for name in sorted(paths):
+              if name == 'SOURCE-SHA256SUMS':
+                  continue
+              path = Path(name)
+              if not path.is_file():
+                  continue
+              rows.append(f'{hashlib.sha256(path.read_bytes()).hexdigest()}  {name}')
+          Path('SOURCE-SHA256SUMS').write_text('\n'.join(rows) + '\n', encoding='utf-8')
+          PY
+
+          git add deploy/update-from-github.sh tests/test_update_preserves_naiveproxy_runtime_02208.py SOURCE-SHA256SUMS
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git commit -m "fix: preserve NaiveProxy runtime during panel update"
+          git push origin HEAD:fix/02208-clients-keys-dormant-restore
