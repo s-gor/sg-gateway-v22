@@ -1,0 +1,39 @@
+name: Temporary finalize NaiveProxy TLS-domain fix
+
+on:
+  push:
+    branches:
+      - fix/02208-awg23-restore-repair-persist
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Remove temporary workflows and regenerate source checksums
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm -f .github/workflows/_tmp-naiveproxy-tls-domain-red.yml
+          git rm -f .github/workflows/_tmp-naiveproxy-finalize.yml
+          python3 - <<'PY'
+          import hashlib
+          import subprocess
+          from pathlib import Path
+
+          tracked = subprocess.check_output(["git", "ls-files"], text=True).splitlines()
+          tracked = [p for p in tracked if p != "SOURCE-SHA256SUMS"]
+          rows = []
+          for path in sorted(tracked):
+              data = Path(path).read_bytes()
+              rows.append(f"{hashlib.sha256(data).hexdigest()}  {path}")
+          Path("SOURCE-SHA256SUMS").write_text("\n".join(rows) + "\n", encoding="utf-8")
+          PY
+          git add SOURCE-SHA256SUMS
+          git commit -m "fix: finalize NaiveProxy TLS-domain restore readiness"
+          git push origin HEAD:fix/02208-awg23-restore-repair-persist
