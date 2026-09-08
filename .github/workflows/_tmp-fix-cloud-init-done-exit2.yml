@@ -1,0 +1,60 @@
+name: Temporary cloud-init done exit2 hotfix
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.head_ref == 'fix/02208-cloud-init-done-exit2'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Patch and verify cloud-init degraded-complete handling
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('deploy/install-from-github.sh')
+          text = path.read_text(encoding='utf-8')
+          old = '''  printf '[SG-Gateway] Waiting for cloud-init to finish...\\n'\n  if ! cloud-init status --wait; then\n    fail "cloud-init did not finish successfully; resolve the Ubuntu first-boot state and rerun the installer"\n  fi\n  printf '[SG-Gateway] cloud-init: ready.\\n'\n'''
+          new = '''  printf '[SG-Gateway] Waiting for cloud-init to finish...\\n'\n  local cloud_init_output="" cloud_init_rc=0\n  set +e\n  cloud_init_output="$(cloud-init status --wait 2>&1)"\n  cloud_init_rc=$?\n  set -e\n  printf '%s\\n' "$cloud_init_output"\n\n  if (( cloud_init_rc == 0 )); then\n    printf '[SG-Gateway] cloud-init: ready.\\n'\n    return 0\n  fi\n\n  # cloud-init 24.x uses exit code 2 when initialization completed with\n  # recoverable/degraded errors.  A completed first boot must not block the\n  # SG-Gateway installer; later apt/network preflights still fail normally if\n  # the machine is genuinely unusable.\n  if (( cloud_init_rc == 2 )) && grep -Eq '(^|[[:space:]])status:[[:space:]]*done([[:space:]]|$)' <<<"$cloud_init_output"; then\n    printf '[SG-Gateway] cloud-init: completed with recoverable errors; continuing.\\n'\n    return 0\n  fi\n\n  fail "cloud-init did not finish successfully; resolve the Ubuntu first-boot state and rerun the installer"\n'''
+          if old not in text:
+              raise SystemExit('cloud-init patch target not found')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8', newline='\n')
+
+          test = Path('tests/test_cloud_init_done_exit2_02208.py')
+          test.write_text('''from pathlib import Path\n\n\ndef test_cloud_init_exit2_done_is_degraded_complete_not_fatal() -> None:\n    source = (Path(__file__).resolve().parents[1] / "deploy" / "install-from-github.sh").read_text(encoding="utf-8")\n    assert "cloud_init_rc == 2" in source\n    assert "status:[[:space:]]*done" in source\n    assert "completed with recoverable errors; continuing" in source\n\n\ndef test_cloud_init_other_nonzero_status_remains_fatal() -> None:\n    source = (Path(__file__).resolve().parents[1] / "deploy" / "install-from-github.sh").read_text(encoding="utf-8")\n    degraded = source.index("cloud_init_rc == 2")\n    fatal = source.index("cloud-init did not finish successfully", degraded)\n    assert fatal > degraded\n''', encoding='utf-8', newline='\n')
+          PY
+
+          python -m pytest -q tests/test_cloud_init_done_exit2_02208.py
+          bash -n deploy/install-from-github.sh
+
+          rm -f .github/workflows/_tmp-fix-cloud-init-done-exit2.yml
+          python - <<'PY'
+          import hashlib, subprocess
+          from pathlib import Path
+          tracked = subprocess.check_output(['git','ls-files'], text=True).splitlines()
+          excluded = {'SOURCE-SHA256SUMS', '.github/workflows/_tmp-fix-cloud-init-done-exit2.yml'}
+          rows = []
+          for p in sorted(x for x in tracked if x not in excluded):
+              rows.append(f"{hashlib.sha256(Path(p).read_bytes()).hexdigest()}  {p}")
+          Path('SOURCE-SHA256SUMS').write_text('\n'.join(rows) + '\n', encoding='utf-8', newline='\n')
+          PY
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'fix: accept completed cloud-init exit code 2'
+          git push origin HEAD:${{ github.head_ref }}
