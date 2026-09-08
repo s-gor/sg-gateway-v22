@@ -6,6 +6,7 @@ ROOT = Path(__file__).parents[1]
 
 def test_runtime_installer_accepts_current_02208_release_channels():
     source = (ROOT / "deploy/install-naiveproxy.sh").read_text()
+    assert 'main' in source
     assert 'stable-02208' in source
     assert 'release/02208-*' in source
     assert 'feature/02208-*' in source
