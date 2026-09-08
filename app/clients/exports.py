@@ -445,8 +445,8 @@ def build_xray_profile_link(
     if (
         profile is None
         or profile_id not in selected
-        or not profile.enabled
-        or not profile.ready
+        or not getattr(profile, "enabled", True)
+        or not getattr(profile, "ready", True)
     ):
         return ClientExport(filename, "text/plain; charset=utf-8", "")
 
