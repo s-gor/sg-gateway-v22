@@ -192,6 +192,17 @@ def is_export_ready(
     ):
         return False
 
+    # "applied" describes the durable client credential, not whether the
+    # corresponding Connection is currently usable on this server.  Keep the
+    # credential intact while suppressing exports for disabled Connections.
+    if engine != "sgclient":
+        try:
+            settings = get_connection_settings(engine)
+        except (KeyError, LookupError):
+            return False
+        if not settings.enabled:
+            return False
+
     if engine not in _AWG_EXPORT_REQUIRED_FIELDS:
         return True
     if not deployment.config_json:
@@ -431,7 +442,12 @@ def build_xray_profile_link(
     selected = _selected_xray_profiles(client, device)
     state, profile = _xray_profile(profile_id)
     filename = f"sg-gateway-{_slug(client, device)}-{profile_id}.txt"
-    if profile is None or profile_id not in selected:
+    if (
+        profile is None
+        or profile_id not in selected
+        or not profile.enabled
+        or not profile.ready
+    ):
         return ClientExport(filename, "text/plain; charset=utf-8", "")
 
     safe_name = quote(f"{_label(client, device)} · {profile.title}", safe="")
