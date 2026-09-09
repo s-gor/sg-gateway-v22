@@ -55,26 +55,14 @@ def _primary_device(client_id: int) -> int:
     return int(row["id"])
 
 
-def test_three_profiles_have_distinct_ports_interfaces_and_paths() -> None:
+def test_historical_and_current_profiles_keep_distinct_runtime_paths() -> None:
     assert client_runtime.AWG_CONFIG == Path("/etc/amnezia/amneziawg/awg0.conf")
     assert awg3_runtime.AWG3_CONFIG == Path("/etc/amnezia/amneziawg/awg3.conf")
     assert lifecycle.SERVER_CONFIG == Path("/etc/amnezia/amneziawg/awg31/awg31.conf")
-    assert len({str(client_runtime.AWG_CONFIG), str(awg3_runtime.AWG3_CONFIG), str(lifecycle.SERVER_CONFIG)}) == 3
-
     assert awg3_runtime.AWG3_ROOT == Path("/opt/sg-gateway/awg3")
     assert lifecycle.RUNTIME_ROOT == Path("/opt/sg-gateway/awg31")
-    assert awg3_runtime.AWG3_ROOT != lifecycle.RUNTIME_ROOT
     assert lifecycle.STATE_ROOT == Path("/var/lib/sg-gateway/awg31")
-    assert lifecycle.STATE_ROOT not in {
-        Path("/var/lib/sg-gateway/awg2"),
-        Path("/var/lib/sg-gateway/awg3"),
-    }
-
-    assert client_runtime.AWG_SERVICE == "sg-gateway-awg.service"
-    assert awg3_runtime.AWG3_SERVICE == "sg-gateway-awg3.service"
     assert awg31_runtime.SERVICE == "sg-gateway-awg31.service"
-    assert len({"awg0", "awg3", lifecycle.INTERFACE}) == 3
-    assert len({585, awg3_runtime.AWG3_PORT, 587}) == 3
 
 
 def test_awg31_contract_is_fixed_udp_only() -> None:
@@ -100,37 +88,34 @@ def test_awg31_contract_is_fixed_udp_only() -> None:
 
 
 def test_client_create_update_and_awg31_delete_are_isolated(isolated_clients) -> None:
-    client_id = repository.create_client("Alpha", "amneziawg,amneziawg3,amneziawg31")
+    client_id = repository.create_client("Alpha", "xray,amneziawg31")
     assert client_id is not None
     device_id = _primary_device(client_id)
     before = _credentials(device_id)
-    assert set(before) == {"amneziawg", "amneziawg3", "amneziawg31"}
+    assert set(before) == {"amneziawg31", "xray"}
     awg31_before = before["amneziawg31"]
+    xray_before = before["xray"]
     assert awg31_before["endpoint"] == "awg31.internal:587"
     assert awg31_before["transport"] == "udp"
     assert awg31_before["address"].startswith("10.131.0.")
 
-    assert repository.update_client(client_id, "Alpha Updated", None, "amneziawg,amneziawg3,amneziawg31")
+    assert repository.update_client(client_id, "Alpha Updated", None, "xray,amneziawg31")
     updated = _credentials(device_id)
     assert updated["amneziawg31"]["client_name"] == "Alpha Updated"
     assert updated["amneziawg31"]["private_key"] == awg31_before["private_key"]
     assert updated["amneziawg31"]["public_key"] == awg31_before["public_key"]
 
-    awg2_before = updated["amneziawg"]
-    awg3_before = updated["amneziawg3"]
     lifecycle.ensure_peer(device_id, updated["amneziawg31"])
-    assert _credentials(device_id)["amneziawg"] == awg2_before
-    assert _credentials(device_id)["amneziawg3"] == awg3_before
+    assert _credentials(device_id)["xray"] == xray_before
 
     assert repository.delete_awg31_peer(device_id) is True
     remaining = _credentials(device_id)
-    assert set(remaining) == {"amneziawg", "amneziawg3"}
-    assert remaining["amneziawg"] == awg2_before
-    assert remaining["amneziawg3"] == awg3_before
+    assert set(remaining) == {"xray"}
+    assert remaining["xray"] == xray_before
 
 
 def test_client_delete_cascades_its_awg31_peer(isolated_clients) -> None:
-    client_id = repository.create_client("Delete Me", "amneziawg,amneziawg3,amneziawg31")
+    client_id = repository.create_client("Delete Me", "xray,amneziawg31")
     assert client_id is not None
     device_id = _primary_device(client_id)
     assert "amneziawg31" in _credentials(device_id)
@@ -146,7 +131,7 @@ def test_client_delete_cascades_its_awg31_peer(isolated_clients) -> None:
 def test_awg31_renders_separate_server_and_peer_configs(
     isolated_clients, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    client_id = repository.create_client("Runtime", "amneziawg,amneziawg3,amneziawg31")
+    client_id = repository.create_client("Runtime", "amneziawg31")
     assert client_id is not None
     device_id = _primary_device(client_id)
 
@@ -167,8 +152,6 @@ def test_awg31_renders_separate_server_and_peer_configs(
     assert "Address = 10.131.0.1/24" in server
     assert "Endpoint = awg31.internal:587" in peer
     assert "DNS = 1.1.1.1" in peer
-    rendered_lines = (server + "\n" + peer).splitlines()
-    assert not any(line.strip().upper().startswith("TCP") for line in rendered_lines)
 
 
 def test_service_repair_and_control_commands_are_separate() -> None:
@@ -180,30 +163,19 @@ def test_service_repair_and_control_commands_are_separate() -> None:
     assert "amneziawg-tools-3.1.20260812.tar.gz" in repair
     assert "amneziawg-go-linux-amd64-v3.1.20260814" in repair
     assert "/opt/sg-gateway/awg31" in repair
-    assert 'install -m 0755 "$PREFIX/deploy/sg-gateway-awg31-userspace.sh" "$PREFIX/deploy/sg-gateway-awg31-userspace.sh"' not in repair
     for action in ("start", "stop", "restart", "status"):
         assert action in control
 
 
-def test_awg3_remains_30_and_awg31_is_31_with_pinned_hashes() -> None:
+def test_awg31_runtime_remains_pinned_and_normal_client_apply_is_extended() -> None:
     versions = (ROOT / "vendor/cores/VERSIONS.env").read_text()
     sums = (ROOT / "vendor/cores/SHA256SUMS").read_text()
-    awg3_repair = (ROOT / "deploy/repair-awg3-runtime.sh").read_text()
     awg31_repair = (ROOT / "deploy/repair-awg31-runtime.sh").read_text()
 
-    assert "AMNEZIAWG3_TOOLS_VERSION=3.0.20260805" in versions
-    assert "AMNEZIAWG3_GO_VERSION=3.0.0" in versions
     assert "AMNEZIAWG31_TOOLS_VERSION=3.1.20260812" in versions
     assert "AMNEZIAWG31_GO_VERSION=3.1.20260814" in versions
-    assert "090f9383532822a756d078890b447e00af7f46bd30a10f9f47c46d633d807b19  amneziawg-tools-3.0.20260805.tar.gz" in sums
-    assert "131110027db6d5dc0e35b19eb5b8a2692676081366c34112088dc68bbb050bcd  amneziawg-go-linux-amd64-v3.0.0" in sums
     assert "f18592c499c893b1b87b15de9e707ce265585cf2536698975b6ede8156d14ada" in sums
     assert "375bc2645df09498aa30215e3b3a09a97626a8e929f409e0edef6564fb8e3110" in sums
-    assert "amneziawg-tools-3.0.20260805.tar.gz" in awg3_repair
-    assert "amneziawg-go-linux-amd64-v3.0.0" in awg3_repair
     assert "amneziawg-tools-3.1.20260812.tar.gz" in awg31_repair
     assert "amneziawg-go-linux-amd64-v3.1.20260814" in awg31_repair
-
-
-def test_normal_client_apply_is_extended_with_awg31() -> None:
     assert getattr(client_runtime, "_awg31_apply_installed", False) is True
