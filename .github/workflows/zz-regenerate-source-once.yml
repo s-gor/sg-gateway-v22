@@ -1,0 +1,47 @@
+name: Regenerate source integrity once
+
+on:
+  push:
+    branches:
+      - feature/02208-awg31-health-cleanup
+
+permissions:
+  contents: write
+
+jobs:
+  regenerate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Regenerate SOURCE-SHA256SUMS and remove this workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm .github/workflows/zz-regenerate-source-once.yml
+          python3 -B - <<'PY'
+          import hashlib
+          import subprocess
+          from pathlib import Path
+
+          tracked = subprocess.check_output(
+              ["git", "ls-files"], text=True, encoding="utf-8"
+          ).splitlines()
+          tracked = sorted(path for path in tracked if path != "SOURCE-SHA256SUMS")
+
+          rows = []
+          for path in tracked:
+              data = subprocess.check_output(["git", "show", f"HEAD:{path}"])
+              rows.append(f"{hashlib.sha256(data).hexdigest()}  {path}")
+
+          Path("SOURCE-SHA256SUMS").write_text("\n".join(rows) + "\n", encoding="utf-8")
+          print(f"regenerated {len(rows)} source hashes")
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add SOURCE-SHA256SUMS
+          git commit -m "chore: refresh source integrity"
+          git push origin HEAD:feature/02208-awg31-health-cleanup
