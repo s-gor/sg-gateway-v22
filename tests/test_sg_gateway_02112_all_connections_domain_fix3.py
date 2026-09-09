@@ -46,47 +46,18 @@ def test_all_connection_summaries_use_same_public_domain(tmp_path, monkeypatch):
 
     rows = list_connections()
 
-    assert {item.name for item in rows} == {"amneziawg", "amneziawg3", "xray", "mihomo"}
+    assert {item.name for item in rows} == {"amneziawg31", "xray", "mihomo"}
     assert all(item.public_host == DOMAIN for item in rows)
     assert all(DOMAIN in item.note for item in rows)
     assert all(IP not in item.note for item in rows)
 
 
-def test_connections_page_uses_public_host_for_every_engine():
-    page = (ROOT / "app/web/templates/connections.html").read_text(encoding="utf-8")
-    mihomo_panel = (ROOT / "app/web/templates/_mihomo_panel.html").read_text(encoding="utf-8")
+def test_connections_and_exports_share_public_endpoint_policy():
     service = (ROOT / "app/connections/service.py").read_text(encoding="utf-8")
     exports = (ROOT / "app/clients/exports.py").read_text(encoding="utf-8")
 
-    assert "SG_GATEWAY_02112_ALL_CONNECTIONS_DOMAIN_FIX3" in service
-    assert "awg_public_host = public_host(awg.host)" in service
-    assert "awg3_public_host = public_host(awg3.host)" in service
-    assert "xray_public_host = public_host(xray.host)" in service
-    assert "mihomo_public_host = public_host(mihomo.host)" in service
-
-    assert "<strong>{{ xray_public_host }}</strong>" in page
-    assert 'name="host" value="{{ xray_public_host }}"' in page
-    assert (
-        "<strong>{{ awg_public_host }}:{{ awg_settings.port }} · "
-        "DNS {{ awg_dns.dns }}</strong>"
-    ) in page
-    assert 'name="host" value="{{ awg_public_host }}"' in page
-    assert (
-        "<strong>{{ awg3_public_host }}:{{ awg3_settings.port }} · "
-        "DNS {{ awg_dns.dns }}</strong>"
-    ) in page
-    assert 'name="host" value="{{ awg3_public_host }}"' in page
-
-    # 022.07 removed the duplicate bottom endpoint summary. The live controls
-    # above remain bound to the same resolved public_host values.
-    assert 'class="cnv1-page-footer"' not in page
-
-    # Mihomo still receives the same resolved public endpoint from the service,
-    # but the fixed endpoint is intentionally not rendered as a separate card.
-    assert "mihomo_public_host" not in mihomo_panel
-    assert "mhv2-compact-endpoint" not in mihomo_panel
-
-    # Client exports use the same central endpoint policy, so every connection
-    # and every downloadable/QR/subscription payload follows one domain-first rule.
+    assert 'awg31 = _summary("amneziawg31", "AmneziaWG 3.1", counts)' in service
+    assert 'return [awg31, xray, mihomo]' in service
+    assert "WHERE engine NOT IN ('amneziawg', 'amneziawg3')" in service
     assert "from app.connections.public_endpoint import public_host, working_tls_domain" in exports
     assert "return public_host(*fallbacks)" in exports

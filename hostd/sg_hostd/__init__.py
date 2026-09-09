@@ -53,6 +53,15 @@ from sg_hostd.awg31_integration import install as _install_awg31_apply
 _install_awg31_apply(_import_module("sg_hostd.client_runtime"))
 del _install_awg31_apply
 
+# SG_GATEWAY_02208_RETIRED_AWG2_AWG3
+from sg_hostd.retired_awg_runtime_patch import install as _install_retired_awg_runtime
+_install_retired_awg_runtime(
+    _import_module("sg_hostd.client_runtime"),
+    _import_module("sg_hostd.awg3_runtime"),
+    _import_module("sg_hostd.runtime_contracts"),
+)
+del _install_retired_awg_runtime
+
 from sg_hostd.xray_stale_profile_patch import install as _install_xray_stale_profile
 _install_xray_stale_profile(_import_module("sg_hostd.client_runtime"))
 del _install_xray_stale_profile

@@ -29,10 +29,10 @@ def test_public_clean_install_commands_pin_one_verified_02208_source_commit() ->
         assert expected_source in text
 
 
-def test_clean_install_smoke_verifies_seeded_awg_subscription_labels() -> None:
+def test_clean_install_smoke_verifies_only_current_awg_profile_for_sg_admin() -> None:
     workflow = _read(".github/workflows/clean-install-awg3-smoke.yml")
-    assert "Verify clean-install subscription labels" in workflow
-    assert "from app.clients.sg_subscription import build_sg_subscription_text" in workflow
-    assert '"amneziawg", "amneziawg3", "amneziawg31"' in workflow
-    assert 'assert labels == ["sg-admin"] * 3' in workflow
-    assert 'assert "sg-admin · Устройство" not in labels' in workflow
+
+    assert "Verify sg-admin exposes only current AWG profile" in workflow
+    assert 'assert "amneziawg" not in access' in workflow
+    assert 'assert "amneziawg3" not in access' in workflow
+    assert 'assert "amneziawg31" in access' in workflow

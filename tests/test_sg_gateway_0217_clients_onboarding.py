@@ -24,9 +24,9 @@ def test_0217_clients_onboarding_and_protocol_grid():
     main = (ROOT / "app/main.py").read_text(encoding="utf-8")
     assert main.count("_prepare_client_protocols(request.form.getlist") == 4
     assert '<strong>SG Client</strong>' not in form
+    assert 'value="amneziawg"' not in form
+    assert 'value="amneziawg3"' not in form
     for token in (
-        'value="amneziawg"',
-        'value="amneziawg3"',
         'value="amneziawg31"',
         'value="mihomo"',
         'value="anytls"',
@@ -34,4 +34,4 @@ def test_0217_clients_onboarding_and_protocol_grid():
     ):
         assert token in form
     assert "Требуется HTTPS" in form
-    assert form.index("create_xray_protocol_card(xray_profiles.profiles, profile_id)") < form.index('value="amneziawg"')
+    assert form.index("create_xray_protocol_card(xray_profiles.profiles, profile_id)") < form.index('value="amneziawg31"')
