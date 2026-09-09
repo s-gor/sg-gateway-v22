@@ -53,7 +53,6 @@ def retire_legacy_awg(*, run: RunCommand = _run) -> dict[str, object]:
             pass
 
     run(("systemctl", "daemon-reload"))
-    run(("systemctl", "reset-failed"))
 
     return {
         "changed": changed,
