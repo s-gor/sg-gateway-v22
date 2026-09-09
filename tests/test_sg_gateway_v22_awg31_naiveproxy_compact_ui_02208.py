@@ -6,6 +6,7 @@ AWG31 = (ROOT / "app/web/templates/_awg31_panel.html").read_text(encoding="utf-8
 NAIVE = (ROOT / "app/web/templates/_naiveproxy_panel.html").read_text(encoding="utf-8")
 CSS = (ROOT / "app/web/static/sg-ui-connections-v22-08.css").read_text(encoding="utf-8")
 XMUX = (ROOT / "app/web/templates/_xray_xmux_settings.html").read_text(encoding="utf-8")
+MIHOMO = (ROOT / "app/web/templates/_mihomo_panel.html").read_text(encoding="utf-8")
 
 
 def test_awg31_and_naiveproxy_share_one_compact_protocol_block() -> None:
@@ -57,3 +58,8 @@ def test_xray_actions_use_panel_width_and_advanced_uses_single_rail() -> None:
     rail = 'var(--sg-ui-rail-inset, 18px)'
     assert 'body.page-connections .cnv1-engine-xray :is(.xps2-top-actions, .xps2-actions) {\n  margin-inline: 0;' in CSS
     assert f'body.page-connections .cnv1-engine-xray > .cnv1-advanced {{\n  margin-inline: {rail};' in CSS
+
+
+def test_mihomo_does_not_add_a_second_inner_rail() -> None:
+    assert 'class="mhv2-inner-rail">' in MIHOMO
+    assert 'class="mhv2-inner-rail sg-ui-rail">' not in MIHOMO
