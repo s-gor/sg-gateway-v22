@@ -8,7 +8,7 @@ permissions:
   contents: write
 
 jobs:
-  apply-awg31-only-cleanup:
+  finalize-awg31-cleanup-ci:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout feature branch
@@ -17,19 +17,32 @@ jobs:
           ref: ${{ github.head_ref }}
           fetch-depth: 0
 
-      - name: Repair applicator
-        run: python3 tools/repair_awg31_cleanup_applicator.py
+      - name: Restore normal CI from main
+        run: |
+          git fetch origin main
+          git show origin/main:.github/workflows/ci.yml > .github/workflows/ci.yml
 
-      - name: Apply cleanup
-        run: python3 tools/apply_awg31_only_cleanup.py
+      - name: Regenerate source integrity inventory
+        run: |
+          python3 -B - <<'PY'
+          import hashlib
+          import subprocess
+          from pathlib import Path
 
-      - name: Remove one-shot applicators
-        run: rm -f tools/apply_awg31_only_cleanup.py tools/repair_awg31_cleanup_applicator.py
+          tracked = subprocess.check_output(["git", "ls-files"], text=True).splitlines()
+          tracked = [p for p in tracked if p != "SOURCE-SHA256SUMS"]
+          rows = []
+          for path in tracked:
+              data = subprocess.check_output(["git", "show", f":{path}"])
+              rows.append(f"{hashlib.sha256(data).hexdigest()}  {path}")
+          Path("SOURCE-SHA256SUMS").write_text("\n".join(rows) + "\n", encoding="utf-8")
+          print(f"source inventory regenerated: {len(rows)} files")
+          PY
 
-      - name: Commit cleanup
+      - name: Commit restored CI and inventory
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -m "fix: finish AWG31-only UI and clean-install cleanup"
+          git add .github/workflows/ci.yml SOURCE-SHA256SUMS
+          git commit -m "ci: restore final verification after AWG31 cleanup"
           git push origin HEAD:${{ github.head_ref }}
