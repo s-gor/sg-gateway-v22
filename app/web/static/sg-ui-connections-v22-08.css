@@ -61,19 +61,19 @@ body.page-connections .cnv1-engine-xray .xps2-panel.sg-ui-section {
 }
 
 body.page-connections .cnv1-engine-xray .sg-ui-rail {
-  padding-inline: calc(var(--sg-ui-card-pad, 18px) + var(--sg-ui-rail-inset, 18px));
+  padding-inline: var(--sg-ui-rail-inset, 18px);
 }
 
 body.page-connections .cnv1-engine-xray > .cnv1-endpoint-card {
-  margin-inline: calc(var(--sg-ui-card-pad, 18px) + var(--sg-ui-rail-inset, 18px));
+  margin-inline: var(--sg-ui-rail-inset, 18px);
 }
 
 body.page-connections .cnv1-engine-xray :is(.xps2-top-actions, .xps2-actions) {
-  margin-inline: calc(var(--sg-ui-card-pad, 18px) + var(--sg-ui-rail-inset, 18px));
+  margin-inline: 0;
 }
 
 body.page-connections .cnv1-engine-xray > .cnv1-advanced {
-  margin-inline: calc(var(--sg-ui-card-pad, 18px) + var(--sg-ui-rail-inset, 18px));
+  margin-inline: var(--sg-ui-rail-inset, 18px);
 }
 
 body.page-connections .cnv1-engine-pair.sg-ui-grid {
@@ -208,7 +208,7 @@ body.page-connections .cnv1-compact-protocols {
 }
 
 body.page-connections .cnv1-compact-protocols .sg-ui-rail {
-  padding-inline: calc(var(--sg-ui-card-pad, 18px) + var(--sg-ui-rail-inset, 18px));
+  padding-inline: var(--sg-ui-rail-inset, 18px);
 }
 
 body.page-connections .cnv1-compact-protocol-grid {
