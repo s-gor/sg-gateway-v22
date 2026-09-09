@@ -17,11 +17,14 @@ jobs:
           ref: ${{ github.head_ref }}
           fetch-depth: 0
 
+      - name: Repair applicator
+        run: python3 tools/repair_awg31_cleanup_applicator.py
+
       - name: Apply cleanup
         run: python3 tools/apply_awg31_only_cleanup.py
 
-      - name: Remove one-shot applicator
-        run: rm -f tools/apply_awg31_only_cleanup.py
+      - name: Remove one-shot applicators
+        run: rm -f tools/apply_awg31_only_cleanup.py tools/repair_awg31_cleanup_applicator.py
 
       - name: Commit cleanup
         run: |
