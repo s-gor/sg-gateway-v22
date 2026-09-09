@@ -33,12 +33,6 @@
       {% for profile_id in ['reality_tcp', 'xhttp_reality'] %}
         {{ edit_xray_protocol_card(xray_profiles.profiles, profile_id, primary_tokens, 'Сначала включите профиль в Connections') }}
       {% endfor %}
-      <label class="dv16-protocol"><input type="checkbox" name="protocols" value="amneziawg" {% if 'amneziawg' in primary_tokens %}checked{% endif %}><span><strong>AmneziaWG 2.0</strong><small>AWG2 · конфигурация и QR</small></span></label>
-      {% set awg3_selected = 'amneziawg3' in primary_tokens %}
-      <label class="dv16-protocol">
-        <input type="checkbox" name="protocols" value="amneziawg3" {% if awg3_selected %}checked{% endif %}>
-        <span><strong>AmneziaWG 3.0</strong><small>{{ 'Подключён — существующие credentials сохраняются' if awg3_selected else 'AWG 3.0 userspace · конфигурация и QR' }}</small></span>
-      </label>
       {% set awg31_selected = 'amneziawg31' in primary_tokens %}
       <label class="dv16-protocol">
         <input type="checkbox" name="protocols" value="amneziawg31" {% if awg31_selected %}checked{% endif %}>
@@ -92,12 +86,6 @@
       {% for profile_id in ['reality_tcp', 'xhttp_reality'] %}
         {{ edit_xray_protocol_card(xray_profiles.profiles, profile_id, selected_tokens, 'Сначала включите профиль') }}
       {% endfor %}
-      <label class="dv16-protocol"><input type="checkbox" name="protocols" value="amneziawg" {% if 'amneziawg' in selected_tokens %}checked{% endif %}><span><strong>AmneziaWG 2.0</strong><small>AWG2 · конфигурация и QR</small></span></label>
-      {% set device_awg3_selected = 'amneziawg3' in selected_tokens %}
-      <label class="dv16-protocol">
-        <input type="checkbox" name="protocols" value="amneziawg3" {% if device_awg3_selected %}checked{% endif %}>
-        <span><strong>AmneziaWG 3.0</strong><small>{{ 'Подключён — существующие credentials сохраняются' if device_awg3_selected else 'AWG 3.0 userspace · конфигурация и QR' }}</small></span>
-      </label>
       {% set device_awg31_selected = 'amneziawg31' in selected_tokens %}
       <label class="dv16-protocol">
         <input type="checkbox" name="protocols" value="amneziawg31" {% if device_awg31_selected %}checked{% endif %}>
@@ -144,8 +132,6 @@
   const addDeviceProtocolOrder = [
     'xray_reality_tcp',
     'xray_xhttp_reality',
-    'amneziawg',
-    'amneziawg3',
     'amneziawg31',
     'mihomo',
     'xray_xhttp_tls',
@@ -171,8 +157,6 @@
       const value = card.querySelector('input[name="protocols"]')?.value;
       if (value && !knownValues.has(value)) addDeviceProtocolList.appendChild(card);
     });
-    const awg2Title = cardsByValue.get('amneziawg')?.querySelector('strong');
-    if (awg2Title) awg2Title.textContent = 'AmneziaWG 2.0';
   }
   // SG_ADD_DEVICE_PROTOCOL_ORDER_V2_END
 })();
