@@ -29,3 +29,14 @@ def test_naiveproxy_uses_same_compact_card_family() -> None:
     assert 'data-naive-state' in NAIVE
     assert '.cnv1-compact-protocol-grid' in CSS
     assert 'grid-template-columns: repeat(2, minmax(0, 1fr));' in CSS
+
+
+def test_compact_protocol_polish_matches_mihomo_rail_and_removes_noise() -> None:
+    assert 'cnv1-compact-protocol-grid sg-ui-rail' in TEMPLATE
+    assert 'UDP VPN + HTTPS PROXY' not in TEMPLATE
+    assert 'AmneziaWG 3.1 · NaiveProxy' not in TEMPLATE
+    assert 'Два независимых подключения в одном компактном блоке.' not in TEMPLATE
+    assert 'country_name(awg31_country)' not in AWG31
+    assert 'HTTPS proxy · TLS · порт' in NAIVE
+    assert 'data-naive-summary-port' in NAIVE
+    assert 'padding-inline: var(--sg-ui-rail-inset, 18px);' in CSS

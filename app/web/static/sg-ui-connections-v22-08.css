@@ -180,13 +180,14 @@ body.page-connections .xps2-naiveproxy-body .cnv1-form-actions {
 
 /* AWG31 + NaiveProxy compact protocol block */
 body.page-connections .cnv1-compact-protocols {
-  padding: var(--sg-ui-card-pad, 18px);
+  padding-block: var(--sg-ui-card-pad, 18px);
+  padding-inline: 0;
   display: grid;
-  gap: var(--sg-ui-grid-gap, 12px);
 }
 
-body.page-connections .cnv1-compact-protocols-head h2 { margin: 4px 0; }
-body.page-connections .cnv1-compact-protocols-head p { margin: 0; }
+body.page-connections .cnv1-compact-protocols .sg-ui-rail {
+  padding-inline: var(--sg-ui-rail-inset, 18px);
+}
 
 body.page-connections .cnv1-compact-protocol-grid {
   display: grid;

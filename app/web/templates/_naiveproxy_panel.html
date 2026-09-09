@@ -6,7 +6,7 @@
       <span class="cnv1-compact-protocol-icon">NP</span>
       <div>
         <h3>NaiveProxy</h3>
-        <p>HTTPS proxy · TLS</p>
+        <p>HTTPS proxy · TLS · порт <span data-naive-summary-port>8447</span></p>
       </div>
     </div>
     <span class="cnv1-engine-status warning" data-naive-state><span></span><b>Проверка…</b></span>
@@ -33,6 +33,7 @@
   const host = root.querySelector('[data-naive-host]');
   const endpoint = root.querySelector('[data-naive-endpoint]');
   const portChip = root.querySelector('[data-naive-port]');
+  const summaryPort = root.querySelector('[data-naive-summary-port]');
   const state = root.querySelector('[data-naive-state]');
   const stateText = state?.querySelector('b');
   const message = root.querySelector('[data-naive-message]');
@@ -66,6 +67,7 @@
       ? `${domain}:${activePort}`
       : `Порт ${activePort} · требуется HTTPS в Security`;
     if (portChip) portChip.textContent = `${activePort}/TCP`;
+    if (summaryPort) summaryPort.textContent = String(activePort);
     const healthy = response.ok && payload.status === 'ok' && runtime.ok === true;
     paintState(healthy, healthy ? 'Работает' : 'Не настроен');
     return payload;
