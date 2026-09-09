@@ -72,3 +72,12 @@ def test_mihomo_and_compact_protocol_cards_match_xray_outline() -> None:
 def test_mihomo_does_not_add_a_second_inner_rail() -> None:
     assert 'class="mhv2-inner-rail">' in MIHOMO
     assert 'class="mhv2-inner-rail sg-ui-rail">' not in MIHOMO
+
+
+def test_protocol_cards_share_one_visual_shell_and_naive_has_no_duplicate_port() -> None:
+    assert 'border-radius: var(--sg-ui-nested-radius, 10px);' in CSS
+    assert 'background-clip: padding-box;' in CSS
+    assert 'cnv1-compact-protocol-port' not in CSS
+    assert 'data-naive-port' not in NAIVE
+    assert 'data-naive-endpoint' not in NAIVE
+    assert "`${domain}:${activePort}`" in NAIVE

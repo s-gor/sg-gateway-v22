@@ -15,14 +15,12 @@
   <div class="cnv1-compact-protocol-endpoint">
     <span>HTTPS-домен</span>
     <strong data-naive-host>—</strong>
-    <small data-naive-endpoint>Порт 8447 · требуется HTTPS в Security</small>
   </div>
 
   <div class="cnv1-compact-protocol-actions">
     <span class="xps2-naiveproxy-message" data-naive-message aria-live="polite"></span>
     <button class="button primary" type="button" data-naive-submit>Проверить и применить</button>
   </div>
-  <span class="cnv1-compact-protocol-port" data-naive-port>8447/TCP</span>
 </article>
 
 <script>
@@ -31,8 +29,6 @@
   if (!root) return;
 
   const host = root.querySelector('[data-naive-host]');
-  const endpoint = root.querySelector('[data-naive-endpoint]');
-  const portChip = root.querySelector('[data-naive-port]');
   const summaryPort = root.querySelector('[data-naive-summary-port]');
   const state = root.querySelector('[data-naive-state]');
   const stateText = state?.querySelector('b');
@@ -62,11 +58,7 @@
     const runtime = payload.runtime || {};
     activePort = Number(payload.port || payload.default_port || 8447);
     const domain = payload.host || '';
-    if (host) host.textContent = domain || 'HTTPS не настроен';
-    if (endpoint) endpoint.textContent = domain
-      ? `${domain}:${activePort}`
-      : `Порт ${activePort} · требуется HTTPS в Security`;
-    if (portChip) portChip.textContent = `${activePort}/TCP`;
+    if (host) host.textContent = domain ? `${domain}:${activePort}` : 'HTTPS не настроен';
     if (summaryPort) summaryPort.textContent = String(activePort);
     const healthy = response.ok && payload.status === 'ok' && runtime.ok === true;
     paintState(healthy, healthy ? 'Работает' : 'Не настроен');

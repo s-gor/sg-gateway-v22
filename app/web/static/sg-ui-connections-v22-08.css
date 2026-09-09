@@ -301,13 +301,6 @@ body.page-connections .cnv1-compact-protocol-actions {
 
 body.page-connections .cnv1-compact-protocol-actions .xps2-naiveproxy-message { margin-right: auto; }
 
-body.page-connections .cnv1-compact-protocol-port {
-  position: absolute;
-  right: 14px;
-  bottom: 14px;
-  font-size: 11px;
-  opacity: .7;
-}
 
 body.page-connections .cnv1-compact-protocol-warning {
   margin: -4px 0 0;
@@ -328,17 +321,31 @@ body.page-connections .cnv1-compact-protocol-warning {
     align-items: stretch;
     flex-direction: column;
   }
-  body.page-connections .cnv1-compact-protocol-port { position: static; }
 }
 
-/* Unified protocol-card outline: match Xray profile cards */
+/* Unified protocol-card shell: one visual language in light and dark themes */
 body.page-connections :is(
   .mhv2-listener,
   .cnv1-compact-protocol-card
 ) {
   border: 2px solid color-mix(in srgb, var(--sg-accent, #4f7d6c) 72%, var(--sg-ui-border, #aeb8ae));
+  border-radius: var(--sg-ui-nested-radius, 10px);
+  background-clip: padding-box;
   box-shadow:
     0 0 0 1px color-mix(in srgb, var(--sg-accent, #4f7d6c) 18%, transparent),
     0 8px 18px rgba(42, 60, 52, .14);
+}
+
+body.page-connections :is(
+  .mhv2-state,
+  .cnv1-engine-status
+) {
+  min-height: var(--sg-ui-badge-height, 28px);
+  padding-inline: 10px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
 }
 
