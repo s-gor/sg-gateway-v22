@@ -1,0 +1,49 @@
+name: Xray working rail alignment
+
+on:
+  push:
+    branches: [tmp/02208-unify-connections-inner-rails-v3]
+    paths:
+      - 'tools/apply_xray_working_rail_once.py'
+      - '.github/workflows/zz-xray-working-rail.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: tmp/02208-unify-connections-inner-rails-v3
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install test dependencies
+        run: python -m pip install -r requirements-dev.txt
+      - name: Apply Xray rail alignment
+        run: python tools/apply_xray_working_rail_once.py
+      - name: Remove helper files
+        run: git rm tools/apply_xray_working_rail_once.py .github/workflows/zz-xray-working-rail.yml
+      - name: Refresh source integrity
+        shell: bash
+        run: |
+          python - <<'PY'
+          import hashlib, subprocess
+          from pathlib import Path
+          tracked = subprocess.check_output(['git','ls-files'], text=True, encoding='utf-8').splitlines()
+          tracked = [p for p in tracked if p != 'SOURCE-SHA256SUMS']
+          rows = [f"{hashlib.sha256(Path(p).read_bytes()).hexdigest()}  {p}" for p in sorted(tracked)]
+          Path('SOURCE-SHA256SUMS').write_text('\n'.join(rows)+'\n', encoding='utf-8')
+          PY
+      - name: Focused tests
+        run: python -m pytest -q tests/test_sg_gateway_v22_awg31_naiveproxy_compact_ui_02208.py tests/test_health.py
+      - name: Commit verified result
+        run: |
+          git config user.name 'Ser.Gor'
+          git config user.email '293675787+s-gor@users.noreply.github.com'
+          git add app/web/static/sg-ui-connections-v22-08.css tests/test_sg_gateway_v22_awg31_naiveproxy_compact_ui_02208.py SOURCE-SHA256SUMS
+          git commit -m 'style: align Xray working sections to shared rail'
+          git push origin HEAD:tmp/02208-unify-connections-inner-rails-v3
