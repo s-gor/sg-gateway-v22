@@ -86,13 +86,14 @@ def _apply_portable_clients_runtime_required(full: ModuleType) -> dict:
 
 @contextmanager
 def _destination_runtime_policy(database_path: Path):
-    """Temporarily hide only credentials whose destination runtime is absent.
+    """Keep destination-missing engine credentials dormant after restore.
 
-    `apply_all_clients()` intentionally uses a global Runtime Contract for
-    ordinary client mutations. Portable restore is different: durable access
-    has already been validated, so a missing runtime must not prevent other
-    ready engines from being reconciled. Original credential statuses are
-    restored byte-for-byte after the best-effort runtime pass.
+    Portable Clients & Keys restore preserves durable credentials independently
+    from destination runtime readiness. Engines that fail the destination
+    runtime contract are disabled in `device_credentials` and intentionally
+    stay disabled after the best-effort apply pass. Their key/config material is
+    untouched; a later successful Connection/runtime reconcile can reactivate
+    the same credential without regeneration.
     """
 
     from sg_hostd import runtime_contracts
@@ -114,18 +115,16 @@ def _destination_runtime_policy(database_path: Path):
         return
 
     database = sqlite3.connect(database_path, timeout=15)
-    snapshots: list[tuple[int, str]] = []
     try:
         placeholders = ",".join("?" for _ in deferred_engines)
         rows = database.execute(
-            f"SELECT id, status FROM device_credentials WHERE lower(engine) IN ({placeholders})",
+            f"SELECT id FROM device_credentials WHERE lower(engine) IN ({placeholders})",
             tuple(deferred_engines),
         ).fetchall()
-        snapshots = [(int(row_id), str(status)) for row_id, status in rows]
-        for row_id, _status in snapshots:
+        for (row_id,) in rows:
             database.execute(
                 "UPDATE device_credentials SET status = 'disabled' WHERE id = ?",
-                (row_id,),
+                (int(row_id),),
             )
         database.commit()
         yield {
@@ -133,15 +132,7 @@ def _destination_runtime_policy(database_path: Path):
             "runtime_contract": contract,
         }
     finally:
-        try:
-            for row_id, status in snapshots:
-                database.execute(
-                    "UPDATE device_credentials SET status = ? WHERE id = ?",
-                    (status, row_id),
-                )
-            database.commit()
-        finally:
-            database.close()
+        database.close()
 
 
 def _validate_portable_runtime_best_effort(full: ModuleType) -> dict:
@@ -180,263 +171,101 @@ def _install_destination_runtime_contract_defer() -> None:
 
 
 def _restore_clients_keys(full: ModuleType, hard: ModuleType) -> dict:
-    full._ensure_dirs()
-    archive = full._backup_dir() / full.RESTORE_UPLOAD_NAME
-    if not archive.is_file():
-        raise RuntimeError("Uploaded .sgbackup file not found")
+    request = full._read_json(full.RESTORE_REQUEST_PATH)
+    backup_name = full._validated_backup_name(str(request.get("backup_name") or ""))
+    backup_path = full.BACKUP_DIR / backup_name
+    if not backup_path.is_file():
+        raise RuntimeError(f"Backup not found: {backup_name}")
+    if not _is_clients_keys_restore(full, backup_path):
+        raise RuntimeError("Selected backup is not a Clients & Keys portable backup")
 
-    full._restore_progress(
-        "[Restore 1/8] Проверяю Clients & Keys backup и свободное место"
-    )
-    plan = hard._preflight_full_restore(full, archive)
-    full._restore_progress(
-        "[Restore 1/8] Места достаточно: свободно "
-        f"{hard._format_bytes(plan['free_bytes'])}; безопасный минимум "
-        f"{hard._format_bytes(plan['required_free_bytes'])}"
-    )
+    print("[Restore 1/8] Проверяю Clients & Keys backup и свободное место", flush=True)
+    hard._verify_backup_archive(full, backup_path)
+    hard._ensure_restore_free_space(full, backup_path)
 
-    with tempfile.TemporaryDirectory(
-        prefix="restore-clients-",
-        dir=full._work_dir(),
-    ) as temp_name:
-        temp = Path(temp_name)
-        manifest = full._extract_archive(archive, temp)
-        if manifest.get("clients_keys_profile") is not True:
-            raise RuntimeError(
-                "Uploaded backup is not a Clients & Keys restore profile"
-            )
-        payload = temp / "payload"
-        db_path = (
-            payload
-            / full._data_dir().relative_to("/")
-            / "sg-gateway.sqlite"
-        )
-        if not db_path.is_file():
-            raise RuntimeError("Backup does not contain the SG-Gateway database")
-        db = sqlite3.connect(db_path)
-        try:
-            row = db.execute("PRAGMA integrity_check").fetchone()
-            if not row or str(row[0]).lower() != "ok":
-                raise RuntimeError("Uploaded SQLite database is damaged")
-        finally:
-            db.close()
+    with tempfile.TemporaryDirectory(prefix="sg-gateway-clients-keys-restore-") as tmp:
+        tmp_path = Path(tmp)
+        full._extract_archive(backup_path, tmp_path)
+        full._validate_extracted_backup(tmp_path)
+        print("[Restore 2/8] Backup и SQLite проверены; выключенные протоколы нового сервера будут пропущены", flush=True)
 
-        full._restore_progress(
-            "[Restore 2/8] Backup и SQLite проверены; выключенные протоколы "
-            "нового сервера будут пропущены"
-        )
-        full._restore_progress(
-            "[Restore 3/8] Создаю страховочный Full Backup текущего сервера"
-        )
-        safety = full.create_full_backup_archive(prefix="SG-Gateway-SAFETY")
-        runtime_result: dict = {"ok": False, "deferred": True}
-        runtime_validation: dict = {"ok": False, "deferred": True}
-        deferred_engines: list[str] = []
+        print("[Restore 3/8] Создаю страховочный Full Backup текущего сервера", flush=True)
+        safety_backup = full.create_full_backup()
+        safety_backup_name = str(safety_backup.get("backup") or "")
+        if not safety_backup_name:
+            raise RuntimeError("Safety backup was not created")
+        safety_backup_path = full.BACKUP_DIR / safety_backup_name
 
         try:
-            full._restore_progress(
-                "[Restore 4/8] Восстанавливаю клиентов, ключи и переносимый HTTPS"
-            )
-            full._restore_payload(payload, preserve_machine_env=True)
-            full._restore_progress(
-                "[Restore 5/8] Проверяю SQLite и права; настройки нового "
-                "сервера сохранены"
-            )
-            full._normalize_panel_data_permissions()
-            full._validate_database_as_panel_user()
+            print("[Restore 4/8] Восстанавливаю клиентов, ключи и переносимый HTTPS", flush=True)
+            restore_result = tls_backup_patch.restore_clients_keys_portable(full, tmp_path)
 
-            full._restore_progress(
-                "[Restore 6/8] Возвращаю HTTPS и пересобираю только "
-                "разрешённый runtime нового сервера"
-            )
-            cert_ready, cert_domain = full._restored_certificate_ready()
-            if cert_domain:
-                state = full._restored_tls_state()
-                panel_port = int(
-                    state.get("public_port")
-                    or state.get("panel_port")
-                    or 443
-                )
-                suffix = "" if panel_port == 443 else f":{panel_port}"
-                full._restore_progress(
-                    f"[Restore 6/8] Адрес панели после переключения: "
-                    f"https://{cert_domain}{suffix}"
-                )
+            print("[Restore 5/8] Проверяю SQLite и права; настройки нового сервера сохранены", flush=True)
+            full._validate_database_after_restore()
+            full._restore_permissions()
 
-            live_database = full._data_dir() / "sg-gateway.sqlite"
-            with tls_backup_patch.destination_protocol_policy(live_database):
-                with _destination_runtime_policy(live_database) as runtime_policy:
-                    deferred_engines = list(runtime_policy["deferred_engines"])
-                    if cert_domain:
-                        full._refresh_restored_https_from_local_files(
-                            allow_xray_inactive=True
-                        )
-                    runtime_result = _apply_portable_clients_runtime_required(full)
-
-            runtime_deferred_engines = [
-                str(item.get("engine") or "").strip().lower()
-                for item in runtime_result.get("engines", [])
-                if isinstance(item, dict)
-                and item.get("deferred")
-                and str(item.get("engine") or "").strip()
-            ]
-            deferred_engines = sorted(
-                set(deferred_engines) | set(runtime_deferred_engines)
-            )
+            print("[Restore 6/8] Возвращаю HTTPS и пересобираю только разрешённый runtime нового сервера", flush=True)
+            tls_result = tls_backup_patch.restore_portable_https(full, tmp_path)
+            database_path = Path(full.DB_PATH)
+            with _destination_runtime_policy(database_path) as runtime_policy:
+                runtime_result = _apply_portable_clients_runtime_required(full)
             runtime_validation = _validate_portable_runtime_best_effort(full)
-            cert_ready, cert_domain = full._restored_certificate_ready()
-            if (
-                deferred_engines
-                or runtime_result.get("deferred")
-                or runtime_validation.get("deferred")
-            ):
-                full._restore_progress(
-                    "[Restore 6/8] Клиенты и ключи восстановлены; часть runtime "
-                    "пока не готова и останется dormant до включения Connections"
-                )
-            if cert_domain and not cert_ready:
-                full._restore_progress(
-                    f"[Restore 6/8] HTTPS для {cert_domain} пока не готов; "
-                    "TLS-зависимые профили останутся dormant"
-                )
 
-            full._restore_progress(
-                "[Restore 7/8] Проверяю backend, HTTPS и hostd до restart панели"
-            )
+            print("[Restore 7/8] Проверяю панель и сохранённые сервисы нового сервера", flush=True)
             hard._local_panel_health(full)
-            panel_generation = hard._panel_service_generation(full)
-            hard._schedule_panel_restart_required(full)
-            full._restore_progress(
-                "[Restore 7/8] Панель перезапускается; жду новый процесс и "
-                "post-restart health-check"
-            )
-            hard._wait_for_panel_after_scheduled_restart(
-                full,
-                panel_generation,
-            )
-            full._restore_progress(
-                "[Restore 8/8] Восстановление клиентов, ключей и HTTPS "
-                "завершено: настройки и выключенные протоколы нового сервера "
-                "сохранены"
-            )
-        except Exception as restore_exc:
-            full._restore_progress(
-                f"[Restore] ОШИБКА: {restore_exc}. Автоматически возвращаю "
-                "страховочный backup"
-            )
-            safety_path = Path(str(safety["path"]))
-            try:
-                with tempfile.TemporaryDirectory(
-                    prefix="rollback-",
-                    dir=full._work_dir(),
-                ) as rollback_name:
-                    rollback = Path(rollback_name)
-                    full._extract_archive(safety_path, rollback)
-                    full._restore_payload(
-                        rollback / "payload",
-                        preserve_machine_env=False,
-                    )
-                    full._normalize_panel_data_permissions()
-                    rollback_cert_ready, rollback_cert_domain = (
-                        full._restored_certificate_ready()
-                    )
-                    if rollback_cert_domain:
-                        full._refresh_restored_https_from_local_files(
-                            allow_xray_inactive=True
-                        )
-                    full._validate_runtime_after_restore()
-                    full._restart_runtime(schedule_panel=False)
-                    if rollback_cert_domain:
-                        full._refresh_restored_https_from_local_files(
-                            allow_xray_inactive=True
-                        )
-                    hard._local_panel_health(full)
-                rollback_panel_generation = hard._panel_service_generation(full)
-                hard._schedule_panel_restart_required(full)
-                full._restore_progress(
-                    "[Restore] Safety Rollback: панель перезапускается; "
-                    "жду новый процесс и post-restart health-check"
-                )
-                hard._wait_for_panel_after_scheduled_restart(
-                    full,
-                    rollback_panel_generation,
-                )
-            except Exception as rollback_exc:
-                full._restore_progress(
-                    f"[Restore] КРИТИЧЕСКАЯ ОШИБКА: Safety Rollback не прошёл "
-                    f"проверку: {rollback_exc}"
-                )
-                raise RuntimeError(
-                    "Восстановление клиентов и ключей завершилось ошибкой, и "
-                    "автоматический Safety Rollback также не прошёл проверку. "
-                    f"Restore: {restore_exc}; Rollback: {rollback_exc}"
-                ) from rollback_exc
 
-            full._restore_progress(
-                "[Restore] Safety Rollback выполнен и проверен после restart: "
-                "SQLite, runtime и новый процесс панели доступны"
+            print("[Restore 8/8] Восстановление клиентов и ключей завершено", flush=True)
+            return {
+                "ok": True,
+                "profile": "clients-and-keys",
+                "backup": backup_name,
+                "safety_backup": safety_backup_name,
+                "restore": restore_result,
+                "https": tls_result,
+                "runtime": runtime_result,
+                "runtime_policy": runtime_policy,
+                "runtime_validation": runtime_validation,
+            }
+        except Exception as restore_exc:
+            print(
+                f"[Restore] ОШИБКА: {restore_exc}. Автоматически возвращаю страховочный backup",
+                flush=True,
             )
+            try:
+                with tempfile.TemporaryDirectory(prefix="sg-gateway-clients-keys-rollback-") as rollback_tmp:
+                    rollback_path = Path(rollback_tmp)
+                    full._extract_archive(safety_backup_path, rollback_path)
+                    full._validate_extracted_backup(rollback_path)
+                    full._restore_full_from_extracted(rollback_path)
+                hard._local_panel_health(full)
+            except Exception as rollback_exc:
+                raise RuntimeError(
+                    "Восстановление клиентов и ключей завершилось ошибкой, и автоматический "
+                    f"Safety Rollback также не прошёл проверку. Restore: {restore_exc}; "
+                    f"Rollback: {rollback_exc}"
+                ) from rollback_exc
             raise RuntimeError(
-                "Восстановление клиентов и ключей завершилось ошибкой; "
-                "Safety Rollback выполнен и проверен после restart. "
-                f"Причина Restore: {restore_exc}"
+                f"Восстановление клиентов и ключей завершилось ошибкой. Safety Rollback выполнен. {restore_exc}"
             ) from restore_exc
 
-    archive.unlink(missing_ok=True)
-    cert_ready, cert_domain = full._restored_certificate_ready()
-    return {
-        "source_version": str(manifest.get("source_version") or "unknown"),
-        "safety_backup": str(safety.get("name") or ""),
-        "certificates": cert_ready,
-        "certificate_domain": cert_domain,
-        "certificate_policy": str(
-            manifest.get("certificate_policy") or "none"
-        ),
-        "xray_active": full._probe(
-            ["systemctl", "is-active", "--quiet", "xray.service"],
-            timeout=20,
-        ).returncode
-        == 0,
-        "client_runtime_applied": bool(runtime_result.get("ok")),
-        "client_runtime_deferred": bool(
-            deferred_engines
-            or runtime_result.get("deferred")
-            or runtime_validation.get("deferred")
-        ),
-        "client_runtime_deferred_engines": deferred_engines,
-        "portable_runtime_regenerated": bool(runtime_result.get("ok")),
-        "restore_space_preflight": plan,
-        "panel_health_validated": True,
-        "panel_post_restart_health_validated": True,
-        "panel_restart_generation_changed": True,
-        "restore_profile": "clients-and-keys",
-        "destination_protocol_enablement_preserved": True,
-        "message": (
-            "Clients & Keys restored; destination server settings and protocol "
-            "enablement preserved; unavailable runtime/profiles remain dormant "
-            "until their Connections become ready"
-        ),
-    }
 
-
-def install(hard: ModuleType, full: ModuleType) -> None:
-    if getattr(full, "_clients_keys_portable_restore_v2_installed", False):
-        return
-
+def install(full: ModuleType, hard: ModuleType) -> None:
     _install_destination_runtime_contract_defer()
-
-    # Wrap only the public restore entry point. The hardened Full Restore
-    # implementation remains untouched and is still used byte-for-byte for
-    # every non-Clients&Keys archive. functools.wraps deliberately preserves
-    # the established restore_hardening_patch identity/metadata.
+    if getattr(full, "_clients_keys_portable_restore_installed", False):
+        return
     original = full.restore_uploaded_full_backup
 
     @wraps(original)
     def dispatch() -> dict:
-        archive = full._backup_dir() / full.RESTORE_UPLOAD_NAME
-        if _is_clients_keys_restore(full, archive):
+        try:
+            request = full._read_json(full.RESTORE_REQUEST_PATH)
+            backup_name = full._validated_backup_name(str(request.get("backup_name") or ""))
+            backup_path = full.BACKUP_DIR / backup_name
+        except Exception:
+            return original()
+        if backup_path.is_file() and _is_clients_keys_restore(full, backup_path):
             return _restore_clients_keys(full, hard)
         return original()
 
     full.restore_uploaded_full_backup = dispatch
-    full._clients_keys_portable_restore_v2_installed = True
+    full._clients_keys_portable_restore_installed = True
