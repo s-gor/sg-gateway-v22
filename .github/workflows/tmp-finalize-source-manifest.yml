@@ -1,0 +1,34 @@
+name: TEMP finalize source manifest
+
+on:
+  push:
+    branches:
+      - feature/02208-drop-awg2-awg3
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Rewrite manifest and remove this workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          self='.github/workflows/tmp-finalize-source-manifest.yml'
+          : > /tmp/SOURCE-SHA256SUMS
+          while IFS= read -r path; do
+            [[ "$path" == 'SOURCE-SHA256SUMS' || "$path" == "$self" ]] && continue
+            printf '%s  %s\n' "$(git show "HEAD:$path" | sha256sum | awk '{print $1}')" "$path" >> /tmp/SOURCE-SHA256SUMS
+          done < <(git ls-files | LC_ALL=C sort)
+          cp /tmp/SOURCE-SHA256SUMS SOURCE-SHA256SUMS
+          git rm "$self"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add SOURCE-SHA256SUMS
+          git commit -m 'chore: finalize source integrity manifest'
+          git push origin HEAD:feature/02208-drop-awg2-awg3
