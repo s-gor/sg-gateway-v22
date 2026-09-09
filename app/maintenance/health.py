@@ -122,14 +122,14 @@ def _hostd_check() -> HealthCheck:
 def _connection_checks() -> list[HealthCheck]:
     checks: list[HealthCheck] = []
 
-    awg = get_connection_settings("amneziawg")
-    awg_key = awg.config.get("server_public_key", "")
-    awg_host = run_hostd_command("awg.status")
+    awg31 = get_connection_settings("amneziawg31")
+    awg31_key = awg31.config.get("server_public_key", "")
+    awg31_host = run_hostd_command("awg31.status")
     checks.append(
         HealthCheck(
-            name="Настройки AmneziaWG",
-            status="warning" if "PLACEHOLDER" in awg_key else awg_host.status,
-            message=f"{awg.host}:{awg.port}; hostd: {awg_host.message}",
+            name="Настройки AmneziaWG 3.1",
+            status="warning" if "PLACEHOLDER" in awg31_key else awg31_host.status,
+            message=f"{awg31.host}:{awg31.port}; hostd: {awg31_host.message}",
         )
     )
 
