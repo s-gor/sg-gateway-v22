@@ -29,6 +29,7 @@ def test_naiveproxy_uses_same_compact_card_family() -> None:
     assert 'data-naive-state' in NAIVE
     assert '.cnv1-compact-protocol-grid' in CSS
     assert 'grid-template-columns: repeat(2, minmax(0, 1fr));' in CSS
+    assert 'padding-inline: calc(var(--sg-ui-card-pad, 18px) + var(--sg-ui-rail-inset, 18px));' in CSS
 
 
 def test_compact_protocol_polish_matches_mihomo_rail_and_removes_noise() -> None:

@@ -186,7 +186,7 @@ body.page-connections .cnv1-compact-protocols {
 }
 
 body.page-connections .cnv1-compact-protocols .sg-ui-rail {
-  padding-inline: var(--sg-ui-rail-inset, 18px);
+  padding-inline: calc(var(--sg-ui-card-pad, 18px) + var(--sg-ui-rail-inset, 18px));
 }
 
 body.page-connections .cnv1-compact-protocol-grid {
@@ -299,6 +299,7 @@ body.page-connections .cnv1-compact-protocol-warning {
 }
 
 @media (max-width: 620px) {
+  body.page-connections .cnv1-compact-protocols .sg-ui-rail { padding-inline: var(--sg-ui-rail-inset, 14px); }
   body.page-connections .cnv1-compact-protocol-head { flex-direction: column; }
   body.page-connections .cnv1-compact-protocol-controls { grid-template-columns: minmax(0, 1fr); }
   body.page-connections .cnv1-compact-protocol-actions {
