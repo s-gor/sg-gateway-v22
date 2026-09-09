@@ -1,4 +1,4 @@
-name: Temporary AWG31 EOL test alignment
+name: Finalize AWG31 EOL alignment
 
 on:
   push:
@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  align-tests:
+  finalize:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
@@ -18,340 +18,28 @@ jobs:
           ref: fix/02208-awg31-ui-installer-cleanup
           fetch-depth: 0
 
-      - name: Align legacy tests with AWG31-only product contract
+      - name: Remove temporary workflow and rebuild source inventory
         run: |
-          python3 -B - <<'PY'
-          from pathlib import Path
-          import re
-
-          def read(path):
-              return Path(path).read_text(encoding='utf-8')
-
-          def write(path, body):
-              Path(path).write_text(body, encoding='utf-8', newline='\n')
-
-          def replace_func(path, old_name, new_source):
-              body = read(path)
-              m = re.search(rf'(?m)^def {re.escape(old_name)}\(', body)
-              if not m:
-                  raise SystemExit(f'{path}: function {old_name} not found')
-              start = m.start()
-              tail = body[m.end():]
-              next_match = re.search(r'(?m)^(?:@pytest[^\n]*\n)*def [A-Za-z0-9_]+\(', tail)
-              end = m.end() + next_match.start() if next_match else len(body)
-              replacement = new_source.rstrip() + '\n\n'
-              write(path, body[:start] + replacement + body[end:])
-
-          replace_func(
-              'tests/test_awg_style_ui.py',
-              'test_awg3_uses_the_same_visual_card_contract_as_awg2',
-              '''def test_awg31_is_the_only_visible_awg_card_contract():
-              root = Path(__file__).resolve().parents[1]
-              template = (root / "app/web/templates/connections.html").read_text(encoding="utf-8")
-              panel = (root / "app/web/templates/_awg31_panel.html").read_text(encoding="utf-8")
-
-              assert '{% include "_awg31_panel.html" %}' in template
-              assert 'class="awgd-card awgd-card-v31"' in panel
-              assert 'class="awgd-card awgd-card-v2"' not in template
-              assert 'class="awgd-card awgd-card-v3"' not in template
-              assert "AmneziaWG 3.1" in template
-              assert "ТРИ ПОКОЛЕНИЯ" not in template'''.replace('\n              ', '\n          ')
-          )
-
-          replace_func(
-              'tests/test_connections_layout_v24.py',
-              'test_awg_is_compact_but_keeps_required_post_fields',
-              '''def test_awg_is_compact_and_exposes_only_awg31_controls():
-              template = (ROOT / "app/web/templates/connections.html").read_text(encoding="utf-8")
-              panel = (ROOT / "app/web/templates/_awg31_panel.html").read_text(encoding="utf-8")
-              assert '{% include "_awg31_panel.html" %}' in template
-              assert 'action="/connections/amneziawg31"' in panel
-              assert 'name="Jc"' in panel
-              assert 'name="I1"' in panel
-              assert 'name="dns"' in template
-              assert '/connections/amneziawg"' not in template
-              assert '/connections/amneziawg3"' not in template
-              for removed in ("КЛИЕНТЫ", "PUBLIC KEY", "Публичный адрес или домен", "Страна по IP"):
-                  assert removed not in template'''.replace('\n              ', '\n          ')
-          )
-
-          replace_func(
-              'tests/test_connections_restore_naiveproxy_bottom_02208.py',
-              'test_connections_is_direct_template_not_wrapper',
-              '''def test_connections_is_direct_template_not_wrapper():
-              template = (ROOT / "app/web/templates/connections.html").read_text(encoding="utf-8")
-
-              assert template.startswith('{% extends "base.html" %}')
-              assert 'connections_legacy_8f7481cb.html' not in template
-              assert 'class="cnv1-engine-pair sg-ui-grid"' in template
-              assert '{% include "_awg31_panel.html" %}' in template
-              assert 'class="awgd-card awgd-card-v2"' not in template
-              assert 'class="awgd-card awgd-card-v3"' not in template
-              assert '{% include "_mihomo_panel.html" %}' in template
-              assert 'name="fingerprint"' in template'''.replace('\n              ', '\n          ')
-          )
-
-          for path in (
-              'tests/test_naiveproxy_native_state_ownership_02208.py',
-              'tests/test_naiveproxy_tls_runtime_contract_02208.py',
-          ):
-              body = read(path)
-              body = body.replace('test_installer_keeps_exact_24_stage_contract', 'test_installer_keeps_exact_22_stage_contract')
-              body = body.replace('list(range(1, 25))', 'list(range(1, 23))')
-              write(path, body)
-
-          replace_func(
-              'tests/test_preview52_installer_stage6_and_progress.py',
-              'test_stage6_update_repairs_empty_hosts_instead_of_asserting',
-              '''def test_update_seed_repairs_only_active_connection_hosts(tmp_path: Path):
-              database = _run_seed(tmp_path, update=True)
-              connection = sqlite3.connect(database)
-              connection.row_factory = sqlite3.Row
-              rows = connection.execute(
-                  "SELECT engine, host, port, config_json FROM connection_settings ORDER BY engine"
-              ).fetchall()
-              by_engine = {row["engine"]: row for row in rows}
-              assert by_engine["amneziawg"]["host"] == ""
-              assert by_engine["amneziawg3"]["host"] == ""
-              assert by_engine["amneziawg31"]["host"] == "awg31.internal"
-              assert by_engine["mihomo"]["host"] == "203.0.113.10"
-              assert by_engine["xray"]["host"] == "203.0.113.10"
-              for engine in ("mihomo", "xray"):
-                  assert json.loads(by_engine[engine]["config_json"])["country_code"] == "fr"
-              assert "country_code" not in json.loads(by_engine["amneziawg31"]["config_json"])
-              assert connection.execute("SELECT COUNT(*) FROM clients").fetchone()[0] == 1'''.replace('\n              ', '\n          ')
-          )
-
-          for path in (
-              'tests/test_sg_gateway_02112_final_cumulative_cleanup_r5.py',
-              'tests/test_sg_gateway_v22_02206_hardening.py',
-          ):
-              body = read(path).replace('· 24 этапа', '· 22 этапа')
-              write(path, body)
-
-          replace_func(
-              'tests/test_sg_gateway_021_awg_585_invariant.py',
-              'test_seed_backend_ui_and_installer_enforce_udp_585',
-              '''def test_retired_awg2_udp_585_is_legacy_only_not_active_ui_or_seed():
-              seed = (ROOT / "app/install_seed.py").read_text(encoding="utf-8")
-              ui = (ROOT / "app/web/templates/connections.html").read_text(encoding="utf-8")
-              installer = (ROOT / "install.sh").read_text(encoding="utf-8")
-              assert "AWG2 and AWG3.0 are retired" in seed
-              assert 'min="585" max="585"' not in ui
-              assert 'url_for(\'update_amneziawg\')' not in ui
-              assert 'DEFAULT_AWG_PORT="585"' in installer  # legacy resume compatibility
-              assert 'AmneziaWG invariant: UDP {AMNEZIAWG_UDP_PORT}' not in installer
-              assert "AmneziaWG runtime does not listen on UDP 585" not in installer'''.replace('\n              ', '\n          ')
-          )
-
-          replace_func(
-              'tests/test_sg_gateway_021_repository.py',
-              'test_runtime_invariants_remain_in_source',
-              '''def test_runtime_invariants_remain_in_source() -> None:
-              installer = (ROOT / "install.sh").read_text(encoding="utf-8")
-              constants = (ROOT / "app/constants.py").read_text(encoding="utf-8")
-              connections = (ROOT / "app/web/templates/connections.html").read_text(encoding="utf-8")
-              assert 'DEFAULT_AWG_PORT="585"' in installer
-              assert "AMNEZIAWG_UDP_PORT = 585" in constants
-              assert 'min="585" max="585"' not in connections
-              assert "AmneziaWG 3.1" in connections
-              assert "stage9_ensure_warp" in installer
-              assert "Salamander" in connections'''.replace('\n              ', '\n          ')
-          )
-
-          body = read('tests/test_sg_gateway_v22_awg31_clean_install_order_cleanup.py')
-          body = body.replace('run_stage 19 "Независимый профиль AWG31"', 'run_stage 17 "Независимый профиль AWG31"')
-          body = body.replace('run_stage 20 "Применение Xray и клиентов"', 'run_stage 18 "Применение Xray и клиентов"')
-          write('tests/test_sg_gateway_v22_awg31_clean_install_order_cleanup.py', body)
-
-          replace_func(
-              'tests/test_sg_gateway_v22_awg31_stage2_api_ui.py',
-              'test_awg31_ui_is_distinct_and_controls_only_awg31_service',
-              '''def test_awg31_ui_is_distinct_and_controls_only_awg31_service(
-              isolated_stage2,
-              monkeypatch: pytest.MonkeyPatch,
-          ) -> None:
-              from app import main
-              from app.hostd.client import HostdResult
-
-              calls: list[str] = []
-
-              def fake_hostd(command: str, timeout: float = 5) -> HostdResult:
-                  calls.append(command)
-                  return HostdResult(
-                      command=command,
-                      status="ok",
-                      message="ok",
-                      payload={"service": "sg-gateway-awg31.service", "status": "active"},
-                  )
-
-              monkeypatch.setattr(main, "run_hostd_command", fake_hostd)
-              app = main.create_app()
-              client = app.test_client()
-              _authenticate(client)
-
-              response = client.get("/connections")
-              assert response.status_code == 200
-              html = response.get_data(as_text=True)
-              assert "AmneziaWG 2.0" not in html
-              assert "AmneziaWG 3.0" not in html
-              assert "AmneziaWG 3.1" in html
-              assert "UDP 587" in html
-              assert "10.131.0.0/24" in html
-              for action in ("start", "stop", "restart", "status"):
-                  assert f"/connections/amneziawg31/service/{action}" in html
-              assert "awg31.status" in calls
-
-              response = client.post("/connections/amneziawg31/service/restart")
-              assert response.status_code == 302
-              assert calls[-1] == "awg31.restart"'''.replace('\n              ', '\n          ')
-          )
-
-          path = 'tests/test_sg_gateway_v22_awg31_update_transaction.py'
-          body = read(path)
-          for line in (
-              '    "amneziawg-tools-3.0.20260805.tar.gz": "090f9383532822a756d078890b447e00af7f46bd30a10f9f47c46d633d807b19",\n',
-              '    "amneziawg-go-linux-amd64-v3.0.0": "131110027db6d5dc0e35b19eb5b8a2692676081366c34112088dc68bbb050bcd",\n',
-          ):
-              if line not in body:
-                  raise SystemExit(f'{path}: missing old runtime line')
-              body = body.replace(line, '', 1)
-          body = body.replace('Stage3A runtime staging: 4 verified files', 'Stage3A runtime staging: 2 verified files')
-          write(path, body)
-
-          replace_func(
-              'tests/test_sg_gateway_v22_awg_cards_unified_ui.py',
-              'test_awg31_endpoint_uses_the_same_flag_and_country_layout_as_other_awg_cards',
-              '''def test_awg31_endpoint_uses_its_own_flag_and_country_context() -> None:
-              panel = _read("app/web/templates/_awg31_panel.html")
-              assert '<img src="{{ country_flag_url(awg31_country) }}"' in panel
-              assert "{{ country_name(awg31_country) }}" in panel
-              assert "awg3_country" not in panel
-              assert 'class="awgd-v31-technical" hidden' in panel'''.replace('\n              ', '\n          ')
-          )
-          replace_func(
-              'tests/test_sg_gateway_v22_awg_cards_unified_ui.py',
-              'test_awg_header_keeps_original_layout_and_names_three_generations',
-              '''def test_awg_header_names_only_current_generation() -> None:
-              panel = _read("app/web/templates/_awg31_panel.html")
-              page = _read("app/web/templates/connections.html")
-              stylesheet = _read("app/web/static/sg-awg-dual-v1.css")
-              assert 'id="sg-awg-header-density-fix"' not in panel
-              assert "UDP VPN · AWG3.1" in page
-              assert "ТРИ ПОКОЛЕНИЯ" not in page
-              assert "ДВА ПОКОЛЕНИЯ" not in page
-              assert ".page-connections .awgd-shell > .cnv1-engine-head { border-bottom:" not in stylesheet
-              assert "padding: 14px 18px 18px;" in stylesheet'''.replace('\n              ', '\n          ')
-          )
-
-          replace_func(
-              'tests/test_sg_gateway_v22_awg_shared_dns.py',
-              'test_connections_has_one_visible_shared_dns_form_and_compact_card_lines',
-              '''def test_connections_has_one_visible_awg31_dns_form_and_compact_card() -> None:
-              connections = (ROOT / "app/web/templates/connections.html").read_text(encoding="utf-8")
-              awg31 = (ROOT / "app/web/templates/_awg31_panel.html").read_text(encoding="utf-8")
-              assert connections.count('action="{{ url_for(\'update_awg_dns\') }}"') == 1
-              assert connections.count('name="dns"') == 1
-              assert awg31.count('name="dns"') == 0
-              assert 'class="awgd-shared-dns' in connections
-              assert "DNS клиентов AWG3.1" in connections
-              assert "активном AWG3.1" in connections
-              assert "{{ awg31_public_host }}:587 · DNS {{ awg_dns.dns }}" in awg31
-              assert "awg_public_host" not in connections
-              assert "awg3_public_host" not in connections
-              assert 'awgd-legacy-settings' not in connections
-              assert 'class="cnv1-engine-form cnv1-engine-form-compact awgd-v31-form" hidden' in awg31'''.replace('\n              ', '\n          ')
-          )
-          replace_func(
-              'tests/test_sg_gateway_v22_awg_shared_dns.py',
-              'test_legacy_profile_forms_cannot_diverge_the_shared_dns',
-              '''def test_retired_profile_routes_are_absent_and_cannot_diverge_shared_dns(
-              isolated_database: Path,
-          ) -> None:
-              from app.connections.awg_dns import set_shared_awg_dns
-              set_shared_awg_dns("9.9.9.9")
-              client = _authenticated_client()
-              assert client.post("/connections/amneziawg", data={"host": "vpn.example", "port": "585"}).status_code == 404
-              assert client.post("/connections/amneziawg3", data={"host": "vpn.example", "port": "586"}).status_code == 404
-              assert _settings_dns() == {engine: "9.9.9.9" for engine in AWG_ENGINES}'''.replace('\n              ', '\n          ')
-          )
-
-          path = 'tests/test_sg_gateway_v22_ui_function_contract_02208.py'
-          body = read(path)
-          for old in (
-              '                _form("/connections/amneziawg", "country_code", "host", "port", "server_public_key"),\n',
-              '                _form("/connections/amneziawg3", "country_code", "host", "port", "server_public_key"),\n',
-          ):
-              if old not in body:
-                  raise SystemExit(f'{path}: old AWG form contract missing')
-              body = body.replace(old, '', 1)
-          write(path, body)
-
-          replace_func(
-              'tests/test_ui_connections_visual_v1.py',
-              'test_connections_visual_v1_uses_existing_context',
-              '''def test_connections_visual_v1_uses_current_context():
-              template = (ROOT / "app/web/templates/connections.html").read_text(encoding="utf-8")
-              for marker in ("connections", "xray_settings", "xray_profiles", "country_name", "country_flag_url", "awg31_country"):
-                  assert marker in template
-              assert "awg_settings" not in template
-              assert "awg3_settings" not in template'''.replace('\n              ', '\n          ')
-          )
-          replace_func(
-              'tests/test_ui_connections_visual_v1.py',
-              'test_connections_visual_v1_uses_existing_post_routes',
-              '''def test_connections_visual_v1_uses_current_post_routes():
-              template = (ROOT / "app/web/templates/connections.html").read_text(encoding="utf-8")
-              panel = (ROOT / "app/web/templates/_awg31_panel.html").read_text(encoding="utf-8")
-              assert "url_for('update_amneziawg')" not in template
-              assert "url_for('update_amneziawg3')" not in template
-              assert 'action="/connections/amneziawg31"' in panel
-              assert "url_for('update_xray')" in template
-              assert "url_for('update_xray_profiles')" in template
-              assert 'name="dns"' in template
-              assert 'name="server_name"' in template
-              assert 'name="public_key"' in template
-              assert 'name="short_id"' in template'''.replace('\n              ', '\n          ')
-          )
-
-          # Make update smoke run for the actual AWG31-only installer/runtime changes.
-          path = '.github/workflows/update-idle-awg3-smoke.yml'
-          body = read(path)
-          needle = '      - deploy/update-from-github.sh\n'
-          addition = (
-              '      - install.sh\n'
-              '      - app/install_seed.py\n'
-              '      - app/maintenance/awg31_stage3a.py\n'
-              '      - hostd/sg_hostd/retired_awg_runtime_patch.py\n'
-          )
-          if body.count(needle) != 2:
-              raise SystemExit(f'{path}: expected 2 path-filter anchors, got {body.count(needle)}')
-          body = body.replace(needle, needle + addition)
-          write(path, body)
-
-          print('legacy AWG tests aligned with AWG31-only contract')
-          PY
-
-      - name: Remove temporary workflow and regenerate final inventory
-        run: |
-          git rm .github/workflows/tmp-awg31-eol-tests.yml
+          set -Eeuo pipefail
+          rm -f .github/workflows/tmp-awg31-eol-tests.yml
+          git add -A
           python3 -B - <<'PY'
           import hashlib
           import subprocess
           from pathlib import Path
-          tracked = subprocess.check_output(['git','ls-files'], text=True).splitlines()
-          tracked = [p for p in tracked if p != 'SOURCE-SHA256SUMS']
-          Path('SOURCE-SHA256SUMS').write_text(
-              ''.join(f"{hashlib.sha256(Path(p).read_bytes()).hexdigest()}  {p}\n" for p in tracked),
-              encoding='utf-8'
-          )
-          print(f'final inventory: {len(tracked)} files')
-          PY
 
-      - name: Commit aligned tests
-        run: |
+          paths = subprocess.check_output(["git", "ls-files"], text=True, encoding="utf-8").splitlines()
+          rows = []
+          for path in sorted(paths):
+              if path == "SOURCE-SHA256SUMS":
+                  continue
+              data = Path(path).read_bytes()
+              rows.append(f"{hashlib.sha256(data).hexdigest()}  {path}")
+          Path("SOURCE-SHA256SUMS").write_text("\n".join(rows) + "\n", encoding="utf-8", newline="\n")
+          print(f"rebuilt SOURCE-SHA256SUMS for {len(rows)} files")
+          PY
+          git add SOURCE-SHA256SUMS
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add tests .github/workflows/update-idle-awg3-smoke.yml SOURCE-SHA256SUMS
-          git commit -m "test: align legacy contracts with AWG31-only product"
+          git commit -m "test: finalize AWG31-only contracts and source inventory"
           git push origin HEAD:fix/02208-awg31-ui-installer-cleanup
