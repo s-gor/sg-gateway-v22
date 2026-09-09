@@ -6,6 +6,7 @@ on:
       - ui/02208-awg31-naiveproxy-compact
     paths:
       - tools/apply_awg31_naive_ui_once.py
+      - .github/workflows/zz-apply-awg31-naive-ui.yml
 
 permissions:
   contents: write
