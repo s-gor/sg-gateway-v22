@@ -65,11 +65,11 @@ jobs:
           ! getent group sg-naiveproxy
           test -z "$(sudo ss -H -ltn 'sport = :8447')"
 
-      - name: Seed first install parameters
+      - name: Seed first install parameters through legacy resume compatibility
         run: |
           PUBLIC_IP="$(curl -4 -fsS --max-time 15 https://api.ipify.org)"
-          sudo install -m 0600 /dev/null /root/sg-gateway-02208-installer-resume.env
-          sudo tee /root/sg-gateway-02208-installer-resume.env >/dev/null <<EOF
+          sudo install -m 0600 /dev/null /root/sg-gateway-02206-installer-resume.env
+          sudo tee /root/sg-gateway-02206-installer-resume.env >/dev/null <<EOF
           PANEL_PORT=63443
           XRAY_PORT=443
           AWG_PORT=585
@@ -200,6 +200,79 @@ jobs:
           assert "amneziawg31" in access
           PY
           '
+
+      - name: Start real NaiveProxy after reinstall
+        run: |
+          sudo install -d -m 0700 /root/sg-gateway-naiveproxy-ci
+          sudo openssl req -x509 -nodes -newkey rsa:2048 \
+            -keyout /root/sg-gateway-naiveproxy-ci/privkey.pem \
+            -out /root/sg-gateway-naiveproxy-ci/fullchain.pem \
+            -days 1 \
+            -subj '/CN=localhost' \
+            -addext 'subjectAltName=DNS:localhost' >/dev/null 2>&1
+          sudo bash -c '
+            set -a
+            source /etc/sg-gateway/runtime.env
+            source /etc/sg-gateway/sg-gateway.env
+            set +a
+            env PYTHONPATH=/opt/sg-gateway:/opt/sg-gateway/hostd \
+              /opt/sg-gateway/.venv/bin/python - <<"PY"
+          import json
+
+          from app.naiveproxy.integration import install as install_naiveproxy_integration
+          install_naiveproxy_integration()
+
+          from app.connections.settings import update_connection_settings
+          from app.db import connect
+          from sg_hostd import naiveproxy_runtime
+
+          updated = update_connection_settings(
+              "naiveproxy",
+              "localhost",
+              8447,
+              {
+                  "domain": "localhost",
+                  "certificate_path": "/root/sg-gateway-naiveproxy-ci/fullchain.pem",
+                  "private_key_path": "/root/sg-gateway-naiveproxy-ci/privkey.pem",
+              },
+          )
+          assert updated
+
+          with connect() as connection:
+              primary = connection.execute(
+                  "SELECT d.id FROM devices d JOIN clients c ON c.id=d.client_id WHERE c.name=? AND d.is_primary=1 ORDER BY d.id LIMIT 1",
+                  ("sg-admin",),
+              ).fetchone()
+              assert primary is not None
+              device_id = int(primary["id"])
+              connection.execute("DELETE FROM device_credentials WHERE engine = ?", ("naiveproxy",))
+              connection.execute(
+                  "INSERT INTO device_credentials (device_id, engine, status, engine_object_id, config_json) VALUES (?, ?, ?, ?, ?)",
+                  (
+                      device_id,
+                      "naiveproxy",
+                      "creating",
+                      "ci-naiveproxy",
+                      json.dumps({"username": "ci-naiveproxy", "password": "ci-naiveproxy-secret-2026"}, sort_keys=True),
+                  ),
+              )
+
+          result = naiveproxy_runtime.sync()
+          assert result.get("service") == "sg-gateway-naiveproxy.service", result
+          assert result.get("users") == 1, result
+          print(result)
+          PY
+          '
+
+      - name: Verify NaiveProxy listener after reinstall
+        run: |
+          sudo systemctl is-active --quiet sg-gateway-naiveproxy.service
+          sudo systemctl is-enabled --quiet sg-gateway-naiveproxy.service
+          sudo test -s /etc/sg-gateway/naiveproxy/Caddyfile
+          sudo -u sg-naiveproxy test -r /etc/sg-gateway/naiveproxy/Caddyfile
+          sudo -u sg-naiveproxy test -r /etc/sg-gateway/naiveproxy/tls/fullchain.pem
+          sudo -u sg-naiveproxy test -r /etc/sg-gateway/naiveproxy/tls/privkey.pem
+          test -n "$(sudo ss -H -ltn 'sport = :8447')"
 
       - name: Print diagnostics on failure
         if: failure()
