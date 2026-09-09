@@ -136,7 +136,7 @@ def test_runtime_ui_blocks_only_explicit_missing_awg3_and_exposes_deployment(mon
     assert state["deployment"] == {}
 
 
-def test_awg3_runtime_ui_keeps_submission_enabled_and_server_gate_authoritative() -> None:
+def test_awg3_runtime_ui_keeps_legacy_repair_but_hides_retired_picker() -> None:
     production = (ROOT / "app" / "production.py").read_text(encoding="utf-8")
     clients = (ROOT / "app" / "web" / "templates" / "clients.html").read_text(encoding="utf-8")
     dialogs = (ROOT / "app" / "web" / "templates" / "_client_edit_dialogs.html").read_text(encoding="utf-8")
@@ -145,9 +145,12 @@ def test_awg3_runtime_ui_keeps_submission_enabled_and_server_gate_authoritative(
     assert "runtime_engine_state" in production
     assert "runtime_engine_state('amneziawg3')" not in clients
     assert "runtime_engine_state('amneziawg3')" not in dialogs
-    assert 'value="amneziawg3"' in clients
-    assert 'value="amneziawg3"' in dialogs
-    assert 'value="amneziawg3"' in detail
+    assert 'value="amneziawg3"' not in clients
+    assert 'value="amneziawg3"' not in dialogs
+    assert 'value="amneziawg3"' not in detail
+    assert 'value="amneziawg31"' in clients
+    assert 'value="amneziawg31"' in dialogs
+    assert 'value="amneziawg31"' in detail
     assert "_require_awg3_runtime()" in provisioning_source
 
 
