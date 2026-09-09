@@ -1,114 +1,120 @@
 name: CI
 
 on:
+  push:
+    branches: [main]
   pull_request:
     branches: [main]
 
-permissions:
-  contents: write
-
 jobs:
-  fix-awg31-only-regressions:
+  panel:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout feature branch
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref }}
-          fetch-depth: 0
 
-      - name: Patch retired AWG runtime coupling and Stage3A tests
-        run: |
-          python3 -B - <<'PY'
-          from pathlib import Path
-
-          path = Path('hostd/sg_hostd/client_runtime.py')
-          body = path.read_text(encoding='utf-8')
-          old = '''    public_address = runtime.get("SG_GATEWAY_PUBLIC_ADDRESS", "").strip()
-    awg_server_public = secrets.get("SG_GATEWAY_AWG_PUBLIC_KEY", "").strip()
-    xray_public = secrets.get("SG_GATEWAY_XRAY_PUBLIC_KEY", "").strip()
-    xray_short_id = secrets.get("SG_GATEWAY_XRAY_SHORT_ID", "").strip()
-    awg_obfuscation = _awg_obfuscation(secrets)
-
-    awg_settings = get_connection_settings("amneziawg")
-    awg_server_identity = awg_server_public or str(
-        awg_settings.config.get("server_public_key") or ""
-    ).strip()
-    awg_ipv6_network = (
-        _awg_ipv6_network(awg_server_identity)
-        if awg_server_identity and _dual_stack_enabled(runtime)
-        else None
-    )
-    xray_settings = get_connection_settings("xray")
-'''
-          new = '''    public_address = runtime.get("SG_GATEWAY_PUBLIC_ADDRESS", "").strip()
-    xray_public = secrets.get("SG_GATEWAY_XRAY_PUBLIC_KEY", "").strip()
-    xray_short_id = secrets.get("SG_GATEWAY_XRAY_SHORT_ID", "").strip()
-    xray_settings = get_connection_settings("xray")
-'''
-          if body.count(old) != 1:
-              raise SystemExit(f'client_runtime prelude match count={body.count(old)}')
-          body = body.replace(old, new, 1)
-          body = body.replace("WHERE dc.engine IN ('amneziawg', 'xray')", "WHERE dc.engine = 'xray'", 1)
-          path.write_text(body, encoding='utf-8', newline='\n')
-
-          path = Path('tests/test_sg_gateway_v22_awg31_stage3a_install_update.py')
-          body = path.read_text(encoding='utf-8')
-          body = body.replace('    AWG3_GO_SHA256,\n    AWG3_TOOLS_SHA256,\n', '')
-          body = body.replace('    assert ("systemctl", "try-restart", "sg-gateway-awg3.service") in fake.commands\n', '    assert not any("sg-gateway-awg3.service" in command for command in fake.commands)\n')
-          old_test = '''def test_runtime_sources_are_sha_verified_and_awg3_30_is_separate(provisioned) -> None:
-    root, _, _, _, _, _, _ = provisioned
-    vendor = root / "opt/sg-gateway/vendor/cores"
-    assert _sha256(vendor / "amneziawg-tools-3.1.20260812.tar.gz") == AWG31_TOOLS_SHA256
-    assert _sha256(vendor / "amneziawg-go-linux-amd64-v3.1.20260814") == AWG31_GO_SHA256
-    assert _sha256(vendor / "amneziawg-tools-3.0.20260805.tar.gz") == AWG3_TOOLS_SHA256
-    assert _sha256(vendor / "amneziawg-go-linux-amd64-v3.0.0") == AWG3_GO_SHA256
-    awg31_version = os.popen(str(root / "opt/sg-gateway/awg31/bin/awg") + " --version").read()
-    awg3_version = os.popen(str(root / "opt/sg-gateway/awg3/bin/awg") + " --version").read()
-    assert "3.1.20260812" in awg31_version
-    assert "3.0.20260805" in awg3_version
-    assert (root / "opt/sg-gateway/awg31").resolve() != (root / "opt/sg-gateway/awg3").resolve()
-'''
-          new_test = '''def test_runtime_sources_are_sha_verified_and_only_awg31_is_installed(provisioned) -> None:
-    root, _, _, _, _, _, _ = provisioned
-    vendor = root / "opt/sg-gateway/vendor/cores"
-    assert _sha256(vendor / "amneziawg-tools-3.1.20260812.tar.gz") == AWG31_TOOLS_SHA256
-    assert _sha256(vendor / "amneziawg-go-linux-amd64-v3.1.20260814") == AWG31_GO_SHA256
-    awg31_version = os.popen(str(root / "opt/sg-gateway/awg31/bin/awg") + " --version").read()
-    assert "3.1.20260812" in awg31_version
-    assert not (root / "opt/sg-gateway/awg3").exists()
-'''
-          if body.count(old_test) != 1:
-              raise SystemExit(f'Stage3A runtime test match count={body.count(old_test)}')
-          body = body.replace(old_test, new_test, 1)
-          body = body.replace('    assert fake.commands.count(("systemctl", "try-restart", "sg-gateway-awg3.service")) == 1\n', '    assert not any("sg-gateway-awg3.service" in command for command in fake.commands)\n')
-          path.write_text(body, encoding='utf-8', newline='\n')
-          PY
-
-      - name: Restore normal CI
-        run: |
-          git fetch origin main
-          git show origin/main:.github/workflows/ci.yml > .github/workflows/ci.yml
-
-      - name: Regenerate source integrity inventory
+      - name: Verify FINAL source integrity
         run: |
           python3 -B - <<'PY'
           import hashlib
+          import re
           import subprocess
           from pathlib import Path
-          tracked = subprocess.check_output(['git','ls-files'], text=True).splitlines()
-          tracked = [p for p in tracked if p != 'SOURCE-SHA256SUMS']
-          Path('SOURCE-SHA256SUMS').write_text(
-              ''.join(f"{hashlib.sha256(Path(p).read_bytes()).hexdigest()}  {p}\n" for p in tracked),
-              encoding='utf-8'
+
+          rows = Path("SOURCE-SHA256SUMS").read_text(encoding="utf-8").splitlines()
+          expected = {}
+
+          for line_no, raw in enumerate(rows, 1):
+              if not raw.strip():
+                  continue
+              match = re.fullmatch(r"([0-9a-f]{64})  (.+)", raw)
+              if match is None:
+                  raise SystemExit(f"invalid SOURCE-SHA256SUMS line {line_no}: {raw!r}")
+              digest, path = match.groups()
+              if path in expected:
+                  raise SystemExit(f"duplicate checksum path: {path}")
+              expected[path] = digest
+
+          tracked = set(
+              subprocess.check_output(
+                  ["git", "ls-files"],
+                  text=True,
+                  encoding="utf-8",
+              ).splitlines()
           )
-          print(f'inventory regenerated: {len(tracked)}')
+          tracked.discard("SOURCE-SHA256SUMS")
+
+          listed = set(expected)
+          missing = sorted(tracked - listed)
+          extra = sorted(listed - tracked)
+          problems = []
+          if missing:
+              problems.append(f"checksum inventory missing: {missing}")
+          if extra:
+              problems.append(f"checksum inventory extra: {extra}")
+
+          for path in sorted(tracked):
+              proc = subprocess.Popen(
+                  ["git", "show", f"HEAD:{path}"],
+                  stdout=subprocess.PIPE,
+              )
+              assert proc.stdout is not None
+              digest = hashlib.sha256()
+              while True:
+                  chunk = proc.stdout.read(1024 * 1024)
+                  if not chunk:
+                      break
+                  digest.update(chunk)
+              rc = proc.wait()
+              if rc != 0:
+                  problems.append(f"git show failed for {path}: rc={rc}")
+                  continue
+              actual = digest.hexdigest()
+              wanted = expected.get(path)
+              if actual != wanted:
+                  problems.append(
+                      f"source hash mismatch: {path}: expected={wanted or '<missing>'} actual={actual}"
+                  )
+
+          if problems:
+              print("Source integrity mismatches:")
+              for problem in problems:
+                  print(problem)
+              raise SystemExit(f"source integrity failed: {len(problems)} problem(s)")
+
+          print(f"Git-blob source integrity ok: {len(tracked)} tracked files verified")
           PY
 
-      - name: Commit fixes
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add hostd/sg_hostd/client_runtime.py tests/test_sg_gateway_v22_awg31_stage3a_install_update.py .github/workflows/ci.yml SOURCE-SHA256SUMS
-          git commit -m "fix: decouple Xray apply from retired AWG2 runtime"
-          git push origin HEAD:${{ github.head_ref }}
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+
+      - name: Install Chromium for browser UI tests
+        run: python -m playwright install --with-deps chromium
+
+      - name: Check Python syntax
+        run: |
+          python -B -c "from pathlib import Path; files=list(Path('app').rglob('*.py'))+list(Path('engines').rglob('*.py'))+list(Path('tests').rglob('*.py')); [compile(p.read_text(encoding='utf-8'), str(p), 'exec') for p in files]; print(f'syntax ok: {len(files)} files')"
+
+      - name: Check release manifest
+        run: |
+          python -B -c "import json, pathlib; manifest=json.loads(pathlib.Path('release-manifest.json').read_text(encoding='utf-8')); version=pathlib.Path('VERSION').read_text(encoding='utf-8').strip(); assert manifest['version']==version; assert manifest['status']=='STABLE'; assert manifest['rebuild_target']=='0.1.0-022.08'; assert manifest['next_development_line']=='0.1.0-022.09'; assert manifest['channel']=='stable-02208'; assert manifest['build']=='MAIN-02208-STABLE'; assert manifest['rebuild_policy']['awg3'] is True; assert manifest['source_integrity']['mode']=='git-blob-sha256'; assert manifest['safe_update']['preserve_local_assets'] is True; assert manifest['images']['panel']; assert manifest['images']['xray']; print('manifest ok')"
+
+      - name: Run panel tests
+        run: python -m pytest tests
+
+      - name: Build and verify current FULL package
+        run: |
+          command -v zip
+          command -v unzip
+          VERSION="$(tr -d '[:space:]' < VERSION)"
+          OUT="/tmp/SG-Gateway-${VERSION}-FULL.run"
+          bash build-run.sh "$OUT"
+          bash "$OUT" --verify-only
