@@ -330,3 +330,15 @@ body.page-connections .cnv1-compact-protocol-warning {
   }
   body.page-connections .cnv1-compact-protocol-port { position: static; }
 }
+
+/* Unified protocol-card outline: match Xray profile cards */
+body.page-connections :is(
+  .mhv2-listener,
+  .cnv1-compact-protocol-card
+) {
+  border: 2px solid color-mix(in srgb, var(--sg-accent, #4f7d6c) 72%, var(--sg-ui-border, #aeb8ae));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--sg-accent, #4f7d6c) 18%, transparent),
+    0 8px 18px rgba(42, 60, 52, .14);
+}
+

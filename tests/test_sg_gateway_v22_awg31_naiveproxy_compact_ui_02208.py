@@ -60,6 +60,15 @@ def test_xray_actions_use_panel_width_and_advanced_uses_single_rail() -> None:
     assert f'body.page-connections .cnv1-engine-xray > .cnv1-advanced {{\n  margin-inline: {rail};' in CSS
 
 
+
+
+def test_mihomo_and_compact_protocol_cards_match_xray_outline() -> None:
+    assert '/* Unified protocol-card outline: match Xray profile cards */' in CSS
+    assert '.mhv2-listener,' in CSS
+    assert '.cnv1-compact-protocol-card' in CSS
+    assert 'border: 2px solid color-mix(' in CSS
+    assert 'box-shadow:' in CSS
+
 def test_mihomo_does_not_add_a_second_inner_rail() -> None:
     assert 'class="mhv2-inner-rail">' in MIHOMO
     assert 'class="mhv2-inner-rail sg-ui-rail">' not in MIHOMO
