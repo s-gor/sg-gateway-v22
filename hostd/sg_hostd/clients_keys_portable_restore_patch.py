@@ -86,13 +86,14 @@ def _apply_portable_clients_runtime_required(full: ModuleType) -> dict:
 
 @contextmanager
 def _destination_runtime_policy(database_path: Path):
-    """Temporarily hide only credentials whose destination runtime is absent.
+    """Keep destination-missing engine credentials dormant after restore.
 
-    `apply_all_clients()` intentionally uses a global Runtime Contract for
-    ordinary client mutations. Portable restore is different: durable access
-    has already been validated, so a missing runtime must not prevent other
-    ready engines from being reconciled. Original credential statuses are
-    restored byte-for-byte after the best-effort runtime pass.
+    Portable Clients & Keys restore preserves durable credentials independently
+    from destination runtime readiness. Engines that fail the destination
+    runtime contract are disabled in `device_credentials` and intentionally
+    stay disabled after the best-effort apply pass. Their key/config material is
+    untouched; a later successful Connection/runtime reconcile can reactivate
+    the same credential without regeneration.
     """
 
     from sg_hostd import runtime_contracts
@@ -133,15 +134,7 @@ def _destination_runtime_policy(database_path: Path):
             "runtime_contract": contract,
         }
     finally:
-        try:
-            for row_id, status in snapshots:
-                database.execute(
-                    "UPDATE device_credentials SET status = ? WHERE id = ?",
-                    (status, row_id),
-                )
-            database.commit()
-        finally:
-            database.close()
+        database.close()
 
 
 def _validate_portable_runtime_best_effort(full: ModuleType) -> dict:
