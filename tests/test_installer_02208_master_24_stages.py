@@ -9,9 +9,9 @@ def _master() -> str:
     return (ROOT / "install.sh").read_text(encoding="utf-8")
 
 
-def test_master_exposes_exactly_24_numbered_stages():
+def test_master_exposes_exactly_22_numbered_stages():
     source = _master()
-    assert "TOTAL_STAGES=24" in source
+    assert "TOTAL_STAGES=22" in source
     main = source[source.index("main() {") :]
     numbers = [
         int(value)

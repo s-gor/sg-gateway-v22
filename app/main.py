@@ -1504,8 +1504,6 @@ def create_app() -> Flask:
             "connections.html",
             active_page="connections",
             connections=list_connections(),
-            awg_settings=get_connection_settings("amneziawg"),
-            awg3_settings=get_connection_settings("amneziawg3"),
             awg_dns=get_shared_awg_dns(),
             xray_settings=get_connection_settings("xray"),
             xray_profiles=xray_profiles_overview(),
@@ -1520,50 +1518,9 @@ def create_app() -> Flask:
         except SharedAwgDnsError as exc:
             flash(f"DNS клиентов AWG не сохранён: {exc}", "error")
         else:
-            flash(f"DNS {state.dns} применён к AWG 2.0, 3.0 и 3.1.", "success")
+            flash(f"DNS {state.dns} применён к AWG3.1.", "success")
         return redirect(url_for("connections") + "#awg-dns")
 
-    @app.post("/connections/amneziawg")
-    def update_amneziawg():
-        current = get_connection_settings("amneziawg")
-        config = dict(current.config)
-        config["server_public_key"] = request.form.get(
-            "server_public_key",
-            config.get("server_public_key", "PLACEHOLDER_SERVER_PUBLIC_KEY"),
-        )
-        config["country_code"] = normalize_country_code(
-            request.form.get("country_code", config.get("country_code", "unknown"))
-        )
-        updated = update_connection_settings(
-            "amneziawg",
-            request.form.get("host", current.host),
-            request.form.get("port", str(current.port)),
-            config,
-        )
-        flash("Настройки AmneziaWG сохранены." if updated else "Настройки AmneziaWG не применены. Проверьте адрес и порт.", "success" if updated else "error")
-        return redirect(url_for("connections"))
-
-    @app.post("/connections/amneziawg3")
-    def update_amneziawg3():
-        current = get_connection_settings("amneziawg3")
-        config = dict(current.config)
-        config["server_public_key"] = request.form.get(
-            "server_public_key", config.get("server_public_key", "")
-        )
-        config["generation"] = 3
-        updated = update_connection_settings(
-            "amneziawg3",
-            request.form.get("host", current.host),
-            request.form.get("port", str(current.port)),
-            config,
-        )
-        flash(
-            "Настройки AmneziaWG 3 сохранены."
-            if updated
-            else "Настройки AmneziaWG 3 не применены. Проверьте адрес.",
-            "success" if updated else "error",
-        )
-        return redirect(url_for("connections"))
 
     @app.post("/connections/xray")
     def update_xray():
