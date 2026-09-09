@@ -5,6 +5,7 @@ TEMPLATE = (ROOT / "app/web/templates/connections.html").read_text(encoding="utf
 AWG31 = (ROOT / "app/web/templates/_awg31_panel.html").read_text(encoding="utf-8")
 NAIVE = (ROOT / "app/web/templates/_naiveproxy_panel.html").read_text(encoding="utf-8")
 CSS = (ROOT / "app/web/static/sg-ui-connections-v22-08.css").read_text(encoding="utf-8")
+XMUX = (ROOT / "app/web/templates/_xray_xmux_settings.html").read_text(encoding="utf-8")
 
 
 def test_awg31_and_naiveproxy_share_one_compact_protocol_block() -> None:
@@ -47,4 +48,10 @@ def test_upper_connection_inner_rails_match_compact_protocol_inset() -> None:
     assert f'body.page-connections .cnv1-engine-xray .sg-ui-rail {{\n  padding-inline: {desktop_inset};' in CSS
     assert f'body.page-connections .cnv1-engine-xray > .cnv1-endpoint-card {{\n  margin-inline: {desktop_inset};' in CSS
     assert f'body.page-connections .cnv1-compact-protocols .sg-ui-rail {{\n  padding-inline: {desktop_inset};' in CSS
+
+def test_xmux_inner_controls_follow_the_same_desktop_rail() -> None:
+    assert '#xray-xmux .xmux1-card > form {' in XMUX
+    assert 'padding-inline: var(--sg-ui-rail-inset, 18px);' in XMUX
+    assert '@media (max-width: 760px)' in XMUX
+    assert 'padding-inline: 0;' in XMUX
 
