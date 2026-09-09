@@ -1,0 +1,45 @@
+name: Connections page-wide wide rail
+on:
+  push:
+    branches: [tmp/02208-unify-connections-inner-rails-v3]
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: tmp/02208-unify-connections-inner-rails-v3
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r requirements-dev.txt
+      - name: Apply page-wide rail
+        run: python tools/apply_connections_pagewide_wide_rail_once.py
+      - name: Remove helper files
+        run: git rm tools/apply_connections_pagewide_wide_rail_once.py .github/workflows/zz-connections-pagewide-wide-rail.yml
+      - name: Refresh source integrity
+        shell: bash
+        run: |
+          python - <<'PY'
+          import hashlib, subprocess
+          from pathlib import Path
+          tracked = subprocess.check_output(['git','ls-files'], text=True, encoding='utf-8').splitlines()
+          tracked = [p for p in tracked if p != 'SOURCE-SHA256SUMS']
+          rows=[]
+          for path in sorted(tracked):
+              rows.append(f"{hashlib.sha256(Path(path).read_bytes()).hexdigest()}  {path}")
+          Path('SOURCE-SHA256SUMS').write_text('\n'.join(rows)+'\n', encoding='utf-8')
+          PY
+      - name: Focused tests
+        run: python -m pytest -q tests/test_sg_gateway_v22_awg31_naiveproxy_compact_ui_02208.py tests/test_health.py
+      - name: Commit verified result
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "style: use one wide inner rail across Connections"
+          git push origin HEAD:tmp/02208-unify-connections-inner-rails-v3
