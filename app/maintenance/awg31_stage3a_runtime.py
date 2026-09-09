@@ -9,10 +9,6 @@ import tempfile
 from pathlib import Path
 
 from app.maintenance.awg31_stage3a_common import (
-    AWG3_GO_FILE,
-    AWG3_GO_SHA256,
-    AWG3_TOOLS_FILE,
-    AWG3_TOOLS_SHA256,
     AWG31_GO_FILE,
     AWG31_GO_SHA256,
     AWG31_TOOLS_FILE,
@@ -47,8 +43,6 @@ class RuntimeMixin:
         staged_vendor.mkdir(parents=True)
         staged_deploy.mkdir(parents=True)
         artifacts = (
-            (AWG3_TOOLS_FILE, AWG3_TOOLS_SHA256),
-            (AWG3_GO_FILE, AWG3_GO_SHA256),
             (AWG31_TOOLS_FILE, AWG31_TOOLS_SHA256),
             (AWG31_GO_FILE, AWG31_GO_SHA256),
         )
