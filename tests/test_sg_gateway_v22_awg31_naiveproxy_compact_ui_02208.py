@@ -30,10 +30,9 @@ def test_naiveproxy_uses_same_compact_card_family() -> None:
     assert 'data-naive-state' in NAIVE
     assert '.cnv1-compact-protocol-grid' in CSS
     assert 'grid-template-columns: repeat(2, minmax(0, 1fr));' in CSS
-    assert 'padding-inline: calc(var(--sg-ui-card-pad, 18px) + var(--sg-ui-rail-inset, 18px));' in CSS
 
 
-def test_compact_protocol_polish_matches_mihomo_rail_and_removes_noise() -> None:
+def test_compact_protocol_polish_removes_noise() -> None:
     assert 'cnv1-compact-protocol-grid sg-ui-rail' in TEMPLATE
     assert 'UDP VPN + HTTPS PROXY' not in TEMPLATE
     assert 'AmneziaWG 3.1 · NaiveProxy' not in TEMPLATE
@@ -41,22 +40,20 @@ def test_compact_protocol_polish_matches_mihomo_rail_and_removes_noise() -> None
     assert 'country_name(awg31_country)' not in AWG31
     assert 'HTTPS proxy · TLS · порт' in NAIVE
     assert 'data-naive-summary-port' in NAIVE
-    assert 'padding-inline: calc(var(--sg-ui-card-pad, 18px) + var(--sg-ui-rail-inset, 18px));' in CSS
 
-def test_upper_connection_inner_rails_match_compact_protocol_inset() -> None:
-    desktop_inset = 'calc(var(--sg-ui-card-pad, 18px) + var(--sg-ui-rail-inset, 18px))'
-    assert f'body.page-connections .cnv1-engine-xray .sg-ui-rail {{\n  padding-inline: {desktop_inset};' in CSS
-    assert f'body.page-connections .cnv1-engine-xray > .cnv1-endpoint-card {{\n  margin-inline: {desktop_inset};' in CSS
-    assert f'body.page-connections .cnv1-compact-protocols .sg-ui-rail {{\n  padding-inline: {desktop_inset};' in CSS
 
-def test_xmux_inner_controls_follow_the_same_desktop_rail() -> None:
-    assert '#xray-xmux .xmux1-card > form {' in XMUX
-    assert 'padding-inline: var(--sg-ui-rail-inset, 18px);' in XMUX
-    assert '@media (max-width: 760px)' in XMUX
-    assert 'padding-inline: 0;' in XMUX
+def test_connections_uses_one_pagewide_inner_rail() -> None:
+    rail = 'var(--sg-ui-rail-inset, 18px)'
+    assert f'body.page-connections .cnv1-engine-xray .sg-ui-rail {{\n  padding-inline: {rail};' in CSS
+    assert f'body.page-connections .cnv1-engine-xray > .cnv1-endpoint-card {{\n  margin-inline: {rail};' in CSS
+    assert f'body.page-connections .cnv1-compact-protocols .sg-ui-rail {{\n  padding-inline: {rail};' in CSS
 
-def test_xray_action_footer_and_advanced_follow_same_working_rail() -> None:
-    desktop_inset = 'calc(var(--sg-ui-card-pad, 18px) + var(--sg-ui-rail-inset, 18px))'
-    assert f'.cnv1-engine-xray :is(.xps2-top-actions, .xps2-actions) {{\n  margin-inline: {desktop_inset};' in CSS
-    assert f'.cnv1-engine-xray > .cnv1-advanced {{\n  margin-inline: {desktop_inset};' in CSS
 
+def test_xmux_does_not_add_a_second_inner_rail() -> None:
+    assert '#xray-xmux .xmux1-card > form {' not in XMUX
+
+
+def test_xray_actions_use_panel_width_and_advanced_uses_single_rail() -> None:
+    rail = 'var(--sg-ui-rail-inset, 18px)'
+    assert 'body.page-connections .cnv1-engine-xray :is(.xps2-top-actions, .xps2-actions) {\n  margin-inline: 0;' in CSS
+    assert f'body.page-connections .cnv1-engine-xray > .cnv1-advanced {{\n  margin-inline: {rail};' in CSS
