@@ -91,9 +91,8 @@ def _destination_runtime_policy(database_path: Path):
     `apply_all_clients()` intentionally uses a global Runtime Contract for
     ordinary client mutations. Portable restore is different: durable access
     has already been validated, so a missing runtime must not prevent other
-    ready engines from being reconciled. Credentials for deferred engines stay
-    dormant after restore; their original material is preserved byte-for-byte
-    and can be reactivated by a later successful runtime reconcile.
+    ready engines from being reconciled. Original credential statuses are
+    restored byte-for-byte after the best-effort runtime pass.
     """
 
     from sg_hostd import runtime_contracts
@@ -135,10 +134,7 @@ def _destination_runtime_policy(database_path: Path):
         }
     finally:
         try:
-            deferred_ids = {row_id for row_id, _status in snapshots}
             for row_id, status in snapshots:
-                if row_id in deferred_ids and status == "applied":
-                    continue
                 database.execute(
                     "UPDATE device_credentials SET status = ? WHERE id = ?",
                     (status, row_id),
@@ -181,3 +177,105 @@ def _install_destination_runtime_contract_defer() -> None:
 
     tls_backup_patch._runtime_contract_for_destination = deferred
     tls_backup_patch._dormant_runtime_contract_installed = True
+
+
+def _restore_clients_keys(full: ModuleType, hard: ModuleType) -> dict:
+    request = full._read_json(full.RESTORE_REQUEST_PATH)
+    backup_name = full._validated_backup_name(str(request.get("backup_name") or ""))
+    backup_path = full.BACKUP_DIR / backup_name
+    if not backup_path.is_file():
+        raise RuntimeError(f"Backup not found: {backup_name}")
+    if not _is_clients_keys_restore(full, backup_path):
+        raise RuntimeError("Selected backup is not a Clients & Keys portable backup")
+
+    print("[Restore 1/8] Проверяю Clients & Keys backup и свободное место", flush=True)
+    hard._verify_backup_archive(full, backup_path)
+    hard._ensure_restore_free_space(full, backup_path)
+
+    with tempfile.TemporaryDirectory(prefix="sg-gateway-clients-keys-restore-") as tmp:
+        tmp_path = Path(tmp)
+        full._extract_archive(backup_path, tmp_path)
+        full._validate_extracted_backup(tmp_path)
+        print("[Restore 2/8] Backup и SQLite проверены; выключенные протоколы нового сервера будут пропущены", flush=True)
+
+        print("[Restore 3/8] Создаю страховочный Full Backup текущего сервера", flush=True)
+        safety_backup = full.create_full_backup()
+        safety_backup_name = str(safety_backup.get("backup") or "")
+        if not safety_backup_name:
+            raise RuntimeError("Safety backup was not created")
+        safety_backup_path = full.BACKUP_DIR / safety_backup_name
+
+        try:
+            print("[Restore 4/8] Восстанавливаю клиентов, ключи и переносимый HTTPS", flush=True)
+            restore_result = tls_backup_patch.restore_clients_keys_portable(full, tmp_path)
+
+            print("[Restore 5/8] Проверяю SQLite и права; настройки нового сервера сохранены", flush=True)
+            full._validate_database_after_restore()
+            full._restore_permissions()
+
+            print("[Restore 6/8] Возвращаю HTTPS и пересобираю только разрешённый runtime нового сервера", flush=True)
+            tls_result = tls_backup_patch.restore_portable_https(full, tmp_path)
+            database_path = Path(full.DB_PATH)
+            with _destination_runtime_policy(database_path) as runtime_policy:
+                runtime_result = _apply_portable_clients_runtime_required(full)
+            runtime_validation = _validate_portable_runtime_best_effort(full)
+
+            print("[Restore 7/8] Проверяю панель и сохранённые сервисы нового сервера", flush=True)
+            hard._local_panel_health(full)
+
+            print("[Restore 8/8] Восстановление клиентов и ключей завершено", flush=True)
+            result = {
+                "ok": True,
+                "profile": "clients-and-keys",
+                "backup": backup_name,
+                "safety_backup": safety_backup_name,
+                "restore": restore_result,
+                "https": tls_result,
+                "runtime": runtime_result,
+                "runtime_policy": runtime_policy,
+                "runtime_validation": runtime_validation,
+            }
+            return result
+        except Exception as restore_exc:
+            print(
+                f"[Restore] ОШИБКА: {restore_exc}. Автоматически возвращаю страховочный backup",
+                flush=True,
+            )
+            try:
+                with tempfile.TemporaryDirectory(prefix="sg-gateway-clients-keys-rollback-") as rollback_tmp:
+                    rollback_path = Path(rollback_tmp)
+                    full._extract_archive(safety_backup_path, rollback_path)
+                    full._validate_extracted_backup(rollback_path)
+                    full._restore_full_from_extracted(rollback_path)
+                hard._local_panel_health(full)
+            except Exception as rollback_exc:
+                raise RuntimeError(
+                    "Восстановление клиентов и ключей завершилось ошибкой, и автоматический "
+                    f"Safety Rollback также не прошёл проверку. Restore: {restore_exc}; "
+                    f"Rollback: {rollback_exc}"
+                ) from rollback_exc
+            raise RuntimeError(
+                f"Восстановление клиентов и ключей завершилось ошибкой. Safety Rollback выполнен. {restore_exc}"
+            ) from restore_exc
+
+
+def install(full: ModuleType, hard: ModuleType) -> None:
+    _install_destination_runtime_contract_defer()
+    if getattr(full, "_clients_keys_portable_restore_installed", False):
+        return
+    original = full.restore_uploaded_full_backup
+
+    @wraps(original)
+    def dispatch() -> dict:
+        try:
+            request = full._read_json(full.RESTORE_REQUEST_PATH)
+            backup_name = full._validated_backup_name(str(request.get("backup_name") or ""))
+            backup_path = full.BACKUP_DIR / backup_name
+        except Exception:
+            return original()
+        if backup_path.is_file() and _is_clients_keys_restore(full, backup_path):
+            return _restore_clients_keys(full, hard)
+        return original()
+
+    full.restore_uploaded_full_backup = dispatch
+    full._clients_keys_portable_restore_installed = True
