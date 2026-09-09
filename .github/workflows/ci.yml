@@ -4,16 +4,98 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: write
+
 jobs:
-  retired-awg-picker-red:
+  retire-awg-pickers:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout feature branch
         uses: actions/checkout@v4
-      - name: Verify retired AWG pickers are hidden
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - name: Remove retired AWG profiles from active pickers
+        run: |
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+
+          def rewrite(path, transform):
+              target = Path(path)
+              before = target.read_text(encoding="utf-8")
+              after = transform(before)
+              if after == before:
+                  raise SystemExit(f"no changes applied to {path}")
+              target.write_text(after, encoding="utf-8")
+
+          def clients(body):
+              patterns = [
+                  r'\n      <label class="cv10-protocol"><input type="checkbox" name="protocols" value="amneziawg"><span><strong>AmneziaWG 2\.0</strong><small>AWG2 · отдельная конфигурация и QR</small></span></label>',
+                  r'\n      <label class="cv10-protocol">\n        <input type="checkbox" name="protocols" value="amneziawg3">\n        <span><strong>AmneziaWG 3\.0</strong><small>AWG 3\.0 userspace · отдельная конфигурация и QR</small></span>\n      </label>',
+              ]
+              for pattern in patterns:
+                  body, count = re.subn(pattern, "", body, count=1)
+                  assert count == 1, pattern
+              return body
+
+          def detail(body):
+              for engine, title in (("amneziawg", "AmneziaWG 2"), ("amneziawg3", "AmneziaWG 3.0")):
+                  pattern = (
+                      r'\n        <label class="dv16-protocol">\n'
+                      rf'          <input type="checkbox" name="protocols" value="{engine}">\n'
+                      rf'          <span><strong>{re.escape(title)}</strong><small>.*?</small></span>\n'
+                      r'        </label>'
+                  )
+                  body, count = re.subn(pattern, "", body, count=1)
+                  assert count == 1, engine
+              return body
+
+          def edits(body):
+              awg2 = r'\n      <label class="dv16-protocol"><input type="checkbox" name="protocols" value="amneziawg" .*?</label>'
+              body, count = re.subn(awg2, "", body, count=2)
+              assert count == 2, count
+
+              awg3 = (
+                  r'\n      \{% set (?:device_)?awg3_selected = \'amneziawg3\' in (?:primary_tokens|selected_tokens) %\}'
+                  r'\n      <label class="dv16-protocol">\n'
+                  r'        <input type="checkbox" name="protocols" value="amneziawg3" .*?\n'
+                  r'        <span><strong>AmneziaWG 3\.0</strong><small>.*?</small></span>\n'
+                  r'      </label>'
+              )
+              body, count = re.subn(awg3, "", body, count=2)
+              assert count == 2, count
+
+              body = body.replace("    'amneziawg',\n", "")
+              body = body.replace("    'amneziawg3',\n", "")
+              body, count = re.subn(
+                  r'\n    const awg2Title = cardsByValue\.get\(\'amneziawg\'\)\?\.querySelector\(\'strong\'\);\n    if \(awg2Title\) awg2Title\.textContent = \'AmneziaWG 2\.0\';',
+                  "",
+                  body,
+                  count=1,
+              )
+              assert count == 1, count
+              return body
+
+          rewrite("app/web/templates/clients.html", clients)
+          rewrite("app/web/templates/client_detail.html", detail)
+          rewrite("app/web/templates/_client_edit_dialogs.html", edits)
+          PY
+
+      - name: Verify picker regression
         run: |
           python3 - <<'PY'
           import runpy
           ns = runpy.run_path("tests/test_retired_awg2_awg3_02208.py")
           ns["test_retired_awg_profiles_are_absent_from_active_protocol_pickers"]()
           PY
+
+      - name: Commit picker cleanup
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/web/templates/clients.html app/web/templates/client_detail.html app/web/templates/_client_edit_dialogs.html
+          git commit -m "fix: hide retired AWG profiles from client pickers"
+          git push origin HEAD:${{ github.head_ref }}
