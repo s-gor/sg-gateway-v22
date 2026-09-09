@@ -94,7 +94,6 @@ def test_client_create_update_and_awg31_delete_are_isolated(isolated_clients) ->
     before = _credentials(device_id)
     assert set(before) == {"amneziawg31", "xray"}
     awg31_before = before["amneziawg31"]
-    xray_before = before["xray"]
     assert awg31_before["endpoint"] == "awg31.internal:587"
     assert awg31_before["transport"] == "udp"
     assert awg31_before["address"].startswith("10.131.0.")
@@ -104,14 +103,16 @@ def test_client_create_update_and_awg31_delete_are_isolated(isolated_clients) ->
     assert updated["amneziawg31"]["client_name"] == "Alpha Updated"
     assert updated["amneziawg31"]["private_key"] == awg31_before["private_key"]
     assert updated["amneziawg31"]["public_key"] == awg31_before["public_key"]
+    xray_after_update = updated["xray"]
+    assert xray_after_update["client_name"] == "Alpha Updated"
 
     lifecycle.ensure_peer(device_id, updated["amneziawg31"])
-    assert _credentials(device_id)["xray"] == xray_before
+    assert _credentials(device_id)["xray"] == xray_after_update
 
     assert repository.delete_awg31_peer(device_id) is True
     remaining = _credentials(device_id)
     assert set(remaining) == {"xray"}
-    assert remaining["xray"] == xray_before
+    assert remaining["xray"] == xray_after_update
 
 
 def test_client_delete_cascades_its_awg31_peer(isolated_clients) -> None:
