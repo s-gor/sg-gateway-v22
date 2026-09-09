@@ -55,3 +55,8 @@ def test_xmux_inner_controls_follow_the_same_desktop_rail() -> None:
     assert '@media (max-width: 760px)' in XMUX
     assert 'padding-inline: 0;' in XMUX
 
+def test_xray_action_footer_and_advanced_follow_same_working_rail() -> None:
+    desktop_inset = 'calc(var(--sg-ui-card-pad, 18px) + var(--sg-ui-rail-inset, 18px))'
+    assert f'.cnv1-engine-xray :is(.xps2-top-actions, .xps2-actions) {{\n  margin-inline: {desktop_inset};' in CSS
+    assert f'.cnv1-engine-xray > .cnv1-advanced {{\n  margin-inline: {desktop_inset};' in CSS
+

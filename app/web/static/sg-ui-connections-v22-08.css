@@ -68,6 +68,14 @@ body.page-connections .cnv1-engine-xray > .cnv1-endpoint-card {
   margin-inline: calc(var(--sg-ui-card-pad, 18px) + var(--sg-ui-rail-inset, 18px));
 }
 
+body.page-connections .cnv1-engine-xray :is(.xps2-top-actions, .xps2-actions) {
+  margin-inline: calc(var(--sg-ui-card-pad, 18px) + var(--sg-ui-rail-inset, 18px));
+}
+
+body.page-connections .cnv1-engine-xray > .cnv1-advanced {
+  margin-inline: calc(var(--sg-ui-card-pad, 18px) + var(--sg-ui-rail-inset, 18px));
+}
+
 body.page-connections .cnv1-engine-pair.sg-ui-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--sg-ui-grid-gap, 12px);
@@ -180,6 +188,12 @@ body.page-connections .xps2-naiveproxy-body .cnv1-form-actions {
   }
 
   body.page-connections .cnv1-engine-xray > .cnv1-endpoint-card {
+    margin-inline: var(--sg-ui-rail-inset, 14px);
+  }
+
+
+  body.page-connections .cnv1-engine-xray :is(.xps2-top-actions, .xps2-actions),
+  body.page-connections .cnv1-engine-xray > .cnv1-advanced {
     margin-inline: var(--sg-ui-rail-inset, 14px);
   }
 }
