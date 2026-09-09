@@ -6,6 +6,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "hostd"))
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_client_repository_no_longer_supports_awg2_or_awg3() -> None:
@@ -21,6 +22,25 @@ def test_client_repository_no_longer_supports_awg2_or_awg3() -> None:
         "amneziawg,amneziawg3,amneziawg31,xray"
     )
     assert engines == ["amneziawg31", "xray"]
+
+
+def test_retired_awg_profiles_are_absent_from_active_protocol_pickers() -> None:
+    templates = {
+        "clients": (ROOT / "app/web/templates/clients.html").read_text(encoding="utf-8"),
+        "detail": (ROOT / "app/web/templates/client_detail.html").read_text(encoding="utf-8"),
+        "edits": (ROOT / "app/web/templates/_client_edit_dialogs.html").read_text(encoding="utf-8"),
+    }
+
+    for name, body in templates.items():
+        assert 'value="amneziawg"' not in body, name
+        assert 'value="amneziawg3"' not in body, name
+        assert 'value="amneziawg31"' in body, name
+
+    edits = templates["edits"]
+    order = edits.split("const addDeviceProtocolOrder = [", 1)[1].split("];", 1)[0]
+    assert "'amneziawg'," not in order
+    assert "'amneziawg3'," not in order
+    assert "'amneziawg31'," in order
 
 
 def test_legacy_awg_credentials_stay_durable_but_are_hidden_from_active_reads(
