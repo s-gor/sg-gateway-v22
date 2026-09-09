@@ -1,0 +1,37 @@
+name: Regenerate source integrity once
+
+on:
+  push:
+    branches: [feature/02208-compatible-subscription-awg31]
+    paths: [.github/workflows/zz-regenerate-source-once.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  regenerate:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: feature/02208-compatible-subscription-awg31
+          fetch-depth: 0
+      - name: Regenerate SOURCE-SHA256SUMS and remove this workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          tmp="$(mktemp)"
+          git ls-files -z | while IFS= read -r -d '' f; do
+            [ "$f" = "SOURCE-SHA256SUMS" ] && continue
+            [ "$f" = ".github/workflows/zz-regenerate-source-once.yml" ] && continue
+            digest="$(git show "HEAD:$f" | sha256sum | cut -d' ' -f1)"
+            printf '%s  %s\n' "$digest" "$f"
+          done | LC_ALL=C sort -k2 > "$tmp"
+          mv "$tmp" SOURCE-SHA256SUMS
+          rm -f .github/workflows/zz-regenerate-source-once.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add SOURCE-SHA256SUMS .github/workflows/zz-regenerate-source-once.yml
+          git commit -m "chore: refresh source integrity"
+          git push origin HEAD:feature/02208-compatible-subscription-awg31
