@@ -1,47 +1,120 @@
 name: CI
 
 on:
+  push:
+    branches: [main]
   pull_request:
     branches: [main]
 
-permissions:
-  contents: write
-
 jobs:
-  finalize-source-inventory:
+  panel:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout feature branch
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref }}
-          fetch-depth: 0
 
-      - name: Restore normal CI from main
-        run: |
-          git fetch origin main
-          git show origin/main:.github/workflows/ci.yml > .github/workflows/ci.yml
-
-      - name: Regenerate source integrity inventory
+      - name: Verify FINAL source integrity
         run: |
           python3 -B - <<'PY'
           import hashlib
+          import re
           import subprocess
           from pathlib import Path
 
-          tracked = subprocess.check_output(["git", "ls-files"], text=True).splitlines()
-          tracked = [p for p in tracked if p != "SOURCE-SHA256SUMS"]
-          rows = []
-          for path in tracked:
-              rows.append(f"{hashlib.sha256(Path(path).read_bytes()).hexdigest()}  {path}")
-          Path("SOURCE-SHA256SUMS").write_text("\n".join(rows) + "\n", encoding="utf-8")
-          print(f"source inventory regenerated: {len(rows)} files")
+          rows = Path("SOURCE-SHA256SUMS").read_text(encoding="utf-8").splitlines()
+          expected = {}
+
+          for line_no, raw in enumerate(rows, 1):
+              if not raw.strip():
+                  continue
+              match = re.fullmatch(r"([0-9a-f]{64})  (.+)", raw)
+              if match is None:
+                  raise SystemExit(f"invalid SOURCE-SHA256SUMS line {line_no}: {raw!r}")
+              digest, path = match.groups()
+              if path in expected:
+                  raise SystemExit(f"duplicate checksum path: {path}")
+              expected[path] = digest
+
+          tracked = set(
+              subprocess.check_output(
+                  ["git", "ls-files"],
+                  text=True,
+                  encoding="utf-8",
+              ).splitlines()
+          )
+          tracked.discard("SOURCE-SHA256SUMS")
+
+          listed = set(expected)
+          missing = sorted(tracked - listed)
+          extra = sorted(listed - tracked)
+          problems = []
+          if missing:
+              problems.append(f"checksum inventory missing: {missing}")
+          if extra:
+              problems.append(f"checksum inventory extra: {extra}")
+
+          for path in sorted(tracked):
+              proc = subprocess.Popen(
+                  ["git", "show", f"HEAD:{path}"],
+                  stdout=subprocess.PIPE,
+              )
+              assert proc.stdout is not None
+              digest = hashlib.sha256()
+              while True:
+                  chunk = proc.stdout.read(1024 * 1024)
+                  if not chunk:
+                      break
+                  digest.update(chunk)
+              rc = proc.wait()
+              if rc != 0:
+                  problems.append(f"git show failed for {path}: rc={rc}")
+                  continue
+              actual = digest.hexdigest()
+              wanted = expected.get(path)
+              if actual != wanted:
+                  problems.append(
+                      f"source hash mismatch: {path}: expected={wanted or '<missing>'} actual={actual}"
+                  )
+
+          if problems:
+              print("Source integrity mismatches:")
+              for problem in problems:
+                  print(problem)
+              raise SystemExit(f"source integrity failed: {len(problems)} problem(s)")
+
+          print(f"Git-blob source integrity ok: {len(tracked)} tracked files verified")
           PY
 
-      - name: Commit inventory
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .github/workflows/ci.yml SOURCE-SHA256SUMS
-          git commit -m "ci: refresh inventory after 22-stage test fix"
-          git push origin HEAD:${{ github.head_ref }}
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+
+      - name: Install Chromium for browser UI tests
+        run: python -m playwright install --with-deps chromium
+
+      - name: Check Python syntax
+        run: |
+          python -B -c "from pathlib import Path; files=list(Path('app').rglob('*.py'))+list(Path('engines').rglob('*.py'))+list(Path('tests').rglob('*.py')); [compile(p.read_text(encoding='utf-8'), str(p), 'exec') for p in files]; print(f'syntax ok: {len(files)} files')"
+
+      - name: Check release manifest
+        run: |
+          python -B -c "import json, pathlib; manifest=json.loads(pathlib.Path('release-manifest.json').read_text(encoding='utf-8')); version=pathlib.Path('VERSION').read_text(encoding='utf-8').strip(); assert manifest['version']==version; assert manifest['status']=='STABLE'; assert manifest['rebuild_target']=='0.1.0-022.08'; assert manifest['next_development_line']=='0.1.0-022.09'; assert manifest['channel']=='stable-02208'; assert manifest['build']=='MAIN-02208-STABLE'; assert manifest['rebuild_policy']['awg3'] is True; assert manifest['source_integrity']['mode']=='git-blob-sha256'; assert manifest['safe_update']['preserve_local_assets'] is True; assert manifest['images']['panel']; assert manifest['images']['xray']; print('manifest ok')"
+
+      - name: Run panel tests
+        run: python -m pytest tests
+
+      - name: Build and verify current FULL package
+        run: |
+          command -v zip
+          command -v unzip
+          VERSION="$(tr -d '[:space:]' < VERSION)"
+          OUT="/tmp/SG-Gateway-${VERSION}-FULL.run"
+          bash build-run.sh "$OUT"
+          bash "$OUT" --verify-only
