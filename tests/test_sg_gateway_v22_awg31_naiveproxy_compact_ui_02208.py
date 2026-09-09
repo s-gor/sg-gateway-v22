@@ -40,4 +40,11 @@ def test_compact_protocol_polish_matches_mihomo_rail_and_removes_noise() -> None
     assert 'country_name(awg31_country)' not in AWG31
     assert 'HTTPS proxy · TLS · порт' in NAIVE
     assert 'data-naive-summary-port' in NAIVE
-    assert 'padding-inline: var(--sg-ui-rail-inset, 18px);' in CSS
+    assert 'padding-inline: calc(var(--sg-ui-card-pad, 18px) + var(--sg-ui-rail-inset, 18px));' in CSS
+
+def test_upper_connection_inner_rails_match_compact_protocol_inset() -> None:
+    desktop_inset = 'calc(var(--sg-ui-card-pad, 18px) + var(--sg-ui-rail-inset, 18px))'
+    assert f'body.page-connections .cnv1-engine-xray .sg-ui-rail {{\n  padding-inline: {desktop_inset};' in CSS
+    assert f'body.page-connections .cnv1-engine-xray > .cnv1-endpoint-card {{\n  margin-inline: {desktop_inset};' in CSS
+    assert f'body.page-connections .cnv1-compact-protocols .sg-ui-rail {{\n  padding-inline: {desktop_inset};' in CSS
+

@@ -61,7 +61,11 @@ body.page-connections .cnv1-engine-xray .xps2-panel.sg-ui-section {
 }
 
 body.page-connections .cnv1-engine-xray .sg-ui-rail {
-  padding-inline: var(--sg-ui-rail-inset, 18px);
+  padding-inline: calc(var(--sg-ui-card-pad, 18px) + var(--sg-ui-rail-inset, 18px));
+}
+
+body.page-connections .cnv1-engine-xray > .cnv1-endpoint-card {
+  margin-inline: calc(var(--sg-ui-card-pad, 18px) + var(--sg-ui-rail-inset, 18px));
 }
 
 body.page-connections .cnv1-engine-pair.sg-ui-grid {
@@ -173,6 +177,10 @@ body.page-connections .xps2-naiveproxy-body .cnv1-form-actions {
 
   body.page-connections .cnv1-engine-xray .sg-ui-rail {
     padding-inline: var(--sg-ui-rail-inset, 14px);
+  }
+
+  body.page-connections .cnv1-engine-xray > .cnv1-endpoint-card {
+    margin-inline: var(--sg-ui-rail-inset, 14px);
   }
 }
 
