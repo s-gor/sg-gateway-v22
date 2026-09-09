@@ -64,6 +64,18 @@ body.page-connections .cnv1-engine-xray .sg-ui-rail {
   padding-inline: var(--sg-ui-rail-inset, 18px);
 }
 
+body.page-connections .cnv1-engine-xray > .cnv1-endpoint-card {
+  margin-inline: var(--sg-ui-rail-inset, 18px);
+}
+
+body.page-connections .cnv1-engine-xray :is(.xps2-top-actions, .xps2-actions) {
+  margin-inline: 0;
+}
+
+body.page-connections .cnv1-engine-xray > .cnv1-advanced {
+  margin-inline: var(--sg-ui-rail-inset, 18px);
+}
+
 body.page-connections .cnv1-engine-pair.sg-ui-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--sg-ui-grid-gap, 12px);
@@ -174,5 +186,147 @@ body.page-connections .xps2-naiveproxy-body .cnv1-form-actions {
   body.page-connections .cnv1-engine-xray .sg-ui-rail {
     padding-inline: var(--sg-ui-rail-inset, 14px);
   }
+
+  body.page-connections .cnv1-engine-xray > .cnv1-endpoint-card {
+    margin-inline: var(--sg-ui-rail-inset, 14px);
+  }
+
+
+  body.page-connections .cnv1-engine-xray :is(.xps2-top-actions, .xps2-actions),
+  body.page-connections .cnv1-engine-xray > .cnv1-advanced {
+    margin-inline: var(--sg-ui-rail-inset, 14px);
+  }
 }
 
+
+
+/* AWG31 + NaiveProxy compact protocol block */
+body.page-connections .cnv1-compact-protocols {
+  padding-block: var(--sg-ui-card-pad, 18px);
+  padding-inline: 0;
+  display: grid;
+}
+
+body.page-connections .cnv1-compact-protocols .sg-ui-rail {
+  padding-inline: var(--sg-ui-rail-inset, 18px);
+}
+
+body.page-connections .cnv1-compact-protocol-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sg-ui-grid-gap, 12px);
+}
+
+body.page-connections .cnv1-compact-protocol-card {
+  position: relative;
+  min-width: 0;
+  padding: 14px;
+  display: grid;
+  align-content: start;
+  gap: 12px;
+}
+
+body.page-connections .cnv1-compact-protocol-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+body.page-connections .cnv1-compact-protocol-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+body.page-connections .cnv1-compact-protocol-title h3 { margin: 0 0 2px; }
+body.page-connections .cnv1-compact-protocol-title p { margin: 0; }
+
+body.page-connections .cnv1-compact-protocol-icon {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  font-size: 12px;
+  border: 1px solid var(--sg-ui-border, currentColor);
+}
+
+body.page-connections .cnv1-compact-protocol-endpoint {
+  display: grid;
+  gap: 3px;
+  padding: 10px 0;
+  border-top: 1px solid var(--sg-ui-border, currentColor);
+  border-bottom: 1px solid var(--sg-ui-border, currentColor);
+}
+
+body.page-connections .cnv1-compact-protocol-endpoint > span,
+body.page-connections .cnv1-compact-protocol-controls label > span {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
+body.page-connections .cnv1-compact-protocol-endpoint strong { overflow-wrap: anywhere; }
+
+body.page-connections .cnv1-compact-protocol-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 10px;
+}
+
+body.page-connections .cnv1-compact-protocol-controls label {
+  display: grid;
+  gap: 5px;
+}
+
+body.page-connections .cnv1-compact-protocol-controls input {
+  width: 100%;
+  min-height: var(--sg-ui-control-height, 42px);
+  border-radius: var(--sg-ui-control-radius, 9px);
+}
+
+body.page-connections .cnv1-compact-protocol-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  min-height: 42px;
+}
+
+body.page-connections .cnv1-compact-protocol-actions .xps2-naiveproxy-message { margin-right: auto; }
+
+body.page-connections .cnv1-compact-protocol-port {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  font-size: 11px;
+  opacity: .7;
+}
+
+body.page-connections .cnv1-compact-protocol-warning {
+  margin: -4px 0 0;
+  font-size: 12px;
+}
+
+@media (max-width: 900px) {
+  body.page-connections .cnv1-compact-protocol-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 620px) {
+  body.page-connections .cnv1-compact-protocols .sg-ui-rail { padding-inline: var(--sg-ui-rail-inset, 14px); }
+  body.page-connections .cnv1-compact-protocol-head { flex-direction: column; }
+  body.page-connections .cnv1-compact-protocol-controls { grid-template-columns: minmax(0, 1fr); }
+  body.page-connections .cnv1-compact-protocol-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  body.page-connections .cnv1-compact-protocol-port { position: static; }
+}

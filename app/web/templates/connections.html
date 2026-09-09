@@ -305,41 +305,14 @@
 
   {% include "_xray_xmux_settings.html" %}
 
-  <section class="cnv1-engine-pair sg-ui-grid">
-    <article class="cnv1-engine-card cnv1-engine-awg awgd-shell sg-ljd-card sg-ui-card sg-ui-section">
-      <header class="cnv1-engine-head">
-        <div class="cnv1-engine-title">
-          <div class="cnv1-engine-logo awg"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l2-7 4 14 2-7h6"/></svg></div>
-          <div>
-            <div class="cnv1-card-kicker">UDP VPN · AWG3.1</div>
-            <h2>AmneziaWG 3.1</h2>
-            <p>Один актуальный AWG-профиль с независимым userspace runtime.</p>
-          </div>
-        </div>
-      </header>
+  {% include "_mihomo_panel.html" %}
 
-      <div class="awgd-inner-rail sg-ui-rail">
-        {% include "_awg31_panel.html" %}
-
-        <section id="awg-dns" class="awgd-shared-dns sg-ljd-nested sg-ui-nested">
-          <div class="awgd-shared-dns-copy">
-            <span>НАСТРОЙКА</span>
-            <strong>DNS клиентов AWG3.1</strong>
-            <small>Используется устройствами при активном AWG3.1. Сохранение обновит существующие клиентские конфигурации AWG3.1.</small>
-          </div>
-          <form method="post" action="{{ url_for('update_awg_dns') }}" class="awgd-shared-dns-form">
-            <label><span>DNS</span><input type="text" name="dns" value="{{ awg_dns.dns }}" autocomplete="off" required></label>
-            <button class="button primary" type="submit">Сохранить DNS</button>
-          </form>
-          {% if not awg_dns.consistent %}<p class="awgd-shared-dns-warning">DNS AWG3.1 требует синхронизации. Нажмите «Сохранить DNS».</p>{% endif %}
-        </section>
-      </div>
-    </article>
-
-    {% include "_mihomo_panel.html" %}
+  <section class="cnv1-compact-protocols cnv1-engine-card sg-ljd-card sg-ui-card">
+    <div class="cnv1-compact-protocol-grid sg-ui-rail">
+      {% include "_awg31_panel.html" %}
+      {% include "_naiveproxy_panel.html" %}
+    </div>
   </section>
-
-  {% include "_naiveproxy_panel.html" %}
 
   <section class="cnv1-note-panel sg-ljd-card sg-ui-card">
     <div class="cnv1-note-icon">
