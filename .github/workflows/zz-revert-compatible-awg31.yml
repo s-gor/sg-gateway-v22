@@ -67,7 +67,6 @@ jobs:
           set -euo pipefail
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add app/clients/sg_subscription.py tests/test_sg_gateway_v22_sg_subscription_base64_body.py SOURCE-SHA256SUMS
-          git add -u tests/test_sg_gateway_v22_compatible_subscription_exact9.py .github/workflows/zz-revert-compatible-awg31.yml
+          git add -A
           git commit -m "revert: remove AWG31 from simple compatible subscription"
           git push origin HEAD:feature/02208-compatible-subscription-awg31-from-good-snapshot
