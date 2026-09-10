@@ -86,6 +86,14 @@
   gap: 10px;
 }
 
+/* Internal service hostnames are implementation details, not server identity. */
+.sg-brand-note,
+.sg-server-meta > span:last-child,
+.sg-current-value > span,
+.cv2-server-cell small {
+  display: none !important;
+}
+
 @media (max-width: 760px) {
   .sg-ui-page-head,
   .sg-ui-section-head {
