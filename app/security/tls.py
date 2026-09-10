@@ -293,7 +293,7 @@ def overview() -> dict:
         and _safe_is_file(nginx_conf)
         and nginx_active
     )
-    dns = request.get("dns") or (check_domain(domain) if domain else None)
+    dns = request.get("dns") or state.get("dns") or None
     port_suffix = "" if public_port == 443 else f":{public_port}"
     return {
         "domain": domain,
