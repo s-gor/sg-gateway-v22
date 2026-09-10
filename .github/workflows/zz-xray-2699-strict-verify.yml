@@ -160,7 +160,9 @@ jobs:
           git status --porcelain
           python - <<'PY'
           import subprocess
-          expected = {
+          from pathlib import Path
+
+          expected_tracked = {
               'app/routing/runtime.py',
               'app/web/templates/_xray_xmux_settings.html',
               'install.sh',
@@ -168,14 +170,17 @@ jobs:
               'tests/test_fix30_routing_ip_family.py',
               'tests/test_preview31_xray_updates.py',
               'tests/test_sg_gateway_02208_xmux_xray26728.py',
-              'tests/test_sg_gateway_02208_xmux_xray2699.py',
           }
           tracked = set(subprocess.check_output(['git','diff','--name-only','HEAD'], text=True).splitlines())
-          untracked = set(subprocess.check_output(['git','ls-files','--others','--exclude-standard'], text=True).splitlines())
-          untracked = {p for p in untracked if not p.startswith('baseline-compare/')}
-          changed = tracked | untracked
-          if changed != expected:
-              raise SystemExit(f'unexpected changed files: symmetric_diff={sorted(changed ^ expected)} actual={sorted(changed)}')
+          if tracked != expected_tracked:
+              raise SystemExit(f'unexpected tracked changes: symmetric_diff={sorted(tracked ^ expected_tracked)} actual={sorted(tracked)}')
+
+          new_test = Path('tests/test_sg_gateway_02208_xmux_xray2699.py')
+          if not new_test.is_file():
+              raise SystemExit('renamed Xray 26.9.9 contract test is missing')
+          listed = subprocess.check_output(['git','ls-files','--others','--exclude-standard','--',str(new_test)], text=True).splitlines()
+          if listed != [str(new_test)]:
+              raise SystemExit(f'expected renamed Xray test to be the intended untracked product file, got {listed!r}')
           PY
 
       - name: Refresh SOURCE-SHA256SUMS for final product tree
