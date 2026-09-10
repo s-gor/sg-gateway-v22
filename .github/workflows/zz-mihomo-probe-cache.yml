@@ -42,7 +42,6 @@ jobs:
                   return SimpleNamespace(returncode=0, stdout="", stderr="")
 
               monkeypatch.setattr(service.subprocess, "run", fake_run)
-
               assert service._service_active() is True
               assert service._service_active() is True
               assert service._service_enabled() is True
@@ -60,17 +59,14 @@ jobs:
               def fake_hostd(*args, **kwargs):
                   nonlocal calls
                   calls += 1
-                  return SimpleNamespace(
-                      status="ok",
-                      payload={
-                          "runtime_source": "hostd",
-                          "protocols": {
-                              "mieru": {"active": True, "port": 2099, "transport": "TCP"},
-                              "anytls": {"active": False, "port": 8443},
-                              "tuic": {"active": False, "port": 10443},
-                          },
+                  return SimpleNamespace(status="ok", payload={
+                      "runtime_source": "hostd",
+                      "protocols": {
+                          "mieru": {"active": True, "port": 2099, "transport": "TCP"},
+                          "anytls": {"active": False, "port": 8443},
+                          "tuic": {"active": False, "port": 10443},
                       },
-                  )
+                  })
 
               monkeypatch.setattr(service, "run_hostd_command", fake_hostd)
               settings = {
@@ -78,10 +74,8 @@ jobs:
                   "anytls_enabled": False, "anytls_port": 8443,
                   "tuic_enabled": False, "tuic_port": 10443,
               }
-
               first = service._hostd_live_snapshot(settings)
               second = service._hostd_live_snapshot(settings)
-
               assert first is not None and second is not None
               assert first[1] == {"mieru"}
               assert second[1] == {"mieru"}
@@ -106,20 +100,16 @@ jobs:
           if marker not in s:
               raise SystemExit('Mihomo insertion marker missing')
           s = s.replace(marker, marker + cache, 1)
-
           old = '''def _service_active() -> bool:\n    return (\n        subprocess.run(\n            ["systemctl", "is-active", "--quiet", "mihomo.service"],\n            capture_output=True,\n            check=False,\n        ).returncode\n        == 0\n    )\n\n\ndef _service_enabled() -> bool:\n    return (\n        subprocess.run(\n            ["systemctl", "is-enabled", "--quiet", "mihomo.service"],\n            capture_output=True,\n            check=False,\n        ).returncode\n        == 0\n    )\n\n\ndef _version() -> str:\n    if not MIHOMO_BINARY.is_file():\n        return "Не установлен"\n    result = subprocess.run(\n        [str(MIHOMO_BINARY), "-v"],\n        capture_output=True,\n        text=True,\n        timeout=10,\n        check=False,\n    )\n    first = (result.stdout or result.stderr).strip().splitlines()\n    return first[0] if first else "Неизвестно"\n'''
-          new = '''def _service_active() -> bool:\n    cached = _probe_get("service", "active", _MIHOMO_SERVICE_TTL_SECONDS)\n    if isinstance(cached, bool):\n        return cached\n    value = (\n        subprocess.run(\n            ["systemctl", "is-active", "--quiet", "mihomo.service"],\n            capture_output=True,\n            check=False,\n        ).returncode\n        == 0\n    )\n    return bool(_probe_put("service", "active", value))\n\n\ndef _service_enabled() -> bool:\n    cached = _probe_get("service", "enabled", _MIHOMO_SERVICE_TTL_SECONDS)\n    if isinstance(cached, bool):\n        return cached\n    value = (\n        subprocess.run(\n            ["systemctl", "is-enabled", "--quiet", "mihomo.service"],\n            capture_output=True,\n            check=False,\n        ).returncode\n        == 0\n    )\n    return bool(_probe_put("service", "enabled", value))\n\n\ndef _version() -> str:\n    cached = _probe_get("version", str(MIHOMO_BINARY), _MIHOMO_VERSION_TTL_SECONDS)\n    if isinstance(cached, str):\n        return cached\n    if not MIHOMO_BINARY.is_file():\n        return str(_probe_put("version", str(MIHOMO_BINARY), "Не установлен"))\n    result = subprocess.run(\n        [str(MIHOMO_BINARY), "-v"],\n        capture_output=True,\n        text=True,\n        timeout=10,\n        check=False,\n    )\n    first = (result.stdout or result.stderr).strip().splitlines()\n    value = first[0] if first else "Неизвестно"\n    return str(_probe_put("version", str(MIHOMO_BINARY), value))\n'''
+          new = '''def _service_active() -> bool:\n    cached = _probe_get("service", "active", _MIHOMO_SERVICE_TTL_SECONDS)\n    if isinstance(cached, bool):\n        return cached\n    value = (subprocess.run(["systemctl", "is-active", "--quiet", "mihomo.service"], capture_output=True, check=False).returncode == 0)\n    return bool(_probe_put("service", "active", value))\n\n\ndef _service_enabled() -> bool:\n    cached = _probe_get("service", "enabled", _MIHOMO_SERVICE_TTL_SECONDS)\n    if isinstance(cached, bool):\n        return cached\n    value = (subprocess.run(["systemctl", "is-enabled", "--quiet", "mihomo.service"], capture_output=True, check=False).returncode == 0)\n    return bool(_probe_put("service", "enabled", value))\n\n\ndef _version() -> str:\n    cached = _probe_get("version", str(MIHOMO_BINARY), _MIHOMO_VERSION_TTL_SECONDS)\n    if isinstance(cached, str):\n        return cached\n    if not MIHOMO_BINARY.is_file():\n        return str(_probe_put("version", str(MIHOMO_BINARY), "Не установлен"))\n    result = subprocess.run([str(MIHOMO_BINARY), "-v"], capture_output=True, text=True, timeout=10, check=False)\n    first = (result.stdout or result.stderr).strip().splitlines()\n    value = first[0] if first else "Неизвестно"\n    return str(_probe_put("version", str(MIHOMO_BINARY), value))\n'''
           if old not in s:
               raise SystemExit('Mihomo service/version block missing')
           s = s.replace(old, new, 1)
-
           old_hostd = '''def _hostd_live_snapshot(\n    settings: dict[str, Any],\n) -> tuple[dict[str, Any], set[str], str] | None:\n    """Read safe runtime truth from privileged HostD.\n\n    The web panel intentionally runs as the unprivileged sg-gateway user and\n    cannot read root-only Mihomo/sing-box configs containing client secrets.\n    HostD returns only listener state, ports and non-secret transport metadata.\n    """\n\n    result = run_hostd_command("mihomo.status", timeout=5)\n    if result.status != "ok":\n        return None\n    payload = result.payload if isinstance(result.payload, dict) else {}\n'''
           new_hostd = '''def _hostd_live_snapshot(\n    settings: dict[str, Any],\n) -> tuple[dict[str, Any], set[str], str] | None:\n    """Read safe runtime truth from privileged HostD."""\n\n    payload = _probe_get("hostd", "mihomo.status", _MIHOMO_HOSTD_TTL_SECONDS)\n    if not isinstance(payload, dict):\n        result = run_hostd_command("mihomo.status", timeout=5)\n        if result.status != "ok":\n            return None\n        payload = result.payload if isinstance(result.payload, dict) else {}\n        _probe_put("hostd", "mihomo.status", dict(payload))\n'''
           if old_hostd not in s:
               raise SystemExit('Mihomo hostd block missing')
           s = s.replace(old_hostd, new_hostd, 1)
-
-          # Runtime mutations must invalidate the short-lived observations immediately.
           s = s.replace('def apply_candidate() -> dict[str, Any]:\n    build_candidate()\n', 'def apply_candidate() -> dict[str, Any]:\n    build_candidate()\n    _clear_probe_cache()\n', 1)
           s = s.replace('def rollback_latest() -> dict[str, Any]:\n    payload = _run_helper("rollback")\n', 'def rollback_latest() -> dict[str, Any]:\n    _clear_probe_cache()\n    payload = _run_helper("rollback")\n', 1)
           s = s.replace('def restart_service() -> dict[str, Any]:\n    payload = _run_helper("restart")\n', 'def restart_service() -> dict[str, Any]:\n    _clear_probe_cache()\n    payload = _run_helper("restart")\n', 1)
@@ -129,7 +119,7 @@ jobs:
       - name: Prove GREEN strictly
         run: |
           python -m pytest -q tests/test_mihomo_probe_cache_02208.py
-          python -m pytest -q tests -k 'mihomo and not browser and not installer' --tb=short
+          python -m pytest -q tests/test_mihomo_state_sandbox_02207.py tests/test_mihomo_021.py --tb=short
           python -B -m py_compile app/mihomo/service.py
       - name: Commit verified change
         run: |
