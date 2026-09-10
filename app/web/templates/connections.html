@@ -15,7 +15,7 @@
 {% set xray_ready = xray_key_ready and xray_short_ready %}
 {% set awg31_country = connections[0].country_code if connections else 'unknown' %}
 {% set xray_country = connections[1].country_code if connections | length > 1 else 'unknown' %}
-{% set awg31_public_host = connections[0].public_host if connections else 'awg31.internal' %}
+{% set awg31_public_host = connections[0].public_host if connections else '' %}
 {% set xray_public_host = connections[1].public_host if connections | length > 1 else xray_settings.host %}
 {% set mihomo_public_host = connections[2].public_host if connections | length > 2 else mihomo.settings.host %}
 
