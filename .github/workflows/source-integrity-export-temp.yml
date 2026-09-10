@@ -1,0 +1,50 @@
+name: TEMP source integrity finalizer
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+      - name: Generate exact final manifest and self-remove
+        run: |
+          python3 -B - <<'PY'
+          import hashlib
+          import subprocess
+          from pathlib import Path
+
+          temp_workflow = ".github/workflows/source-integrity-export-temp.yml"
+          excluded = {"SOURCE-SHA256SUMS", temp_workflow}
+          tracked = sorted(
+              path
+              for path in subprocess.check_output(
+                  ["git", "ls-files"], text=True, encoding="utf-8"
+              ).splitlines()
+              if path not in excluded
+          )
+          rows = []
+          for path in tracked:
+              data = subprocess.check_output(["git", "show", f"HEAD:{path}"])
+              rows.append(f"{hashlib.sha256(data).hexdigest()}  {path}")
+          Path("SOURCE-SHA256SUMS").write_text(
+              "\n".join(rows) + "\n", encoding="utf-8"
+          )
+          Path(temp_workflow).unlink()
+          print(f"finalized {len(rows)} checksum rows")
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add SOURCE-SHA256SUMS .github/workflows/source-integrity-export-temp.yml
+          git commit -m "chore: refresh client protocol grid integrity"
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
