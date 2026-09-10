@@ -3,7 +3,6 @@
 
 {% block head %}
   {{ super() }}
-  <script src="{{ static_asset('sg-awg-only-notice-v1.js') }}" defer></script>
 {% endblock %}
 
 {% block page_styles %}
@@ -11,7 +10,6 @@
   <link rel="stylesheet" href="{{ static_asset('sg-clients-runtime-v10.css') }}">
   <link rel="stylesheet" href="{{ static_asset('sg-preview35-clients.css') }}">
   <link rel="stylesheet" href="{{ static_asset('sg-clients-readable-small-v1.css') }}">
-  <link rel="stylesheet" href="{{ static_asset('sg-awg-only-notice-v1.css') }}">
   <link rel="stylesheet" href="{{ static_asset('sg-device-collapse-v4.css') }}">
   <link rel="stylesheet" href="{{ static_asset('sg-device-expanded-cleanup-v1.css') }}">
   <link rel="stylesheet" href="{{ static_asset('sg-ui-clients-v22-08.css') }}">
@@ -181,11 +179,9 @@
       {% endfor %}
       <label class="cv10-protocol {{ 'is-locked' if not tls.https_ready else '' }}"><input type="checkbox" name="protocols" value="anytls" {% if not tls.https_ready %}disabled{% endif %}><span><strong>AnyTLS</strong><small>{{ 'Отдельный TLS-профиль и QR' if tls.https_ready else 'Требуется HTTPS' }}</small></span></label>
       <label class="cv10-protocol {{ 'is-locked' if not tls.https_ready else '' }}"><input type="checkbox" name="protocols" value="tuic" {% if not tls.https_ready %}disabled{% endif %}><span><strong>TUIC v5</strong><small>{{ 'Отдельный QUIC/UDP-профиль и QR' if tls.https_ready else 'Требуется HTTPS' }}</small></span></label>
+      <label class="cv10-protocol {{ 'is-locked' if not tls.https_ready else '' }}"><input type="checkbox" name="protocols" value="naiveproxy" {% if not tls.https_ready %}disabled{% endif %}><span><strong>NaiveProxy</strong><small>{{ 'HTTPS-прокси · отдельная ссылка' if tls.https_ready else 'Требуется HTTPS' }}</small></span></label>
       <!-- SG_PROTOCOL_ORDER_END -->
     </fieldset>
-    <!-- SG_AWG_ONLY_NOTICE_V1_CREATE_CLIENT -->
-    <div class="sg-awg-only-note" data-awg-only-note role="status" aria-live="polite">При выборе только AWG-профилей подписка не создаётся. Используйте QR-коды или файлы конфигурации для каждого соединения.</div>
-
     <label><span>Срок действия</span><input type="date" name="expires_at"><small>Пустое поле означает бессрочный доступ.</small></label>
     <div class="cv2-dialog-actions"><button class="button" type="button" data-close-client-form>Отмена</button><button class="button primary" type="submit">Создать и применить</button></div>
   </form>

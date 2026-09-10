@@ -24,6 +24,7 @@ _PROFILE_SPECS = (
     ("mieru", "mihomo", "mieru", "Mieru", "mieru", "uri"),
     ("anytls", "anytls", "anytls", "AnyTLS", "anytls", "uri"),
     ("tuic", "tuic", "tuic", "TUIC v5", "tuic", "uri"),
+    ("naiveproxy", "naiveproxy", "naiveproxy", "NaiveProxy", "naiveproxy", "uri"),
 )
 
 _COMPATIBLE_PROFILE_IDS = (
