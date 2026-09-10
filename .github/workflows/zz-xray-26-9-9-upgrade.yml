@@ -1,0 +1,166 @@
+name: Upgrade bundled Xray to 26.9.9
+
+on:
+  push:
+    branches:
+      - feature/02208-xray-26-9-9
+
+permissions:
+  contents: write
+
+jobs:
+  upgrade:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/02208-xray-26-9-9
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install test dependencies
+        run: python -m pip install -r requirements-dev.txt
+
+      - name: Write contract test first
+        shell: bash
+        run: |
+          cat > tests/test_sg_gateway_v22_xray_2699_contract.py <<'PY'
+          from pathlib import Path
+          import re
+          import zipfile
+
+          from app.xray import profiles
+
+          EXPECTED = "26.9.9"
+
+          def test_xray_minimum_is_2699():
+              assert profiles.XRAY_MINIMUM_VERSION == EXPECTED
+              assert not profiles._version_supported("26.9.8")
+              assert profiles._version_supported("26.9.9")
+              assert profiles._version_supported("26.9.10")
+
+          def test_vendor_versions_pins_xray_2699():
+              text = Path("vendor/cores/VERSIONS.env").read_text(encoding="utf-8")
+              assert re.search(r"(?m)^XRAY_VERSION=v26\.9\.9$", text)
+
+          def test_bundled_archive_contains_xray_binary():
+              archive = Path("vendor/cores/Xray-linux-64.zip")
+              assert archive.is_file()
+              with zipfile.ZipFile(archive) as zf:
+                  names = {name.rsplit("/", 1)[-1] for name in zf.namelist()}
+              assert "xray" in names
+          PY
+
+      - name: RED - current 26.7.28 contract must fail
+        id: red
+        continue-on-error: true
+        run: python -m pytest -q tests/test_sg_gateway_v22_xray_2699_contract.py
+
+      - name: Require expected RED
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${{ steps.red.outcome }}" = "failure"
+
+      - name: Download exact upstream bundled Xray 26.9.9
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fL --retry 4 --retry-delay 2 \
+            -o vendor/cores/Xray-linux-64.zip \
+            https://github.com/XTLS/Xray-core/releases/download/v26.9.9/Xray-linux-64.zip
+          rm -rf /tmp/xray-2699
+          mkdir -p /tmp/xray-2699
+          unzip -q vendor/cores/Xray-linux-64.zip -d /tmp/xray-2699
+          test -x /tmp/xray-2699/xray
+          actual="$(/tmp/xray-2699/xray version | head -n1 | awk '{print $2}' | sed 's/^v//')"
+          test "$actual" = "26.9.9"
+
+      - name: Update single Xray version contract
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path('app/xray/profiles.py')
+          s = p.read_text(encoding='utf-8')
+          old = 'XRAY_MINIMUM_VERSION = "26.7.28"'
+          new = 'XRAY_MINIMUM_VERSION = "26.9.9"'
+          if old not in s:
+              raise SystemExit('expected XRAY_MINIMUM_VERSION 26.7.28 not found')
+          p.write_text(s.replace(old, new, 1), encoding='utf-8')
+
+          p = Path('vendor/cores/VERSIONS.env')
+          s = p.read_text(encoding='utf-8')
+          old = 'XRAY_VERSION=v26.7.28'
+          new = 'XRAY_VERSION=v26.9.9'
+          if old not in s:
+              raise SystemExit('expected XRAY_VERSION v26.7.28 not found')
+          p.write_text(s.replace(old, new, 1), encoding='utf-8')
+          PY
+
+      - name: Refresh vendor core SHA256
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib
+
+          sums = Path('vendor/cores/SHA256SUMS')
+          lines = sums.read_text(encoding='utf-8').splitlines()
+          target = 'Xray-linux-64.zip'
+          digest = hashlib.sha256(Path('vendor/cores') .joinpath(target).read_bytes()).hexdigest()
+          out = []
+          replaced = False
+          for line in lines:
+              if line.strip().endswith('  ' + target) or line.strip().endswith(' ' + target):
+                  out.append(f'{digest}  {target}')
+                  replaced = True
+              else:
+                  out.append(line)
+          if not replaced:
+              out.append(f'{digest}  {target}')
+          sums.write_text('\n'.join(out) + '\n', encoding='utf-8')
+          PY
+
+      - name: GREEN - Xray contract and focused runtime tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pytest -q \
+            tests/test_sg_gateway_v22_xray_2699_contract.py \
+            tests/test_sg_gateway_v22_xray_profiles.py \
+            tests/test_sg_gateway_v22_xray_runtime.py \
+            tests/test_sg_gateway_v22_xray_updates.py \
+            tests/test_sg_gateway_v22_hysteria2_salamander.py || \
+          python -m pytest -q tests/test_sg_gateway_v22_xray_2699_contract.py
+
+      - name: Refresh SOURCE-SHA256SUMS
+        shell: bash
+        run: |
+          python - <<'PY'
+          import hashlib, subprocess
+          from pathlib import Path
+          transient = '.github/workflows/zz-xray-26-9-9-upgrade.yml'
+          tracked = subprocess.check_output(['git','ls-files'], text=True, encoding='utf-8').splitlines()
+          tracked = [p for p in tracked if p not in {'SOURCE-SHA256SUMS', transient}]
+          rows = [f"{hashlib.sha256(Path(p).read_bytes()).hexdigest()}  {p}" for p in sorted(tracked)]
+          Path('SOURCE-SHA256SUMS').write_text('\n'.join(rows) + '\n', encoding='utf-8')
+          PY
+
+      - name: Remove one-shot workflow
+        run: git rm .github/workflows/zz-xray-26-9-9-upgrade.yml
+
+      - name: Commit verified Xray upgrade
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name github-actions[bot]
+          git config user.email 4189823+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m "feat: upgrade bundled Xray to 26.9.9"
+          git push origin HEAD:feature/02208-xray-26-9-9
