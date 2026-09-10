@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from flask import jsonify, request
 
 from app.connections.settings import get_connection_settings, update_connection_settings
@@ -7,6 +9,14 @@ from app.hostd.client import run_hostd_command
 from app.naiveproxy.integration import _restore_connection_settings, reserved_ports
 from app.naiveproxy.runtime import DEFAULT_PORT, NaiveProxyError, validate_port
 from app.security.tls import overview as tls_overview
+
+
+_PROTOCOL_PICKER_RE = re.compile(
+    r'(?P<open><fieldset\b[^>]*class="[^"]*(?:cv10-protocols|dv16-protocol-list)[^"]*"[^>]*>)'
+    r'(?P<body>.*?)'
+    r'(?P<close></fieldset>)',
+    re.DOTALL,
+)
 
 
 def register_naiveproxy_http(app) -> None:
@@ -111,23 +121,39 @@ def _inject_naiveproxy_protocol_option(response):
         return response
 
     body = response.get_data(as_text=True)
-    marker = "<!-- SG_PROTOCOL_ORDER_END -->"
-    if marker in body and 'value="naiveproxy"' not in body:
-        tls = tls_overview()
-        ready = bool(tls.get("https_ready"))
-        disabled = "" if ready else " disabled"
-        locked = "" if ready else " is-locked"
-        note = (
-            "HTTPS-прокси · отдельная ссылка"
-            if ready
-            else "Требуется HTTPS в Security"
+    if 'name="protocols"' not in body:
+        return response
+
+    tls = tls_overview()
+    ready = bool(tls.get("https_ready"))
+    disabled = "" if ready else " disabled"
+    locked = "" if ready else " is-locked"
+    note = (
+        "HTTPS-прокси · отдельная ссылка"
+        if ready
+        else "Требуется HTTPS в Security"
+    )
+
+    def inject_into_picker(match: re.Match[str]) -> str:
+        opening = match.group("open")
+        picker_body = match.group("body")
+        if 'value="naiveproxy"' in picker_body:
+            return match.group(0)
+
+        card_class = (
+            "dv16-protocol"
+            if "dv16-protocol-list" in opening
+            else "cv10-protocol"
         )
         option = (
-            f'<label class="cv10-protocol{locked}">'
+            f'\n        <label class="{card_class}{locked}">'
             f'<input type="checkbox" name="protocols" value="naiveproxy"{disabled}>'
-            f'<span><strong>NaiveProxy</strong><small>{note}</small></span></label>\n      '
+            f'<span><strong>NaiveProxy</strong><small>{note}</small></span></label>'
         )
-        body = body.replace(marker, option + marker, 1)
-        response.set_data(body)
+        return f'{opening}{picker_body}{option}\n      {match.group("close")}'
+
+    updated = _PROTOCOL_PICKER_RE.sub(inject_into_picker, body)
+    if updated != body:
+        response.set_data(updated)
 
     return response
