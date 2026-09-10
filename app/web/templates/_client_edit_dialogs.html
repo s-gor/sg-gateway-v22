@@ -46,6 +46,8 @@
       <label class="dv16-protocol {{ 'is-locked' if not tls.https_ready and not anytls_selected else '' }}"><input type="checkbox" name="protocols" value="anytls" {% if anytls_selected %}checked{% endif %} {% if not tls.https_ready and not anytls_selected %}disabled{% endif %}><span><strong>AnyTLS</strong><small>{{ 'Подключён — пароль сохранится' if anytls_selected else ('Доступен' if tls.https_ready else 'Нужен HTTPS') }}</small></span></label>
       {% set tuic_selected = 'tuic' in primary_tokens %}
       <label class="dv16-protocol {{ 'is-locked' if not tls.https_ready and not tuic_selected else '' }}"><input type="checkbox" name="protocols" value="tuic" {% if tuic_selected %}checked{% endif %} {% if not tls.https_ready and not tuic_selected %}disabled{% endif %}><span><strong>TUIC v5</strong><small>{{ 'Подключён — реквизиты сохранятся' if tuic_selected else ('Доступен' if tls.https_ready else 'Нужен HTTPS') }}</small></span></label>
+      {% set naive_selected = 'naiveproxy' in primary_tokens %}
+      <label class="dv16-protocol {{ 'is-locked' if not tls.https_ready and not naive_selected else '' }}"><input type="checkbox" name="protocols" value="naiveproxy" {% if naive_selected %}checked{% endif %} {% if not tls.https_ready and not naive_selected %}disabled{% endif %}><span><strong>NaiveProxy</strong><small>{{ 'Подключён — реквизиты сохранятся' if naive_selected else ('Доступен' if tls.https_ready else 'Нужен HTTPS') }}</small></span></label>
       <!-- SG_PROTOCOL_ORDER_END -->
     </fieldset>
     <!-- SG_AWG_ONLY_NOTICE_V1_EDIT_CLIENT -->
@@ -99,6 +101,8 @@
       <label class="dv16-protocol {{ 'is-locked' if not tls.https_ready and not anytls_selected else '' }}"><input type="checkbox" name="protocols" value="anytls" {% if anytls_selected %}checked{% endif %} {% if not tls.https_ready and not anytls_selected %}disabled{% endif %}><span><strong>AnyTLS</strong><small>{{ 'Подключён — пароль сохранится' if anytls_selected else ('Доступен' if tls.https_ready else 'Нужен HTTPS') }}</small></span></label>
       {% set tuic_selected = 'tuic' in selected_tokens %}
       <label class="dv16-protocol {{ 'is-locked' if not tls.https_ready and not tuic_selected else '' }}"><input type="checkbox" name="protocols" value="tuic" {% if tuic_selected %}checked{% endif %} {% if not tls.https_ready and not tuic_selected %}disabled{% endif %}><span><strong>TUIC v5</strong><small>{{ 'Подключён — реквизиты сохранятся' if tuic_selected else ('Доступен' if tls.https_ready else 'Нужен HTTPS') }}</small></span></label>
+      {% set device_naive_selected = 'naiveproxy' in selected_tokens %}
+      <label class="dv16-protocol {{ 'is-locked' if not tls.https_ready and not device_naive_selected else '' }}"><input type="checkbox" name="protocols" value="naiveproxy" {% if device_naive_selected %}checked{% endif %} {% if not tls.https_ready and not device_naive_selected %}disabled{% endif %}><span><strong>NaiveProxy</strong><small>{{ 'Подключён — реквизиты сохранятся' if device_naive_selected else ('Доступен' if tls.https_ready else 'Нужен HTTPS') }}</small></span></label>
       <!-- SG_PROTOCOL_ORDER_END -->
     </fieldset>
     <!-- SG_AWG_ONLY_NOTICE_V1_EDIT_DEVICE -->
@@ -119,7 +123,7 @@
   clientDialog?.addEventListener('click', event => { if (event.target === clientDialog) clientDialog.close(); });
 
   document.querySelectorAll('[data-open-device-edit]').forEach(button => {
-    button.addEventListener('click', () => document.getElementById(`dv-edit-device-${button.dataset.openDeviceEdit}`)?.showModal());
+    button.addEventListener('click', () => document.getElementById(`dv-edit-device-${button.dataset.openDeviceEdit}`)?.showModal()));
   });
   document.querySelectorAll('[data-close-device-edit]').forEach(button => {
     button.addEventListener('click', () => document.getElementById(`dv-edit-device-${button.dataset.closeDeviceEdit}`)?.close());
@@ -138,6 +142,7 @@
     'xray_hysteria2',
     'anytls',
     'tuic',
+    'naiveproxy',
   ];
   const addDeviceProtocolList = document.querySelector('#dv46-device-dialog .dv16-protocol-list');
   if (addDeviceProtocolList) {
