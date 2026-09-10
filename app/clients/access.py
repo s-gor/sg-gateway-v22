@@ -117,6 +117,8 @@ def _error_card(
 def build_access_cards(
     client: Client,
     device: Device | None = None,
+    *,
+    xray_state: dict | None = None,
 ) -> list[AccessCard]:
     deployments = _deployment_map(client, device)
     cards: list[AccessCard] = []
@@ -244,7 +246,7 @@ def build_access_cards(
             ),
         }
         try:
-            state = xray_profiles_overview()
+            state = xray_state if xray_state is not None else xray_profiles_overview()
             profiles = {item.id: item for item in state["profiles"]}
         except Exception as exc:
             for profile_id in selected:
@@ -275,8 +277,8 @@ def build_access_cards(
                 ready = bool(profile.enabled and profile.ready)
                 status = _status(client, device, xray, ready=ready)
                 payload = (
-                    build_xray_profile_link(client, profile_id, device).body
-                    if status == "applied" and protocol_ready(client, kind, device)
+                    build_xray_profile_link(client, profile_id, device, xray_state=state).body
+                    if status == "applied" and protocol_ready(client, kind, device, xray_state=state)
                     else ""
                 )
                 export_url, qr_url = _urls(client, device, kind)

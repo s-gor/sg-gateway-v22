@@ -1191,10 +1191,11 @@ def create_app() -> Flask:
         if client is None:
             abort(404)
         devices = list_devices(client_id)
+        xray_state = xray_profiles_overview()
         device_views = [
             {
                 "device": device,
-                "access_cards": build_access_cards(client, device),
+                "access_cards": build_access_cards(client, device, xray_state=xray_state),
                 "protocol_tokens": device_access_tokens(device.id),
             }
             for device in devices
@@ -1210,7 +1211,7 @@ def create_app() -> Flask:
             devices=devices,
             device_views=device_views,
             primary_view=primary_view,
-            xray_profiles=xray_profiles_overview(),
+            xray_profiles=xray_state,
             tls=security_tls_overview(),
         )
 
