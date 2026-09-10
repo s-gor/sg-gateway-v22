@@ -32,7 +32,6 @@ _COMPATIBLE_PROFILE_IDS = (
     "xray_xhttp_reality",
     "xray_xhttp_tls",
     "xray_hysteria2",
-    "amneziawg31",
     "mieru",
     "anytls",
     "tuic",
@@ -265,27 +264,11 @@ def _ready_uri_lines(document: dict) -> list[str]:
     return lines
 
 
-def _ready_awg31_config_lines(document: dict) -> list[str]:
-    client_name = str((document.get("client") or {}).get("name") or "SG")
-    lines: list[str] = []
-    for device in document.get("devices", []):
-        for profile in device.get("profiles", []):
-            if (
-                not profile.get("ready")
-                or profile.get("id") != "amneziawg31"
-                or profile.get("format") != "config"
-                or not profile.get("config")
-            ):
-                continue
-            lines.append(_config_marker(profile, device, client_name))
-    return lines
-
 
 def build_compatible_subscription_body(client: Client) -> str:
-    """Return the exact nine-profile SG Client-compatible Base64 transport."""
+    """Return the URI-only compatible Base64 subscription transport."""
     document = build_sg_subscription_document(client)
     lines = _ready_uri_lines(document)
-    lines.extend(_ready_awg31_config_lines(document))
     decoded = "\n".join(lines)
     if decoded:
         decoded += "\n"
