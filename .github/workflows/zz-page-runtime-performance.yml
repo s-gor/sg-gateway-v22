@@ -1,0 +1,169 @@
+name: Temporary Page Runtime Performance Verifier
+
+on:
+  push:
+    branches:
+      - feature/02208-performance-clients
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact branch
+        uses: actions/checkout@v4
+        with:
+          ref: feature/02208-performance-clients
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+
+      - name: Write RED page-runtime contracts
+        run: |
+          cat > tests/test_page_runtime_performance_02208.py <<'PY'
+          from __future__ import annotations
+
+          import json
+
+
+          def test_tls_overview_never_performs_implicit_network_dns_check(tmp_path, monkeypatch):
+              from app.security import tls
+
+              state_dir = tmp_path / "security"
+              state_dir.mkdir()
+              (state_dir / "tls-state.json").write_text(
+                  json.dumps(
+                      {
+                          "domain": "vpn.example.com",
+                          "https_ready": True,
+                          "certificate": {"days_left": 30},
+                          "public_port": 443,
+                      }
+                  ),
+                  encoding="utf-8",
+              )
+              monkeypatch.setattr(tls, "_state_dir", lambda: state_dir)
+              monkeypatch.setattr(tls, "_service_active", lambda name: False)
+              monkeypatch.setattr(tls, "_service_enabled", lambda name: False)
+              monkeypatch.setattr(tls, "_safe_is_file", lambda path: False)
+
+              def forbidden_network_check(domain):
+                  raise AssertionError(f"implicit DNS/network check for {domain}")
+
+              monkeypatch.setattr(tls, "check_domain", forbidden_network_check)
+
+              result = tls.overview()
+
+              assert result["domain"] == "vpn.example.com"
+              assert result["dns"] is None
+
+
+          def test_health_summary_reuses_recent_expensive_scan(monkeypatch):
+              from app.maintenance import health
+
+              calls = 0
+
+              def fake_checks():
+                  nonlocal calls
+                  calls += 1
+                  return [health.HealthCheck("test", "ok", "ok")]
+
+              monkeypatch.setattr(health, "collect_health_checks", fake_checks)
+              health._HEALTH_SUMMARY_CACHE["updated_at"] = 0.0
+              health._HEALTH_SUMMARY_CACHE["value"] = None
+
+              assert health.health_summary() == "ok"
+              assert health.health_summary() == "ok"
+              assert calls == 1
+          PY
+
+      - name: Prove RED on inherited runtime behavior
+        run: |
+          set +e
+          python -m pytest -q tests/test_page_runtime_performance_02208.py
+          rc=$?
+          set -e
+          if [ "$rc" -eq 0 ]; then
+            echo "Expected inherited page runtime behavior to fail at least one performance contract"
+            exit 1
+          fi
+          echo "RED confirmed: ordinary page state still performs repeated expensive work"
+
+      - name: Remove implicit TLS network check and cache health summary
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          tls_path = Path("app/security/tls.py")
+          tls_text = tls_path.read_text(encoding="utf-8")
+          old_tls = '    dns = request.get("dns") or (check_domain(domain) if domain else None)\n'
+          new_tls = '    dns = request.get("dns") or state.get("dns") or None\n'
+          if old_tls not in tls_text:
+              raise SystemExit("expected TLS overview DNS line not found")
+          tls_path.write_text(tls_text.replace(old_tls, new_tls, 1), encoding="utf-8")
+
+          health_path = Path("app/maintenance/health.py")
+          health_text = health_path.read_text(encoding="utf-8")
+          old_import = 'from dataclasses import dataclass\n'
+          new_import = 'from dataclasses import dataclass\nimport time\n'
+          if old_import not in health_text:
+              raise SystemExit("health import anchor not found")
+          health_text = health_text.replace(old_import, new_import, 1)
+
+          anchor = '''class HealthCheck:\n    name: str\n    status: str\n    message: str\n\n\n'''
+          addition = '''class HealthCheck:\n    name: str\n    status: str\n    message: str\n\n\n_HEALTH_SUMMARY_TTL_SECONDS = 15.0\n_HEALTH_SUMMARY_CACHE: dict[str, object] = {\n    "updated_at": 0.0,\n    "value": None,\n}\n\n\ndef _summary_value(checks: list[HealthCheck]) -> str:\n    statuses = {check.status for check in checks}\n    if "error" in statuses:\n        return "error"\n    if "warning" in statuses:\n        return "warning"\n    return "ok"\n\n\ndef _remember_summary(checks: list[HealthCheck]) -> str:\n    value = _summary_value(checks)\n    _HEALTH_SUMMARY_CACHE["updated_at"] = time.monotonic()\n    _HEALTH_SUMMARY_CACHE["value"] = value\n    return value\n\n\n'''
+          if anchor not in health_text:
+              raise SystemExit("HealthCheck anchor not found")
+          health_text = health_text.replace(anchor, addition, 1)
+
+          old_return = '''    if salamander is not None:\n        checks.append(salamander)\n    return checks\n\n\ndef health_summary() -> str:\n    statuses = {check.status for check in collect_health_checks()}\n    if "error" in statuses:\n        return "error"\n    if "warning" in statuses:\n        return "warning"\n    return "ok"\n'''
+          new_return = '''    if salamander is not None:\n        checks.append(salamander)\n    _remember_summary(checks)\n    return checks\n\n\ndef health_summary() -> str:\n    now = time.monotonic()\n    updated_at = float(_HEALTH_SUMMARY_CACHE.get("updated_at") or 0.0)\n    value = _HEALTH_SUMMARY_CACHE.get("value")\n    if (\n        isinstance(value, str)\n        and value in {"ok", "warning", "error"}\n        and now - updated_at < _HEALTH_SUMMARY_TTL_SECONDS\n    ):\n        return value\n    return _remember_summary(collect_health_checks())\n'''
+          if old_return not in health_text:
+              raise SystemExit("health summary block not found")
+          health_path.write_text(health_text.replace(old_return, new_return, 1), encoding="utf-8")
+          PY
+
+      - name: Prove GREEN and run health/TLS regressions
+        run: |
+          python -m pytest -q \
+            tests/test_page_runtime_performance_02208.py \
+            tests/test_auth.py \
+            tests/test_client_access.py \
+            tests/test_client_exports.py \
+            tests/test_clients_performance_02208.py
+
+      - name: Stage exact change and regenerate source inventory
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/security/tls.py app/maintenance/health.py tests/test_page_runtime_performance_02208.py
+          git rm .github/workflows/zz-page-runtime-performance.yml
+          python - <<'PY'
+          import hashlib
+          import subprocess
+          from pathlib import Path
+
+          files = subprocess.check_output(["git", "ls-files"], text=True).splitlines()
+          files = [path for path in files if path != "SOURCE-SHA256SUMS"]
+          rows = []
+          for name in sorted(files):
+              rows.append(f"{hashlib.sha256(Path(name).read_bytes()).hexdigest()}  {name}")
+          Path("SOURCE-SHA256SUMS").write_text("\n".join(rows) + "\n", encoding="utf-8")
+          PY
+          git add SOURCE-SHA256SUMS
+          git diff --cached --name-only
+
+      - name: Commit exact verified change
+        run: |
+          git commit -m "perf: avoid repeated page runtime probes"
+          git push origin HEAD:feature/02208-performance-clients
