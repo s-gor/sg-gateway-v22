@@ -64,6 +64,11 @@ body.page-connections .cnv1-engine-xray .sg-ui-rail {
   padding-inline: var(--sg-ui-rail-inset, 18px);
 }
 
+/* Mihomo already owns its panel padding. Do not inset its listener grid a second time. */
+body.page-connections .cnv1-engine-xray .mhv2-inner-rail.sg-ui-rail {
+  padding-inline: 0;
+}
+
 body.page-connections .cnv1-engine-pair.sg-ui-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--sg-ui-grid-gap, 12px);
@@ -91,12 +96,10 @@ body.page-connections :is(
   gap: var(--sg-ui-grid-gap, 12px);
 }
 
-/* Keep Mieru, AnyTLS and TUIC as one full-width row aligned with the lower engine pair. */
+/* Mieru, AnyTLS and TUIC form one equal-height three-column row. */
 body.page-connections .mhv2-listeners {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   align-items: stretch;
-  width: calc(100% + 36px);
-  margin-inline: -18px;
 }
 
 body.page-connections .mhv2-listener {
@@ -195,8 +198,7 @@ body.page-connections .xps2-version-stack > small {
     padding-inline: var(--sg-ui-rail-inset, 14px);
   }
 
-  body.page-connections .mhv2-listeners {
-    width: calc(100% + 28px);
-    margin-inline: -14px;
+  body.page-connections .cnv1-engine-xray .mhv2-inner-rail.sg-ui-rail {
+    padding-inline: 0;
   }
 }
