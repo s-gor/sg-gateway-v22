@@ -94,7 +94,6 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
-          import re
 
           path = Path('app/main.py')
           text = path.read_text(encoding='utf-8')
@@ -121,7 +120,8 @@ jobs:
           PY
       - name: Prove GREEN
         run: |
-          python -m pytest -q tests/test_other_pages_performance_02208.py tests/test_page_runtime_performance_02208.py tests/test_clients_performance_02208.py tests/test_auth.py
+          python -m pytest -q tests/test_other_pages_performance_02208.py
+          python -m pytest -q tests/test_page_runtime_performance_02208.py tests/test_clients_performance_02208.py tests/test_auth.py
           python -m pytest -q tests -k 'system_page or dashboard_resources or server_identity' --tb=short
       - name: Commit verified product change
         run: |
