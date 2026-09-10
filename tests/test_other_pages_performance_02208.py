@@ -37,7 +37,7 @@ def test_system_context_does_not_build_full_diagnostic_report(monkeypatch):
         raise AssertionError("full diagnostics must not run during ordinary System page rendering")
 
     monkeypatch.setattr(main, "build_diagnostic_report", forbidden_diagnostic)
-    monkeypatch.setattr(main, "health_summary", lambda: "ok")
+    monkeypatch.setattr(main, "collect_health_checks", lambda: [])
     monkeypatch.setattr(main, "_dashboard_resources", lambda: {})
     monkeypatch.setattr(main, "list_connections", lambda: [])
     monkeypatch.setattr(main, "count_clients", lambda: 7)

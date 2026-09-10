@@ -629,21 +629,31 @@ def _sg_gateway_server_identity(config) -> dict:
     _SERVER_IDENTITY_CACHE["value"] = dict(result)
     return result
 
-def _system_page_report() -> dict:
+def _health_summary_from_checks(checks) -> str:
+    statuses = {str(getattr(check, "status", "warning")) for check in checks}
+    if "error" in statuses:
+        return "error"
+    if "warning" in statuses:
+        return "warning"
+    return "ok"
+
+
+def _system_page_report(health_checks) -> dict:
     from datetime import datetime, timezone
 
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
-        "health": health_summary(),
+        "health": _health_summary_from_checks(health_checks),
         "version": get_version(),
     }
 
 
 def _sg_gateway_system_context() -> dict:
     connections = list_connections()
+    health_checks = collect_health_checks()
     return {
-        "report": _system_page_report(),
-        "health_checks": collect_health_checks(),
+        "report": _system_page_report(health_checks),
+        "health_checks": health_checks,
         "resources": _dashboard_resources(),
         "connections": connections,
         "client_total": count_clients(),
