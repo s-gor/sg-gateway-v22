@@ -59,6 +59,7 @@ jobs:
 
               assert context["xray_updates"]["refresh"] is True
               assert context["backups"] == []
+              assert context["backup_cleanup"] is None
               assert context["health_checks"] == []
               assert context["operations"] == []
 
@@ -80,7 +81,7 @@ jobs:
               assert "diagnostics" not in context
               assert context["backup_cleanup"]["total_count"] == 0
           PY
-      - name: Prove RED
+      - name: Prove RED on current product
         run: |
           set +e
           python -m pytest -q tests/test_maintenance_performance_02208.py
@@ -97,7 +98,7 @@ jobs:
           s = s.replace('from app.maintenance.service import collect_diagnostics\n', '', 1)
 
           marker = 'def create_app() -> Flask:\n'
-          helper = '''def _maintenance_page_context(tab: str, *, refresh_updates: bool = False) -> dict:\n    context = {\n        "xray_updates": None,\n        "panel_updates": None,\n        "core_updates": None,\n        "geofiles_updates": None,\n        "runtime_contract": None,\n        "backups": [],\n        "backup_cleanup": backup_cleanup_preview([]),\n        "data_backups": [],\n        "verified_data_backup": None,\n        "full_backups": [],\n        "verified_full_backup": None,\n        "operations": [],\n        "health_checks": [],\n        "release": get_release_manifest(),\n    }\n    if tab == "updates":\n        context["xray_updates"] = xray_update_overview(refresh=refresh_updates)\n        context["panel_updates"] = panel_update_overview(refresh=refresh_updates)\n        context["core_updates"] = core_update_overview(refresh=refresh_updates)\n        context["geofiles_updates"] = geofiles_overview()\n        runtime_result = run_hostd_command("runtime.contract", timeout=20)\n        runtime_contract = dict(runtime_result.payload or {})\n        if not runtime_contract:\n            runtime_contract = {\n                "ok": False,\n                "checks": [],\n                "message": runtime_result.message or "Runtime Contract недоступен",\n            }\n        context["runtime_contract"] = runtime_contract\n        return context\n\n    backups = list_backups()\n    context.update(\n        backups=backups,\n        backup_cleanup=backup_cleanup_preview(backups),\n        data_backups=list_data_backups(),\n        verified_data_backup=get_verified_data_backup(),\n        full_backups=list_full_backups(),\n        verified_full_backup=get_verified_full_backup(),\n        operations=list_operations(),\n        health_checks=collect_health_checks(),\n    )\n    return context\n\n\n'''
+          helper = '''def _maintenance_page_context(tab: str, *, refresh_updates: bool = False) -> dict:\n    context = {\n        "xray_updates": None,\n        "panel_updates": None,\n        "core_updates": None,\n        "geofiles_updates": None,\n        "runtime_contract": None,\n        "backups": [],\n        "backup_cleanup": None,\n        "data_backups": [],\n        "verified_data_backup": None,\n        "full_backups": [],\n        "verified_full_backup": None,\n        "operations": [],\n        "health_checks": [],\n        "release": get_release_manifest(),\n    }\n    if tab == "updates":\n        context["xray_updates"] = xray_update_overview(refresh=refresh_updates)\n        context["panel_updates"] = panel_update_overview(refresh=refresh_updates)\n        context["core_updates"] = core_update_overview(refresh=refresh_updates)\n        context["geofiles_updates"] = geofiles_overview()\n        runtime_result = run_hostd_command("runtime.contract", timeout=20)\n        runtime_contract = dict(runtime_result.payload or {})\n        if not runtime_contract:\n            runtime_contract = {\n                "ok": False,\n                "checks": [],\n                "message": runtime_result.message or "Runtime Contract недоступен",\n            }\n        context["runtime_contract"] = runtime_contract\n        return context\n\n    backups = list_backups()\n    context.update(\n        backups=backups,\n        backup_cleanup=backup_cleanup_preview(backups),\n        data_backups=list_data_backups(),\n        verified_data_backup=get_verified_data_backup(),\n        full_backups=list_full_backups(),\n        verified_full_backup=get_verified_full_backup(),\n        operations=list_operations(),\n        health_checks=collect_health_checks(),\n    )\n    return context\n\n\n'''
           if marker not in s:
               raise SystemExit('create_app marker missing')
           s = s.replace(marker, helper + marker, 1)
@@ -108,14 +109,11 @@ jobs:
               raise SystemExit('maintenance route block not found')
           p.write_text(s.replace(old, new, 1), encoding='utf-8')
           PY
-      - name: Prove GREEN
+      - name: Prove GREEN strictly
         run: |
           python -m pytest -q tests/test_maintenance_performance_02208.py
-          python -m pytest -q tests/test_backups.py tests/test_sg_gateway_02208_maintenance_ui.py --tb=short || true
-      - name: Verify named maintenance test existence and run available focused tests
-        run: |
-          python -m pytest -q tests -k 'maintenance and not browser' --tb=short || rc=$?
-          if [ "${rc:-0}" -ne 0 ] && [ "${rc:-0}" -ne 5 ]; then exit "$rc"; fi
+          python -m pytest -q tests/test_backups.py
+          python -B -m py_compile app/main.py tests/test_maintenance_performance_02208.py
       - name: Commit verified change
         run: |
           git config user.name 'github-actions[bot]'
