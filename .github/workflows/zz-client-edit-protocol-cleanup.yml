@@ -1,0 +1,106 @@
+name: Client protocol editor cleanup
+
+on:
+  push:
+    branches:
+      - feature/02208-compatible-subscription-awg31-from-good-snapshot
+
+permissions:
+  contents: write
+
+jobs:
+  fix-test-finalize:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/02208-compatible-subscription-awg31-from-good-snapshot
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install test dependencies
+        run: python -m pip install -r requirements-dev.txt
+      - name: Patch all client protocol forms
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          def strip_obsolete_notice(text: str) -> str:
+              text = text.replace("  <script src=\"{{ static_asset('sg-awg-only-notice-v1.js') }}\" defer></script>\n", "")
+              text = text.replace("  <link rel=\"stylesheet\" href=\"{{ static_asset('sg-awg-only-notice-v1.css') }}\">\n", "")
+              text = re.sub(
+                  r"\n\s*<!-- SG_AWG_ONLY_NOTICE_V1_[A-Z_]+ -->\s*\n\s*<div class=\"sg-awg-only-note\"[^>]*>.*?</div>\s*\n",
+                  "\n",
+                  text,
+                  flags=re.DOTALL,
+              )
+              return text
+
+          clients_path = Path('app/web/templates/clients.html')
+          clients = strip_obsolete_notice(clients_path.read_text(encoding='utf-8'))
+          marker = '      <!-- SG_PROTOCOL_ORDER_END -->'
+          assert clients.count(marker) == 1
+          assert 'value="naiveproxy"' not in clients
+          create_naive = '''      <label class="cv10-protocol {{ 'is-locked' if not tls.https_ready else '' }}"><input type="checkbox" name="protocols" value="naiveproxy" {% if not tls.https_ready %}disabled{% endif %}><span><strong>NaiveProxy</strong><small>{{ 'HTTPS-прокси · отдельная ссылка' if tls.https_ready else 'Требуется HTTPS' }}</small></span></label>\n'''
+          clients = clients.replace(marker, create_naive + marker, 1)
+          clients_path.write_text(clients, encoding='utf-8')
+
+          edits_path = Path('app/web/templates/_client_edit_dialogs.html')
+          edits = strip_obsolete_notice(edits_path.read_text(encoding='utf-8'))
+          assert edits.count(marker) == 2
+          assert 'value="naiveproxy"' not in edits
+          primary_naive = '''      {% set naive_selected = 'naiveproxy' in primary_tokens %}\n      <label class="dv16-protocol {{ 'is-locked' if not tls.https_ready and not naive_selected else '' }}"><input type="checkbox" name="protocols" value="naiveproxy" {% if naive_selected %}checked{% endif %} {% if not tls.https_ready and not naive_selected %}disabled{% endif %}><span><strong>NaiveProxy</strong><small>{{ 'Подключён — реквизиты сохранятся' if naive_selected else ('Доступен' if tls.https_ready else 'Нужен HTTPS') }}</small></span></label>\n'''
+          device_naive = '''      {% set device_naive_selected = 'naiveproxy' in selected_tokens %}\n      <label class="dv16-protocol {{ 'is-locked' if not tls.https_ready and not device_naive_selected else '' }}"><input type="checkbox" name="protocols" value="naiveproxy" {% if device_naive_selected %}checked{% endif %} {% if not tls.https_ready and not device_naive_selected %}disabled{% endif %}><span><strong>NaiveProxy</strong><small>{{ 'Подключён — реквизиты сохранятся' if device_naive_selected else ('Доступен' if tls.https_ready else 'Нужен HTTPS') }}</small></span></label>\n'''
+          first, rest = edits.split(marker, 1)
+          middle, last = rest.split(marker, 1)
+          edits = first + primary_naive + marker + middle + device_naive + marker + last
+          edits = edits.replace("    'tuic',\n  ];", "    'tuic',\n    'naiveproxy',\n  ];")
+          edits_path.write_text(edits, encoding='utf-8')
+
+          detail_path = Path('app/web/templates/client_detail.html')
+          detail = strip_obsolete_notice(detail_path.read_text(encoding='utf-8'))
+          assert 'value="naiveproxy"' not in detail
+          needle = '''        <label class="dv16-protocol {{ 'is-locked' if not tls.https_ready else '' }}">\n          <input type="checkbox" name="protocols" value="tuic" {% if not tls.https_ready %}disabled{% endif %}>\n          <span><strong>TUIC v5</strong><small>{{ 'Доступен' if tls.https_ready else 'Нужен HTTPS' }}</small></span>\n        </label>\n'''
+          assert detail.count(needle) == 1
+          add_device_naive = '''        <label class="dv16-protocol {{ 'is-locked' if not tls.https_ready else '' }}">\n          <input type="checkbox" name="protocols" value="naiveproxy" {% if not tls.https_ready %}disabled{% endif %}>\n          <span><strong>NaiveProxy</strong><small>{{ 'Доступен' if tls.https_ready else 'Нужен HTTPS' }}</small></span>\n        </label>\n'''
+          detail = detail.replace(needle, needle + add_device_naive, 1)
+          detail_path.write_text(detail, encoding='utf-8')
+
+          test_path = Path('tests/test_sg_gateway_v22_client_protocol_edit_cleanup.py')
+          test_path.write_text('''from pathlib import Path\n\n\ndef _read(path: str) -> str:\n    return Path(path).read_text(encoding="utf-8")\n\n\ndef test_all_client_device_protocol_forms_have_native_naiveproxy_card():\n    clients = _read("app/web/templates/clients.html")\n    detail = _read("app/web/templates/client_detail.html")\n    edits = _read("app/web/templates/_client_edit_dialogs.html")\n\n    assert clients.count('value="naiveproxy"') == 1\n    assert detail.count('value="naiveproxy"') == 1\n    assert edits.count('value="naiveproxy"') == 2\n    assert edits.count('class="dv16-protocol') >= 18\n\n\ndef test_obsolete_awg_only_subscription_notice_is_gone_from_client_forms():\n    combined = "\\n".join([\n        _read("app/web/templates/clients.html"),\n        _read("app/web/templates/client_detail.html"),\n        _read("app/web/templates/_client_edit_dialogs.html"),\n    ])\n    assert "При выборе только AWG-профилей подписка не создаётся" not in combined\n    assert "sg-awg-only-note" not in combined\n    assert "sg-awg-only-notice-v1.js" not in combined\n    assert "sg-awg-only-notice-v1.css" not in combined\n''', encoding='utf-8')
+          PY
+      - name: Focused regressions
+        run: |
+          python -m pytest -q \
+            tests/test_sg_gateway_v22_client_protocol_edit_cleanup.py \
+            tests/test_sg_gateway_v22_compatible_subscription_exact9.py \
+            tests/test_sg_gateway_v22_sg_subscription_base64_body.py \
+            tests/test_sg_gateway_v22_sg_subscription_compat_text.py \
+            tests/test_sg_gateway_v22_sg_subscription_http.py
+      - name: Refresh SOURCE-SHA256SUMS
+        shell: bash
+        run: |
+          python - <<'PY'
+          import hashlib
+          import subprocess
+          from pathlib import Path
+          transient = '.github/workflows/zz-client-edit-protocol-cleanup.yml'
+          tracked = subprocess.check_output(['git', 'ls-files'], text=True, encoding='utf-8').splitlines()
+          tracked = [p for p in tracked if p not in {'SOURCE-SHA256SUMS', transient}]
+          rows = [f"{hashlib.sha256(Path(p).read_bytes()).hexdigest()}  {p}" for p in sorted(tracked)]
+          Path('SOURCE-SHA256SUMS').write_text('\n'.join(rows) + '\n', encoding='utf-8')
+          PY
+      - name: Remove one-shot workflow
+        run: git rm .github/workflows/zz-client-edit-protocol-cleanup.yml
+      - name: Commit verified cleanup
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add app/web/templates/clients.html app/web/templates/client_detail.html app/web/templates/_client_edit_dialogs.html tests/test_sg_gateway_v22_client_protocol_edit_cleanup.py SOURCE-SHA256SUMS
+          git commit -m "fix: clean client protocol editors and native NaiveProxy card"
+          git push origin HEAD:feature/02208-compatible-subscription-awg31-from-good-snapshot
