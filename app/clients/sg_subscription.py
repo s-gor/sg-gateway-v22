@@ -26,9 +26,26 @@ _PROFILE_SPECS = (
     ("tuic", "tuic", "tuic", "TUIC v5", "tuic", "uri"),
 )
 
+_COMPATIBLE_PROFILE_IDS = (
+    "xray_reality_tcp",
+    "xray_xhttp_reality",
+    "xray_xhttp_tls",
+    "xray_hysteria2",
+    "amneziawg31",
+    "mieru",
+    "anytls",
+    "tuic",
+    "naiveproxy",
+)
+
 
 def canonical_profile_ids() -> tuple[str, ...]:
     return tuple(item[0] for item in _PROFILE_SPECS)
+
+
+def compatible_profile_ids() -> tuple[str, ...]:
+    """Return the exact SG Client-compatible subscription profile contract."""
+    return _COMPATIBLE_PROFILE_IDS
 
 
 def _canonical_uri(profile_id: str, value: str) -> str:
@@ -227,10 +244,16 @@ def _config_marker(profile: dict, device: dict, client_name: str) -> str:
 
 def _ready_uri_lines(document: dict) -> list[str]:
     client_name = str((document.get("client") or {}).get("name") or "SG")
+    allowed = set(compatible_profile_ids())
     lines: list[str] = []
     for device in document.get("devices", []):
         for profile in device.get("profiles", []):
-            if not profile.get("ready") or profile.get("format") != "uri" or not profile.get("uri"):
+            if (
+                profile.get("id") not in allowed
+                or not profile.get("ready")
+                or profile.get("format") != "uri"
+                or not profile.get("uri")
+            ):
                 continue
             label = _subscription_label(
                 client_name,
@@ -258,7 +281,7 @@ def _ready_awg31_config_lines(document: dict) -> list[str]:
 
 
 def build_compatible_subscription_body(client: Client) -> str:
-    """Return the compatible Base64 transport with ready URIs and AWG3.1 configs."""
+    """Return the exact nine-profile SG Client-compatible Base64 transport."""
     document = build_sg_subscription_document(client)
     lines = _ready_uri_lines(document)
     lines.extend(_ready_awg31_config_lines(document))
