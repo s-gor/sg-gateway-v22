@@ -122,7 +122,7 @@ def family_gate_outbound(tag: str, family: int, *, proxy_tag: str | None = None)
         },
     }
     if proxy_tag:
-        result["proxySettings"] = {"tag": proxy_tag}
+        result["streamSettings"] = {"sockopt": {"dialerProxy": proxy_tag}}
     return result
 
 

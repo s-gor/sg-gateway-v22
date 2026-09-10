@@ -27,7 +27,7 @@ RF_FAST_ROTATION = {
 }
 
 
-def test_02208_fixed_presets_match_xray_26728_contract() -> None:
+def test_02208_fixed_presets_match_xray_2699_contract() -> None:
     assert xmux.XMUX_STANDARD_PRESET == STANDARD
     assert xmux.XMUX_REDUCED_PRESET == RF_FAST_ROTATION
     assert profiles.XHTTP_XMUX_RF == RF_FAST_ROTATION
@@ -95,7 +95,7 @@ def test_02208_ui_has_two_locked_presets_manual_fields_and_raw_json() -> None:
     assert "Ручной" in partial
     assert "Client Extra JSON" in partial
     assert "Для РФ — уменьшенный" not in partial
-    assert "Xray-core 26.7.28 · закреплено" in partial
+    assert "Xray-core 26.9.9 · закреплено" in partial
     for key in (
         "maxConcurrency",
         "maxConnections",
@@ -107,16 +107,16 @@ def test_02208_ui_has_two_locked_presets_manual_fields_and_raw_json() -> None:
         assert f'name="xhttp_xmux_{key}"' in partial
 
 
-def test_02208_xray_runtime_is_pinned_to_official_26728_asset() -> None:
+def test_02208_xray_runtime_is_pinned_to_official_2699_asset() -> None:
     versions = (ROOT / "vendor/cores/VERSIONS.env").read_text(encoding="utf-8")
     sums = (ROOT / "vendor/cores/SHA256SUMS").read_text(encoding="utf-8")
     installer = (ROOT / "install.sh").read_text(encoding="utf-8")
 
-    assert profiles.XRAY_MINIMUM_VERSION == "26.7.28"
-    assert "XRAY_VERSION=v26.7.28" in versions
-    assert 'XRAY_REQUIRED_VERSION="v26.7.28"' in installer
-    assert 'XRAY_MINIMUM_VERSION="v26.7.28"' in installer
+    assert profiles.XRAY_MINIMUM_VERSION == "26.9.9"
+    assert "XRAY_VERSION=v26.9.9" in versions
+    assert 'XRAY_REQUIRED_VERSION="v26.9.9"' in installer
+    assert 'XRAY_MINIMUM_VERSION="v26.9.9"' in installer
     assert (
-        "8195d909f1109b8f3d99eefe401a3c451d7bf4af71f24d3815420f77e5dd2a40  "
+        "1eb9175d0f0a8f8149c9230a7fc5ae66ce332ed20a53155ce61fe62e3f58b7df  "
         "Xray-linux-64.zip"
     ) in sums
