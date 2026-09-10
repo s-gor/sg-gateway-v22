@@ -4,8 +4,6 @@ on:
   pull_request:
     branches: [main]
 
-authorization-placeholder: true
-
 permissions:
   contents: write
 
