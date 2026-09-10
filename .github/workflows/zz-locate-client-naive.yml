@@ -1,0 +1,15 @@
+name: Locate client NaiveProxy picker
+on:
+  push:
+    paths:
+      - '.github/workflows/zz-locate-client-naive.yml'
+jobs:
+  locate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Locate NaiveProxy client picker markup
+        run: |
+          set -o pipefail
+          grep -RniE 'NaiveProxy|naiveproxy' app/web app/clients tests | head -250
+          exit 1
