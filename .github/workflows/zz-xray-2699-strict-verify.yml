@@ -48,5 +48,26 @@ jobs:
       - name: Run Xray 26.9.9 contract tests without fallback
         run: python -m pytest -q tests/test_sg_gateway_v22_xray_2699_contract.py
 
-      - name: Run complete test suite without fallback
-        run: python -m pytest -q tests
+      - name: Run complete test suite and capture exact failures
+        id: full_suite
+        shell: bash
+        run: |
+          set +e
+          python -m pytest -q tests 2>&1 | tee pytest-full.log
+          status=${PIPESTATUS[0]}
+          echo "$status" > pytest-full.status
+          exit 0
+
+      - name: Upload full-suite evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xray-2699-pytest-evidence
+          path: |
+            pytest-full.log
+            pytest-full.status
+          if-no-files-found: error
+
+      - name: Require complete test suite GREEN
+        shell: bash
+        run: test "$(cat pytest-full.status)" = "0"
