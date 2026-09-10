@@ -17,6 +17,7 @@ _PROTOCOL_PICKER_RE = re.compile(
     r'(?P<close></fieldset>)',
     re.DOTALL,
 )
+_LEGACY_PROTOCOL_HOOK = "<!-- SG_PROTOCOL_ORDER_END -->"
 
 
 def register_naiveproxy_http(app) -> None:
@@ -121,7 +122,7 @@ def _inject_naiveproxy_protocol_option(response):
         return response
 
     body = response.get_data(as_text=True)
-    if 'name="protocols"' not in body:
+    if 'name="protocols"' not in body and _LEGACY_PROTOCOL_HOOK not in body:
         return response
 
     tls = tls_overview()
@@ -134,6 +135,13 @@ def _inject_naiveproxy_protocol_option(response):
         else "Требуется HTTPS в Security"
     )
 
+    def option(card_class: str) -> str:
+        return (
+            f'\n        <label class="{card_class}{locked}">'
+            f'<input type="checkbox" name="protocols" value="naiveproxy"{disabled}>'
+            f'<span><strong>NaiveProxy</strong><small>{note}</small></span></label>'
+        )
+
     def inject_into_picker(match: re.Match[str]) -> str:
         opening = match.group("open")
         picker_body = match.group("body")
@@ -145,14 +153,16 @@ def _inject_naiveproxy_protocol_option(response):
             if "dv16-protocol-list" in opening
             else "cv10-protocol"
         )
-        option = (
-            f'\n        <label class="{card_class}{locked}">'
-            f'<input type="checkbox" name="protocols" value="naiveproxy"{disabled}>'
-            f'<span><strong>NaiveProxy</strong><small>{note}</small></span></label>'
-        )
-        return f'{opening}{picker_body}{option}\n      {match.group("close")}'
+        return f'{opening}{picker_body}{option(card_class)}\n      {match.group("close")}'
 
     updated = _PROTOCOL_PICKER_RE.sub(inject_into_picker, body)
+    if updated == body and _LEGACY_PROTOCOL_HOOK in body and 'value="naiveproxy"' not in body:
+        updated = body.replace(
+            _LEGACY_PROTOCOL_HOOK,
+            f'{option("cv10-protocol")}\n{_LEGACY_PROTOCOL_HOOK}',
+            1,
+        )
+
     if updated != body:
         response.set_data(updated)
 
