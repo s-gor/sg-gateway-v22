@@ -581,7 +581,30 @@ def _sg_gateway_status_label(status: str) -> str:
     return {"Configured": "Настроено", "Disabled": "Не настроено"}.get(status, status)
 
 
+_SERVER_IDENTITY_TTL_SECONDS = 15.0
+_SERVER_IDENTITY_CACHE: dict[str, object] = {
+    "key": None,
+    "updated_at": 0.0,
+    "value": None,
+}
+
+
 def _sg_gateway_server_identity(config) -> dict:
+    cache_key = (
+        str(getattr(config, "server_name", "") or ""),
+        str(getattr(config, "public_address", "") or ""),
+        str(getattr(config, "host", "") or ""),
+        normalize_country_code(getattr(config, "country_code", "unknown")),
+    )
+    now = time.monotonic()
+    cached_value = _SERVER_IDENTITY_CACHE.get("value")
+    if (
+        _SERVER_IDENTITY_CACHE.get("key") == cache_key
+        and isinstance(cached_value, dict)
+        and now - float(_SERVER_IDENTITY_CACHE.get("updated_at") or 0.0) < _SERVER_IDENTITY_TTL_SECONDS
+    ):
+        return dict(cached_value)
+
     address = config.public_address or config.host
     configured_code = normalize_country_code(getattr(config, "country_code", "unknown"))
     code = configured_code
@@ -595,17 +618,31 @@ def _sg_gateway_server_identity(config) -> dict:
             code = lookup_country_code(address)
     except Exception:
         pass
-    return {
+    result = {
         "name": getattr(config, "server_name", "SG-Gateway") or "SG-Gateway",
         "address": address,
         "country_code": normalize_country_code(code),
         "country_name": country_name(code),
     }
+    _SERVER_IDENTITY_CACHE["key"] = cache_key
+    _SERVER_IDENTITY_CACHE["updated_at"] = now
+    _SERVER_IDENTITY_CACHE["value"] = dict(result)
+    return result
+
+def _system_page_report() -> dict:
+    from datetime import datetime, timezone
+
+    return {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "health": health_summary(),
+        "version": get_version(),
+    }
+
 
 def _sg_gateway_system_context() -> dict:
     connections = list_connections()
     return {
-        "report": build_diagnostic_report(),
+        "report": _system_page_report(),
         "health_checks": collect_health_checks(),
         "resources": _dashboard_resources(),
         "connections": connections,
