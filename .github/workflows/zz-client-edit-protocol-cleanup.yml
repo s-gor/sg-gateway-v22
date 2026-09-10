@@ -69,8 +69,17 @@ jobs:
           detail = detail.replace(needle, needle + add_device_naive, 1)
           detail_path.write_text(detail, encoding='utf-8')
 
+          subscription_path = Path('app/clients/sg_subscription.py')
+          subscription = subscription_path.read_text(encoding='utf-8')
+          naive_spec = '    ("naiveproxy", "naiveproxy", "naiveproxy", "NaiveProxy", "naiveproxy", "uri"),\n'
+          if naive_spec not in subscription:
+              anchor = '    ("tuic", "tuic", "tuic", "TUIC v5", "tuic", "uri"),\n'
+              assert subscription.count(anchor) == 1
+              subscription = subscription.replace(anchor, anchor + naive_spec, 1)
+          subscription_path.write_text(subscription, encoding='utf-8')
+
           test_path = Path('tests/test_sg_gateway_v22_client_protocol_edit_cleanup.py')
-          test_path.write_text('''from pathlib import Path\n\n\ndef _read(path: str) -> str:\n    return Path(path).read_text(encoding="utf-8")\n\n\ndef test_all_client_device_protocol_forms_have_native_naiveproxy_card():\n    clients = _read("app/web/templates/clients.html")\n    detail = _read("app/web/templates/client_detail.html")\n    edits = _read("app/web/templates/_client_edit_dialogs.html")\n\n    assert clients.count('value="naiveproxy"') == 1\n    assert detail.count('value="naiveproxy"') == 1\n    assert edits.count('value="naiveproxy"') == 2\n    assert edits.count('class="dv16-protocol') >= 18\n\n\ndef test_obsolete_awg_only_subscription_notice_is_gone_from_client_forms():\n    combined = "\\n".join([\n        _read("app/web/templates/clients.html"),\n        _read("app/web/templates/client_detail.html"),\n        _read("app/web/templates/_client_edit_dialogs.html"),\n    ])\n    assert "При выборе только AWG-профилей подписка не создаётся" not in combined\n    assert "sg-awg-only-note" not in combined\n    assert "sg-awg-only-notice-v1.js" not in combined\n    assert "sg-awg-only-notice-v1.css" not in combined\n''', encoding='utf-8')
+          test_path.write_text('''from pathlib import Path\n\n\ndef _read(path: str) -> str:\n    return Path(path).read_text(encoding="utf-8")\n\n\ndef test_all_client_device_protocol_forms_have_native_naiveproxy_card():\n    clients = _read("app/web/templates/clients.html")\n    detail = _read("app/web/templates/client_detail.html")\n    edits = _read("app/web/templates/_client_edit_dialogs.html")\n\n    assert clients.count('value="naiveproxy"') == 1\n    assert detail.count('value="naiveproxy"') == 1\n    assert edits.count('value="naiveproxy"') == 2\n    assert 'class="cv10-protocol' in clients\n    assert 'class="dv16-protocol' in detail\n    assert edits.count('class="dv16-protocol') >= 3\n\n\ndef test_obsolete_awg_only_subscription_notice_is_gone_from_client_forms():\n    combined = "\\n".join([\n        _read("app/web/templates/clients.html"),\n        _read("app/web/templates/client_detail.html"),\n        _read("app/web/templates/_client_edit_dialogs.html"),\n    ])\n    assert "При выборе только AWG-профилей подписка не создаётся" not in combined\n    assert "sg-awg-only-note" not in combined\n    assert "sg-awg-only-notice-v1.js" not in combined\n    assert "sg-awg-only-notice-v1.css" not in combined\n''', encoding='utf-8')
           PY
       - name: Focused regressions
         run: |
@@ -101,6 +110,6 @@ jobs:
           set -euo pipefail
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add app/web/templates/clients.html app/web/templates/client_detail.html app/web/templates/_client_edit_dialogs.html tests/test_sg_gateway_v22_client_protocol_edit_cleanup.py SOURCE-SHA256SUMS
+          git add app/clients/sg_subscription.py app/web/templates/clients.html app/web/templates/client_detail.html app/web/templates/_client_edit_dialogs.html tests/test_sg_gateway_v22_client_protocol_edit_cleanup.py SOURCE-SHA256SUMS
           git commit -m "fix: clean client protocol editors and native NaiveProxy card"
           git push origin HEAD:feature/02208-compatible-subscription-awg31-from-good-snapshot
