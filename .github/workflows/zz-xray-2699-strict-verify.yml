@@ -12,21 +12,30 @@ jobs:
   verify:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
-      - name: Checkout exact Xray candidate payload
-        run: git checkout --detach 3565ec5978be251d1f7fb41d68ef9c595ba050ef
+      - name: Checkout exact Xray candidate
+        uses: actions/checkout@v4
+        with:
+          ref: 3565ec5978be251d1f7fb41d68ef9c595ba050ef
+          fetch-depth: 0
+          path: candidate
+
+      - name: Checkout exact baseline snapshot
+        uses: actions/checkout@v4
+        with:
+          ref: d58c3785832fc3442af3408e7c2f3b2372ad76a9
+          fetch-depth: 0
+          path: baseline
 
       - name: Install test dependencies
+        working-directory: candidate
         run: python -m pip install -r requirements-dev.txt
 
       - name: Verify exact bundled archive SHA256
+        working-directory: candidate
         shell: bash
         run: |
           set -euo pipefail
@@ -35,6 +44,7 @@ jobs:
           grep '  Xray-linux-64.zip$' SHA256SUMS | sha256sum -c -
 
       - name: Verify executable reports Xray 26.9.9
+        working-directory: candidate
         shell: bash
         run: |
           set -euo pipefail
@@ -46,53 +56,53 @@ jobs:
           test "$actual" = '26.9.9'
 
       - name: Run Xray 26.9.9 contract tests without fallback
+        working-directory: candidate
         run: python -m pytest -q tests/test_sg_gateway_v22_xray_2699_contract.py
 
-      - name: Run complete candidate suite and capture failures
+      - name: Run complete candidate suite and capture outcomes
+        working-directory: candidate
         shell: bash
         run: |
           set +e
           python -m pytest -q tests 2>&1 | tee /tmp/candidate.log
           echo "${PIPESTATUS[0]}" > /tmp/candidate.status
-          grep '^FAILED ' /tmp/candidate.log | sed 's/ - .*//' | sort -u > /tmp/candidate.failed || true
+          grep -E '^(FAILED|ERROR) ' /tmp/candidate.log | sed 's/ - .*//' | sort -u > /tmp/candidate.outcomes || true
           exit 0
 
-      - name: Checkout exact baseline snapshot
-        run: git checkout --detach d58c3785832fc3442af3408e7c2f3b2372ad76a9
-
-      - name: Run complete baseline suite in identical environment
+      - name: Run complete baseline suite in isolated checkout
+        working-directory: baseline
         shell: bash
         run: |
           set +e
           python -m pytest -q tests 2>&1 | tee /tmp/baseline.log
           echo "${PIPESTATUS[0]}" > /tmp/baseline.status
-          grep '^FAILED ' /tmp/baseline.log | sed 's/ - .*//' | sort -u > /tmp/baseline.failed || true
+          grep -E '^(FAILED|ERROR) ' /tmp/baseline.log | sed 's/ - .*//' | sort -u > /tmp/baseline.outcomes || true
           exit 0
 
       - name: Compare candidate failures against baseline
         shell: bash
         run: |
           set -euo pipefail
-          comm -13 /tmp/baseline.failed /tmp/candidate.failed > /tmp/new.failures
-          comm -23 /tmp/baseline.failed /tmp/candidate.failed > /tmp/resolved.failures
-          echo '=== NEW FAILURES IN CANDIDATE ==='
-          cat /tmp/new.failures
-          echo '=== BASELINE FAILURES RESOLVED IN CANDIDATE ==='
-          cat /tmp/resolved.failures
-          test ! -s /tmp/new.failures
+          comm -13 /tmp/baseline.outcomes /tmp/candidate.outcomes > /tmp/new.outcomes
+          comm -23 /tmp/baseline.outcomes /tmp/candidate.outcomes > /tmp/resolved.outcomes
+          echo '=== NEW CANDIDATE FAILURES/ERRORS ==='
+          cat /tmp/new.outcomes
+          echo '=== BASELINE FAILURES/ERRORS RESOLVED ==='
+          cat /tmp/resolved.outcomes
+          test ! -s /tmp/new.outcomes
 
       - name: Upload comparison evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: xray-2699-baseline-comparison
+          name: xray-2699-isolated-baseline-comparison
           path: |
             /tmp/candidate.log
             /tmp/candidate.status
-            /tmp/candidate.failed
+            /tmp/candidate.outcomes
             /tmp/baseline.log
             /tmp/baseline.status
-            /tmp/baseline.failed
-            /tmp/new.failures
-            /tmp/resolved.failures
+            /tmp/baseline.outcomes
+            /tmp/new.outcomes
+            /tmp/resolved.outcomes
           if-no-files-found: error
