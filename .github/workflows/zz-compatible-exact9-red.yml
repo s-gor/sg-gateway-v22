@@ -1,0 +1,19 @@
+name: Compatible exact9 RED
+
+on:
+  push:
+    branches:
+      - feature/02208-compatible-subscription-awg31-from-good-snapshot
+
+jobs:
+  red:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/02208-compatible-subscription-awg31-from-good-snapshot
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r requirements-dev.txt
+      - run: python -m pytest -q tests/test_sg_gateway_v22_compatible_subscription_exact9.py
