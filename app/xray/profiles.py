@@ -33,7 +33,7 @@ from app.xray.settings_transactions import (
 
 
 REALITY_TCP_FLOW = "xtls-rprx-vision"
-XRAY_MINIMUM_VERSION = "26.7.28"
+XRAY_MINIMUM_VERSION = "26.9.9"
 # Compatibility name used by older modules; the policy is minimum, not exact.
 XRAY_REQUIRED_VERSION = XRAY_MINIMUM_VERSION
 XHTTP_MODES = ("auto", "stream-one", "stream-up", "packet-up")

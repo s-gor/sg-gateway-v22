@@ -68,7 +68,8 @@ def test_family_gates_are_force_and_fail_closed():
         {"action": "block", "ip": ["0.0.0.0/0"], "blockDelay": 0},
     ]
     assert "proxySettings" not in direct4
-    assert warp6["proxySettings"] == {"tag": "warp-core"}
+    assert "proxySettings" not in warp6
+    assert warp6["streamSettings"]["sockopt"]["dialerProxy"] == "warp-core"
 
 
 def test_managed_outbounds_have_four_family_exits_and_one_warp_core(monkeypatch):
@@ -81,8 +82,10 @@ def test_managed_outbounds_have_four_family_exits_and_one_warp_core(monkeypatch)
     assert by_tag["warp-core"]["protocol"] == "wireguard"
     assert by_tag["warp4"]["settings"]["domainStrategy"] == "ForceIPv4"
     assert by_tag["warp6"]["settings"]["domainStrategy"] == "ForceIPv6"
-    assert by_tag["warp4"]["proxySettings"] == {"tag": "warp-core"}
-    assert by_tag["warp6"]["proxySettings"] == {"tag": "warp-core"}
+    assert "proxySettings" not in by_tag["warp4"]
+    assert "proxySettings" not in by_tag["warp6"]
+    assert by_tag["warp4"]["streamSettings"]["sockopt"]["dialerProxy"] == "warp-core"
+    assert by_tag["warp6"]["streamSettings"]["sockopt"]["dialerProxy"] == "warp-core"
     assert by_tag["direct"]["settings"]["domainStrategy"] == "ForceIPv4"
     assert by_tag["warp"]["settings"]["domainStrategy"] == "ForceIPv4"
 
