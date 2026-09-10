@@ -70,15 +70,24 @@ jobs:
           if old not in s:
               raise SystemExit('system health context block not found')
           p.write_text(s.replace(old, new, 1), encoding='utf-8')
+
+          t = Path('tests/test_other_pages_performance_02208.py')
+          q = t.read_text(encoding='utf-8')
+          old_line = '    monkeypatch.setattr(main, "health_summary", lambda: "ok")\n'
+          new_line = '    monkeypatch.setattr(main, "collect_health_checks", lambda: [])\n'
+          if old_line not in q:
+              raise SystemExit('old System test health stub missing')
+          t.write_text(q.replace(old_line, new_line, 1), encoding='utf-8')
           PY
-      - name: Prove GREEN
+      - name: Prove GREEN isolated
         run: |
-          python -m pytest -q tests/test_system_health_performance_02208.py tests/test_other_pages_performance_02208.py tests/test_page_runtime_performance_02208.py
+          python -m pytest -q tests/test_system_health_performance_02208.py tests/test_other_pages_performance_02208.py
+          python -m pytest -q tests/test_page_runtime_performance_02208.py
       - name: Commit verified change
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add app/main.py tests/test_system_health_performance_02208.py
+          git add app/main.py tests/test_system_health_performance_02208.py tests/test_other_pages_performance_02208.py
           git rm .github/workflows/zz-system-health-performance.yml
           python - <<'PY'
           import hashlib, subprocess
