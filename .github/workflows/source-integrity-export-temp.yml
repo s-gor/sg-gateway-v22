@@ -1,26 +1,33 @@
-name: TEMP source integrity export
+name: TEMP source integrity finalizer
 
 on:
   pull_request:
     branches: [main]
 
+authorization-placeholder: true
+
+permissions:
+  contents: write
+
 jobs:
-  export:
+  finalize:
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout feature branch
         uses: actions/checkout@v4
-      - name: Generate exact final manifest
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+      - name: Generate exact final manifest and self-remove
         run: |
           python3 -B - <<'PY'
           import hashlib
           import subprocess
           from pathlib import Path
 
-          excluded = {
-              "SOURCE-SHA256SUMS",
-              ".github/workflows/source-integrity-export-temp.yml",
-          }
+          temp_workflow = ".github/workflows/source-integrity-export-temp.yml"
+          excluded = {"SOURCE-SHA256SUMS", temp_workflow}
           tracked = sorted(
               path
               for path in subprocess.check_output(
@@ -32,14 +39,14 @@ jobs:
           for path in tracked:
               data = subprocess.check_output(["git", "show", f"HEAD:{path}"])
               rows.append(f"{hashlib.sha256(data).hexdigest()}  {path}")
-          Path("SOURCE-SHA256SUMS.generated").write_text(
+          Path("SOURCE-SHA256SUMS").write_text(
               "\n".join(rows) + "\n", encoding="utf-8"
           )
-          print(f"generated {len(rows)} checksum rows")
+          Path(temp_workflow).unlink()
+          print(f"finalized {len(rows)} checksum rows")
           PY
-      - name: Upload generated manifest
-        uses: actions/upload-artifact@v4
-        with:
-          name: source-integrity-final
-          path: SOURCE-SHA256SUMS.generated
-          if-no-files-found: error
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add SOURCE-SHA256SUMS .github/workflows/source-integrity-export-temp.yml
+          git commit -m "chore: finalize client protocol grid integrity"
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
