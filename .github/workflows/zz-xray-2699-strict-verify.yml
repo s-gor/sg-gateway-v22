@@ -119,6 +119,22 @@ jobs:
           actual="$(/tmp/xray-2699-final/xray version | head -n1 | awk '{print $2}' | sed 's/^v//')"
           test "$actual" = '26.9.9'
 
+      - name: Snapshot exact tested Xray product files
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=(
+            app/routing/runtime.py
+            app/web/templates/_xray_xmux_settings.html
+            install.sh
+            release-manifest.json
+            tests/test_fix30_routing_ip_family.py
+            tests/test_preview31_xray_updates.py
+            tests/test_sg_gateway_02208_xmux_xray2699.py
+          )
+          tar -cf /tmp/xray-2699-product-snapshot.tar "${files[@]}"
+          sha256sum "${files[@]}" > /tmp/xray-2699-product-snapshot.sha256
+
       - name: Prepare isolated baseline checkout
         uses: actions/checkout@v4
         with:
@@ -153,9 +169,14 @@ jobs:
           cat /tmp/new-final.outcomes
           test ! -s /tmp/new-final.outcomes
 
-      - name: Reset manifest verifier side effect before product guard
+      - name: Restore exact tested product snapshot after test side effects
         shell: bash
-        run: git checkout HEAD -- SOURCE-SHA256SUMS
+        run: |
+          set -euo pipefail
+          git restore --worktree --source=HEAD -- .
+          tar -xf /tmp/xray-2699-product-snapshot.tar
+          rm -f tests/test_sg_gateway_02208_xmux_xray26728.py
+          sha256sum -c /tmp/xray-2699-product-snapshot.sha256
 
       - name: Ensure only intended product files changed
         shell: bash
