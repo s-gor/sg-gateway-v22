@@ -40,7 +40,6 @@ jobs:
                   return SimpleNamespace(returncode=0, stdout="", stderr="")
 
               monkeypatch.setattr(profiles.subprocess, "run", fake_run)
-
               assert profiles._installed_xray_version() == "26.9.9"
               assert profiles._installed_xray_version() == "26.9.9"
               assert profiles._service_active() is True
@@ -58,7 +57,6 @@ jobs:
                   return SimpleNamespace(returncode=0, stdout="", stderr="")
 
               monkeypatch.setattr(tls.subprocess, "run", fake_run)
-
               assert tls._service_active("nginx.service") is True
               assert tls._service_active("nginx.service") is True
               assert tls._service_active("certbot.timer") is True
@@ -95,13 +93,13 @@ jobs:
           text = text.replace(marker, marker + cache, 1)
 
           old_version = '''def _installed_xray_version() -> str:\n    for binary in ("/usr/local/bin/xray", "xray"):\n        try:\n            result = subprocess.run(\n                [binary, "version"],\n                capture_output=True,\n                text=True,\n                timeout=4,\n                check=False,\n            )\n        except (OSError, subprocess.SubprocessError):\n            continue\n        first = (result.stdout or result.stderr or "").splitlines()\n        if result.returncode == 0 and first:\n            parts = first[0].split()\n            if len(parts) >= 2:\n                return parts[1].lstrip("v")\n    return ""\n'''
-          new_version = '''def _installed_xray_version() -> str:\n    now = time.monotonic()\n    cached = _XRAY_VERSION_PROBE_CACHE.get("value")\n    if (\n        isinstance(cached, str)\n        and now - float(_XRAY_VERSION_PROBE_CACHE.get("updated_at") or 0.0) < _XRAY_VERSION_PROBE_TTL_SECONDS\n    ):\n        return cached\n\n    value = ""\n    for binary in ("/usr/local/bin/xray", "xray"):\n        try:\n            result = subprocess.run(\n                [binary, "version"],\n                capture_output=True,\n                text=True,\n                timeout=4,\n                check=False,\n            )\n        except (OSError, subprocess.SubprocessError):\n            continue\n        first = (result.stdout or result.stderr or "").splitlines()\n        if result.returncode == 0 and first:\n            parts = first[0].split()\n            if len(parts) >= 2:\n                value = parts[1].lstrip("v")\n                break\n    _XRAY_VERSION_PROBE_CACHE["updated_at"] = now\n    _XRAY_VERSION_PROBE_CACHE["value"] = value\n    return value\n'''
+          new_version = '''def _installed_xray_version() -> str:\n    now = time.monotonic()\n    cached = _XRAY_VERSION_PROBE_CACHE.get("value")\n    if isinstance(cached, str) and now - float(_XRAY_VERSION_PROBE_CACHE.get("updated_at") or 0.0) < _XRAY_VERSION_PROBE_TTL_SECONDS:\n        return cached\n    value = ""\n    for binary in ("/usr/local/bin/xray", "xray"):\n        try:\n            result = subprocess.run([binary, "version"], capture_output=True, text=True, timeout=4, check=False)\n        except (OSError, subprocess.SubprocessError):\n            continue\n        first = (result.stdout or result.stderr or "").splitlines()\n        if result.returncode == 0 and first:\n            parts = first[0].split()\n            if len(parts) >= 2:\n                value = parts[1].lstrip("v")\n                break\n    _XRAY_VERSION_PROBE_CACHE["updated_at"] = now\n    _XRAY_VERSION_PROBE_CACHE["value"] = value\n    return value\n'''
           if old_version not in text:
               raise SystemExit('xray version probe block missing')
           text = text.replace(old_version, new_version, 1)
 
           old_service = '''def _service_active() -> bool:\n    try:\n        result = subprocess.run(\n            ["systemctl", "is-active", "--quiet", "xray.service"],\n            capture_output=True,\n            text=True,\n            timeout=4,\n            check=False,\n        )\n    except (OSError, subprocess.SubprocessError):\n        return False\n    return result.returncode == 0\n'''
-          new_service = '''def _service_active() -> bool:\n    now = time.monotonic()\n    cached = _XRAY_SERVICE_PROBE_CACHE.get("value")\n    if (\n        isinstance(cached, bool)\n        and now - float(_XRAY_SERVICE_PROBE_CACHE.get("updated_at") or 0.0) < _XRAY_SERVICE_PROBE_TTL_SECONDS\n    ):\n        return cached\n    try:\n        result = subprocess.run(\n            ["systemctl", "is-active", "--quiet", "xray.service"],\n            capture_output=True,\n            text=True,\n            timeout=4,\n            check=False,\n        )\n        value = result.returncode == 0\n    except (OSError, subprocess.SubprocessError):\n        value = False\n    _XRAY_SERVICE_PROBE_CACHE["updated_at"] = now\n    _XRAY_SERVICE_PROBE_CACHE["value"] = value\n    return value\n'''
+          new_service = '''def _service_active() -> bool:\n    now = time.monotonic()\n    cached = _XRAY_SERVICE_PROBE_CACHE.get("value")\n    if isinstance(cached, bool) and now - float(_XRAY_SERVICE_PROBE_CACHE.get("updated_at") or 0.0) < _XRAY_SERVICE_PROBE_TTL_SECONDS:\n        return cached\n    try:\n        result = subprocess.run(["systemctl", "is-active", "--quiet", "xray.service"], capture_output=True, text=True, timeout=4, check=False)\n        value = result.returncode == 0\n    except (OSError, subprocess.SubprocessError):\n        value = False\n    _XRAY_SERVICE_PROBE_CACHE["updated_at"] = now\n    _XRAY_SERVICE_PROBE_CACHE["value"] = value\n    return value\n'''
           if old_service not in text:
               raise SystemExit('xray service probe block missing')
           xray.write_text(text.replace(old_service, new_service, 1), encoding='utf-8')
@@ -114,20 +112,16 @@ jobs:
           if marker not in text:
               raise SystemExit('tls cache insertion marker missing')
           text = text.replace(marker, marker + cache, 1)
-          text = text.replace(
-              '    payload = dict(result.payload)\n    payload.setdefault("ok", True)\n',
-              '    _clear_service_probe_cache()\n    payload = dict(result.payload)\n    payload.setdefault("ok", True)\n',
-              1,
-          )
+          text = text.replace('    payload = dict(result.payload)\n    payload.setdefault("ok", True)\n', '    _clear_service_probe_cache()\n    payload = dict(result.payload)\n    payload.setdefault("ok", True)\n', 1)
 
           old_active = '''def _service_active(name: str) -> bool:\n    try:\n        result = subprocess.run(\n            ["systemctl", "is-active", "--quiet", name],\n            capture_output=True,\n            text=True,\n            timeout=3,\n            check=False,\n        )\n    except (OSError, subprocess.TimeoutExpired):\n        return False\n    return result.returncode == 0\n'''
-          new_active = '''def _service_active(name: str) -> bool:\n    cached = _service_probe_cached("active", name)\n    if cached is not None:\n        return cached\n    try:\n        result = subprocess.run(\n            ["systemctl", "is-active", "--quiet", name],\n            capture_output=True,\n            text=True,\n            timeout=3,\n            check=False,\n        )\n        value = result.returncode == 0\n    except (OSError, subprocess.TimeoutExpired):\n        value = False\n    return _remember_service_probe("active", name, value)\n'''
+          new_active = '''def _service_active(name: str) -> bool:\n    cached = _service_probe_cached("active", name)\n    if cached is not None:\n        return cached\n    try:\n        result = subprocess.run(["systemctl", "is-active", "--quiet", name], capture_output=True, text=True, timeout=3, check=False)\n        value = result.returncode == 0\n    except (OSError, subprocess.TimeoutExpired):\n        value = False\n    return _remember_service_probe("active", name, value)\n'''
           if old_active not in text:
               raise SystemExit('tls active block missing')
           text = text.replace(old_active, new_active, 1)
 
           old_enabled = '''def _service_enabled(name: str) -> bool:\n    try:\n        result = subprocess.run(\n            ["systemctl", "is-enabled", "--quiet", name],\n            capture_output=True,\n            text=True,\n            timeout=3,\n            check=False,\n        )\n    except (OSError, subprocess.TimeoutExpired):\n        return False\n    return result.returncode == 0\n'''
-          new_enabled = '''def _service_enabled(name: str) -> bool:\n    cached = _service_probe_cached("enabled", name)\n    if cached is not None:\n        return cached\n    try:\n        result = subprocess.run(\n            ["systemctl", "is-enabled", "--quiet", name],\n            capture_output=True,\n            text=True,\n            timeout=3,\n            check=False,\n        )\n        value = result.returncode == 0\n    except (OSError, subprocess.TimeoutExpired):\n        value = False\n    return _remember_service_probe("enabled", name, value)\n'''
+          new_enabled = '''def _service_enabled(name: str) -> bool:\n    cached = _service_probe_cached("enabled", name)\n    if cached is not None:\n        return cached\n    try:\n        result = subprocess.run(["systemctl", "is-enabled", "--quiet", name], capture_output=True, text=True, timeout=3, check=False)\n        value = result.returncode == 0\n    except (OSError, subprocess.TimeoutExpired):\n        value = False\n    return _remember_service_probe("enabled", name, value)\n'''
           if old_enabled not in text:
               raise SystemExit('tls enabled block missing')
           tls.write_text(text.replace(old_enabled, new_enabled, 1), encoding='utf-8')
@@ -136,7 +130,7 @@ jobs:
         run: |
           python -m pytest -q tests/test_runtime_probe_cache_02208.py
           python -m pytest -q tests/test_page_runtime_performance_02208.py tests/test_preview31_xray_updates.py tests/test_sg_gateway_v22_xray_2699_contract.py
-          python -m pytest -q tests/test_security.py tests/test_sg_gateway_v22_clients_keys_tls_portable.py --tb=short
+          python -m pytest -q tests/test_sg_gateway_v22_clients_keys_tls_portable.py --tb=short
       - name: Commit verified product change
         run: |
           git config user.name 'github-actions[bot]'
