@@ -96,6 +96,7 @@ def test_02208_ui_has_two_locked_presets_manual_fields_and_raw_json() -> None:
     assert "Client Extra JSON" in partial
     assert "Для РФ — уменьшенный" not in partial
     assert "Xray-core 26.9.9 · закреплено" in partial
+    assert "Xray-core 26.7.28" not in partial
     for key in (
         "maxConcurrency",
         "maxConnections",
