@@ -54,3 +54,4 @@ jobs:
           git add -A
           git commit -m "fix: unify client protocol picker as 3x3 grid"
           git push origin HEAD:tmp/02208-unify-connections-inner-rails-v3
+# rerun after test syntax fix
