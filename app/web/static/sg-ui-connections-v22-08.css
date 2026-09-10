@@ -349,3 +349,21 @@ body.page-connections :is(
   white-space: nowrap;
 }
 
+/* Mieru user-hint toggle: use the same compact switch language as protocol controls. */
+body.page-connections .mhv2-user-hint-switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 34px;
+  margin-top: 2px;
+  font-weight: 700;
+}
+
+body.page-connections .mhv2-user-hint-control {
+  flex: 0 0 auto;
+}
+
+body.page-connections .mhv2-user-hint-control .sg-runtime-copy {
+  display: none;
+}

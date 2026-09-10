@@ -82,10 +82,13 @@
                 {% endfor %}
               </select>
             </label>
-            <label class="mhv2-check">
-              <input type="checkbox" name="mieru_user_hint_mandatory"
-                     {% if mihomo.settings.mieru_user_hint_mandatory %}checked{% endif %}>
+            <label class="mhv2-user-hint-switch">
               <span>Требовать user hint</span>
+              <span class="sg-runtime-switch mhv2-user-hint-control">
+                <input type="checkbox" name="mieru_user_hint_mandatory"
+                       {% if mihomo.settings.mieru_user_hint_mandatory %}checked{% endif %}>
+                <span class="sg-runtime-track" aria-hidden="true"><i></i></span>
+              </span>
             </label>
           </div>
         </details>

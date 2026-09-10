@@ -81,3 +81,11 @@ def test_protocol_cards_share_one_visual_shell_and_naive_has_no_duplicate_port()
     assert 'data-naive-port' not in NAIVE
     assert 'data-naive-endpoint' not in NAIVE
     assert "`${domain}:${activePort}`" in NAIVE
+
+def test_mieru_user_hint_uses_compact_switch_not_native_checkbox_row() -> None:
+    assert 'class="mhv2-user-hint-switch"' in MIHOMO
+    assert 'class="sg-runtime-switch mhv2-user-hint-control"' in MIHOMO
+    assert 'name="mieru_user_hint_mandatory"' in MIHOMO
+    assert 'class="mhv2-check"' not in MIHOMO
+    assert '.mhv2-user-hint-switch {' in CSS
+
