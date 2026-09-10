@@ -91,6 +91,20 @@ body.page-connections :is(
   gap: var(--sg-ui-grid-gap, 12px);
 }
 
+/* Keep Mieru, AnyTLS and TUIC as one full-width row aligned with the lower engine pair. */
+body.page-connections .mhv2-listeners {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: stretch;
+  width: calc(100% + 36px);
+  margin-inline: -18px;
+}
+
+body.page-connections .mhv2-listener {
+  box-sizing: border-box;
+  height: 100%;
+  min-width: 0;
+}
+
 body.page-connections :is(
   #xray-xmux .xmux1-actions,
   .mhv2-actions,
@@ -160,8 +174,14 @@ body.page-connections .xps2-naiveproxy-body .cnv1-form-actions {
   padding-top: 0;
 }
 
+/* The installed Xray version is sufficient; the internal pin is not user-facing UI. */
+body.page-connections .xps2-version-stack > small {
+  display: none !important;
+}
+
 @media (max-width: 900px) {
-  body.page-connections .cnv1-engine-pair.sg-ui-grid {
+  body.page-connections .cnv1-engine-pair.sg-ui-grid,
+  body.page-connections .mhv2-listeners {
     grid-template-columns: minmax(0, 1fr);
   }
 }
@@ -174,5 +194,9 @@ body.page-connections .xps2-naiveproxy-body .cnv1-form-actions {
   body.page-connections .cnv1-engine-xray .sg-ui-rail {
     padding-inline: var(--sg-ui-rail-inset, 14px);
   }
-}
 
+  body.page-connections .mhv2-listeners {
+    width: calc(100% + 28px);
+    margin-inline: -14px;
+  }
+}
