@@ -46,9 +46,6 @@ def test_health_summary_reuses_recent_expensive_scan(monkeypatch):
         return [health.HealthCheck("test", "ok", "ok")]
 
     monkeypatch.setattr(health, "collect_health_checks", fake_checks)
-    health._HEALTH_SUMMARY_CACHE["updated_at"] = 0.0
-    health._HEALTH_SUMMARY_CACHE["value"] = None
-
     assert health.health_summary() == "ok"
     assert health.health_summary() == "ok"
     assert calls == 1
