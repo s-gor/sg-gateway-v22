@@ -83,7 +83,6 @@ from app.maintenance.full_backups import (
 from app.maintenance.diagnostics import build_diagnostic_report, build_diagnostic_report_json
 from app.maintenance.health import collect_health_checks, health_summary
 from app.maintenance.operations import list_operations, log_operation
-from app.maintenance.service import collect_diagnostics
 from app.maintenance.xray_updates import overview as xray_update_overview
 from app.maintenance.panel_updates import overview as panel_update_overview
 from app.maintenance.core_updates import overview as core_update_overview
@@ -660,6 +659,53 @@ def _sg_gateway_system_context() -> dict:
         "backup_total": len(list_backups()),
         "release": get_release_manifest(),
     }
+
+def _maintenance_page_context(tab: str, *, refresh_updates: bool = False) -> dict:
+    context = {
+        "xray_updates": None,
+        "panel_updates": None,
+        "core_updates": None,
+        "geofiles_updates": None,
+        "runtime_contract": None,
+        "backups": [],
+        "backup_cleanup": None,
+        "data_backups": [],
+        "verified_data_backup": None,
+        "full_backups": [],
+        "verified_full_backup": None,
+        "operations": [],
+        "health_checks": [],
+        "release": get_release_manifest(),
+    }
+    if tab == "updates":
+        context["xray_updates"] = xray_update_overview(refresh=refresh_updates)
+        context["panel_updates"] = panel_update_overview(refresh=refresh_updates)
+        context["core_updates"] = core_update_overview(refresh=refresh_updates)
+        context["geofiles_updates"] = geofiles_overview()
+        runtime_result = run_hostd_command("runtime.contract", timeout=20)
+        runtime_contract = dict(runtime_result.payload or {})
+        if not runtime_contract:
+            runtime_contract = {
+                "ok": False,
+                "checks": [],
+                "message": runtime_result.message or "Runtime Contract недоступен",
+            }
+        context["runtime_contract"] = runtime_contract
+        return context
+
+    backups = list_backups()
+    context.update(
+        backups=backups,
+        backup_cleanup=backup_cleanup_preview(backups),
+        data_backups=list_data_backups(),
+        verified_data_backup=get_verified_data_backup(),
+        full_backups=list_full_backups(),
+        verified_full_backup=get_verified_full_backup(),
+        operations=list_operations(),
+        health_checks=collect_health_checks(),
+    )
+    return context
+
 
 def create_app() -> Flask:
     config = load_config()
@@ -1722,45 +1768,13 @@ def create_app() -> Flask:
         tab = request.args.get("tab", "backups").strip().lower()
         if tab not in {"backups", "updates"}:
             tab = "backups"
-        updates = None
-        panel_updates = None
-        core_updates = None
-        geofiles_updates = None
-        runtime_contract = None
-        if tab == "updates":
-            refresh_updates = request.args.get("refresh") == "1"
-            updates = xray_update_overview(refresh=refresh_updates)
-            panel_updates = panel_update_overview(refresh=refresh_updates)
-            core_updates = core_update_overview(refresh=refresh_updates)
-            geofiles_updates = geofiles_overview()
-            runtime_result = run_hostd_command("runtime.contract", timeout=20)
-            runtime_contract = dict(runtime_result.payload or {})
-            if not runtime_contract:
-                runtime_contract = {
-                    "ok": False,
-                    "checks": [],
-                    "message": runtime_result.message or "Runtime Contract недоступен",
-                }
-        backups = list_backups()
         return render_template(
             "maintenance.html",
             active_page="maintenance",
             active_tab=tab,
-            xray_updates=updates,
-            panel_updates=panel_updates,
-            core_updates=core_updates,
-            geofiles_updates=geofiles_updates,
-            runtime_contract=runtime_contract,
-            diagnostics=collect_diagnostics(),
-            health_checks=collect_health_checks(),
-            backups=backups,
-            backup_cleanup=backup_cleanup_preview(backups),
-            data_backups=list_data_backups(),
-            verified_data_backup=get_verified_data_backup(),
-            full_backups=list_full_backups(),
-            verified_full_backup=get_verified_full_backup(),
-            operations=list_operations(),
-            release=get_release_manifest(),
+            **_maintenance_page_context(
+                tab, refresh_updates=request.args.get("refresh") == "1"
+            ),
         )
 
     @app.post("/maintenance/panel/update")
