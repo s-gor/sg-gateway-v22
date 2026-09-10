@@ -36,7 +36,7 @@ def test_naiveproxy_uses_same_compact_card_family() -> None:
 def test_compact_protocol_polish_removes_noise() -> None:
     assert 'cnv1-compact-protocol-grid sg-ui-rail' in TEMPLATE
     assert 'UDP VPN + HTTPS PROXY' not in TEMPLATE
-    assert 'AmneziaWG 3.1 · NaiveProxy' not in TEMPLATE
+    assert '<h2>AmneziaWG 3.1 · NaiveProxy</h2>' in TEMPLATE
     assert 'Два независимых подключения в одном компактном блоке.' not in TEMPLATE
     assert 'country_name(awg31_country)' not in AWG31
     assert 'HTTPS proxy · TLS · порт' in NAIVE
@@ -82,6 +82,7 @@ def test_protocol_cards_share_one_visual_shell_and_naive_has_no_duplicate_port()
     assert 'data-naive-endpoint' not in NAIVE
     assert "`${domain}:${activePort}`" in NAIVE
 
+
 def test_mieru_user_hint_uses_compact_switch_not_native_checkbox_row() -> None:
     assert 'class="mhv2-user-hint-switch"' in MIHOMO
     assert 'class="sg-runtime-switch mhv2-user-hint-control"' in MIHOMO
@@ -89,3 +90,11 @@ def test_mieru_user_hint_uses_compact_switch_not_native_checkbox_row() -> None:
     assert 'class="mhv2-check"' not in MIHOMO
     assert '.mhv2-user-hint-switch {' in CSS
 
+
+def test_lower_engine_shells_match_xray_outer_card_language() -> None:
+    assert 'mhv2-head cnv1-engine-head cnv1-peer-engine-head' in MIHOMO
+    assert 'cnv1-engine-logo mihomo' in MIHOMO
+    assert 'cnv1-compact-protocols cnv1-engine-card sg-ljd-card sg-ui-card sg-ui-section' in TEMPLATE
+    assert '<h2>AmneziaWG 3.1 · NaiveProxy</h2>' in TEMPLATE
+    assert '2 протокола' in TEMPLATE
+    assert '/* Unified engine shells: Xray, Mihomo and AWG31/NaiveProxy share one outer-card language. */' in CSS
