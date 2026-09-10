@@ -72,6 +72,7 @@ def test_mihomo_and_compact_protocol_cards_match_xray_outline() -> None:
 def test_mihomo_does_not_add_a_second_inner_rail() -> None:
     assert 'class="mhv2-inner-rail">' in MIHOMO
     assert 'class="mhv2-inner-rail sg-ui-rail">' not in MIHOMO
+    assert 'body.page-connections .mhv2-inner-rail {\n  padding: 0 0 var(--sg-ui-card-pad, 18px);' in CSS
 
 
 def test_protocol_cards_share_one_visual_shell_and_naive_has_no_duplicate_port() -> None:

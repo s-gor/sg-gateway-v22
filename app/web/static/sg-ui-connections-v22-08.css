@@ -403,7 +403,7 @@ body.page-connections .cnv1-compact-protocols .sg-ui-rail {
 }
 
 body.page-connections .mhv2-inner-rail {
-  padding: 0 var(--sg-ui-rail-inset, 18px) var(--sg-ui-card-pad, 18px);
+  padding: 0 0 var(--sg-ui-card-pad, 18px);
 }
 
 @media (max-width: 620px) {
