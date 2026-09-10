@@ -1,0 +1,52 @@
+name: Strict Xray 26.9.9 verification
+
+on:
+  push:
+    branches:
+      - feature/02208-xray-26-9-9
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Remove transient verifier from workspace
+        run: rm .github/workflows/zz-xray-2699-strict-verify.yml
+
+      - name: Install test dependencies
+        run: python -m pip install -r requirements-dev.txt
+
+      - name: Verify exact bundled archive SHA256
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep '  vendor/cores/Xray-linux-64.zip$' SOURCE-SHA256SUMS | sha256sum -c -
+          cd vendor/cores
+          grep '  Xray-linux-64.zip$' SHA256SUMS | sha256sum -c -
+
+      - name: Verify executable reports Xray 26.9.9
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/xray-2699-strict
+          mkdir -p /tmp/xray-2699-strict
+          unzip -q vendor/cores/Xray-linux-64.zip -d /tmp/xray-2699-strict
+          test -x /tmp/xray-2699-strict/xray
+          actual="$(/tmp/xray-2699-strict/xray version | head -n1 | awk '{print $2}' | sed 's/^v//')"
+          test "$actual" = '26.9.9'
+
+      - name: Run Xray 26.9.9 contract tests without fallback
+        run: python -m pytest -q tests/test_sg_gateway_v22_xray_2699_contract.py
+
+      - name: Run complete test suite without fallback
+        run: python -m pytest -q tests
