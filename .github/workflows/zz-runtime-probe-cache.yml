@@ -67,17 +67,19 @@ jobs:
               assert tls._service_enabled("certbot.timer") is True
               assert len(calls) == 3
           PY
-      - name: Prove RED
+      - name: Prove RED on pre-stage product
         run: |
+          git worktree add --detach /tmp/pre-stage a5dd302a260915cdd930a792d7fc417a11bed122
+          cp tests/test_runtime_probe_cache_02208.py /tmp/pre-stage/tests/
           set +e
-          python -m pytest -q tests/test_runtime_probe_cache_02208.py
+          (cd /tmp/pre-stage && python -m pytest -q tests/test_runtime_probe_cache_02208.py)
           rc=$?
           set -e
           if [ "$rc" -eq 0 ]; then
-            echo 'Expected RED but tests passed'
+            echo 'Expected RED but pre-stage product passed'
             exit 1
           fi
-          echo 'RED confirmed'
+          echo 'RED confirmed on exact pre-stage SHA'
       - name: Implement bounded probe caches
         run: |
           python - <<'PY'
@@ -130,11 +132,11 @@ jobs:
               raise SystemExit('tls enabled block missing')
           tls.write_text(text.replace(old_enabled, new_enabled, 1), encoding='utf-8')
           PY
-      - name: Prove GREEN
+      - name: Prove GREEN focused
         run: |
           python -m pytest -q tests/test_runtime_probe_cache_02208.py
           python -m pytest -q tests/test_page_runtime_performance_02208.py tests/test_preview31_xray_updates.py tests/test_sg_gateway_v22_xray_2699_contract.py
-          python -m pytest -q tests -k 'tls and not browser' --tb=short
+          python -m pytest -q tests/test_security.py tests/test_sg_gateway_v22_clients_keys_tls_portable.py --tb=short
       - name: Commit verified product change
         run: |
           git config user.name 'github-actions[bot]'
