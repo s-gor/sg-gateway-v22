@@ -367,3 +367,48 @@ body.page-connections .mhv2-user-hint-control {
 body.page-connections .mhv2-user-hint-control .sg-runtime-copy {
   display: none;
 }
+
+
+/* Unified engine shells: Xray, Mihomo and AWG31/NaiveProxy share one outer-card language. */
+body.page-connections :is(
+  .mhv2-panel.cnv1-engine-card,
+  .cnv1-compact-protocols.cnv1-engine-card
+) {
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--sg-line);
+  border-radius: var(--sg-ui-card-radius, 15px);
+  background: var(--sg-panel);
+  box-shadow: inset 0 1px rgba(255,255,255,.018);
+}
+
+body.page-connections .mhv2-head.cnv1-engine-head,
+body.page-connections .cnv1-compact-protocols > .cnv1-engine-head {
+  margin: 0;
+  padding: var(--sg-ui-card-pad, 18px);
+}
+
+body.page-connections .cnv1-engine-logo.mihomo {
+  border: 1px solid color-mix(in srgb, var(--sg-blue) 28%, transparent);
+  background: color-mix(in srgb, var(--sg-blue) 12%, transparent);
+  color: var(--sg-blue);
+}
+
+body.page-connections .cnv1-compact-protocols {
+  padding-block: 0;
+}
+
+body.page-connections .cnv1-compact-protocols .sg-ui-rail {
+  padding: 0 var(--sg-ui-rail-inset, 18px) var(--sg-ui-card-pad, 18px);
+}
+
+body.page-connections .mhv2-inner-rail {
+  padding: 0 var(--sg-ui-rail-inset, 18px) var(--sg-ui-card-pad, 18px);
+}
+
+@media (max-width: 620px) {
+  body.page-connections .cnv1-compact-protocols .sg-ui-rail,
+  body.page-connections .mhv2-inner-rail {
+    padding-inline: var(--sg-ui-rail-inset, 14px);
+  }
+}

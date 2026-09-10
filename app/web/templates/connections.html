@@ -307,7 +307,20 @@
 
   {% include "_mihomo_panel.html" %}
 
-  <section class="cnv1-compact-protocols cnv1-engine-card sg-ljd-card sg-ui-card">
+  <section class="cnv1-compact-protocols cnv1-engine-card sg-ljd-card sg-ui-card sg-ui-section">
+    <header class="cnv1-engine-head cnv1-peer-engine-head">
+      <div class="cnv1-engine-title">
+        <div class="cnv1-engine-logo awg">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h4l2-5 4 10 2-5h4"/></svg>
+        </div>
+        <div>
+          <div class="cnv1-card-kicker">UDP VPN · HTTPS PROXY</div>
+          <h2>AmneziaWG 3.1 · NaiveProxy</h2>
+          <p>Два независимых подключения SG-Gateway.</p>
+        </div>
+      </div>
+      <span class="cnv1-port-chip">2 протокола</span>
+    </header>
     <div class="cnv1-compact-protocol-grid sg-ui-rail">
       {% include "_awg31_panel.html" %}
       {% include "_naiveproxy_panel.html" %}

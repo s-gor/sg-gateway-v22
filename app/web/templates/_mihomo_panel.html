@@ -1,12 +1,17 @@
-<section class="mhv2-panel cnv1-engine-card cnv1-engine-mihomo sg-ljd-card" id="mihomo">
+<section class="mhv2-panel cnv1-engine-card cnv1-engine-mihomo sg-ljd-card sg-ui-card sg-ui-section" id="mihomo">
   {% set mieru_state = mihomo.protocols|selectattr('id', 'equalto', 'mieru')|first %}
   {% set anytls_state = mihomo.protocols|selectattr('id', 'equalto', 'anytls')|first %}
   {% set tuic_state = mihomo.protocols|selectattr('id', 'equalto', 'tuic')|first %}
-  <header class="mhv2-head">
-    <div>
-      <div class="mhv2-kicker">MIHOMO + SING-BOX</div>
+  <header class="mhv2-head cnv1-engine-head cnv1-peer-engine-head">
+    <div class="cnv1-engine-title">
+      <div class="cnv1-engine-logo mihomo">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h14"/></svg>
+      </div>
+      <div>
+        <div class="mhv2-kicker cnv1-card-kicker">MIHOMO + SING-BOX</div>
       <h2>Mieru · AnyTLS · TUIC v5</h2>
-      <p>Три независимых listener двух движков.</p>
+        <p>Три независимых listener двух движков.</p>
+      </div>
     </div>
     <span class="mhv2-state {{ 'ok' if mihomo.service_active else 'warning' }}">
       {{ 'Работает' if mihomo.service_active else 'Не запущен' }}
