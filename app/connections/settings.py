@@ -17,6 +17,16 @@ class ConnectionSettings:
     config: dict
 
 
+def _row_to_settings(row) -> ConnectionSettings:
+    return ConnectionSettings(
+        engine=row["engine"],
+        enabled=bool(row["enabled"]),
+        host=row["host"],
+        port=int(row["port"]),
+        config=json.loads(row["config_json"]),
+    )
+
+
 def get_connection_settings(engine: str) -> ConnectionSettings:
     with connect() as connection:
         row = connection.execute(
@@ -30,14 +40,20 @@ def get_connection_settings(engine: str) -> ConnectionSettings:
 
     if row is None:
         raise KeyError(f"Unknown connection engine: {engine}")
+    return _row_to_settings(row)
 
-    return ConnectionSettings(
-        engine=row["engine"],
-        enabled=bool(row["enabled"]),
-        host=row["host"],
-        port=int(row["port"]),
-        config=json.loads(row["config_json"]),
-    )
+
+def list_connection_settings(engines) -> dict[str, ConnectionSettings]:
+    names = tuple(dict.fromkeys(str(engine) for engine in engines if str(engine)))
+    if not names:
+        return {}
+    placeholders = ",".join("?" for _ in names)
+    with connect() as connection:
+        rows = connection.execute(
+            f"SELECT engine, enabled, host, port, config_json FROM connection_settings WHERE engine IN ({placeholders})",
+            names,
+        ).fetchall()
+    return {str(row["engine"]): _row_to_settings(row) for row in rows}
 
 
 def _clean_host(host: str) -> str | None:

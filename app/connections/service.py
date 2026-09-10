@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from app.connections.geoip_country import lookup_country_code
 from app.connections.public_endpoint import public_host
-from app.connections.settings import get_connection_settings
+from app.connections.settings import list_connection_settings
 from app.db import connect
 
 COUNTRY_NAMES = {
@@ -53,8 +53,7 @@ def _country_for(settings) -> str:
     return detected if detected != "unknown" else "unknown"
 
 
-def _summary(name: str, label: str, counts: dict[str, int], *, note: str = "") -> ConnectionSummary:
-    settings = get_connection_settings(name)
+def _summary(name: str, label: str, counts: dict[str, int], settings, *, note: str = "") -> ConnectionSummary:
     host = public_host(settings.host)
     country = _country_for(settings)
     return ConnectionSummary(
@@ -82,10 +81,11 @@ def list_connections() -> list[ConnectionSummary]:
         ).fetchall()
 
     counts = {str(row["engine"]): int(row["total"]) for row in rows}
+    settings_map = list_connection_settings(("xray", "mihomo", "amneziawg31"))
 
-    xray = _summary("xray", "Xray Reality", counts)
+    xray = _summary("xray", "Xray Reality", counts, settings_map["xray"])
 
-    mihomo_settings = get_connection_settings("mihomo")
+    mihomo_settings = settings_map["mihomo"]
     mihomo_host = public_host(mihomo_settings.host)
     mihomo_country = _country_for(mihomo_settings)
     mihomo = ConnectionSummary(
@@ -104,7 +104,7 @@ def list_connections() -> list[ConnectionSummary]:
         public_host=mihomo_host,
     )
 
-    awg31 = _summary("amneziawg31", "AmneziaWG 3.1", counts)
+    awg31 = _summary("amneziawg31", "AmneziaWG 3.1", counts, settings_map["amneziawg31"])
 
     # AWG2/AWG3 are retired. Their legacy settings/credentials may remain in
     # old backups, but they are deliberately absent from the Connections UI.
