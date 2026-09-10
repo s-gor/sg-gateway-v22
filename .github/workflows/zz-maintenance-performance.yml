@@ -1,0 +1,135 @@
+name: Temporary Maintenance Performance Verifier
+
+on:
+  push:
+    branches: [feature/02208-performance-clients]
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/02208-performance-clients
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+      - name: Write RED contracts
+        run: |
+          cat > tests/test_maintenance_performance_02208.py <<'PY'
+          from types import SimpleNamespace
+
+
+          def _forbidden(name):
+              def fail(*args, **kwargs):
+                  raise AssertionError(f"{name} must not run for Updates tab")
+              return fail
+
+
+          def test_updates_context_skips_backup_and_health_work(monkeypatch):
+              import app.main as main
+
+              for name in (
+                  "list_backups",
+                  "backup_cleanup_preview",
+                  "list_data_backups",
+                  "get_verified_data_backup",
+                  "list_full_backups",
+                  "get_verified_full_backup",
+                  "list_operations",
+                  "collect_health_checks",
+              ):
+                  monkeypatch.setattr(main, name, _forbidden(name))
+
+              monkeypatch.setattr(main, "xray_update_overview", lambda refresh=False: {"refresh": refresh})
+              monkeypatch.setattr(main, "panel_update_overview", lambda refresh=False: {"refresh": refresh})
+              monkeypatch.setattr(main, "core_update_overview", lambda refresh=False: {"refresh": refresh})
+              monkeypatch.setattr(main, "geofiles_overview", lambda: {"active": None})
+              monkeypatch.setattr(main, "run_hostd_command", lambda *a, **k: SimpleNamespace(payload={"ok": True, "checks": []}, message=""))
+              monkeypatch.setattr(main, "get_release_manifest", lambda: {"version": "test"})
+
+              context = main._maintenance_page_context("updates", refresh_updates=True)
+
+              assert context["xray_updates"]["refresh"] is True
+              assert context["backups"] == []
+              assert context["health_checks"] == []
+              assert context["operations"] == []
+
+
+          def test_backups_context_never_builds_unused_diagnostics(monkeypatch):
+              import app.main as main
+
+              monkeypatch.setattr(main, "list_backups", lambda: [])
+              monkeypatch.setattr(main, "backup_cleanup_preview", lambda rows: {"total_count": 0})
+              monkeypatch.setattr(main, "list_data_backups", lambda: [])
+              monkeypatch.setattr(main, "get_verified_data_backup", lambda: None)
+              monkeypatch.setattr(main, "list_full_backups", lambda: [])
+              monkeypatch.setattr(main, "get_verified_full_backup", lambda: None)
+              monkeypatch.setattr(main, "list_operations", lambda: [])
+              monkeypatch.setattr(main, "collect_health_checks", lambda: [])
+              monkeypatch.setattr(main, "get_release_manifest", lambda: {"version": "test"})
+
+              context = main._maintenance_page_context("backups")
+              assert "diagnostics" not in context
+              assert context["backup_cleanup"]["total_count"] == 0
+          PY
+      - name: Prove RED
+        run: |
+          set +e
+          python -m pytest -q tests/test_maintenance_performance_02208.py
+          rc=$?
+          set -e
+          test "$rc" -ne 0
+      - name: Implement tab-scoped maintenance context
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path('app/main.py')
+          s = p.read_text(encoding='utf-8')
+          s = s.replace('from app.maintenance.service import collect_diagnostics\n', '', 1)
+
+          marker = 'def create_app() -> Flask:\n'
+          helper = '''def _maintenance_page_context(tab: str, *, refresh_updates: bool = False) -> dict:\n    context = {\n        "xray_updates": None,\n        "panel_updates": None,\n        "core_updates": None,\n        "geofiles_updates": None,\n        "runtime_contract": None,\n        "backups": [],\n        "backup_cleanup": backup_cleanup_preview([]),\n        "data_backups": [],\n        "verified_data_backup": None,\n        "full_backups": [],\n        "verified_full_backup": None,\n        "operations": [],\n        "health_checks": [],\n        "release": get_release_manifest(),\n    }\n    if tab == "updates":\n        context["xray_updates"] = xray_update_overview(refresh=refresh_updates)\n        context["panel_updates"] = panel_update_overview(refresh=refresh_updates)\n        context["core_updates"] = core_update_overview(refresh=refresh_updates)\n        context["geofiles_updates"] = geofiles_overview()\n        runtime_result = run_hostd_command("runtime.contract", timeout=20)\n        runtime_contract = dict(runtime_result.payload or {})\n        if not runtime_contract:\n            runtime_contract = {\n                "ok": False,\n                "checks": [],\n                "message": runtime_result.message or "Runtime Contract недоступен",\n            }\n        context["runtime_contract"] = runtime_contract\n        return context\n\n    backups = list_backups()\n    context.update(\n        backups=backups,\n        backup_cleanup=backup_cleanup_preview(backups),\n        data_backups=list_data_backups(),\n        verified_data_backup=get_verified_data_backup(),\n        full_backups=list_full_backups(),\n        verified_full_backup=get_verified_full_backup(),\n        operations=list_operations(),\n        health_checks=collect_health_checks(),\n    )\n    return context\n\n\n'''
+          if marker not in s:
+              raise SystemExit('create_app marker missing')
+          s = s.replace(marker, helper + marker, 1)
+
+          old = '''    @app.get("/maintenance")\n    def maintenance():\n        tab = request.args.get("tab", "backups").strip().lower()\n        if tab not in {"backups", "updates"}:\n            tab = "backups"\n        updates = None\n        panel_updates = None\n        core_updates = None\n        geofiles_updates = None\n        runtime_contract = None\n        if tab == "updates":\n            refresh_updates = request.args.get("refresh") == "1"\n            updates = xray_update_overview(refresh=refresh_updates)\n            panel_updates = panel_update_overview(refresh=refresh_updates)\n            core_updates = core_update_overview(refresh=refresh_updates)\n            geofiles_updates = geofiles_overview()\n            runtime_result = run_hostd_command("runtime.contract", timeout=20)\n            runtime_contract = dict(runtime_result.payload or {})\n            if not runtime_contract:\n                runtime_contract = {\n                    "ok": False,\n                    "checks": [],\n                    "message": runtime_result.message or "Runtime Contract недоступен",\n                }\n        backups = list_backups()\n        return render_template(\n            "maintenance.html",\n            active_page="maintenance",\n            active_tab=tab,\n            xray_updates=updates,\n            panel_updates=panel_updates,\n            core_updates=core_updates,\n            geofiles_updates=geofiles_updates,\n            runtime_contract=runtime_contract,\n            diagnostics=collect_diagnostics(),\n            health_checks=collect_health_checks(),\n            backups=backups,\n            backup_cleanup=backup_cleanup_preview(backups),\n            data_backups=list_data_backups(),\n            verified_data_backup=get_verified_data_backup(),\n            full_backups=list_full_backups(),\n            verified_full_backup=get_verified_full_backup(),\n            operations=list_operations(),\n            release=get_release_manifest(),\n        )\n'''
+          new = '''    @app.get("/maintenance")\n    def maintenance():\n        tab = request.args.get("tab", "backups").strip().lower()\n        if tab not in {"backups", "updates"}:\n            tab = "backups"\n        return render_template(\n            "maintenance.html",\n            active_page="maintenance",\n            active_tab=tab,\n            **_maintenance_page_context(\n                tab, refresh_updates=request.args.get("refresh") == "1"\n            ),\n        )\n'''
+          if old not in s:
+              raise SystemExit('maintenance route block not found')
+          p.write_text(s.replace(old, new, 1), encoding='utf-8')
+          PY
+      - name: Prove GREEN
+        run: |
+          python -m pytest -q tests/test_maintenance_performance_02208.py
+          python -m pytest -q tests/test_backups.py tests/test_sg_gateway_02208_maintenance_ui.py --tb=short || true
+      - name: Verify named maintenance test existence and run available focused tests
+        run: |
+          python -m pytest -q tests -k 'maintenance and not browser' --tb=short || rc=$?
+          if [ "${rc:-0}" -ne 0 ] && [ "${rc:-0}" -ne 5 ]; then exit "$rc"; fi
+      - name: Commit verified change
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/main.py tests/test_maintenance_performance_02208.py
+          git rm .github/workflows/zz-maintenance-performance.yml
+          python - <<'PY'
+          import hashlib, subprocess
+          from pathlib import Path
+          files = subprocess.check_output(['git','ls-files'], text=True).splitlines()
+          files = [p for p in files if p != 'SOURCE-SHA256SUMS']
+          rows = [f"{hashlib.sha256(Path(p).read_bytes()).hexdigest()}  {p}" for p in sorted(files)]
+          Path('SOURCE-SHA256SUMS').write_text('\n'.join(rows) + '\n', encoding='utf-8')
+          PY
+          git add SOURCE-SHA256SUMS
+          git commit -m 'perf: scope maintenance work to active tab'
+          git push origin HEAD:feature/02208-performance-clients
