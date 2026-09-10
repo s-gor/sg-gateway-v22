@@ -153,6 +153,10 @@ jobs:
           cat /tmp/new-final.outcomes
           test ! -s /tmp/new-final.outcomes
 
+      - name: Reset manifest verifier side effect before product guard
+        shell: bash
+        run: git checkout HEAD -- SOURCE-SHA256SUMS
+
       - name: Ensure only intended product files changed
         shell: bash
         run: |
