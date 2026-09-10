@@ -347,7 +347,49 @@ def list_clients() -> list[Client]:
         rows = connection.execute(
             "SELECT id, name, enabled, expires_at FROM clients ORDER BY id DESC"
         ).fetchall()
-        return [_client_from_row(connection, row) for row in rows]
+        device_rows = connection.execute(
+            "SELECT id, client_id, enabled FROM devices ORDER BY client_id, id"
+        ).fetchall()
+        credential_rows = connection.execute(
+            """
+            SELECT d.client_id, dc.engine, dc.status
+            FROM device_credentials dc
+            JOIN devices d ON d.id = dc.device_id
+            ORDER BY d.client_id, dc.engine
+            """
+        ).fetchall()
+
+    devices_by_client: dict[int, list] = {}
+    for device in device_rows:
+        devices_by_client.setdefault(int(device["client_id"]), []).append(device)
+
+    credentials_by_client: dict[int, list] = {}
+    for credential in credential_rows:
+        credentials_by_client.setdefault(int(credential["client_id"]), []).append(credential)
+
+    clients: list[Client] = []
+    for row in rows:
+        client_id = int(row["id"])
+        devices = devices_by_client.get(client_id, [])
+        credentials = credentials_by_client.get(client_id, [])
+        clients.append(
+            Client(
+                id=client_id,
+                name=str(row["name"]),
+                enabled=bool(row["enabled"]),
+                expires_at=row["expires_at"],
+                awg_status=_aggregate_status(credentials, "amneziawg"),
+                awg3_status=_aggregate_status(credentials, "amneziawg3"),
+                xray_status=_aggregate_status(credentials, "xray"),
+                mihomo_status=_aggregate_status(credentials, "mihomo"),
+                anytls_status=_aggregate_status(credentials, "anytls"),
+                tuic_status=_aggregate_status(credentials, "tuic"),
+                sgclient_status=_aggregate_status(credentials, "sgclient"),
+                device_count=len(devices),
+                active_device_count=sum(1 for item in devices if bool(item["enabled"])),
+            )
+        )
+    return clients
 
 
 def get_client(client_id: int) -> Client | None:
