@@ -126,7 +126,7 @@
             <td>
               <div class="cv2-server-cell">
                 <img src="{{ country_flag_url(server_identity.country_code) }}" alt="{{ server_identity.country_name }}" width="24" height="16">
-                <div><strong>{{ server_identity.name }}</strong><small>{{ server_identity.address }}</small></div>
+                <div><strong>{{ server_identity.name }}</strong></div>
               </div>
             </td>
             <td><span class="cv2-pill {{ 'success' if client.enabled else 'danger' }}">{{ 'Активен' if client.enabled else 'Отключён' }}</span></td>
