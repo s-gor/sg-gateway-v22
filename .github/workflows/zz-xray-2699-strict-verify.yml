@@ -52,7 +52,6 @@ jobs:
               '        result["proxySettings"] = {"tag": proxy_tag}',
               '        result["streamSettings"] = {"sockopt": {"dialerProxy": proxy_tag}}',
           )
-
           replace_exact(
               'tests/test_fix30_routing_ip_family.py',
               '    assert warp6["proxySettings"] == {"tag": "warp-core"}',
@@ -86,27 +85,15 @@ jobs:
 
           replace_exact('install.sh', 'XRAY_REQUIRED_VERSION="v26.7.28"', 'XRAY_REQUIRED_VERSION="v26.9.9"')
           replace_exact('install.sh', 'XRAY_MINIMUM_VERSION="v26.7.28"', 'XRAY_MINIMUM_VERSION="v26.9.9"')
-
           replace_exact('release-manifest.json', '    "minimum_version": "v26.7.28",', '    "minimum_version": "v26.9.9",')
           replace_exact('release-manifest.json', '    "required_version": "v26.7.28",', '    "required_version": "v26.9.9",')
-
-          replace_exact(
-              'app/web/templates/_xray_xmux_settings.html',
-              'Xray-core 26.7.28 · закреплено',
-              'Xray-core 26.9.9 · закреплено',
-          )
+          replace_exact('app/web/templates/_xray_xmux_settings.html', 'Xray-core 26.7.28 · закреплено', 'Xray-core 26.9.9 · закреплено')
 
           old_test = Path('tests/test_sg_gateway_02208_xmux_xray26728.py')
           s = old_test.read_text(encoding='utf-8')
-          s = s.replace('xray_26728', 'xray_2699')
-          s = s.replace('26728', '2699')
-          s = s.replace('26.7.28', '26.9.9')
-          s = s.replace(
-              '8195d909f1109b8f3d99eefe401a3c451d7bf4af71f24d3815420f77e5dd2a40',
-              '1eb9175d0f0a8f8149c9230a7fc5ae66ce332ed20a53155ce61fe62e3f58b7df',
-          )
-          new_test = Path('tests/test_sg_gateway_02208_xmux_xray2699.py')
-          new_test.write_text(s, encoding='utf-8')
+          s = s.replace('xray_26728', 'xray_2699').replace('26728', '2699').replace('26.7.28', '26.9.9')
+          s = s.replace('8195d909f1109b8f3d99eefe401a3c451d7bf4af71f24d3815420f77e5dd2a40', '1eb9175d0f0a8f8149c9230a7fc5ae66ce332ed20a53155ce61fe62e3f58b7df')
+          Path('tests/test_sg_gateway_02208_xmux_xray2699.py').write_text(s, encoding='utf-8')
           old_test.unlink()
           PY
 
@@ -126,8 +113,7 @@ jobs:
           set -euo pipefail
           grep '  vendor/cores/Xray-linux-64.zip$' SOURCE-SHA256SUMS | sha256sum -c -
           (cd vendor/cores && grep '  Xray-linux-64.zip$' SHA256SUMS | sha256sum -c -)
-          rm -rf /tmp/xray-2699-final
-          mkdir -p /tmp/xray-2699-final
+          rm -rf /tmp/xray-2699-final && mkdir -p /tmp/xray-2699-final
           unzip -q vendor/cores/Xray-linux-64.zip -d /tmp/xray-2699-final
           test -x /tmp/xray-2699-final/xray
           actual="$(/tmp/xray-2699-final/xray version | head -n1 | awk '{print $2}' | sed 's/^v//')"
@@ -164,7 +150,6 @@ jobs:
         run: |
           set -euo pipefail
           comm -13 /tmp/baseline-final.outcomes /tmp/candidate-final.outcomes > /tmp/new-final.outcomes
-          echo '=== NEW FAILURES/ERRORS ==='
           cat /tmp/new-final.outcomes
           test ! -s /tmp/new-final.outcomes
 
@@ -185,9 +170,12 @@ jobs:
               'tests/test_sg_gateway_02208_xmux_xray26728.py',
               'tests/test_sg_gateway_02208_xmux_xray2699.py',
           }
-          changed = set(subprocess.check_output(['git','diff','--name-only','HEAD'], text=True).splitlines())
+          tracked = set(subprocess.check_output(['git','diff','--name-only','HEAD'], text=True).splitlines())
+          untracked = set(subprocess.check_output(['git','ls-files','--others','--exclude-standard'], text=True).splitlines())
+          untracked = {p for p in untracked if not p.startswith('baseline-compare/')}
+          changed = tracked | untracked
           if changed != expected:
-              raise SystemExit(f'unexpected changed files: {sorted(changed ^ expected)}; actual={sorted(changed)}')
+              raise SystemExit(f'unexpected changed files: symmetric_diff={sorted(changed ^ expected)} actual={sorted(changed)}')
           PY
 
       - name: Refresh SOURCE-SHA256SUMS for final product tree
@@ -199,14 +187,13 @@ jobs:
           from pathlib import Path
           transient = '.github/workflows/zz-xray-2699-strict-verify.yml'
           tracked = subprocess.check_output(['git','ls-files'], text=True, encoding='utf-8').splitlines()
-          tracked = [p for p in tracked if p not in {'SOURCE-SHA256SUMS', transient, 'tests/test_sg_gateway_02208_xmux_xray26728.py'}]
-          if Path('tests/test_sg_gateway_02208_xmux_xray2699.py').exists():
-              tracked.append('tests/test_sg_gateway_02208_xmux_xray2699.py')
+          tracked = [p for p in tracked if p not in {'SOURCE-SHA256SUMS', transient, 'tests/test_sg_gateway_02208_xmux_xray26728.py'} and not p.startswith('baseline-compare/')]
+          tracked.append('tests/test_sg_gateway_02208_xmux_xray2699.py')
           rows = []
           for p in sorted(set(tracked)):
               path = Path(p)
               if not path.is_file():
-                  raise SystemExit(f'missing tracked file while hashing: {p}')
+                  raise SystemExit(f'missing file while hashing: {p}')
               rows.append(f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {p}")
           Path('SOURCE-SHA256SUMS').write_text('\n'.join(rows) + '\n', encoding='utf-8')
           PY
@@ -217,15 +204,7 @@ jobs:
           set -euo pipefail
           git config user.name github-actions[bot]
           git config user.email 4189823+github-actions[bot]@users.noreply.github.com
-          git add \
-            app/routing/runtime.py \
-            app/web/templates/_xray_xmux_settings.html \
-            install.sh \
-            release-manifest.json \
-            tests/test_fix30_routing_ip_family.py \
-            tests/test_preview31_xray_updates.py \
-            tests/test_sg_gateway_02208_xmux_xray2699.py \
-            SOURCE-SHA256SUMS
+          git add app/routing/runtime.py app/web/templates/_xray_xmux_settings.html install.sh release-manifest.json tests/test_fix30_routing_ip_family.py tests/test_preview31_xray_updates.py tests/test_sg_gateway_02208_xmux_xray2699.py SOURCE-SHA256SUMS
           git rm tests/test_sg_gateway_02208_xmux_xray26728.py
           git rm .github/workflows/zz-xray-2699-strict-verify.yml
           git commit -m "fix: complete Xray 26.9.9 compatibility contract"
