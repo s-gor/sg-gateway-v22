@@ -110,3 +110,81 @@ def test_system_activity_api_uses_aggregate_counts_not_full_client_catalogue(mon
         payload = response.get_json()
 
     assert payload["clients"] == expected
+
+
+def test_connections_page_reuses_batched_settings(monkeypatch):
+    import app.main as main
+
+    settings_map = {
+        "xray": SimpleNamespace(engine="xray"),
+        "mihomo": SimpleNamespace(engine="mihomo"),
+        "amneziawg31": SimpleNamespace(engine="amneziawg31"),
+    }
+    calls = {"batch": 0, "connections": 0}
+
+    def batch(engines):
+        calls["batch"] += 1
+        assert tuple(engines) == ("xray", "mihomo", "amneziawg31")
+        return settings_map
+
+    def connections(*, settings_map=None):
+        calls["connections"] += 1
+        assert settings_map is not None
+        return []
+
+    monkeypatch.setattr(main, "list_connection_settings", batch, raising=False)
+    monkeypatch.setattr(main, "list_connections", connections)
+    monkeypatch.setattr(main, "get_connection_settings", lambda *_: (_ for _ in ()).throw(AssertionError("page must reuse batched settings")))
+    monkeypatch.setattr(main, "get_shared_awg_dns", lambda: None)
+    monkeypatch.setattr(main, "xray_profiles_overview", lambda: {})
+    monkeypatch.setattr(main, "mihomo_overview", lambda: {})
+    monkeypatch.setattr(main, "count_clients", lambda: 0)
+    monkeypatch.setattr(main, "render_template", lambda template, **context: (template, context))
+
+    with main.app.test_request_context("/connections"):
+        template, context = main.app.view_functions["connections"]()
+
+    assert template == "connections.html"
+    assert context["xray_settings"] is settings_map["xray"]
+    assert calls == {"batch": 1, "connections": 1}
+
+
+def test_routing_page_reuses_batched_settings(monkeypatch):
+    import app.main as main
+
+    settings_map = {
+        "xray": SimpleNamespace(engine="xray"),
+        "mihomo": SimpleNamespace(engine="mihomo"),
+        "amneziawg31": SimpleNamespace(engine="amneziawg31"),
+        "amneziawg": SimpleNamespace(engine="amneziawg"),
+    }
+    calls = {"batch": 0, "connections": 0}
+
+    def batch(engines):
+        calls["batch"] += 1
+        assert tuple(engines) == ("xray", "mihomo", "amneziawg31", "amneziawg")
+        return settings_map
+
+    def connections(*, settings_map=None):
+        calls["connections"] += 1
+        assert settings_map is not None
+        return []
+
+    monkeypatch.setattr(main, "list_connection_settings", batch, raising=False)
+    monkeypatch.setattr(main, "list_connections", connections)
+    monkeypatch.setattr(main, "get_connection_settings", lambda *_: (_ for _ in ()).throw(AssertionError("page must reuse batched settings")))
+    monkeypatch.setattr(main, "xray_profiles_overview", lambda: {})
+    monkeypatch.setattr(main, "geofiles_overview", lambda: {})
+    monkeypatch.setattr(main, "routing_templates_overview", lambda: {})
+    monkeypatch.setattr(main, "warp_overview", lambda: {})
+    monkeypatch.setattr(main, "mihomo_overview", lambda: {})
+    monkeypatch.setattr(main, "count_clients", lambda: 0)
+    monkeypatch.setattr(main, "render_template", lambda template, **context: (template, context))
+
+    with main.app.test_request_context("/routing"):
+        template, context = main.app.view_functions["routing"]()
+
+    assert template == "routing.html"
+    assert context["awg_settings"] is settings_map["amneziawg"]
+    assert context["xray_settings"] is settings_map["xray"]
+    assert calls == {"batch": 1, "connections": 1}
