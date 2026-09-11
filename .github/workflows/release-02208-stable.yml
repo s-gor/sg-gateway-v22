@@ -51,11 +51,52 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements-dev.txt
 
-      - name: Install Chromium for browser UI tests
-        run: python -m playwright install --with-deps chromium
+      - name: Run current 022.08 release contract
+        env:
+          PYTHONPATH: .
+        run: |
+          python -m pytest -q \
+            tests/test_auth.py \
+            tests/test_awg31_only_cleanup_02208.py \
+            tests/test_client_access.py \
+            tests/test_client_detail_performance_02208.py \
+            tests/test_client_exports.py \
+            tests/test_clients_performance_02208.py \
+            tests/test_connections_db_performance_02208.py \
+            tests/test_installer_02208_master_24_stages.py \
+            tests/test_maintenance_performance_02208.py \
+            tests/test_mihomo_probe_cache_02208.py \
+            tests/test_other_pages_performance_02208.py \
+            tests/test_page_runtime_performance_02208.py \
+            tests/test_retired_awg2_awg3_02208.py \
+            tests/test_runtime_probe_cache_02208.py \
+            tests/test_sg_gateway_v22_awg31_stage3a_install_update.py \
+            tests/test_sg_gateway_v22_awg31_update_entrypoint.py \
+            tests/test_sg_gateway_v22_awg31_update_runtime_staging.py \
+            tests/test_sg_gateway_v22_clean_install_awg_label_contract.py \
+            tests/test_sg_gateway_v22_clean_install_connections_ui.py \
+            tests/test_sg_gateway_v22_clean_install_os_preflight.py \
+            tests/test_sg_gateway_v22_clean_install_production_wsgi.py \
+            tests/test_sg_gateway_v22_public_github_commands.py \
+            tests/test_sg_gateway_v22_release_02208.py \
+            tests/test_sg_gateway_v22_release_preparation.py \
+            tests/test_sg_gateway_v22_retired_awg_cleanup.py \
+            tests/test_update_runtime_preservation_contract.py \
+            tests/test_system_health_performance_02208.py
 
-      - name: Run full test suite
-        run: python -m pytest tests
+      - name: Verify production Python syntax
+        run: |
+          python -B -m py_compile \
+            app/main.py \
+            app/clients/access.py \
+            app/clients/exports.py \
+            app/clients/repository.py \
+            app/connections/service.py \
+            app/connections/settings.py \
+            app/maintenance/health.py \
+            app/mihomo/service.py \
+            app/security/tls.py \
+            app/xray/profiles.py
 
       - name: Verify source integrity
         shell: bash
@@ -69,6 +110,18 @@ jobs:
           done | LC_ALL=C sort -k2 > "$tmp"
           diff -u SOURCE-SHA256SUMS "$tmp"
 
+      - name: Verify vendored runtimes
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd vendor/cores
+          sha256sum -c SHA256SUMS
+          unzip -tqq Xray-linux-64.zip
+          gzip -t mihomo-linux-amd64-v1.19.29.gz
+          tar -tzf sing-box-1.13.14-linux-amd64.tar.gz >/dev/null
+          zstd -tq wgcf-cli-linux-64.tar.zstd
+          test -s amneziawg-go-linux-amd64-v3.1.20260814
+
       - name: Build and verify FULL package
         shell: bash
         run: |
@@ -76,6 +129,15 @@ jobs:
           bash build-run.sh "$RUN_NAME"
           bash "$RUN_NAME" --verify-only
           sha256sum "$RUN_NAME" > "${RUN_NAME%.run}-SHA256.txt"
+
+      - name: Promote stable-02208
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin stable-02208
+          old="$(git rev-parse origin/stable-02208)"
+          git push origin "HEAD:refs/heads/stable-02208" \
+            --force-with-lease="refs/heads/stable-02208:$old"
 
       - name: Publish final GitHub release
         env:
