@@ -1,0 +1,106 @@
+name: Temporary All Pages Final Verifier
+on:
+  push:
+    branches: [feature/02208-performance-clients]
+permissions:
+  contents: write
+jobs:
+  verify:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/02208-performance-clients
+          fetch-depth: 0
+      - name: Focused all-page performance regression
+        env:
+          PYTHONPATH: .
+        run: |
+          python -m pip install -q -r requirements.txt pytest
+          python -m pytest -q \
+            tests/test_client_detail_performance_02208.py \
+            tests/test_clients_performance_02208.py \
+            tests/test_connections_db_performance_02208.py \
+            tests/test_maintenance_performance_02208.py \
+            tests/test_mihomo_probe_cache_02208.py \
+            tests/test_other_pages_performance_02208.py \
+            tests/test_page_runtime_performance_02208.py \
+            tests/test_runtime_probe_cache_02208.py \
+            tests/test_system_health_performance_02208.py \
+            tests/test_client_access.py \
+            tests/test_client_exports.py \
+            tests/test_auth.py
+      - name: Compile changed production modules
+        run: |
+          python -B -m py_compile \
+            app/main.py \
+            app/clients/access.py \
+            app/clients/exports.py \
+            app/clients/repository.py \
+            app/connections/service.py \
+            app/connections/settings.py \
+            app/maintenance/health.py \
+            app/mihomo/service.py \
+            app/security/tls.py \
+            app/xray/profiles.py
+      - name: Verify vendored runtime integrity
+        run: |
+          set -euxo pipefail
+          cd vendor/cores
+          sha256sum -c SHA256SUMS
+          unzip -tqq Xray-linux-64.zip
+          gzip -t mihomo-linux-amd64-v1.19.29.gz
+          tar -tzf sing-box-1.13.14-linux-amd64.tar.gz >/dev/null
+          zstd -tq wgcf-cli-linux-64.tar.zstd
+          tar -tzf amneziawg-tools-1.0.20260618-2.tar.gz >/dev/null
+          tar -tzf amneziawg-linux-kernel-module-1.0.20260329-2.tar.gz >/dev/null
+          tar -tzf amneziawg-tools-3.0.20260805.tar.gz >/dev/null
+          test -s amneziawg-go-linux-amd64-v3.0.0
+          test -s amneziawg-go-linux-amd64-v3.1.20260814
+      - name: Finalize clean candidate
+        id: final
+        run: |
+          set -euxo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/zz-all-pages-final.yml
+          python - <<'PY'
+          import hashlib, subprocess
+          from pathlib import Path
+          files = subprocess.check_output(['git','ls-files'], text=True).splitlines()
+          files = [p for p in files if p != 'SOURCE-SHA256SUMS']
+          rows = [f"{hashlib.sha256(Path(p).read_bytes()).hexdigest()}  {p}" for p in sorted(files)]
+          Path('SOURCE-SHA256SUMS').write_text('\n'.join(rows) + '\n', encoding='utf-8')
+          PY
+          git add SOURCE-SHA256SUMS
+          git commit -m 'test: finalize all-page performance candidate'
+          git push origin HEAD:feature/02208-performance-clients
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Verify exact final GitHub archive
+        env:
+          TARGET_SHA: ${{ steps.final.outputs.sha }}
+        run: |
+          set -euxo pipefail
+          work="$(mktemp -d)"
+          for attempt in 1 2 3 4 5; do
+            if curl -fsSL --retry 2 "https://github.com/s-gor/sg-gateway-v22/archive/${TARGET_SHA}.tar.gz" -o "$work/source.tar.gz"; then
+              break
+            fi
+            sleep 3
+          done
+          gzip -t "$work/source.tar.gz"
+          mkdir "$work/source"
+          tar -xzf "$work/source.tar.gz" -C "$work/source" --strip-components=1
+          cd "$work/source/vendor/cores"
+          sha256sum -c SHA256SUMS
+          unzip -tqq Xray-linux-64.zip
+          gzip -t mihomo-linux-amd64-v1.19.29.gz
+          tar -tzf sing-box-1.13.14-linux-amd64.tar.gz >/dev/null
+          zstd -tq wgcf-cli-linux-64.tar.zstd
+          tar -tzf amneziawg-tools-1.0.20260618-2.tar.gz >/dev/null
+          tar -tzf amneziawg-linux-kernel-module-1.0.20260329-2.tar.gz >/dev/null
+          tar -tzf amneziawg-tools-3.0.20260805.tar.gz >/dev/null
+          test -s amneziawg-go-linux-amd64-v3.0.0
+          test -s amneziawg-go-linux-amd64-v3.1.20260814
+          echo "FINAL_ALL_PAGES_ARCHIVE_VERIFY=OK"
