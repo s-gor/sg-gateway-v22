@@ -4,7 +4,7 @@ from dataclasses import dataclass
 import time
 
 from app.config import load_config
-from app.connections.settings import get_connection_settings
+from app.connections.settings import list_connection_settings
 from app.db import get_database_path
 from app.hostd.client import hostd_health, run_hostd_command
 from app.maintenance.backups import get_backup_dir
@@ -150,8 +150,9 @@ def _hostd_check() -> HealthCheck:
 
 def _connection_checks() -> list[HealthCheck]:
     checks: list[HealthCheck] = []
+    settings_map = list_connection_settings(("amneziawg31", "xray"))
 
-    awg31 = get_connection_settings("amneziawg31")
+    awg31 = settings_map["amneziawg31"]
     awg31_key = awg31.config.get("server_public_key", "")
     awg31_host = run_hostd_command("awg31.status")
     checks.append(
@@ -162,7 +163,7 @@ def _connection_checks() -> list[HealthCheck]:
         )
     )
 
-    xray = get_connection_settings("xray")
+    xray = settings_map["xray"]
     xray_key = xray.config.get("public_key", "")
     xray_short_id = xray.config.get("short_id", "")
     xray_ready = "PLACEHOLDER" not in xray_key and "PLACEHOLDER" not in xray_short_id

@@ -69,7 +69,7 @@ def _summary(name: str, label: str, counts: dict[str, int], settings, *, note: s
     )
 
 
-def list_connections() -> list[ConnectionSummary]:
+def list_connections(*, settings_map=None) -> list[ConnectionSummary]:
     with connect() as connection:
         rows = connection.execute(
             """
@@ -81,7 +81,8 @@ def list_connections() -> list[ConnectionSummary]:
         ).fetchall()
 
     counts = {str(row["engine"]): int(row["total"]) for row in rows}
-    settings_map = list_connection_settings(("xray", "mihomo", "amneziawg31"))
+    if settings_map is None:
+        settings_map = list_connection_settings(("xray", "mihomo", "amneziawg31"))
 
     xray = _summary("xray", "Xray Reality", counts, settings_map["xray"])
 

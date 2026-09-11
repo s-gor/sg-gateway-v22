@@ -26,6 +26,8 @@ from app.clients.repository import (
     count_clients,
     client_activity_counts,
     device_access_tokens,
+    device_deployments_map,
+    deployment_access_tokens,
     create_client,
     create_device,
     delete_client,
@@ -48,7 +50,7 @@ from app.cpu_activity import collect_cpu_activity
 from app.system_activity import collect_system_activity
 from app.connections.geoip_country import lookup_country_code
 from app.connections.service import list_connections
-from app.connections.settings import get_connection_settings, update_connection_settings
+from app.connections.settings import get_connection_settings, list_connection_settings, update_connection_settings
 from app.connections.awg_dns import (
     SharedAwgDnsError,
     get_shared_awg_dns,
@@ -804,12 +806,13 @@ def create_app() -> Flask:
 
     @app.get("/routing")
     def routing():
+        settings_map = list_connection_settings(("xray", "mihomo", "amneziawg31", "amneziawg"))
         return render_template(
             "routing.html",
             active_page="routing",
-            connections=list_connections(),
-            awg_settings=get_connection_settings("amneziawg"),
-            xray_settings=get_connection_settings("xray"),
+            connections=list_connections(settings_map=settings_map),
+            awg_settings=settings_map["amneziawg"],
+            xray_settings=settings_map["xray"],
             xray_profiles=xray_profiles_overview(),
             geofiles=geofiles_overview(),
             routing_templates=routing_templates_overview(),
@@ -1236,12 +1239,13 @@ def create_app() -> Flask:
         if client is None:
             abort(404)
         devices = list_devices(client_id)
+        deployments_by_device = device_deployments_map(client_id)
         xray_state = xray_profiles_overview()
         device_views = [
             {
                 "device": device,
                 "access_cards": build_access_cards(client, device, xray_state=xray_state),
-                "protocol_tokens": device_access_tokens(device.id),
+                "protocol_tokens": deployment_access_tokens(deployments_by_device.get(device.id, [])),
             }
             for device in devices
         ]
@@ -1593,12 +1597,13 @@ def create_app() -> Flask:
 
     @app.get("/connections")
     def connections():
+        settings_map = list_connection_settings(("xray", "mihomo", "amneziawg31"))
         return render_template(
             "connections.html",
             active_page="connections",
-            connections=list_connections(),
+            connections=list_connections(settings_map=settings_map),
             awg_dns=get_shared_awg_dns(),
-            xray_settings=get_connection_settings("xray"),
+            xray_settings=settings_map["xray"],
             xray_profiles=xray_profiles_overview(),
             mihomo=mihomo_overview(),
             client_total=count_clients(),
