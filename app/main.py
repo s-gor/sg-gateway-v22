@@ -84,7 +84,7 @@ from app.maintenance.full_backups import (
     stage_verified_full_backup_for_restore,
 )
 from app.maintenance.diagnostics import build_diagnostic_report, build_diagnostic_report_json
-from app.maintenance.health import collect_health_checks, health_summary
+from app.maintenance.health import cached_health_summary, collect_health_checks, health_summary
 from app.maintenance.operations import list_operations, log_operation
 from app.maintenance.xray_updates import overview as xray_update_overview
 from app.maintenance.panel_updates import overview as panel_update_overview
@@ -730,7 +730,7 @@ def create_app() -> Flask:
     @app.context_processor
     def inject_globals():
         try:
-            panel_health = health_summary()
+            panel_health = cached_health_summary()
         except Exception:
             panel_health = "warning"
         return {

@@ -78,6 +78,14 @@ def collect_health_checks() -> list[HealthCheck]:
     return checks
 
 
+def cached_health_summary(default: str = "warning") -> str:
+    """Return the last known health status without starting runtime diagnostics."""
+    value = _HEALTH_SUMMARY_CACHE.get("value")
+    if isinstance(value, str) and value in {"ok", "warning", "error"}:
+        return value
+    return default
+
+
 def health_summary() -> str:
     now = time.monotonic()
     updated_at = float(_HEALTH_SUMMARY_CACHE.get("updated_at") or 0.0)
