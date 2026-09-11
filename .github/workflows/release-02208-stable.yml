@@ -48,6 +48,9 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements-dev.txt
 
+      - name: Install Chromium for browser UI tests
+        run: python -m playwright install --with-deps chromium
+
       - name: Run current 022.08 release contract
         env:
           PYTHONPATH: .
