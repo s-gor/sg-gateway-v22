@@ -1,0 +1,68 @@
+name: Temporary Performance Final Verifier
+
+on:
+  push:
+    branches: [feature/02208-performance-clients]
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/02208-performance-clients
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+      - name: Run complete performance contract set
+        run: |
+          python -m pytest -q \
+            tests/test_client_detail_performance_02208.py \
+            tests/test_clients_performance_02208.py \
+            tests/test_connections_db_performance_02208.py \
+            tests/test_maintenance_performance_02208.py \
+            tests/test_mihomo_probe_cache_02208.py \
+            tests/test_other_pages_performance_02208.py \
+            tests/test_page_runtime_performance_02208.py \
+            tests/test_runtime_probe_cache_02208.py \
+            tests/test_system_health_performance_02208.py \
+            tests/test_client_access.py \
+            tests/test_client_exports.py \
+            tests/test_auth.py
+      - name: Compile changed Python modules
+        run: |
+          python -B -m py_compile \
+            app/clients/access.py \
+            app/clients/exports.py \
+            app/clients/repository.py \
+            app/connections/service.py \
+            app/connections/settings.py \
+            app/main.py \
+            app/maintenance/health.py \
+            app/mihomo/service.py \
+            app/security/tls.py \
+            app/xray/profiles.py
+      - name: Finalize verified candidate
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/zz-performance-final.yml
+          python - <<'PY'
+          import hashlib, subprocess
+          from pathlib import Path
+          files = subprocess.check_output(['git','ls-files'], text=True).splitlines()
+          files = [p for p in files if p != 'SOURCE-SHA256SUMS']
+          rows = [f"{hashlib.sha256(Path(p).read_bytes()).hexdigest()}  {p}" for p in sorted(files)]
+          Path('SOURCE-SHA256SUMS').write_text('\n'.join(rows) + '\n', encoding='utf-8')
+          PY
+          git add SOURCE-SHA256SUMS
+          git commit -m 'test: finalize performance candidate'
+          git push origin HEAD:feature/02208-performance-clients
