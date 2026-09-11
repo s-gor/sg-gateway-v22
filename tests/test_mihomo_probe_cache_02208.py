@@ -4,6 +4,7 @@ from types import SimpleNamespace
 def test_mihomo_systemctl_and_version_probes_are_short_cached(monkeypatch, tmp_path):
     from app.mihomo import service
 
+    service._clear_probe_cache()
     calls = []
     binary = tmp_path / "mihomo"
     binary.write_text("x", encoding="utf-8")
@@ -28,6 +29,7 @@ def test_mihomo_systemctl_and_version_probes_are_short_cached(monkeypatch, tmp_p
 def test_mihomo_hostd_status_is_short_cached(monkeypatch):
     from app.mihomo import service
 
+    service._clear_probe_cache()
     calls = 0
 
     def fake_hostd(*args, **kwargs):
