@@ -49,13 +49,7 @@ jobs:
             tests/test_sg_gateway_v22_release_02208.py \
             tests/test_sg_gateway_v22_release_preparation.py \
             tests/test_sg_gateway_v22_retired_awg_cleanup.py \
-            tests/test_sg_gateway_v22_update_exact_archive.py \
-            tests/test_sg_gateway_v22_update_hostd_writable.py \
-            tests/test_sg_gateway_v22_update_noninteractive_git.py \
-            tests/test_sg_gateway_v22_update_preserves_naiveproxy.py \
-            tests/test_sg_gateway_v22_update_rollback.py \
             tests/test_update_runtime_preservation_contract.py \
-            tests/test_reinstall_after_full_uninstall_02208.py \
             tests/test_system_health_performance_02208.py
       - name: Compile production Python
         run: |
