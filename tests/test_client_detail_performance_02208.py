@@ -54,3 +54,36 @@ def test_exports_can_reuse_supplied_xray_overview(monkeypatch):
     returned_state, profile = exports._xray_profile("reality_tcp", state)
     assert returned_state is state
     assert profile is state["profiles"][0]
+
+
+def test_client_detail_batches_protocol_tokens_for_all_devices(monkeypatch):
+    import app.main as main
+
+    client = Client(1, "client", True, None, "missing", "missing")
+    devices = [
+        Device(2, 1, "main", True, None, True, "now"),
+        Device(3, 1, "phone", True, None, False, "now"),
+    ]
+    token_map = {2: ["amneziawg31"], 3: ["xray_reality_tcp"]}
+
+    monkeypatch.setattr(main, "get_client", lambda client_id: client)
+    monkeypatch.setattr(main, "list_devices", lambda client_id: devices)
+    monkeypatch.setattr(main, "xray_profiles_overview", lambda: {"profiles": []})
+    monkeypatch.setattr(main, "security_tls_overview", lambda: {})
+    monkeypatch.setattr(main, "build_access_cards", lambda *args, **kwargs: [])
+    monkeypatch.setattr(
+        main,
+        "device_access_tokens",
+        lambda *_: (_ for _ in ()).throw(AssertionError("per-device credential query must not run")),
+    )
+    monkeypatch.setattr(main, "device_access_tokens_map", lambda client_id: token_map, raising=False)
+    monkeypatch.setattr(main, "render_template", lambda template, **context: (template, context))
+
+    with main.app.test_request_context("/clients/1"):
+        template, context = main.app.view_functions["client_detail"](1)
+
+    assert template == "client_detail.html"
+    assert [view["protocol_tokens"] for view in context["device_views"]] == [
+        ["amneziawg31"],
+        ["xray_reality_tcp"],
+    ]
