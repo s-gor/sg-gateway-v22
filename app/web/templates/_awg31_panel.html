@@ -1,35 +1,36 @@
 {% set awg31_ready = awg31_status.status == 'ok' and awg31_status.payload.get('status') == 'active' %}
-<section class="awgd-card awgd-card-v31" id="awg31-settings" data-awg31-profile="awg31">
-  <header class="awgd-head">
-    <div class="awgd-title">
-      <span class="awgd-generation">AWG3.1</span>
+<article class="cnv1-compact-protocol-card awg31-compact-card sg-ljd-nested" id="awg31-settings" data-awg31-profile="awg31">
+  <header class="cnv1-compact-protocol-head">
+    <div class="cnv1-compact-protocol-title">
+      <span class="cnv1-compact-protocol-icon">A31</span>
       <div>
-        <strong>AmneziaWG 3.1</strong>
-        <small>Изолированный userspace runtime 3.1 · AWG2 и AWG3.0 не заменяются.</small>
+        <h3>AmneziaWG 3.1</h3>
+        <p>UDP VPN · порт 587</p>
       </div>
     </div>
     <span class="cnv1-engine-status {{ 'success' if awg31_ready else 'warning' }}">
-      <span></span>{{ 'Настроено' if awg31_ready else 'Готов к первому запуску' }}
+      <span></span>{{ 'Работает' if awg31_ready else 'Не запущен' }}
     </span>
   </header>
 
-  <section class="cnv1-endpoint-card sg-ljd-nested">
-    <div class="cnv1-endpoint-main">
-      <img src="{{ country_flag_url(awg3_country) }}" alt="{{ country_name(awg3_country) }}" width="30" height="20">
-      <div>
-        <span>ВНЕШНЯЯ ТОЧКА</span>
-        <strong>{{ awg31_public_host }}:587 · DNS {{ awg_dns.dns }}</strong>
-        <small>{{ country_name(awg3_country) }}</small>
-        <small class="awgd-v31-technical" hidden>UDP 587 · интерфейс awg31 · 10.131.0.0/24</small>
-      </div>
-    </div>
-  </section>
+  <div class="cnv1-compact-protocol-endpoint">
+    <span>Внешняя точка</span>
+    <strong>{{ awg31_public_host }}:587</strong>
+  </div>
+
+  <form method="post" action="{{ url_for('update_awg_dns') }}" class="cnv1-compact-protocol-controls awg31-compact-dns">
+    <label>
+      <span>DNS</span>
+      <input type="text" name="dns" value="{{ awg_dns.dns }}" autocomplete="off" required>
+    </label>
+    <button class="button primary" type="submit">Сохранить DNS</button>
+  </form>
+  {% if not awg_dns.consistent %}<p class="cnv1-compact-protocol-warning">DNS AWG3.1 требует синхронизации.</p>{% endif %}
 
   <form method="post" action="/connections/amneziawg31" class="cnv1-engine-form cnv1-engine-form-compact awgd-v31-form" hidden>
     <div class="cnv1-compact-fields awgd-compact-single">
       <label class="awgd-dns-field"><span>DNS</span><input type="text" value="{{ awg31_settings.dns }}" readonly></label>
     </div>
-
     <details class="cnv1-advanced sg-ljd-nested awgd-v31-advanced">
       <summary><span>Дополнительно · параметры сервера</span><span>{{ 'Настроены' if awg31_settings.advanced_security else 'Создадутся автоматически' }}</span></summary>
       <div class="cnv1-advanced-body">
@@ -56,7 +57,6 @@
         </div>
       </div>
     </details>
-
     <footer class="cnv1-form-actions">
       <span>Адрес подключения: {{ awg31_public_host }}:587</span>
       <button class="button primary" type="submit">Сохранить</button>
@@ -71,5 +71,4 @@
       {% endfor %}
     </div>
   </details>
-</section>
-
+</article>

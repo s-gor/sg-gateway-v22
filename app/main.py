@@ -24,7 +24,10 @@ from app.clients.awg31_stage2 import register_awg31
 from app.clients.runtime import ClientWorkflowError, apply_clients_runtime
 from app.clients.repository import (
     count_clients,
+    client_activity_counts,
     device_access_tokens,
+    device_deployments_map,
+    deployment_access_tokens,
     create_client,
     create_device,
     delete_client,
@@ -47,7 +50,7 @@ from app.cpu_activity import collect_cpu_activity
 from app.system_activity import collect_system_activity
 from app.connections.geoip_country import lookup_country_code
 from app.connections.service import list_connections
-from app.connections.settings import get_connection_settings, update_connection_settings
+from app.connections.settings import get_connection_settings, list_connection_settings, update_connection_settings
 from app.connections.awg_dns import (
     SharedAwgDnsError,
     get_shared_awg_dns,
@@ -81,9 +84,8 @@ from app.maintenance.full_backups import (
     stage_verified_full_backup_for_restore,
 )
 from app.maintenance.diagnostics import build_diagnostic_report, build_diagnostic_report_json
-from app.maintenance.health import collect_health_checks, health_summary
+from app.maintenance.health import cached_health_summary, collect_health_checks, health_summary
 from app.maintenance.operations import list_operations, log_operation
-from app.maintenance.service import collect_diagnostics
 from app.maintenance.xray_updates import overview as xray_update_overview
 from app.maintenance.panel_updates import overview as panel_update_overview
 from app.maintenance.core_updates import overview as core_update_overview
@@ -581,38 +583,129 @@ def _sg_gateway_status_label(status: str) -> str:
     return {"Configured": "Настроено", "Disabled": "Не настроено"}.get(status, status)
 
 
+_SERVER_IDENTITY_TTL_SECONDS = 15.0
+_SERVER_IDENTITY_CACHE: dict[str, object] = {
+    "key": None,
+    "updated_at": 0.0,
+    "value": None,
+}
+
+
 def _sg_gateway_server_identity(config) -> dict:
+    cache_key = (
+        str(getattr(config, "server_name", "") or ""),
+        str(getattr(config, "public_address", "") or ""),
+        str(getattr(config, "host", "") or ""),
+        normalize_country_code(getattr(config, "country_code", "unknown")),
+    )
+    now = time.monotonic()
+    cached_value = _SERVER_IDENTITY_CACHE.get("value")
+    if (
+        _SERVER_IDENTITY_CACHE.get("key") == cache_key
+        and isinstance(cached_value, dict)
+        and now - float(_SERVER_IDENTITY_CACHE.get("updated_at") or 0.0) < _SERVER_IDENTITY_TTL_SECONDS
+    ):
+        return dict(cached_value)
+
     address = config.public_address or config.host
     configured_code = normalize_country_code(getattr(config, "country_code", "unknown"))
     code = configured_code
     try:
-        connections = list_connections()
-        selected = connections[0] if connections else None
-        if selected is not None:
-            settings = get_connection_settings(selected.name)
-            address = settings.host or address
+        settings = get_connection_settings("amneziawg31")
+        address = settings.host or address
         if code == "unknown":
             code = lookup_country_code(address)
     except Exception:
         pass
-    return {
+    result = {
         "name": getattr(config, "server_name", "SG-Gateway") or "SG-Gateway",
         "address": address,
         "country_code": normalize_country_code(code),
         "country_name": country_name(code),
     }
+    _SERVER_IDENTITY_CACHE["key"] = cache_key
+    _SERVER_IDENTITY_CACHE["updated_at"] = now
+    _SERVER_IDENTITY_CACHE["value"] = dict(result)
+    return result
+
+def _health_summary_from_checks(checks) -> str:
+    statuses = {str(getattr(check, "status", "warning")) for check in checks}
+    if "error" in statuses:
+        return "error"
+    if "warning" in statuses:
+        return "warning"
+    return "ok"
+
+
+def _system_page_report(health_checks) -> dict:
+    from datetime import datetime, timezone
+
+    return {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "health": _health_summary_from_checks(health_checks),
+        "version": get_version(),
+    }
+
 
 def _sg_gateway_system_context() -> dict:
     connections = list_connections()
+    health_checks = collect_health_checks()
     return {
-        "report": build_diagnostic_report(),
-        "health_checks": collect_health_checks(),
+        "report": _system_page_report(health_checks),
+        "health_checks": health_checks,
         "resources": _dashboard_resources(),
         "connections": connections,
         "client_total": count_clients(),
         "backup_total": len(list_backups()),
         "release": get_release_manifest(),
     }
+
+def _maintenance_page_context(tab: str, *, refresh_updates: bool = False) -> dict:
+    context = {
+        "xray_updates": None,
+        "panel_updates": None,
+        "core_updates": None,
+        "geofiles_updates": None,
+        "runtime_contract": None,
+        "backups": [],
+        "backup_cleanup": None,
+        "data_backups": [],
+        "verified_data_backup": None,
+        "full_backups": [],
+        "verified_full_backup": None,
+        "operations": [],
+        "health_checks": [],
+        "release": get_release_manifest(),
+    }
+    if tab == "updates":
+        context["xray_updates"] = xray_update_overview(refresh=refresh_updates)
+        context["panel_updates"] = panel_update_overview(refresh=refresh_updates)
+        context["core_updates"] = core_update_overview(refresh=refresh_updates)
+        context["geofiles_updates"] = geofiles_overview()
+        runtime_result = run_hostd_command("runtime.contract", timeout=20)
+        runtime_contract = dict(runtime_result.payload or {})
+        if not runtime_contract:
+            runtime_contract = {
+                "ok": False,
+                "checks": [],
+                "message": runtime_result.message or "Runtime Contract недоступен",
+            }
+        context["runtime_contract"] = runtime_contract
+        return context
+
+    backups = list_backups()
+    context.update(
+        backups=backups,
+        backup_cleanup=backup_cleanup_preview(backups),
+        data_backups=list_data_backups(),
+        verified_data_backup=get_verified_data_backup(),
+        full_backups=list_full_backups(),
+        verified_full_backup=get_verified_full_backup(),
+        operations=list_operations(),
+        health_checks=collect_health_checks(),
+    )
+    return context
+
 
 def create_app() -> Flask:
     config = load_config()
@@ -637,7 +730,7 @@ def create_app() -> Flask:
     @app.context_processor
     def inject_globals():
         try:
-            panel_health = health_summary()
+            panel_health = cached_health_summary()
         except Exception:
             panel_health = "warning"
         return {
@@ -685,10 +778,11 @@ def create_app() -> Flask:
 
     @app.get("/recovery")
     def recovery():
+        health_checks = collect_health_checks()
         return render_template(
             "recovery.html",
-            health=health_summary(),
-            health_checks=collect_health_checks(),
+            health=_health_summary_from_checks(health_checks),
+            health_checks=health_checks,
             backups=list_backups()[:5],
             requested_restore=request.args.get("restore", ""),
         )
@@ -712,12 +806,13 @@ def create_app() -> Flask:
 
     @app.get("/routing")
     def routing():
+        settings_map = list_connection_settings(("xray", "mihomo", "amneziawg31", "amneziawg"))
         return render_template(
             "routing.html",
             active_page="routing",
-            connections=list_connections(),
-            awg_settings=get_connection_settings("amneziawg"),
-            xray_settings=get_connection_settings("xray"),
+            connections=list_connections(settings_map=settings_map),
+            awg_settings=settings_map["amneziawg"],
+            xray_settings=settings_map["xray"],
             xray_profiles=xray_profiles_overview(),
             geofiles=geofiles_overview(),
             routing_templates=routing_templates_overview(),
@@ -1144,11 +1239,13 @@ def create_app() -> Flask:
         if client is None:
             abort(404)
         devices = list_devices(client_id)
+        deployments_by_device = device_deployments_map(client_id)
+        xray_state = xray_profiles_overview()
         device_views = [
             {
                 "device": device,
-                "access_cards": build_access_cards(client, device),
-                "protocol_tokens": device_access_tokens(device.id),
+                "access_cards": build_access_cards(client, device, xray_state=xray_state),
+                "protocol_tokens": deployment_access_tokens(deployments_by_device.get(device.id, [])),
             }
             for device in devices
         ]
@@ -1163,7 +1260,7 @@ def create_app() -> Flask:
             devices=devices,
             device_views=device_views,
             primary_view=primary_view,
-            xray_profiles=xray_profiles_overview(),
+            xray_profiles=xray_state,
             tls=security_tls_overview(),
         )
 
@@ -1500,14 +1597,13 @@ def create_app() -> Flask:
 
     @app.get("/connections")
     def connections():
+        settings_map = list_connection_settings(("xray", "mihomo", "amneziawg31"))
         return render_template(
             "connections.html",
             active_page="connections",
-            connections=list_connections(),
-            awg_settings=get_connection_settings("amneziawg"),
-            awg3_settings=get_connection_settings("amneziawg3"),
+            connections=list_connections(settings_map=settings_map),
             awg_dns=get_shared_awg_dns(),
-            xray_settings=get_connection_settings("xray"),
+            xray_settings=settings_map["xray"],
             xray_profiles=xray_profiles_overview(),
             mihomo=mihomo_overview(),
             client_total=count_clients(),
@@ -1520,50 +1616,9 @@ def create_app() -> Flask:
         except SharedAwgDnsError as exc:
             flash(f"DNS клиентов AWG не сохранён: {exc}", "error")
         else:
-            flash(f"DNS {state.dns} применён к AWG 2.0, 3.0 и 3.1.", "success")
+            flash(f"DNS {state.dns} применён к AWG3.1.", "success")
         return redirect(url_for("connections") + "#awg-dns")
 
-    @app.post("/connections/amneziawg")
-    def update_amneziawg():
-        current = get_connection_settings("amneziawg")
-        config = dict(current.config)
-        config["server_public_key"] = request.form.get(
-            "server_public_key",
-            config.get("server_public_key", "PLACEHOLDER_SERVER_PUBLIC_KEY"),
-        )
-        config["country_code"] = normalize_country_code(
-            request.form.get("country_code", config.get("country_code", "unknown"))
-        )
-        updated = update_connection_settings(
-            "amneziawg",
-            request.form.get("host", current.host),
-            request.form.get("port", str(current.port)),
-            config,
-        )
-        flash("Настройки AmneziaWG сохранены." if updated else "Настройки AmneziaWG не применены. Проверьте адрес и порт.", "success" if updated else "error")
-        return redirect(url_for("connections"))
-
-    @app.post("/connections/amneziawg3")
-    def update_amneziawg3():
-        current = get_connection_settings("amneziawg3")
-        config = dict(current.config)
-        config["server_public_key"] = request.form.get(
-            "server_public_key", config.get("server_public_key", "")
-        )
-        config["generation"] = 3
-        updated = update_connection_settings(
-            "amneziawg3",
-            request.form.get("host", current.host),
-            request.form.get("port", str(current.port)),
-            config,
-        )
-        flash(
-            "Настройки AmneziaWG 3 сохранены."
-            if updated
-            else "Настройки AmneziaWG 3 не применены. Проверьте адрес.",
-            "success" if updated else "error",
-        )
-        return redirect(url_for("connections"))
 
     @app.post("/connections/xray")
     def update_xray():
@@ -1717,45 +1772,13 @@ def create_app() -> Flask:
         tab = request.args.get("tab", "backups").strip().lower()
         if tab not in {"backups", "updates"}:
             tab = "backups"
-        updates = None
-        panel_updates = None
-        core_updates = None
-        geofiles_updates = None
-        runtime_contract = None
-        if tab == "updates":
-            refresh_updates = request.args.get("refresh") == "1"
-            updates = xray_update_overview(refresh=refresh_updates)
-            panel_updates = panel_update_overview(refresh=refresh_updates)
-            core_updates = core_update_overview(refresh=refresh_updates)
-            geofiles_updates = geofiles_overview()
-            runtime_result = run_hostd_command("runtime.contract", timeout=20)
-            runtime_contract = dict(runtime_result.payload or {})
-            if not runtime_contract:
-                runtime_contract = {
-                    "ok": False,
-                    "checks": [],
-                    "message": runtime_result.message or "Runtime Contract недоступен",
-                }
-        backups = list_backups()
         return render_template(
             "maintenance.html",
             active_page="maintenance",
             active_tab=tab,
-            xray_updates=updates,
-            panel_updates=panel_updates,
-            core_updates=core_updates,
-            geofiles_updates=geofiles_updates,
-            runtime_contract=runtime_contract,
-            diagnostics=collect_diagnostics(),
-            health_checks=collect_health_checks(),
-            backups=backups,
-            backup_cleanup=backup_cleanup_preview(backups),
-            data_backups=list_data_backups(),
-            verified_data_backup=get_verified_data_backup(),
-            full_backups=list_full_backups(),
-            verified_full_backup=get_verified_full_backup(),
-            operations=list_operations(),
-            release=get_release_manifest(),
+            **_maintenance_page_context(
+                tab, refresh_updates=request.args.get("refresh") == "1"
+            ),
         )
 
     @app.post("/maintenance/panel/update")
@@ -2096,13 +2119,7 @@ def create_app() -> Flask:
     @app.get("/api/system/activity")
     def system_activity_api():
         activity = collect_system_activity()
-        clients = list_clients()
-        activity["clients"] = {
-            "total": len(clients),
-            "enabled": sum(1 for client in clients if bool(getattr(client, "enabled", False))),
-            "devices_total": sum(int(getattr(client, "device_count", 0) or 0) for client in clients),
-            "devices_enabled": sum(int(getattr(client, "active_device_count", 0) or 0) for client in clients),
-        }
+        activity["clients"] = client_activity_counts()
         return jsonify(activity)
 
     @app.get("/api/status")

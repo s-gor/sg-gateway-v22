@@ -5,6 +5,7 @@ import os
 import re
 import socket
 import subprocess
+import time
 import urllib.error
 import urllib.request
 import uuid
@@ -23,6 +24,29 @@ DOMAIN_RE = re.compile(
 
 class TlsError(RuntimeError):
     pass
+
+_SERVICE_PROBE_TTL_SECONDS = 3.0
+_SERVICE_PROBE_CACHE: dict[tuple[str, str], tuple[float, bool]] = {}
+
+
+def _service_probe_cached(kind: str, name: str) -> bool | None:
+    item = _SERVICE_PROBE_CACHE.get((kind, name))
+    if item is None:
+        return None
+    updated_at, value = item
+    if time.monotonic() - updated_at >= _SERVICE_PROBE_TTL_SECONDS:
+        return None
+    return value
+
+
+def _remember_service_probe(kind: str, name: str, value: bool) -> bool:
+    _SERVICE_PROBE_CACHE[(kind, name)] = (time.monotonic(), bool(value))
+    return bool(value)
+
+
+def _clear_service_probe_cache() -> None:
+    _SERVICE_PROBE_CACHE.clear()
+
 
 
 def _utc_now() -> str:
@@ -179,6 +203,7 @@ def _run_hostd(action: str, timeout: float) -> dict:
     result = run_hostd_command(command, timeout=timeout)
     if result.status != "ok":
         raise TlsError(result.message or f"{command} failed")
+    _clear_service_probe_cache()
     payload = dict(result.payload)
     payload.setdefault("ok", True)
     payload.setdefault("message", result.message)
@@ -221,31 +246,27 @@ def rollback_latest() -> dict:
 
 
 def _service_active(name: str) -> bool:
+    cached = _service_probe_cached("active", name)
+    if cached is not None:
+        return cached
     try:
-        result = subprocess.run(
-            ["systemctl", "is-active", "--quiet", name],
-            capture_output=True,
-            text=True,
-            timeout=3,
-            check=False,
-        )
+        result = subprocess.run(["systemctl", "is-active", "--quiet", name], capture_output=True, text=True, timeout=3, check=False)
+        value = result.returncode == 0
     except (OSError, subprocess.TimeoutExpired):
-        return False
-    return result.returncode == 0
+        value = False
+    return _remember_service_probe("active", name, value)
 
 
 def _service_enabled(name: str) -> bool:
+    cached = _service_probe_cached("enabled", name)
+    if cached is not None:
+        return cached
     try:
-        result = subprocess.run(
-            ["systemctl", "is-enabled", "--quiet", name],
-            capture_output=True,
-            text=True,
-            timeout=3,
-            check=False,
-        )
+        result = subprocess.run(["systemctl", "is-enabled", "--quiet", name], capture_output=True, text=True, timeout=3, check=False)
+        value = result.returncode == 0
     except (OSError, subprocess.TimeoutExpired):
-        return False
-    return result.returncode == 0
+        value = False
+    return _remember_service_probe("enabled", name, value)
 
 
 def _safe_is_file(path: Path) -> bool:
@@ -293,7 +314,7 @@ def overview() -> dict:
         and _safe_is_file(nginx_conf)
         and nginx_active
     )
-    dns = request.get("dns") or (check_domain(domain) if domain else None)
+    dns = request.get("dns") or state.get("dns") or None
     port_suffix = "" if public_port == 443 else f":{public_port}"
     return {
         "domain": domain,

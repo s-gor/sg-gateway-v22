@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import time
 
 from app.config import load_config
-from app.connections.settings import get_connection_settings
+from app.connections.settings import list_connection_settings
 from app.db import get_database_path
 from app.hostd.client import hostd_health, run_hostd_command
 from app.maintenance.backups import get_backup_dir
@@ -18,6 +19,29 @@ class HealthCheck:
     name: str
     status: str
     message: str
+
+
+_HEALTH_SUMMARY_TTL_SECONDS = 15.0
+_HEALTH_SUMMARY_CACHE: dict[str, object] = {
+    "updated_at": 0.0,
+    "value": None,
+}
+
+
+def _summary_value(checks: list[HealthCheck]) -> str:
+    statuses = {check.status for check in checks}
+    if "error" in statuses:
+        return "error"
+    if "warning" in statuses:
+        return "warning"
+    return "ok"
+
+
+def _remember_summary(checks: list[HealthCheck]) -> str:
+    value = _summary_value(checks)
+    _HEALTH_SUMMARY_CACHE["updated_at"] = time.monotonic()
+    _HEALTH_SUMMARY_CACHE["value"] = value
+    return value
 
 
 def collect_health_checks() -> list[HealthCheck]:
@@ -50,16 +74,29 @@ def collect_health_checks() -> list[HealthCheck]:
     salamander = _salamander_check()
     if salamander is not None:
         checks.append(salamander)
+    _remember_summary(checks)
     return checks
 
 
+def cached_health_summary(default: str = "warning") -> str:
+    """Return the last known health status without starting runtime diagnostics."""
+    value = _HEALTH_SUMMARY_CACHE.get("value")
+    if isinstance(value, str) and value in {"ok", "warning", "error"}:
+        return value
+    return default
+
+
 def health_summary() -> str:
-    statuses = {check.status for check in collect_health_checks()}
-    if "error" in statuses:
-        return "error"
-    if "warning" in statuses:
-        return "warning"
-    return "ok"
+    now = time.monotonic()
+    updated_at = float(_HEALTH_SUMMARY_CACHE.get("updated_at") or 0.0)
+    value = _HEALTH_SUMMARY_CACHE.get("value")
+    if (
+        isinstance(value, str)
+        and value in {"ok", "warning", "error"}
+        and now - updated_at < _HEALTH_SUMMARY_TTL_SECONDS
+    ):
+        return value
+    return _remember_summary(collect_health_checks())
 
 
 
@@ -121,8 +158,9 @@ def _hostd_check() -> HealthCheck:
 
 def _connection_checks() -> list[HealthCheck]:
     checks: list[HealthCheck] = []
+    settings_map = list_connection_settings(("amneziawg31", "xray"))
 
-    awg31 = get_connection_settings("amneziawg31")
+    awg31 = settings_map["amneziawg31"]
     awg31_key = awg31.config.get("server_public_key", "")
     awg31_host = run_hostd_command("awg31.status")
     checks.append(
@@ -133,7 +171,7 @@ def _connection_checks() -> list[HealthCheck]:
         )
     )
 
-    xray = get_connection_settings("xray")
+    xray = settings_map["xray"]
     xray_key = xray.config.get("public_key", "")
     xray_short_id = xray.config.get("short_id", "")
     xray_ready = "PLACEHOLDER" not in xray_key and "PLACEHOLDER" not in xray_short_id

@@ -417,8 +417,8 @@ def build_awg31_uri(client: Client, device: Device | None = None) -> ClientExpor
     )
 
 
-def _xray_profile(profile_id: str):
-    state = xray_profiles_overview()
+def _xray_profile(profile_id: str, xray_state: dict | None = None):
+    state = xray_state if xray_state is not None else xray_profiles_overview()
     return state, next(
         (item for item in state["profiles"] if item.id == profile_id),
         None,
@@ -464,10 +464,12 @@ def build_xray_profile_link(
     client: Client,
     profile_id: str,
     device: Device | None = None,
+    *,
+    xray_state: dict | None = None,
 ) -> ClientExport:
     config = _deployment_config(client, "xray", device)
     selected = _selected_xray_profiles(client, device)
-    state, profile = _xray_profile(profile_id)
+    state, profile = _xray_profile(profile_id, xray_state)
     filename = f"sg-gateway-{_slug(client, device)}-{profile_id}.txt"
     if (
         profile is None
@@ -834,6 +836,8 @@ def protocol_ready(
     client: Client,
     kind: str,
     device: Device | None = None,
+    *,
+    xray_state: dict | None = None,
 ) -> bool:
     engine = protocol_engine(kind)
     if not engine or not is_export_ready(client, engine, device):
@@ -847,7 +851,7 @@ def protocol_ready(
         }[kind]
         if profile_id not in _selected_xray_profiles(client, device):
             return False
-        _, profile = _xray_profile(profile_id)
+        _, profile = _xray_profile(profile_id, xray_state)
         return bool(profile and profile.enabled and profile.ready)
     if kind in {"anytls", "tuic"}:
         return bool(tls_overview().get("https_ready"))

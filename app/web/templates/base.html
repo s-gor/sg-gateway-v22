@@ -63,7 +63,7 @@
         <div class="sg-brand-mark" aria-hidden="true"><span>SG</span></div>
         <div class="sg-brand-copy">
           <div class="sg-brand-name">SG-Gateway</div>
-          <div class="sg-brand-note">SG-Gateway · {{ server_identity.address }}</div>
+          <div class="sg-brand-note">SG-Gateway</div>
         </div>
       </header>
 
@@ -86,7 +86,7 @@
           <span class="sg-nav-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24"><path d="M7 7h10v4H7zM5 17h14v3H5zM9 11v6M15 11v6M12 3v4"/></svg>
           </span>
-          <span class="sg-nav-copy"><strong>Connections</strong><small>AWG2/3 · Xray · Mihomo</small></span>
+          <span class="sg-nav-copy"><strong>Connections</strong><small>AWG3.1 · Xray · Mihomo</small></span>
         </a>
 
         <a class="sg-nav-item {{ 'active' if active_page == 'outbounds' else '' }}" href="{{ url_for('outbounds') }}">
@@ -142,7 +142,6 @@
         </div>
         <div class="sg-server-meta">
           <span>SG-Gateway Core</span>
-          <span>{{ server_identity.address }}</span>
         </div>
       </section>
 
@@ -171,8 +170,7 @@
             <img class="sg-flag" src="{{ country_flag_url(server_identity.country_code) }}"
                  alt="{{ server_identity.country_name }}" width="24" height="16">
             <strong>{{ server_identity.name }}</strong>
-            <span>{{ server_identity.address }}</span>
-          </div>
+            </div>
         </div>
 
         <div class="sg-version-label">{{ app_version[-5:] }}</div>

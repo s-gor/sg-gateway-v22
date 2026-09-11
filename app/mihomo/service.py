@@ -7,6 +7,7 @@ import secrets
 import shutil
 import string
 import subprocess
+import time
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -24,6 +25,31 @@ from app.clients.repository import get_primary_device
 
 class MihomoError(RuntimeError):
     pass
+
+
+_MIHOMO_SERVICE_TTL_SECONDS = 2.0
+_MIHOMO_VERSION_TTL_SECONDS = 10.0
+_MIHOMO_HOSTD_TTL_SECONDS = 2.0
+_MIHOMO_PROBE_CACHE: dict[tuple[str, str], tuple[float, object]] = {}
+
+
+def _probe_get(kind: str, key: str, ttl: float):
+    item = _MIHOMO_PROBE_CACHE.get((kind, key))
+    if item is None:
+        return None
+    updated_at, value = item
+    if time.monotonic() - updated_at >= ttl:
+        return None
+    return value
+
+
+def _probe_put(kind: str, key: str, value):
+    _MIHOMO_PROBE_CACHE[(kind, key)] = (time.monotonic(), value)
+    return value
+
+
+def _clear_probe_cache() -> None:
+    _MIHOMO_PROBE_CACHE.clear()
 
 
 MIHOMO_VERSION = "1.19.29"
@@ -924,6 +950,7 @@ def _run_helper(action: str) -> dict[str, Any]:
 
 def apply_candidate() -> dict[str, Any]:
     build_candidate()
+    _clear_probe_cache()
     result = run_hostd_command("mihomo.split.apply", timeout=240)
     if result.status != "ok":
         raise MihomoError(result.message or "Не удалось применить Mieru / AnyTLS / TUIC")
@@ -939,6 +966,7 @@ def apply_candidate() -> dict[str, Any]:
 
 
 def rollback_latest() -> dict[str, Any]:
+    _clear_probe_cache()
     payload = _run_helper("rollback")
     log_operation(
         "mihomo.rollback",
@@ -949,6 +977,7 @@ def rollback_latest() -> dict[str, Any]:
 
 
 def restart_service() -> dict[str, Any]:
+    _clear_probe_cache()
     payload = _run_helper("restart")
     log_operation(
         "mihomo.restart",
@@ -960,43 +989,36 @@ def restart_service() -> dict[str, Any]:
 
 def test_candidate() -> dict[str, Any]:
     build_candidate()
+    _clear_probe_cache()
     return _run_helper("test")
 
 
 def _service_active() -> bool:
-    return (
-        subprocess.run(
-            ["systemctl", "is-active", "--quiet", "mihomo.service"],
-            capture_output=True,
-            check=False,
-        ).returncode
-        == 0
-    )
+    cached = _probe_get("service", "active", _MIHOMO_SERVICE_TTL_SECONDS)
+    if isinstance(cached, bool):
+        return cached
+    value = (subprocess.run(["systemctl", "is-active", "--quiet", "mihomo.service"], capture_output=True, check=False).returncode == 0)
+    return bool(_probe_put("service", "active", value))
 
 
 def _service_enabled() -> bool:
-    return (
-        subprocess.run(
-            ["systemctl", "is-enabled", "--quiet", "mihomo.service"],
-            capture_output=True,
-            check=False,
-        ).returncode
-        == 0
-    )
+    cached = _probe_get("service", "enabled", _MIHOMO_SERVICE_TTL_SECONDS)
+    if isinstance(cached, bool):
+        return cached
+    value = (subprocess.run(["systemctl", "is-enabled", "--quiet", "mihomo.service"], capture_output=True, check=False).returncode == 0)
+    return bool(_probe_put("service", "enabled", value))
 
 
 def _version() -> str:
+    cached = _probe_get("version", str(MIHOMO_BINARY), _MIHOMO_VERSION_TTL_SECONDS)
+    if isinstance(cached, str):
+        return cached
     if not MIHOMO_BINARY.is_file():
-        return "Не установлен"
-    result = subprocess.run(
-        [str(MIHOMO_BINARY), "-v"],
-        capture_output=True,
-        text=True,
-        timeout=10,
-        check=False,
-    )
+        return str(_probe_put("version", str(MIHOMO_BINARY), "Не установлен"))
+    result = subprocess.run([str(MIHOMO_BINARY), "-v"], capture_output=True, text=True, timeout=10, check=False)
     first = (result.stdout or result.stderr).strip().splitlines()
-    return first[0] if first else "Неизвестно"
+    value = first[0] if first else "Неизвестно"
+    return str(_probe_put("version", str(MIHOMO_BINARY), value))
 
 
 
@@ -1127,17 +1149,15 @@ def _parse_legacy_singbox_live_settings(
 def _hostd_live_snapshot(
     settings: dict[str, Any],
 ) -> tuple[dict[str, Any], set[str], str] | None:
-    """Read safe runtime truth from privileged HostD.
+    """Read safe runtime truth from privileged HostD."""
 
-    The web panel intentionally runs as the unprivileged sg-gateway user and
-    cannot read root-only Mihomo/sing-box configs containing client secrets.
-    HostD returns only listener state, ports and non-secret transport metadata.
-    """
-
-    result = run_hostd_command("mihomo.status", timeout=5)
-    if result.status != "ok":
-        return None
-    payload = result.payload if isinstance(result.payload, dict) else {}
+    payload = _probe_get("hostd", "mihomo.status", _MIHOMO_HOSTD_TTL_SECONDS)
+    if not isinstance(payload, dict):
+        result = run_hostd_command("mihomo.status", timeout=5)
+        if result.status != "ok":
+            return None
+        payload = result.payload if isinstance(result.payload, dict) else {}
+        _probe_put("hostd", "mihomo.status", dict(payload))
     protocols = payload.get("protocols")
     if not isinstance(protocols, dict):
         return None

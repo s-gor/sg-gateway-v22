@@ -6,7 +6,6 @@ from typing import Any
 
 from app.connections.settings import get_connection_settings, update_connection_settings
 from app.clients.repository import count_clients, create_client
-from app.constants import AMNEZIAWG3_UDP_PORT, AMNEZIAWG_UDP_PORT
 from app.db import connect, get_database_path, init_db
 from app.maintenance.seeded_admin_awg3 import mark_seeded_admin_pending
 
@@ -103,7 +102,6 @@ def seed_or_migrate() -> None:
     vless_encryption = _text("SG_SEED_VLESS_ENCRYPTION")
     xray_public_key = _text("SG_SEED_XRAY_PUBLIC_KEY")
     xray_short_id = _text("SG_SEED_XRAY_SHORT_ID")
-    awg_public_key = _text("SG_SEED_AWG_PUBLIC_KEY")
 
     xray = get_connection_settings("xray")
     xray_config = dict(xray.config)
@@ -117,19 +115,12 @@ def seed_or_migrate() -> None:
     if not _usable(xray_config.get("vless_encryption")):
         xray_config["vless_encryption"] = vless_encryption
 
-    # Reality credentials have exactly one source of truth: the active
-    # root-owned engine-secrets.env. A non-empty value in an old/interrupted
-    # database is not proof that it belongs to the active private key. Keeping
-    # stale public_key/short_id breaks both Reality TCP and XHTTP while Xray
-    # configuration still passes syntactic validation. Always synchronize them.
     if not _usable(xray_public_key) or not _usable(xray_short_id):
         raise RuntimeError("Активные ключи Xray Reality не переданы в инициализацию")
     xray_config["public_key"] = xray_public_key
     xray_config["short_id"] = xray_short_id
 
     if update_mode:
-        # Preserve intentional expert transport values, but repair missing
-        # endpoint metadata from the current installer answers.
         if not _usable(xray_config.get("server_name")):
             xray_config["server_name"] = _text("SG_SEED_REALITY_SNI")
         if not _usable(xray_config.get("target")):
@@ -158,39 +149,9 @@ def seed_or_migrate() -> None:
         )
     _save("xray", xray_host, xray_port, xray_config)
 
-    awg = get_connection_settings("amneziawg")
-    awg_config = dict(awg.config)
-    awg_host = str(awg.host or "").strip() or public_host
-    requested_awg_port = _port(_text("SG_SEED_AWG_PORT"), AMNEZIAWG_UDP_PORT)
-    if requested_awg_port != AMNEZIAWG_UDP_PORT:
-        raise RuntimeError(
-            f"SG-Gateway requires AmneziaWG UDP {AMNEZIAWG_UDP_PORT}; "
-            f"installer requested {requested_awg_port}"
-        )
-    awg_port = AMNEZIAWG_UDP_PORT
-    _country(awg_config, country)
-    awg_config.setdefault("allowed_ips", "0.0.0.0/0, ::/0")
-    awg_config.setdefault("persistent_keepalive", 25)
-    if not _usable(awg_config.get("server_public_key")):
-        awg_config["server_public_key"] = awg_public_key
-    if not update_mode:
-        awg_config.update(
-            {
-                "server_public_key": awg_public_key,
-                "allowed_ips": "0.0.0.0/0, ::/0",
-                "persistent_keepalive": 25,
-            }
-        )
-    _save("amneziawg", awg_host, awg_port, awg_config)
-
-    awg3 = get_connection_settings("amneziawg3")
-    awg3_config = dict(awg3.config)
-    awg3_host = str(awg3.host or "").strip() or awg_host or public_host
-    _country(awg3_config, country)
-    awg3_config.setdefault("allowed_ips", "0.0.0.0/0, ::/0")
-    awg3_config.setdefault("persistent_keepalive", "25-35")
-    awg3_config["generation"] = 3
-    _save("amneziawg3", awg3_host, AMNEZIAWG3_UDP_PORT, awg3_config)
+    # AWG2 and AWG3.0 are retired. They are intentionally not seeded here.
+    # AWG3.1 is provisioned independently by the Stage3A migration after the
+    # database and privileged host service are ready.
 
     mihomo = get_connection_settings("mihomo")
     mihomo_config = dict(mihomo.config)
@@ -221,18 +182,17 @@ def seed_or_migrate() -> None:
     )
 
     created_admin = False
-    if (
-        _text("SG_SEED_CREATE_ADMIN", "1") == "1"
-        and count_clients() == 0
-    ):
+    if _text("SG_SEED_CREATE_ADMIN", "1") == "1" and count_clients() == 0:
         admin_client_id = create_client(
             "sg-admin",
-            "xray_reality_tcp,xray_xhttp_reality,amneziawg,mihomo,sgclient",
+            "xray_reality_tcp,xray_xhttp_reality,amneziawg31,mihomo,sgclient",
         )
         if not admin_client_id:
             raise RuntimeError("Не удалось создать первого клиента sg-admin")
         created_admin = True
         if not update_mode:
+            # Historical marker remains a compatibility no-op; it no longer
+            # provisions AWG3.0.
             mark_seeded_admin_pending(get_database_path())
 
     mode = "migration" if update_mode else "seed"

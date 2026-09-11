@@ -21,8 +21,8 @@ AWG3_TOOLS_VERSION="3.0.20260805"
 AWG3_GO_VERSION="v3.0.0"
 PANEL_USER="sg-gateway"
 PANEL_GROUP="sg-gateway"
-XRAY_REQUIRED_VERSION="v26.7.28"
-XRAY_MINIMUM_VERSION="v26.7.28"
+XRAY_REQUIRED_VERSION="v26.9.9"
+XRAY_MINIMUM_VERSION="v26.9.9"
 
 # SG-Gateway V22 vendor bundle. Clean installation does not download these
 # runtimes from upstream projects. The files are committed with the source.
@@ -60,7 +60,7 @@ YELLOW=$'\033[1;33m'
 CYAN=$'\033[1;36m'
 RESET=$'\033[0m'
 
-TOTAL_STAGES=24
+TOTAL_STAGES=22
 CURRENT_STAGE="0"
 CURRENT_LABEL="Подготовка"
 PANEL_PORT=""
@@ -1921,8 +1921,6 @@ EOF
     vless_encryption="$MIGRATION_VLESS_ENCRYPTION"
     vless_decryption="$MIGRATION_VLESS_DECRYPTION"
     vless_auth="mlkem768"
-    awg_private="$(awg genkey)"
-    awg_public="$(printf '%s\n' "$awg_private" | awg pubkey)"
     h1="$(random_header)"; h2="$(random_header)"; h3="$(random_header)"; h4="$(random_header)"
     while [[ "$h2" == "$h1" ]]; do h2="$(random_header)"; done
     while [[ "$h3" == "$h1" || "$h3" == "$h2" ]]; do h3="$(random_header)"; done
@@ -1974,8 +1972,6 @@ PYXRAY
     xray_public="$(printf '%s\n' "$xray_pair" | sed -n '2p')"
     [[ -n "$xray_private" && -n "$xray_public" ]] || { echo "Xray вернул пустой Reality key pair" >&2; return 1; }
     short_id="$(openssl rand -hex 8)"
-    awg_private="$(awg genkey)"
-    awg_public="$(printf '%s\n' "$awg_private" | awg pubkey)"
 
     h1="$(random_header)"; h2="$(random_header)"; h3="$(random_header)"; h4="$(random_header)"
     while [[ "$h2" == "$h1" ]]; do h2="$(random_header)"; done
@@ -2024,17 +2020,6 @@ SG_GATEWAY_XRAY_SHORT_ID=${short_id}
 SG_GATEWAY_VLESS_ENCRYPTION=${vless_encryption}
 SG_GATEWAY_VLESS_DECRYPTION=${vless_decryption}
 SG_GATEWAY_VLESS_AUTH=${vless_auth}
-SG_GATEWAY_AWG_PRIVATE_KEY=${awg_private}
-SG_GATEWAY_AWG_PUBLIC_KEY=${awg_public}
-SG_GATEWAY_AWG_JC=4
-SG_GATEWAY_AWG_JMIN=40
-SG_GATEWAY_AWG_JMAX=70
-SG_GATEWAY_AWG_S1=0
-SG_GATEWAY_AWG_S2=0
-SG_GATEWAY_AWG_H1=${h1}
-SG_GATEWAY_AWG_H2=${h2}
-SG_GATEWAY_AWG_H3=${h3}
-SG_GATEWAY_AWG_H4=${h4}
 EOF
 
   chmod 0640 "$CONFIG_DIR/sg-gateway.env"
@@ -2065,38 +2050,13 @@ EOF
     SG_GATEWAY_SERVER_NAME="$SERVER_NAME" \
     SG_GATEWAY_COUNTRY_CODE="$COUNTRY_CODE" \
     SG_SEED_XRAY_PORT="$XRAY_PORT" \
-    SG_SEED_AWG_PORT="$AWG_PORT" \
     SG_SEED_REALITY_TARGET="$REALITY_TARGET" \
     SG_SEED_REALITY_SNI="$REALITY_SNI" \
     SG_SEED_XRAY_PUBLIC_KEY="$xray_public" \
     SG_SEED_XRAY_SHORT_ID="$short_id" \
     SG_SEED_VLESS_ENCRYPTION="$vless_encryption" \
-    SG_SEED_AWG_PUBLIC_KEY="$awg_public" \
     "$PREFIX/.venv/bin/python" -m app.install_seed
 
-  runuser -u "$PANEL_USER" -- env \
-    PYTHONPATH="$PREFIX" \
-    SG_GATEWAY_DATA_DIR="$DATA_DIR" \
-    "$PREFIX/.venv/bin/python" - <<'PYAWG585'
-import json
-from app.constants import AMNEZIAWG_UDP_PORT
-from app.db import connect
-
-with connect() as connection:
-    row = connection.execute(
-        "SELECT port FROM connection_settings WHERE engine = 'amneziawg'"
-    ).fetchone()
-    assert row is not None, "AmneziaWG settings are missing"
-    assert int(row["port"]) == AMNEZIAWG_UDP_PORT, row["port"]
-    credentials = connection.execute(
-        "SELECT config_json FROM device_credentials WHERE engine = 'amneziawg'"
-    ).fetchall()
-    for item in credentials:
-        config = json.loads(item["config_json"] or "{}")
-        endpoint = str(config.get("endpoint") or "")
-        assert endpoint.endswith(f":{AMNEZIAWG_UDP_PORT}"), endpoint
-print(f"AmneziaWG invariant: UDP {AMNEZIAWG_UDP_PORT}")
-PYAWG585
   restore_minimal_013_clients
   # The unprivileged panel never writes /etc/mihomo directly. A stale
   # atomic temporary file must not survive an installation. On a clean
@@ -2369,8 +2329,6 @@ ReadWritePaths=${DATA_DIR} ${LOG_DIR}
 WantedBy=multi-user.target
 EOF
 
-  install -m 0644 "$PREFIX/deploy/sg-gateway-awg.service" /etc/systemd/system/sg-gateway-awg.service
-  install -m 0644 "$PREFIX/deploy/sg-gateway-awg3.service" /etc/systemd/system/sg-gateway-awg3.service
   install -m 0644 "$PREFIX/deploy/sg-gateway-singbox.service" /etc/systemd/system/sg-gateway-singbox.service
   install -m 0644 "$PREFIX/deploy/mihomo.service" /etc/systemd/system/mihomo.service
 
@@ -2527,7 +2485,7 @@ EOF
   [[ "$(systemctl show -p User --value sg-hostd.service)" == "root" ]]
   [[ -z "$(systemctl show -p DropInPaths --value sg-hostd.service)" ]]
   if (( UPDATE_MODE == 0 )); then
-    systemctl disable sg-gateway-awg.service sg-gateway-awg3.service sg-gateway-singbox.service >/dev/null 2>&1 || true
+    systemctl disable sg-gateway-singbox.service >/dev/null 2>&1 || true
     systemctl enable --now mihomo.service
     systemctl is-active --quiet mihomo.service
   fi
@@ -2541,7 +2499,7 @@ stage_firewall_and_network() {
     for rule in \
       "${PANEL_PORT}/tcp" "80/tcp" "${XRAY_PORT}/tcp" \
       "${XHTTP_REALITY_PORT}/tcp" "${XHTTP_TLS_PORT}/tcp" \
-      "${AWG_PORT}/udp" "${AWG3_PORT}/udp" "${HYSTERIA2_PORT}/udp" \
+      "${HYSTERIA2_PORT}/udp" \
       "${MIHOMO_PORT}/tcp" "${ANYTLS_PORT}/tcp" "${TUIC_PORT}/udp"; do
       ufw allow "$rule"
     done
@@ -2952,7 +2910,7 @@ service_was_enabled_before_update() {
 restore_update_runtime_services() {
   (( UPDATE_MODE == 1 )) || return 0
   local service
-  for service in mihomo.service sg-gateway-awg.service sg-gateway-awg3.service sg-gateway-singbox.service; do
+  for service in mihomo.service sg-gateway-singbox.service; do
     if service_was_enabled_before_update "$service"; then
       systemctl_with_retry enable "$service"
     fi
@@ -3598,7 +3556,7 @@ main() {
   prepare_log
   export DEBIAN_FRONTEND=noninteractive LANG=C.UTF-8 LC_ALL=C.UTF-8
 
-  printf '\n%s[SG-Gateway]%s Запускаю полный мастер SG-Gateway 0.1.0-022.08 · 24 этапа\n' "$CYAN" "$RESET"
+  printf '\n%s[SG-Gateway]%s Запускаю полный мастер SG-Gateway 0.1.0-022.08 · 22 этапа\n' "$CYAN" "$RESET"
   printf '[SG-Gateway] Технический журнал: %s\n' "$INSTALL_LOG"
   printf '[SG-Gateway] Повторный запуск выполняется на этом же EC2. Домен не обязателен.\n\n'
 
@@ -3607,25 +3565,23 @@ main() {
   run_stage 3 "Проверка установочного комплекта" stage_vendor_media_contract
   run_stage 4 "Резервная копия и исходник" stage_backup_and_prepare
   run_stage 5 "Системные пакеты, Nginx и Certbot" stage_system_packages_02208
-  run_stage 6 "AmneziaWG 2 runtime" stage_awg2_runtime
-  run_stage 7 "AmneziaWG 3 runtime" stage_awg3_runtime
-  run_stage 8 "Xray runtime" stage_xray_runtime
-  run_stage 9 "Mihomo runtime" stage_mihomo_runtime
-  run_stage 10 "sing-box и WARP runtime" stage_singbox_and_warp_runtime
-  run_stage 11 "NaiveProxy runtime" stage_naiveproxy_runtime
-  run_stage 12 "Python-окружение и исходник" stage_python_and_source_check
-  run_stage 13 "Конфигурация и база" stage_configuration_and_database_02208
-  run_stage 14 "Локальная проверка страниц" stage_local_application_smoke_test
-  run_stage 15 "Systemd-службы и Nginx" stage_systemd_units_02208
-  run_stage 16 "Firewall и сетевые порты" stage_firewall_and_network_02208
-  run_stage 17 "Запуск sg-hostd" stage9_start_hostd
-  run_stage 18 "Проверка команд hostd" stage9_verify_hostd
-  run_stage 19 "Независимый профиль AWG31" run_awg31_stage3a_migration
-  run_stage 20 "Применение Xray и клиентов" stage9_apply_runtime
-  run_stage 21 "Запуск панели" stage9_start_panel
-  run_stage 22 "Проверка Nginx и служб" stage9_verify_nginx
-  run_stage 23 "Проверка NaiveProxy" verify_naiveproxy_install_contract
-  run_stage 24 "Финальный контракт 22.08" stage_final_contract
+  run_stage 6 "Xray runtime" stage_xray_runtime
+  run_stage 7 "Mihomo runtime" stage_mihomo_runtime
+  run_stage 8 "sing-box и WARP runtime" stage_singbox_and_warp_runtime
+  run_stage 9 "NaiveProxy runtime" stage_naiveproxy_runtime
+  run_stage 10 "Python-окружение и исходник" stage_python_and_source_check
+  run_stage 11 "Конфигурация и база" stage_configuration_and_database_02208
+  run_stage 12 "Локальная проверка страниц" stage_local_application_smoke_test
+  run_stage 13 "Systemd-службы и Nginx" stage_systemd_units_02208
+  run_stage 14 "Firewall и сетевые порты" stage_firewall_and_network_02208
+  run_stage 15 "Запуск sg-hostd" stage9_start_hostd
+  run_stage 16 "Проверка команд hostd" stage9_verify_hostd
+  run_stage 17 "Независимый профиль AWG31" run_awg31_stage3a_migration
+  run_stage 18 "Применение Xray и клиентов" stage9_apply_runtime
+  run_stage 19 "Запуск панели" stage9_start_panel
+  run_stage 20 "Проверка Nginx и служб" stage9_verify_nginx
+  run_stage 21 "Проверка NaiveProxy" verify_naiveproxy_install_contract
+  run_stage 22 "Финальный контракт 22.08" stage_final_contract
 
   INSTALL_SUCCESS=1
   sanitize_installer_log_file
@@ -3646,7 +3602,7 @@ main() {
   else
     printf '%s[SG-Gateway] SG-Gateway успешно установлен%s\n' "$GREEN" "$RESET"
   fi
-  printf '%s[SG-Gateway] 24/24 · NaiveProxy включён в основной мастер%s\n' "$GREEN" "$RESET"
+  printf '%s[SG-Gateway] 22/22 · NaiveProxy включён в основной мастер%s\n' "$GREEN" "$RESET"
   printf '%s[SG-Gateway] ============================================================%s\n' "$GREEN" "$RESET"
   printf '[SG-Gateway] Имя сервера:  %s\n' "$SERVER_NAME"
   printf '[SG-Gateway] Страна:       %s\n' "${COUNTRY_CODE^^}"

@@ -347,7 +347,49 @@ def list_clients() -> list[Client]:
         rows = connection.execute(
             "SELECT id, name, enabled, expires_at FROM clients ORDER BY id DESC"
         ).fetchall()
-        return [_client_from_row(connection, row) for row in rows]
+        device_rows = connection.execute(
+            "SELECT id, client_id, enabled FROM devices ORDER BY client_id, id"
+        ).fetchall()
+        credential_rows = connection.execute(
+            """
+            SELECT d.client_id, dc.engine, dc.status
+            FROM device_credentials dc
+            JOIN devices d ON d.id = dc.device_id
+            ORDER BY d.client_id, dc.engine
+            """
+        ).fetchall()
+
+    devices_by_client: dict[int, list] = {}
+    for device in device_rows:
+        devices_by_client.setdefault(int(device["client_id"]), []).append(device)
+
+    credentials_by_client: dict[int, list] = {}
+    for credential in credential_rows:
+        credentials_by_client.setdefault(int(credential["client_id"]), []).append(credential)
+
+    clients: list[Client] = []
+    for row in rows:
+        client_id = int(row["id"])
+        devices = devices_by_client.get(client_id, [])
+        credentials = credentials_by_client.get(client_id, [])
+        clients.append(
+            Client(
+                id=client_id,
+                name=str(row["name"]),
+                enabled=bool(row["enabled"]),
+                expires_at=row["expires_at"],
+                awg_status=_aggregate_status(credentials, "amneziawg"),
+                awg3_status=_aggregate_status(credentials, "amneziawg3"),
+                xray_status=_aggregate_status(credentials, "xray"),
+                mihomo_status=_aggregate_status(credentials, "mihomo"),
+                anytls_status=_aggregate_status(credentials, "anytls"),
+                tuic_status=_aggregate_status(credentials, "tuic"),
+                sgclient_status=_aggregate_status(credentials, "sgclient"),
+                device_count=len(devices),
+                active_device_count=sum(1 for item in devices if bool(item["enabled"])),
+            )
+        )
+    return clients
 
 
 def get_client(client_id: int) -> Client | None:
@@ -410,6 +452,9 @@ def get_primary_device(client_id: int) -> Device | None:
 
 
 def list_device_credentials(device_id: int) -> list[ClientDeployment]:
+    cache = _request_device_credentials_cache()
+    if cache is not None and device_id in cache:
+        return list(cache[device_id])
     init_db()
     with connect() as connection:
         rows = connection.execute(
@@ -421,7 +466,7 @@ def list_device_credentials(device_id: int) -> list[ClientDeployment]:
             """,
             (device_id,),
         ).fetchall()
-    return [
+    result = [
         ClientDeployment(
             engine=str(row["engine"]),
             status=str(row["status"]),
@@ -431,6 +476,9 @@ def list_device_credentials(device_id: int) -> list[ClientDeployment]:
         )
         for row in rows
     ]
+    if cache is not None:
+        cache[device_id] = result
+    return list(result)
 
 
 def list_client_deployments(client_id: int) -> list[ClientDeployment]:
@@ -444,6 +492,27 @@ def count_clients() -> int:
     with connect() as connection:
         row = connection.execute("SELECT COUNT(*) AS total FROM clients").fetchone()
     return int(row["total"])
+
+
+def client_activity_counts() -> dict[str, int]:
+    """Return dashboard client/device counters without hydrating catalogue rows."""
+    init_db()
+    with connect() as connection:
+        row = connection.execute(
+            """
+            SELECT
+                (SELECT COUNT(*) FROM clients) AS total,
+                (SELECT COUNT(*) FROM clients WHERE enabled = 1) AS enabled,
+                (SELECT COUNT(*) FROM devices) AS devices_total,
+                (SELECT COUNT(*) FROM devices WHERE enabled = 1) AS devices_enabled
+            """
+        ).fetchone()
+    return {
+        "total": int(row["total"] or 0),
+        "enabled": int(row["enabled"] or 0),
+        "devices_total": int(row["devices_total"] or 0),
+        "devices_enabled": int(row["devices_enabled"] or 0),
+    }
 
 
 def count_devices() -> int:
@@ -534,11 +603,61 @@ def create_device(
 
 
 
-def device_access_tokens(device_id: int) -> list[str]:
-    """Return the exact form tokens currently assigned to one device."""
+def _request_device_credentials_cache() -> dict[int, list[ClientDeployment]] | None:
+    try:
+        from flask import g, has_request_context
+    except ImportError:
+        return None
+    if not has_request_context():
+        return None
+    cache = getattr(g, "_sg_device_credentials_cache", None)
+    if cache is None:
+        cache = {}
+        setattr(g, "_sg_device_credentials_cache", cache)
+    return cache
+
+
+def device_deployments_map(client_id: int) -> dict[int, list[ClientDeployment]]:
+    """Load all device credentials for a client in one query and reuse them in this request."""
+    init_db()
+    with connect() as connection:
+        rows = connection.execute(
+            """
+            SELECT d.id AS device_id, dc.engine, dc.status, dc.engine_object_id, dc.config_json
+            FROM devices d
+            LEFT JOIN device_credentials dc ON dc.device_id = d.id
+            WHERE d.client_id = ?
+            ORDER BY d.id, dc.engine
+            """,
+            (client_id,),
+        ).fetchall()
+
+    result: dict[int, list[ClientDeployment]] = {}
+    for row in rows:
+        device_id = int(row["device_id"])
+        bucket = result.setdefault(device_id, [])
+        if row["engine"] is None:
+            continue
+        bucket.append(
+            ClientDeployment(
+                engine=str(row["engine"]),
+                status=str(row["status"]),
+                engine_object_id=row["engine_object_id"],
+                config_json=row["config_json"],
+                device_id=device_id,
+            )
+        )
+    cache = _request_device_credentials_cache()
+    if cache is not None:
+        cache.update(result)
+    return result
+
+
+def deployment_access_tokens(credentials: list[ClientDeployment]) -> list[str]:
+    """Return form tokens from already-loaded credentials."""
     result: list[str] = []
     reverse_profiles = {value: key for key, value in XRAY_PROFILE_TOKENS.items()}
-    for credential in list_device_credentials(device_id):
+    for credential in credentials:
         if credential.engine == "xray":
             try:
                 payload = json.loads(credential.config_json or "{}")
@@ -555,6 +674,11 @@ def device_access_tokens(device_id: int) -> list[str]:
         if credential.engine in SUPPORTED_ENGINES and credential.engine not in result:
             result.append(credential.engine)
     return result
+
+
+def device_access_tokens(device_id: int) -> list[str]:
+    """Return the exact form tokens currently assigned to one device."""
+    return deployment_access_tokens(list_device_credentials(device_id))
 
 
 def _client_name_exists_except(connection, clean_name: str, client_id: int) -> bool:

@@ -24,11 +24,28 @@ _PROFILE_SPECS = (
     ("mieru", "mihomo", "mieru", "Mieru", "mieru", "uri"),
     ("anytls", "anytls", "anytls", "AnyTLS", "anytls", "uri"),
     ("tuic", "tuic", "tuic", "TUIC v5", "tuic", "uri"),
+    ("naiveproxy", "naiveproxy", "naiveproxy", "NaiveProxy", "naiveproxy", "uri"),
+)
+
+_COMPATIBLE_PROFILE_IDS = (
+    "xray_reality_tcp",
+    "xray_xhttp_reality",
+    "xray_xhttp_tls",
+    "xray_hysteria2",
+    "mieru",
+    "anytls",
+    "tuic",
+    "naiveproxy",
 )
 
 
 def canonical_profile_ids() -> tuple[str, ...]:
     return tuple(item[0] for item in _PROFILE_SPECS)
+
+
+def compatible_profile_ids() -> tuple[str, ...]:
+    """Return the exact SG Client-compatible subscription profile contract."""
+    return _COMPATIBLE_PROFILE_IDS
 
 
 def _canonical_uri(profile_id: str, value: str) -> str:
@@ -225,13 +242,18 @@ def _config_marker(profile: dict, device: dict, client_name: str) -> str:
     return "# SG-CONFIG " + json.dumps(metadata, ensure_ascii=False, separators=(",", ":"))
 
 
-
 def _ready_uri_lines(document: dict) -> list[str]:
     client_name = str((document.get("client") or {}).get("name") or "SG")
+    allowed = set(compatible_profile_ids())
     lines: list[str] = []
     for device in document.get("devices", []):
         for profile in device.get("profiles", []):
-            if not profile.get("ready") or profile.get("format") != "uri" or not profile.get("uri"):
+            if (
+                profile.get("id") not in allowed
+                or not profile.get("ready")
+                or profile.get("format") != "uri"
+                or not profile.get("uri")
+            ):
                 continue
             label = _subscription_label(
                 client_name,
@@ -242,10 +264,12 @@ def _ready_uri_lines(document: dict) -> list[str]:
     return lines
 
 
+
 def build_compatible_subscription_body(client: Client) -> str:
-    """Return the proven v2rayN-style Base64 transport for all ready URI profiles."""
+    """Return the URI-only compatible Base64 subscription transport."""
     document = build_sg_subscription_document(client)
-    decoded = "\n".join(_ready_uri_lines(document))
+    lines = _ready_uri_lines(document)
+    decoded = "\n".join(lines)
     if decoded:
         decoded += "\n"
     return base64.b64encode(decoded.encode("utf-8")).decode("ascii")

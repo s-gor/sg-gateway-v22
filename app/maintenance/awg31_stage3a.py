@@ -10,10 +10,6 @@ import tempfile
 from pathlib import Path
 
 from app.maintenance.awg31_stage3a_common import (
-    AWG3_GO_FILE,
-    AWG3_GO_SHA256,
-    AWG3_TOOLS_FILE,
-    AWG3_TOOLS_SHA256,
     AWG31_GO_FILE,
     AWG31_GO_SHA256,
     AWG31_TOOLS_FILE,
@@ -80,21 +76,8 @@ class Stage3AInstaller(RuntimeMixin, DataMixin):
         replacements: list[Replacement] = []
         connection: sqlite3.Connection | None = None
         committed = False
-        preserve_awg3_runtime = (
-            self.layout.awg3_runtime.exists()
-            or self.layout.awg3_runtime.is_symlink()
-        )
         try:
             vendor, deploy = self._copy_install_media(work)
-            awg3_runtime = self._build_runtime(
-                work=work,
-                vendor=vendor,
-                tools_file=AWG3_TOOLS_FILE,
-                go_file=AWG3_GO_FILE,
-                tools_sha=AWG3_TOOLS_SHA256,
-                go_sha=AWG3_GO_SHA256,
-                name="awg3",
-            )
             awg31_runtime = self._build_runtime(
                 work=work,
                 vendor=vendor,
@@ -126,20 +109,11 @@ class Stage3AInstaller(RuntimeMixin, DataMixin):
                 server_public=server_public,
             )
 
-            if not preserve_awg3_runtime:
-                replacements.append(
-                    self._replace(self.layout.awg3_runtime, awg3_runtime, backups)
-                )
             replacements.append(self._replace(self.layout.awg31_runtime, awg31_runtime, backups))
             replacements.append(self._replace(self.layout.config, config, backups))
             replacements.append(self._replace(self.layout.state, state, backups))
             self.layout.vendor.mkdir(parents=True, exist_ok=True)
-            for filename in (
-                AWG3_TOOLS_FILE,
-                AWG3_GO_FILE,
-                AWG31_TOOLS_FILE,
-                AWG31_GO_FILE,
-            ):
+            for filename in (AWG31_TOOLS_FILE, AWG31_GO_FILE):
                 replacements.append(
                     self._replace(self.layout.vendor / filename, vendor / filename, backups)
                 )
@@ -155,8 +129,6 @@ class Stage3AInstaller(RuntimeMixin, DataMixin):
             self.os.run("systemctl", "daemon-reload")
             self.os.run("systemctl", "enable", SERVICE)
             self.os.run("systemctl", "restart", SERVICE)
-            if not preserve_awg3_runtime and self.layout.awg3_unit.is_file():
-                self.os.run("systemctl", "try-restart", "sg-gateway-awg3.service")
             connection.commit()
             committed = True
             total = connection.execute(
@@ -176,9 +148,6 @@ class Stage3AInstaller(RuntimeMixin, DataMixin):
             self._rollback(replacements)
             with contextlib.suppress(RuntimeError):
                 self.os.run("systemctl", "daemon-reload")
-            if not preserve_awg3_runtime and self.layout.awg3_unit.is_file():
-                with contextlib.suppress(RuntimeError):
-                    self.os.run("systemctl", "try-restart", "sg-gateway-awg3.service")
             raise
         finally:
             if connection is not None:
@@ -233,6 +202,7 @@ def main(argv: list[str] | None = None) -> int:
     os.environ["SG_GATEWAY_DATA_DIR"] = str(database.parent)
     installer = Stage3AInstaller(source_root=args.source_root, root=args.root)
     if args.command == "migrate":
+        # Historical hook is now a compatibility no-op; AWG3.0 is retired.
         seeded_awg3_created = ensure_seeded_admin_awg3(database=database)
         result = installer.migrate(database=database)
         if os.environ.get("SG_GATEWAY_UPDATE_CORE_LIBRARY_ONLY") != "1":

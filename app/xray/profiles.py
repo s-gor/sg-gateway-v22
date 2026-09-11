@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import subprocess
+import time
 from dataclasses import dataclass
 from typing import Any
 
@@ -33,7 +34,7 @@ from app.xray.settings_transactions import (
 
 
 REALITY_TCP_FLOW = "xtls-rprx-vision"
-XRAY_MINIMUM_VERSION = "26.7.28"
+XRAY_MINIMUM_VERSION = "26.9.9"
 # Compatibility name used by older modules; the policy is minimum, not exact.
 XRAY_REQUIRED_VERSION = XRAY_MINIMUM_VERSION
 XHTTP_MODES = ("auto", "stream-one", "stream-up", "packet-up")
@@ -97,6 +98,12 @@ XHTTP_XMUX_RF = {
 
 class XrayProfilesError(RuntimeError):
     pass
+
+
+_XRAY_VERSION_PROBE_TTL_SECONDS = 10.0
+_XRAY_SERVICE_PROBE_TTL_SECONDS = 2.0
+_XRAY_VERSION_PROBE_CACHE: dict[str, object] = {"updated_at": 0.0, "value": None}
+_XRAY_SERVICE_PROBE_CACHE: dict[str, object] = {"updated_at": 0.0, "value": None}
 
 
 @dataclass(frozen=True)
@@ -174,23 +181,25 @@ def _fingerprint(value: Any, default: str = FINGERPRINT_DEFAULT) -> str:
 
 
 def _installed_xray_version() -> str:
+    now = time.monotonic()
+    cached = _XRAY_VERSION_PROBE_CACHE.get("value")
+    if isinstance(cached, str) and now - float(_XRAY_VERSION_PROBE_CACHE.get("updated_at") or 0.0) < _XRAY_VERSION_PROBE_TTL_SECONDS:
+        return cached
+    value = ""
     for binary in ("/usr/local/bin/xray", "xray"):
         try:
-            result = subprocess.run(
-                [binary, "version"],
-                capture_output=True,
-                text=True,
-                timeout=4,
-                check=False,
-            )
+            result = subprocess.run([binary, "version"], capture_output=True, text=True, timeout=4, check=False)
         except (OSError, subprocess.SubprocessError):
             continue
         first = (result.stdout or result.stderr or "").splitlines()
         if result.returncode == 0 and first:
             parts = first[0].split()
             if len(parts) >= 2:
-                return parts[1].lstrip("v")
-    return ""
+                value = parts[1].lstrip("v")
+                break
+    _XRAY_VERSION_PROBE_CACHE["updated_at"] = now
+    _XRAY_VERSION_PROBE_CACHE["value"] = value
+    return value
 
 
 def _version_key(value: str) -> tuple[int, ...]:
@@ -212,17 +221,18 @@ def _version_supported(installed: str) -> bool:
 
 
 def _service_active() -> bool:
+    now = time.monotonic()
+    cached = _XRAY_SERVICE_PROBE_CACHE.get("value")
+    if isinstance(cached, bool) and now - float(_XRAY_SERVICE_PROBE_CACHE.get("updated_at") or 0.0) < _XRAY_SERVICE_PROBE_TTL_SECONDS:
+        return cached
     try:
-        result = subprocess.run(
-            ["systemctl", "is-active", "--quiet", "xray.service"],
-            capture_output=True,
-            text=True,
-            timeout=4,
-            check=False,
-        )
+        result = subprocess.run(["systemctl", "is-active", "--quiet", "xray.service"], capture_output=True, text=True, timeout=4, check=False)
+        value = result.returncode == 0
     except (OSError, subprocess.SubprocessError):
-        return False
-    return result.returncode == 0
+        value = False
+    _XRAY_SERVICE_PROBE_CACHE["updated_at"] = now
+    _XRAY_SERVICE_PROBE_CACHE["value"] = value
+    return value
 
 
 def _config() -> tuple[Any, dict[str, Any], dict[str, Any]]:

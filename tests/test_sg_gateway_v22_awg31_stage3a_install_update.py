@@ -13,8 +13,6 @@ import pytest
 # mihomo import.
 from app.clients import repository as _repository  # noqa: F401
 from app.maintenance.awg31_stage3a import (
-    AWG3_GO_SHA256,
-    AWG3_TOOLS_SHA256,
     AWG31_GO_SHA256,
     AWG31_TOOLS_SHA256,
     Stage3AInstaller,
@@ -209,23 +207,19 @@ def test_clean_install_creates_isolated_awg31_runtime_paths_and_service(provisio
     assert ("systemctl", "daemon-reload") in fake.commands
     assert ("systemctl", "enable", "sg-gateway-awg31.service") in fake.commands
     assert ("systemctl", "restart", "sg-gateway-awg31.service") in fake.commands
-    assert ("systemctl", "try-restart", "sg-gateway-awg3.service") in fake.commands
+    assert not any("sg-gateway-awg3.service" in command for command in fake.commands)
     for path, expected_body in preserved_files.items():
         assert path.read_text() == expected_body
 
 
-def test_runtime_sources_are_sha_verified_and_awg3_30_is_separate(provisioned) -> None:
+def test_runtime_sources_are_sha_verified_and_only_awg31_is_installed(provisioned) -> None:
     root, _, _, _, _, _, _ = provisioned
     vendor = root / "opt/sg-gateway/vendor/cores"
     assert _sha256(vendor / "amneziawg-tools-3.1.20260812.tar.gz") == AWG31_TOOLS_SHA256
     assert _sha256(vendor / "amneziawg-go-linux-amd64-v3.1.20260814") == AWG31_GO_SHA256
-    assert _sha256(vendor / "amneziawg-tools-3.0.20260805.tar.gz") == AWG3_TOOLS_SHA256
-    assert _sha256(vendor / "amneziawg-go-linux-amd64-v3.0.0") == AWG3_GO_SHA256
     awg31_version = os.popen(str(root / "opt/sg-gateway/awg31/bin/awg") + " --version").read()
-    awg3_version = os.popen(str(root / "opt/sg-gateway/awg3/bin/awg") + " --version").read()
     assert "3.1.20260812" in awg31_version
-    assert "3.0.20260805" in awg3_version
-    assert (root / "opt/sg-gateway/awg31").resolve() != (root / "opt/sg-gateway/awg3").resolve()
+    assert not (root / "opt/sg-gateway/awg3").exists()
 
 
 def test_migration_preserves_awg2_awg3_and_existing_awg31_keys_idempotently(provisioned) -> None:
@@ -244,7 +238,7 @@ def test_migration_preserves_awg2_awg3_and_existing_awg31_keys_idempotently(prov
     assert second.created_credentials == 0
     assert after_second == after_first
     assert _rows(database, ("amneziawg", "amneziawg3")) == before_legacy
-    assert fake.commands.count(("systemctl", "try-restart", "sg-gateway-awg3.service")) == 1
+    assert not any("sg-gateway-awg3.service" in command for command in fake.commands)
     for path, expected_body in preserved_files.items():
         assert path.read_text() == expected_body
 
