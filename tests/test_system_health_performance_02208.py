@@ -55,6 +55,7 @@ def test_connection_health_reads_settings_in_one_batch(monkeypatch):
         health,
         "get_connection_settings",
         lambda *_: (_ for _ in ()).throw(AssertionError("health must not open settings DB per engine")),
+        raising=False,
     )
     monkeypatch.setattr(
         health,
