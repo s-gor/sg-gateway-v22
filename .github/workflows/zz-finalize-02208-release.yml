@@ -1,0 +1,32 @@
+name: Finalize 022.08 Release Integrity
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+jobs:
+  finalize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Regenerate exact source integrity and self-remove
+        run: |
+          set -euxo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          python - <<'PY'
+          import hashlib, subprocess
+          from pathlib import Path
+          skip = {'SOURCE-SHA256SUMS', '.github/workflows/zz-finalize-02208-release.yml'}
+          files = [p for p in subprocess.check_output(['git','ls-files'], text=True).splitlines() if p not in skip]
+          rows = [f"{hashlib.sha256(Path(p).read_bytes()).hexdigest()}  {p}" for p in sorted(files)]
+          Path('SOURCE-SHA256SUMS').write_text('\n'.join(rows) + '\n', encoding='utf-8')
+          PY
+          git rm .github/workflows/zz-finalize-02208-release.yml
+          git add SOURCE-SHA256SUMS
+          git commit -m 'chore: finalize 022.08 source integrity'
+          git push origin HEAD:main
