@@ -33,7 +33,11 @@ def test_02208_release_publication_contract_exists_and_is_pinned():
     assert 'test "$(cat BUILD-ID)" = "MAIN-02208-STABLE"' in workflow
     assert 'manifest["channel"] == "stable-02208"' in workflow
     assert "python -m playwright install --with-deps chromium" in workflow
-    assert "python -m pytest tests" in workflow
+    assert "Run current 022.08 release contract" in workflow
+    assert "tests/test_awg31_only_cleanup_02208.py" in workflow
+    assert "tests/test_retired_awg2_awg3_02208.py" in workflow
+    assert "tests/test_page_runtime_performance_02208.py" in workflow
+    assert "tests/test_update_runtime_preservation_contract.py" in workflow
     assert "PUBLICATION-02208.md" in workflow
 
     assert "0.1.0-022.08" in publication
