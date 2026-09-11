@@ -41,6 +41,20 @@ UNINSTALLER="$SOURCE_DIR/deploy/full-uninstall-ubuntu.sh"
 [[ -f "$UNINSTALLER" ]] || fail "deploy/full-uninstall-ubuntu.sh is missing from the GitHub archive"
 [[ -f "$SOURCE_DIR/VERSION" ]] || fail "VERSION is missing from the GitHub archive"
 
+# Keep the post-uninstall reinstall hint identical to the public verified Clean Install command.
+python3 - "$UNINSTALLER" <<'PY'
+from pathlib import Path
+import sys
+
+path = Path(sys.argv[1])
+body = path.read_text(encoding="utf-8")
+old = "curl -4 -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/stable-02208/deploy/install-from-github.sh | sudo env SG_GATEWAY_GITHUB_BRANCH=stable-02208 bash"
+new = "curl -4 -fsSL https://raw.githubusercontent.com/s-gor/sg-gateway-v22/d87663737746b91237098342f9c6c1d37856c88c/deploy/install-from-github.sh | sudo env SG_GATEWAY_GITHUB_BRANCH=stable-02208 SG_GATEWAY_SOURCE_COMMIT=d87663737746b91237098342f9c6c1d37856c88c bash"
+if old not in body:
+    raise SystemExit("expected reinstall hint not found in full uninstaller")
+path.write_text(body.replace(old, new, 1), encoding="utf-8")
+PY
+
 printf '[SG-Gateway] GitHub source version: %s\n' "$(tr -d '\r\n' < "$SOURCE_DIR/VERSION")"
 printf '[SG-Gateway] Starting the official FULL uninstaller...\n'
 bash "$UNINSTALLER"
