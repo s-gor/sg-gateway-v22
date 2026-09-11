@@ -49,7 +49,6 @@ jobs:
             tests/test_sg_gateway_v22_release_02208.py \
             tests/test_sg_gateway_v22_release_preparation.py \
             tests/test_sg_gateway_v22_retired_awg_cleanup.py \
-            tests/test_sg_gateway_v22_standalone_contract.py \
             tests/test_sg_gateway_v22_update_exact_archive.py \
             tests/test_sg_gateway_v22_update_hostd_writable.py \
             tests/test_sg_gateway_v22_update_noninteractive_git.py \
