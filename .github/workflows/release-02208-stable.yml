@@ -3,9 +3,6 @@ name: Release 0.1.0-022.08 Final
 on:
   push:
     branches: [main]
-    paths:
-      - ".github/workflows/release-02208-stable.yml"
-      - "SOURCE-SHA256SUMS"
   workflow_dispatch:
 
 permissions:
