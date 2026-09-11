@@ -45,7 +45,24 @@ def test_health_summary_reuses_recent_expensive_scan(monkeypatch):
         calls += 1
         return [health.HealthCheck("test", "ok", "ok")]
 
+    health._HEALTH_SUMMARY_CACHE.update({"updated_at": 0.0, "value": None})
     monkeypatch.setattr(health, "collect_health_checks", fake_checks)
     assert health.health_summary() == "ok"
     assert health.health_summary() == "ok"
     assert calls == 1
+
+
+def test_cached_navigation_health_never_starts_full_scan(monkeypatch):
+    from app.maintenance import health
+
+    health._HEALTH_SUMMARY_CACHE.update({"updated_at": 0.0, "value": "warning"})
+    monkeypatch.setattr(
+        health,
+        "collect_health_checks",
+        lambda: (_ for _ in ()).throw(AssertionError("ordinary page navigation must not start full health scan")),
+    )
+
+    assert health.cached_health_summary() == "warning"
+
+    health._HEALTH_SUMMARY_CACHE.update({"updated_at": 0.0, "value": None})
+    assert health.cached_health_summary() == "warning"
