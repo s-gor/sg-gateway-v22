@@ -1,0 +1,20 @@
+name: Temporary Reality Restore Regression
+
+on:
+  push:
+    branches:
+      - fix/02208-reality-restore-runtime
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -r requirements-dev.txt
+      - name: Reality restore regression
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q tests/test_clients_keys_reality_restore_runtime_02208.py
