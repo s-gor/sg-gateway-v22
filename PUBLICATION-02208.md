@@ -12,10 +12,10 @@
 
 ```bash
 curl -4 -fsSL \
-  https://raw.githubusercontent.com/s-gor/sg-gateway-v22/dfe760756636f675934a4f085f7ddd35f336d4a7/deploy/install-from-github.sh \
+  https://raw.githubusercontent.com/s-gor/sg-gateway-v22/d87663737746b91237098342f9c6c1d37856c88c/deploy/install-from-github.sh \
 | sudo env \
   SG_GATEWAY_GITHUB_BRANCH=stable-02208 \
-  SG_GATEWAY_SOURCE_COMMIT=dfe760756636f675934a4f085f7ddd35f336d4a7 \
+  SG_GATEWAY_SOURCE_COMMIT=d87663737746b91237098342f9c6c1d37856c88c \
   bash
 ```
 
@@ -84,7 +84,7 @@ Legacy runtime **AWG 2.0** и **AWG 3.0** выведен из эксплуата
 
 Проверенный production source Clean Install:
 
-`dfe760756636f675934a4f085f7ddd35f336d4a7`
+`d87663737746b91237098342f9c6c1d37856c88c`
 
 ## Для кого этот выпуск
 
