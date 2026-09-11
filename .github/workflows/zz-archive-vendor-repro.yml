@@ -1,0 +1,44 @@
+name: Temporary Archive Vendor Repro
+on:
+  push:
+    branches: [ feature/02208-performance-clients ]
+permissions:
+  contents: write
+jobs:
+  repro:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/02208-performance-clients
+          fetch-depth: 0
+      - name: Reproduce exact installer archive vendor verification
+        run: |
+          set -euxo pipefail
+          target=83318454eebc6840c4159046988df5f7ad40b5f9
+          work="$(mktemp -d)"
+          curl -fsSL --retry 3 "https://github.com/s-gor/sg-gateway-v22/archive/${target}.tar.gz" -o "$work/source.tar.gz"
+          mkdir "$work/source"
+          tar -xzf "$work/source.tar.gz" -C "$work/source" --strip-components=1
+          cd "$work/source/vendor/cores"
+          echo '=== files ==='
+          ls -lh
+          echo '=== checksums ==='
+          sha256sum -c SHA256SUMS
+          echo '=== archive integrity ==='
+          unzip -tqq Xray-linux-64.zip
+          gzip -t mihomo-linux-amd64-v1.19.29.gz
+          tar -tzf sing-box-1.13.14-linux-amd64.tar.gz >/dev/null
+          zstd -tq wgcf-cli-linux-64.tar.zstd
+          tar -tzf amneziawg-tools-1.0.20260618-2.tar.gz >/dev/null
+          tar -tzf amneziawg-linux-kernel-module-1.0.20260329-2.tar.gz >/dev/null
+          tar -tzf amneziawg-tools-3.0.20260805.tar.gz >/dev/null
+          test -s amneziawg-go-linux-amd64-v3.0.0
+      - name: Remove temporary repro workflow
+        if: always()
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/zz-archive-vendor-repro.yml
+          git commit -m 'test: remove archive vendor repro' || true
+          git push origin HEAD:feature/02208-performance-clients
