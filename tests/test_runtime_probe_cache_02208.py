@@ -5,7 +5,8 @@ def test_xray_os_probes_reuse_recent_results(monkeypatch):
     from app.xray import profiles
 
     calls = []
-    profiles._XRAY_PROBE_CACHE.clear()
+    profiles._XRAY_VERSION_PROBE_CACHE.update({"updated_at": 0.0, "value": None})
+    profiles._XRAY_SERVICE_PROBE_CACHE.update({"updated_at": 0.0, "value": None})
 
     def fake_run(args, **kwargs):
         calls.append(tuple(args))
