@@ -24,6 +24,7 @@ from app.clients.awg31_stage2 import register_awg31
 from app.clients.runtime import ClientWorkflowError, apply_clients_runtime
 from app.clients.repository import (
     count_clients,
+    client_activity_counts,
     device_access_tokens,
     create_client,
     create_device,
@@ -608,11 +609,8 @@ def _sg_gateway_server_identity(config) -> dict:
     configured_code = normalize_country_code(getattr(config, "country_code", "unknown"))
     code = configured_code
     try:
-        connections = list_connections()
-        selected = connections[0] if connections else None
-        if selected is not None:
-            settings = get_connection_settings(selected.name)
-            address = settings.host or address
+        settings = get_connection_settings("amneziawg31")
+        address = settings.host or address
         if code == "unknown":
             code = lookup_country_code(address)
     except Exception:
@@ -778,10 +776,11 @@ def create_app() -> Flask:
 
     @app.get("/recovery")
     def recovery():
+        health_checks = collect_health_checks()
         return render_template(
             "recovery.html",
-            health=health_summary(),
-            health_checks=collect_health_checks(),
+            health=_health_summary_from_checks(health_checks),
+            health_checks=health_checks,
             backups=list_backups()[:5],
             requested_restore=request.args.get("restore", ""),
         )
@@ -2115,13 +2114,7 @@ def create_app() -> Flask:
     @app.get("/api/system/activity")
     def system_activity_api():
         activity = collect_system_activity()
-        clients = list_clients()
-        activity["clients"] = {
-            "total": len(clients),
-            "enabled": sum(1 for client in clients if bool(getattr(client, "enabled", False))),
-            "devices_total": sum(int(getattr(client, "device_count", 0) or 0) for client in clients),
-            "devices_enabled": sum(int(getattr(client, "active_device_count", 0) or 0) for client in clients),
-        }
+        activity["clients"] = client_activity_counts()
         return jsonify(activity)
 
     @app.get("/api/status")

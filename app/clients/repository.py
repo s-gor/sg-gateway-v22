@@ -488,6 +488,27 @@ def count_clients() -> int:
     return int(row["total"])
 
 
+def client_activity_counts() -> dict[str, int]:
+    """Return dashboard client/device counters without hydrating catalogue rows."""
+    init_db()
+    with connect() as connection:
+        row = connection.execute(
+            """
+            SELECT
+                (SELECT COUNT(*) FROM clients) AS total,
+                (SELECT COUNT(*) FROM clients WHERE enabled = 1) AS enabled,
+                (SELECT COUNT(*) FROM devices) AS devices_total,
+                (SELECT COUNT(*) FROM devices WHERE enabled = 1) AS devices_enabled
+            """
+        ).fetchone()
+    return {
+        "total": int(row["total"] or 0),
+        "enabled": int(row["enabled"] or 0),
+        "devices_total": int(row["devices_total"] or 0),
+        "devices_enabled": int(row["devices_enabled"] or 0),
+    }
+
+
 def count_devices() -> int:
     init_db()
     with connect() as connection:
