@@ -5,6 +5,7 @@ def test_xray_os_probes_reuse_recent_results(monkeypatch):
     from app.xray import profiles
 
     calls = []
+    profiles._XRAY_PROBE_CACHE.clear()
 
     def fake_run(args, **kwargs):
         calls.append(tuple(args))
@@ -24,6 +25,7 @@ def test_tls_systemctl_probes_reuse_recent_results(monkeypatch):
     from app.security import tls
 
     calls = []
+    tls._clear_service_probe_cache()
 
     def fake_run(args, **kwargs):
         calls.append(tuple(args))
