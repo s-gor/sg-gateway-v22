@@ -16,5 +16,5 @@ jobs:
       - run: python -m pip install -r requirements-dev.txt
       - name: Reality restore regression
         env:
-          PYTHONPATH: .
+          PYTHONPATH: .:hostd
         run: python -m pytest -q tests/test_clients_keys_reality_restore_runtime_02208.py
