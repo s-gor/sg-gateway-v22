@@ -56,7 +56,7 @@ def test_exports_can_reuse_supplied_xray_overview(monkeypatch):
     assert profile is state["profiles"][0]
 
 
-def test_client_detail_batches_protocol_tokens_for_all_devices(monkeypatch):
+def test_client_detail_batches_credentials_for_all_devices(monkeypatch):
     import app.main as main
 
     client = Client(1, "client", True, None, "missing", "missing")
@@ -64,19 +64,40 @@ def test_client_detail_batches_protocol_tokens_for_all_devices(monkeypatch):
         Device(2, 1, "main", True, None, True, "now"),
         Device(3, 1, "phone", True, None, False, "now"),
     ]
+    deployments = {
+        2: [ClientDeployment("amneziawg31", "applied", None, "{}", 2)],
+        3: [ClientDeployment("xray", "applied", None, json.dumps({"profiles": ["reality_tcp"]}), 3)],
+    }
     token_map = {2: ["amneziawg31"], 3: ["xray_reality_tcp"]}
+    calls = {"batch": 0, "tokens": 0, "cards": 0}
 
     monkeypatch.setattr(main, "get_client", lambda client_id: client)
     monkeypatch.setattr(main, "list_devices", lambda client_id: devices)
     monkeypatch.setattr(main, "xray_profiles_overview", lambda: {"profiles": []})
     monkeypatch.setattr(main, "security_tls_overview", lambda: {})
-    monkeypatch.setattr(main, "build_access_cards", lambda *args, **kwargs: [])
     monkeypatch.setattr(
         main,
         "device_access_tokens",
         lambda *_: (_ for _ in ()).throw(AssertionError("per-device credential query must not run")),
     )
-    monkeypatch.setattr(main, "device_access_tokens_map", lambda client_id: token_map, raising=False)
+
+    def batch(client_id):
+        calls["batch"] += 1
+        assert client_id == 1
+        return deployments
+
+    def tokens(rows):
+        calls["tokens"] += 1
+        device_id = rows[0].device_id
+        return token_map[device_id]
+
+    def cards(*args, **kwargs):
+        calls["cards"] += 1
+        return []
+
+    monkeypatch.setattr(main, "device_deployments_map", batch, raising=False)
+    monkeypatch.setattr(main, "deployment_access_tokens", tokens, raising=False)
+    monkeypatch.setattr(main, "build_access_cards", cards)
     monkeypatch.setattr(main, "render_template", lambda template, **context: (template, context))
 
     with main.app.test_request_context("/clients/1"):
@@ -87,3 +108,4 @@ def test_client_detail_batches_protocol_tokens_for_all_devices(monkeypatch):
         ["amneziawg31"],
         ["xray_reality_tcp"],
     ]
+    assert calls == {"batch": 1, "tokens": 2, "cards": 2}
