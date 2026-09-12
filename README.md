@@ -34,10 +34,10 @@
 
 ```bash
 curl -4 -fsSL \
-  https://raw.githubusercontent.com/s-gor/sg-gateway-v22/d87663737746b91237098342f9c6c1d37856c88c/deploy/install-from-github.sh \
+  https://raw.githubusercontent.com/s-gor/sg-gateway-v22/6d8b07125289566a6e8a7ba206094d8969e92125/deploy/install-from-github.sh \
 | sudo env \
   SG_GATEWAY_GITHUB_BRANCH=stable-02208 \
-  SG_GATEWAY_SOURCE_COMMIT=d87663737746b91237098342f9c6c1d37856c88c \
+  SG_GATEWAY_SOURCE_COMMIT=6d8b07125289566a6e8a7ba206094d8969e92125 \
   bash
 ```
 
