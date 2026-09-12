@@ -249,9 +249,9 @@ def install() -> None:
             return build_naiveproxy_link(client, device)
         return original_build_export(client, kind, device)
 
-    def protocol_ready(client, kind: str, device=None) -> bool:
+    def protocol_ready(client, kind: str, device=None, *, xray_state=None) -> bool:
         if kind != "naiveproxy":
-            return original_protocol_ready(client, kind, device)
+            return original_protocol_ready(client, kind, device, xray_state=xray_state)
         try:
             return bool(
                 exports.is_export_ready(client, "naiveproxy", device)
