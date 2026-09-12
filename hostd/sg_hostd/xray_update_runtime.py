@@ -188,6 +188,22 @@ def _test_config(binary: Path) -> None:
     _run([str(binary), "run", "-test", "-config", str(XRAY_CONFIG)], timeout=120)
 
 
+def _regenerate_xray_config() -> None:
+    # The profiles module caches the binary version for a few seconds. Recovery
+    # replaces /usr/local/bin/xray in-place, so invalidate that cache before the
+    # normal SG renderer evaluates profile readiness against the new binary.
+    from app.xray import profiles as xray_profiles
+    from sg_hostd.client_runtime import _apply_xray
+
+    xray_profiles._XRAY_VERSION_PROBE_CACHE["updated_at"] = 0.0
+    xray_profiles._XRAY_VERSION_PROBE_CACHE["value"] = None
+    result = _apply_xray(force_profiles=True)
+    if not getattr(result, "ok", False):
+        raise XrayUpdateRuntimeError(
+            getattr(result, "message", "Не удалось перегенерировать Xray config.json")
+        )
+
+
 def _write_result(payload: dict[str, Any]) -> None:
     UPDATE_ROOT.mkdir(parents=True, exist_ok=True)
     temporary = LAST_RESULT.with_suffix(".json.new")
@@ -204,6 +220,13 @@ def _restore_binary(backup: Path) -> None:
     _run(["systemctl", "restart", "xray.service"], timeout=60)
     _run(["systemctl", "is-active", "--quiet", "xray.service"], timeout=30)
     _test_config(XRAY_BINARY)
+
+
+def _restore_recovery_state(binary_backup: Path, config_backup: Path | None) -> None:
+    if config_backup is not None and config_backup.is_file():
+        XRAY_CONFIG.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(config_backup, XRAY_CONFIG)
+    _restore_binary(binary_backup)
 
 
 def update_xray(channel: str) -> dict[str, Any]:
@@ -254,6 +277,7 @@ def update_xray(channel: str) -> dict[str, Any]:
         os.chmod(BACKUP_DIR, 0o750)
         timestamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
         backup = BACKUP_DIR / f"xray-v{installed}-{timestamp}"
+        config_backup = BACKUP_DIR / f"xray-config-v{installed}-{timestamp}.json"
         result_payload: dict[str, Any] = {
             "ok": False,
             "channel": channel,
@@ -284,11 +308,18 @@ def update_xray(channel: str) -> dict[str, Any]:
                 raise XrayUpdateRuntimeError(
                     f"Архив содержит Xray v{candidate_version or 'unknown'}, ожидалась v{target}"
                 )
-            print("[Xray Update 4/7] Проверяю текущий config.json новым бинарником", flush=True)
-            _test_config(candidate)
+
+            if recovery_upgrade:
+                print("[Xray Update 4/7] Recovery: новый config.json будет собран после установки candidate", flush=True)
+            else:
+                print("[Xray Update 4/7] Проверяю текущий config.json новым бинарником", flush=True)
+                _test_config(candidate)
 
             shutil.copy2(XRAY_BINARY, backup)
             os.chmod(backup, 0o750)
+            if recovery_upgrade and XRAY_CONFIG.is_file():
+                shutil.copy2(XRAY_CONFIG, config_backup)
+                os.chmod(config_backup, 0o640)
             staged = XRAY_BINARY.with_name("xray.sg-gateway-new")
             shutil.copy2(candidate, staged)
             os.chmod(staged, 0o755)
@@ -297,9 +328,13 @@ def update_xray(channel: str) -> dict[str, Any]:
             try:
                 os.replace(staged, XRAY_BINARY)
                 replaced = True
-                print("[Xray Update 6/7] Перезапускаю xray.service", flush=True)
-                _run(["systemctl", "restart", "xray.service"], timeout=60)
-                _run(["systemctl", "is-active", "--quiet", "xray.service"], timeout=30)
+                if recovery_upgrade:
+                    print("[Xray Update 6/7] Перегенерирую config.json для нового Xray", flush=True)
+                    _regenerate_xray_config()
+                else:
+                    print("[Xray Update 6/7] Перезапускаю xray.service", flush=True)
+                    _run(["systemctl", "restart", "xray.service"], timeout=60)
+                    _run(["systemctl", "is-active", "--quiet", "xray.service"], timeout=30)
                 running = _installed_version()
                 if running != target:
                     raise XrayUpdateRuntimeError(
@@ -311,7 +346,13 @@ def update_xray(channel: str) -> dict[str, Any]:
                 if replaced and backup.is_file():
                     print(f"[Xray Update] Автоматически возвращаю Xray v{installed}", flush=True)
                     try:
-                        _restore_binary(backup)
+                        if recovery_upgrade:
+                            _restore_recovery_state(
+                                backup,
+                                config_backup if config_backup.is_file() else None,
+                            )
+                        else:
+                            _restore_binary(backup)
                         print("[Xray Update] Откат завершён, прежняя версия снова работает", flush=True)
                     except Exception as rollback_exc:
                         raise XrayUpdateRuntimeError(

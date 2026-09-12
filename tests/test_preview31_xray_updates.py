@@ -135,3 +135,79 @@ def test_manifest_and_updates_ui_declare_safe_update_flow():
     assert "SHA-256" in template
     assert "_restore_binary" in runtime
     assert '"systemctl", "restart", "xray.service"' in runtime
+
+
+def test_recovery_upgrade_regenerates_config_before_testing_new_binary(monkeypatch, tmp_path):
+    binary = tmp_path / "xray"
+    config = tmp_path / "config.json"
+    update_root = tmp_path / "updates"
+    binary.write_text("old-binary", encoding="utf-8")
+    config.write_text("old-config", encoding="utf-8")
+
+    monkeypatch.setattr(xray_update_runtime, "XRAY_BINARY", binary)
+    monkeypatch.setattr(xray_update_runtime, "XRAY_CONFIG", config)
+    monkeypatch.setattr(xray_update_runtime, "UPDATE_ROOT", update_root)
+    monkeypatch.setattr(xray_update_runtime, "BACKUP_DIR", update_root / "backups")
+    monkeypatch.setattr(xray_update_runtime, "LOCK_FILE", tmp_path / "xray-update.lock")
+    monkeypatch.setattr(xray_update_runtime, "LAST_RESULT", update_root / "last-update.json")
+    monkeypatch.setattr(
+        xray_update_runtime,
+        "_latest_release",
+        lambda channel: {
+            "tag_name": "v26.9.9",
+            "assets": [{"name": "Xray-linux-64.zip", "browser_download_url": "https://example.invalid/xray.zip"}],
+        },
+    )
+    monkeypatch.setattr(xray_update_runtime, "_asset_filename", lambda: "Xray-linux-64.zip")
+    monkeypatch.setattr(
+        xray_update_runtime,
+        "_find_asset",
+        lambda release, name: {"name": name, "browser_download_url": "https://example.invalid/xray.zip"},
+    )
+    monkeypatch.setattr(xray_update_runtime, "_download", lambda url, path: path.write_bytes(b"archive"))
+    monkeypatch.setattr(xray_update_runtime, "_expected_digest", lambda *args: "digest")
+    monkeypatch.setattr(xray_update_runtime, "_sha256", lambda path: "digest")
+    monkeypatch.setattr(
+        xray_update_runtime,
+        "_extract_binary",
+        lambda archive, destination: destination.write_text("new-binary", encoding="utf-8"),
+    )
+
+    version_calls = {"live": 0}
+
+    def installed_version(path=None):
+        if path is not None and Path(path) != binary:
+            return "26.9.9"
+        version_calls["live"] += 1
+        return "26.7.28" if version_calls["live"] == 1 else "26.9.9"
+
+    monkeypatch.setattr(xray_update_runtime, "_installed_version", installed_version)
+    monkeypatch.setattr(
+        xray_update_runtime,
+        "_regenerate_xray_config",
+        lambda: config.write_text("new-config", encoding="utf-8"),
+        raising=False,
+    )
+
+    tested = []
+
+    def test_config(path):
+        tested.append((Path(path), config.read_text(encoding="utf-8")))
+        if config.read_text(encoding="utf-8") == "old-config":
+            raise xray_update_runtime.XrayUpdateRuntimeError("new Xray rejected old config")
+
+    monkeypatch.setattr(xray_update_runtime, "_test_config", test_config)
+    monkeypatch.setattr(
+        xray_update_runtime,
+        "_run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(args=args[0], returncode=0, stdout="", stderr=""),
+    )
+    monkeypatch.setattr(xray_update_runtime, "_write_result", lambda payload: None)
+    monkeypatch.setattr(xray_update_runtime, "log_operation", lambda *args, **kwargs: None)
+
+    result = xray_update_runtime.update_xray("prerelease")
+
+    assert result["ok"] is True
+    assert config.read_text(encoding="utf-8") == "new-config"
+    assert tested
+    assert all(body == "new-config" for _path, body in tested)
